@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 
-# Use the gem_template engine
-gem "gem_template", path: "../.."
+# Recording Studio AI addon under test
+gem "recording_studio_ai", path: "../.."
 
 # RecordingStudio engine
 gem "recording_studio", github: "bowerbird-app/RecordingStudio", tag: "recording_studio/v3.0.0"

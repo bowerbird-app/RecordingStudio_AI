@@ -6,6 +6,13 @@ require "devise/test/integration_helpers"
 class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
 
+  test "sign in page renders the addon branding" do
+    get new_user_session_path
+
+    assert_response :success
+    assert_includes response.body, "Recording Studio AI"
+  end
+
   test "home page renders the root switch dropdown trigger" do
     user = User.find_or_create_by!(email: "root-switch-test@example.com") do |record|
       record.password = "Password123!"
@@ -37,7 +44,7 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     get "/recording_studio_root_switchable/v1/root_switch?scope=all_workspaces"
 
     assert_response :success
-    assert_includes response.body, "Install"
+    assert_includes response.body, "Foundation"
   end
 
   test "switching returns to the current page when it is a valid internal route" do
@@ -57,11 +64,11 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
       scope: "all_workspaces",
       root_switch: {
         root_recording_id: target_root_recording.id,
-        return_to: "/docs/install"
+        return_to: "/"
       }
     }
 
-    assert_redirected_to "/docs/install"
+    assert_redirected_to "/"
   end
 
   test "switching falls back to home when return_to is not a valid internal route" do
