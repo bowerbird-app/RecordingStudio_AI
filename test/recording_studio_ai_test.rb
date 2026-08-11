@@ -11,15 +11,21 @@ class RecordingStudioAITest < Minitest::Test
     specification = Gem::Specification.load(File.expand_path("../recording_studio_ai.gemspec", __dir__))
     dependencies = specification.runtime_dependencies.to_h { |dependency| [dependency.name, dependency.requirement] }
 
-    assert_equal %w[rails recording_studio], dependencies.keys.sort
+    assert_equal %w[csv flat_pack json_schemer openai rails recording_studio], dependencies.keys.sort
   end
 
-  def test_phase_one_ships_no_addon_database_or_example_surfaces
+  def test_phase_six_ships_concrete_providers_without_example_surfaces
     root = File.expand_path("..", __dir__)
 
-    assert_empty Dir[File.join(root, "db/migrate/*.rb")]
-    assert_empty Dir[File.join(root, "lib/generators/recording_studio_ai/migrations/**/*.rb")]
-    assert_empty Dir[File.join(root, "lib/recording_studio_ai/adapters/**/*.rb")]
+    migration_files = Dir[File.join(root, "db/migrate/*.rb")]
+
+    assert_equal 3, migration_files.size
+    assert migration_files.any? { |file| file.include?("create_recording_studio_ai_persistence_tables") }
+    assert migration_files.any? { |file| file.include?("harden_recording_studio_ai_persistence") }
+    assert migration_files.any? { |file| file.include?("enforce_recording_studio_ai_history_integrity") }
+    assert File.exist?(File.join(root, "lib/recording_studio_ai/adapters/base.rb"))
+    assert File.exist?(File.join(root, "lib/recording_studio_ai/adapters/open_ai.rb"))
+    assert File.exist?(File.join(root, "lib/recording_studio_ai/adapters/gemini.rb"))
     refute File.exist?(File.join(root, "lib/recording_studio_ai/services/example_service.rb"))
     refute File.exist?(File.join(root, "app/controllers/recording_studio_ai/home_controller.rb"))
   end
@@ -39,7 +45,17 @@ class RecordingStudioAITest < Minitest::Test
 
     assert_includes home, 'title: "Recording Studio AI"'
     assert_includes home, "OpenAI or Gemini credentials can be supplied without selecting a provider."
-    assert_includes home, "No addon migrations or database tables are installed."
-    assert_includes home, "Generation behavior is intentionally deferred"
+    assert_includes home, "Addon migrations install six execution infrastructure tables."
+    assert_includes home, "Synchronous generation resolves OpenAI or Gemini"
+  end
+
+  def test_persistence_models_are_non_recordable_infrastructure
+    refute File.exist?(File.expand_path("../app/models/recording_studio_ai/home.rb", __dir__))
+    assert File.exist?(File.expand_path("../app/models/recording_studio_ai/run.rb", __dir__))
+    assert File.exist?(File.expand_path("../app/models/recording_studio_ai/attempt.rb", __dir__))
+    assert File.exist?(File.expand_path("../app/models/recording_studio_ai/custom_tool_invocation.rb", __dir__))
+    assert File.exist?(File.expand_path("../app/models/recording_studio_ai/batch.rb", __dir__))
+    assert File.exist?(File.expand_path("../app/models/recording_studio_ai/batch_item.rb", __dir__))
+    assert File.exist?(File.expand_path("../app/models/recording_studio_ai/response.rb", __dir__))
   end
 end

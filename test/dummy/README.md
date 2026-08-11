@@ -1,7 +1,7 @@
 # Recording Studio AI Dummy Host
 
-This Rails app validates the Phase 1 addon foundation in a real Recording
-Studio host application.
+This Rails app validates the complete V1 addon in a real Recording Studio host
+application.
 
 It covers:
 
@@ -10,9 +10,12 @@ It covers:
 - Devise authentication and `Current.actor` wiring
 - Recording Studio v3 recordable declarations and root recordings
 - Recording Studio's root switcher and FlatPack host layout
+- all six non-recordable addon infrastructure tables
+- the mounted, GET-only addon administration screens
+- fail-closed production configuration with an explicit demo-only authorization policy
 
-It intentionally contains no Recording Studio AI generation UI, generation
-endpoint, or addon database table.
+It intentionally contains no public generation controller or request-replay UI.
+Tests use injected provider clients; live generation requires provider credentials.
 
 ## Run the host
 
