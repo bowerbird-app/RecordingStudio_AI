@@ -1,0 +1,45 @@
+# frozen_string_literal: true
+
+RecordingStudioAdmin.configure do |config|
+  config.default_mount_path = "/admin"
+  config.engine_layout = "recording_studio_admin_blank"
+  config.authentication_method = :authenticate_user!
+  config.current_actor_method = :current_user
+
+  config.access_recording_resolver = lambda do |context|
+    context.controller.current_root_recording ||
+      RecordingStudio::Recording.where(parent_recording_id: nil).order(:created_at).first
+  end
+
+  config.admin_sections_resolver = lambda do |recording:, context:, **|
+    ["recording_studio_ai"]
+  end
+end
+
+module RecordingStudioAdminRootAnchorDefault
+  private
+
+  def page_nav_anchor_url(default: nil)
+    super(default: main_app.root_path)
+  end
+
+  def preserve_anchor_url(url)
+    safe_url = RecordingStudioAdmin::UrlSafety.safe_href(url)
+    return safe_url if safe_url.blank?
+    return safe_url if safe_url.start_with?("/admin/screens/")
+
+    super
+  end
+end
+
+Rails.application.config.to_prepare do
+  if defined?(RecordingStudioAdmin::ApplicationController) &&
+      !RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudioAdminRootAnchorDefault)
+    RecordingStudioAdmin::ApplicationController.prepend(RecordingStudioAdminRootAnchorDefault)
+  end
+
+  load Rails.root.join("app/admin/manifest.rb")
+  AdminScreens.load!
+  RecordingStudioAdmin.register_screen(AdminScreens::RecordingStudioAIOverviewScreen)
+  RecordingStudioAdmin.register_section(AdminScreens::RecordingStudioAISection)
+end

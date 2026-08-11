@@ -6,7 +6,7 @@ Rails.application.routes.draw do
   get "/recording_studio", to: redirect("/"), as: nil
   mount RecordingStudio::Engine, at: "/recording_studio"
   mount RecordingStudioRootSwitchable::Engine, at: "/recording_studio_root_switchable"
-  mount RecordingStudioAI::Engine, at: "/recording_studio_ai"
+  recording_studio_admin_for :admin, at: "/admin", root_section: :recording_studio_ai
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
@@ -19,5 +19,6 @@ Rails.application.routes.draw do
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
   # Defines the root path route ("/")
+  get "recording_tree", to: "recording_tree#show"
   root "home#index"
 end
