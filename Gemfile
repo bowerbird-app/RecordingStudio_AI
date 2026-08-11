@@ -7,6 +7,9 @@ source "https://rubygems.org"
 gem "recording_studio",
     github: "bowerbird-app/RecordingStudio",
     tag: "recording_studio/v3.0.0"
+gem "flat_pack",
+    github: "bowerbird-app/flatpack",
+    tag: "v0.1.129"
 
 gemspec
 
@@ -16,6 +19,7 @@ gem "sprockets-rails"
 group :development, :test do
   gem "debug"
   gem "simplecov", require: false
+  gem "sqlite3"
 end
 
 group :development do

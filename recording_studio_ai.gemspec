@@ -18,9 +18,13 @@ Gem::Specification.new do |spec|
   spec.metadata["rubygems_mfa_required"] = "true"
 
   spec.files = Dir.chdir(File.expand_path(__dir__)) do
-    Dir["{config,lib}/**/*", "CHANGELOG.md", "MIT-LICENSE", "README.md"]
+    Dir["{app,config,db,lib}/**/*", "CHANGELOG.md", "MIT-LICENSE", "README.md"]
   end
 
+  spec.add_dependency "json_schemer", "~> 2.4"
+  spec.add_dependency "csv", ">= 3.2"
+  spec.add_dependency "flat_pack", "~> 0.1"
+  spec.add_dependency "openai", "~> 0.78"
   spec.add_dependency "rails", ">= 8.1", "< 9.0"
   spec.add_dependency "recording_studio", "~> 3.0"
 end
