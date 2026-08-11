@@ -1,7 +1,7 @@
 <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Recording Studio AI",
-    subtitle: "Phase 1 foundation running inside a Recording Studio host.",
+    subtitle: "Synchronous provider execution inside a Recording Studio host.",
     variant: :h1
   ) %>
 
@@ -21,7 +21,7 @@
           <li>The <code>RecordingStudioAI</code> namespace is loaded.</li>
           <li>The isolated engine is mounted at <code>/recording_studio_ai</code>.</li>
           <li>OpenAI or Gemini credentials can be supplied without selecting a provider.</li>
-          <li>No addon migrations or database tables are installed.</li>
+          <li>Addon migrations install six execution infrastructure tables.</li>
         </ul>
       <% end %>
     <% end %>
@@ -41,7 +41,7 @@
           <li>Strict v3 recordable declarations are enabled.</li>
           <li>Authenticated users are assigned to <code>Current.actor</code>.</li>
           <li>Workspace, folder, and page records exercise root and child recordings.</li>
-          <li>Generation behavior is intentionally deferred to a later phase.</li>
+          <li>Synchronous generation resolves OpenAI or Gemini through shared contracts.</li>
         </ul>
       <% end %>
     <% end %>

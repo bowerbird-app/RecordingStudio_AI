@@ -1,0 +1,40 @@
+# frozen_string_literal: true
+
+module RecordingStudioAI
+  module Admin
+    module ApplicationHelper
+      def admin_status_style(status)
+        case status.to_s
+        when "completed" then :success
+        when "failed", "cancelled", "expired", "denied", "rejected" then :danger
+        when "running", "processing", "submitted" then :info
+        when "partially_completed", "awaiting_confirmation" then :warning
+        else :default
+        end
+      end
+
+      def admin_duration(milliseconds)
+        milliseconds.nil? ? "Unknown" : "#{number_with_delimiter(milliseconds)} ms"
+      end
+
+      def admin_tokens(value)
+        value.nil? ? "Unknown" : number_with_delimiter(value)
+      end
+
+      def admin_cost(microunits, currency, estimated = false)
+        return "Unknown" if microunits.nil?
+
+        amount = number_to_currency(microunits.to_f / 1_000_000, unit: currency.presence || "USD ")
+        estimated ? "#{amount} estimated" : amount
+      end
+
+      def admin_identity(type, id, snapshot = nil)
+        snapshot.presence || [type, id].compact.join(" #").presence || "Unknown"
+      end
+
+      def admin_json(value)
+        JSON.pretty_generate(value || {})
+      end
+    end
+  end
+end

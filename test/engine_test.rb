@@ -8,8 +8,10 @@ class EngineTest < Minitest::Test
     assert_equal "recording_studio_ai", RecordingStudioAI::Engine.engine_name
   end
 
-  def test_engine_has_no_phase_one_routes
-    assert_empty RecordingStudioAI::Engine.routes.routes
+  def test_engine_recognizes_admin_runs_route
+    load RecordingStudioAI::Engine.root.join("config/routes.rb")
+
+    assert_includes RecordingStudioAI::Engine.routes.routes.map(&:name), "admin_runs"
   end
 
   def test_recording_studio_dependency_is_loaded

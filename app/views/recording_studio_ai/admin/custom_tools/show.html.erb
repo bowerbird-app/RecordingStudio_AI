@@ -1,0 +1,31 @@
+<div class="mx-auto flex w-full max-w-7xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(title: "#{@definition.name} v#{@definition.version}", subtitle: @definition.key, variant: :h1) %>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+      <% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Definition", variant: :h3, class: "mb-0 pb-0") %><% end %>
+      <% card.body do %><dl class="space-y-4 text-sm"><div><dt class="opacity-70">Description</dt><dd><%= @definition.description %></dd></div><div><dt class="opacity-70">Use when</dt><dd><%= @definition.use_when %></dd></div><div><dt class="opacity-70">Do not use when</dt><dd><%= @definition.do_not_use_when %></dd></div><div><dt class="opacity-70">Returns</dt><dd><%= @definition.returns %></dd></div><div><dt class="opacity-70">Executor</dt><dd><%= @definition.executor_label %></dd></div><div><dt class="opacity-70">Safety</dt><dd><%= @definition.read_only ? "Read only" : "Writes" %>; destructive: <%= @definition.destructive ? "yes" : "no" %>; confirmation: <%= @definition.requires_confirmation ? "required" : "not required" %>; idempotent: <%= @definition.idempotent ? "yes" : "no" %></dd></div></dl><% if @definition.examples.present? %><p class="mt-4 text-sm"><span class="font-semibold">Examples:</span> <%= @definition.examples.to_json %></p><% end %><% end %>
+    <% end %>
+
+    <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+      <% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Parameters", subtitle: "Schema values and defaults", variant: :h3, class: "mb-0 pb-0") %><% end %>
+      <% card.body do %><% if @definition.parameters.any? %><dl class="space-y-4 text-sm"><% @definition.parameters.each do |parameter| %><div><dt class="font-semibold"><%= parameter[:name] %> · <%= parameter[:type] %><%= " · required" if parameter[:required] %></dt><dd class="opacity-70"><%= parameter[:description] %><%= " Allowed: #{parameter[:allowed_values].join(', ')}" if parameter[:allowed_values] %><%= " Default: #{parameter[:default]}" if parameter.key?(:default) %></dd></div><% end %></dl><% else %><p class="text-sm opacity-70">This tool has no parameters.</p><% end %><% end %>
+    <% end %>
+  </div>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+    <% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Recent calls", subtitle: "Latest 100 invocations; complete payloads and executor source are never shown.", variant: :h3, class: "mb-0 pb-0") %><% end %>
+    <% card.body do %>
+      <% if @invocations.any? %><div class="overflow-x-auto"><table class="w-full min-w-max text-left text-sm"><thead><tr class="border-b"><th class="p-3">Time / run</th><th class="p-3">Status</th><th class="p-3">Safety / confirmation</th><th class="p-3">Duration</th><th class="p-3">Digests / summaries</th><th class="p-3">Error</th></tr></thead><tbody><% @invocations.each do |invocation| %><% sensitive = @sensitive_roots[invocation.run.root_recording_id] %><tr class="border-b align-top"><td class="p-3"><%= invocation.created_at.to_fs(:short) %><br><%= link_to "Run #{invocation.run_id}", admin_run_path(invocation.run_id) %></td><td class="p-3"><%= render FlatPack::Badge::Component.new(text: invocation.status.humanize, style: admin_status_style(invocation.status), size: :sm) %></td><td class="p-3"><%= invocation.destructive? ? "Destructive" : (invocation.read_only? ? "Read only" : "Writes") %> / <%= invocation.confirmation_status.presence || "not required" %></td><td class="p-3"><%= admin_duration(invocation.latency_ms) %></td><td class="p-3"><%= sensitive ? [invocation.arguments_digest, invocation.result_digest, invocation.arguments_summary, invocation.result_summary].compact.join(" / ").presence || "None" : "Restricted" %></td><td class="p-3"><%= sensitive ? [invocation.error_code, invocation.error_message].compact.join(": ").presence || "None" : "Restricted" %></td></tr><% end %></tbody></table></div><% else %><p class="text-sm opacity-70">No calls are recorded for this version.</p><% end %>
+    <% end %>
+  <% end %>
+
+  <% if @argument_digests.any? %><%= render FlatPack::Card::Component.new(style: :flat) do |card| %><% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Repeated argument digests", variant: :h3, class: "mb-0 pb-0") %><% end %><% card.body do %><dl class="space-y-2 text-sm"><% @argument_digests.each do |digest, count| %><div class="flex justify-between gap-4"><dt class="break-all"><%= digest %></dt><dd><%= count %></dd></div><% end %></dl><% end %><% end %><% end %>
+
+  <% if @common_errors.any? %><%= render FlatPack::Card::Component.new(style: :flat) do |card| %><% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Common errors", variant: :h3, class: "mb-0 pb-0") %><% end %><% card.body do %><dl class="space-y-2 text-sm"><% @common_errors.each do |(category, code), count| %><div class="flex justify-between gap-4"><dt><%= [category, code].compact.join(": ") %></dt><dd><%= count %></dd></div><% end %></dl><% end %><% end %><% end %>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <%= render FlatPack::Card::Component.new(style: :flat) do |card| %><% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Usage by day", variant: :h3, class: "mb-0 pb-0") %><% end %><% card.body do %><dl class="space-y-2 text-sm"><% @daily_usage.each do |date, count| %><div class="flex justify-between gap-4"><dt><%= date.to_fs(:short) %></dt><dd><%= count %></dd></div><% end %></dl><% end %><% end %>
+    <%= render FlatPack::Card::Component.new(style: :flat) do |card| %><% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Calls per run", variant: :h3, class: "mb-0 pb-0") %><% end %><% card.body do %><% if @calls_per_run.any? %><dl class="space-y-2 text-sm"><% @calls_per_run.each do |run_id, count| %><div class="flex justify-between gap-4"><dt><%= link_to "Run #{run_id}", admin_run_path(run_id) %></dt><dd><%= count %></dd></div><% end %></dl><% else %><p class="text-sm opacity-70">No calls recorded.</p><% end %><% end %><% end %>
+  </div>
+</div>

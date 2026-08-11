@@ -14,11 +14,31 @@
         href: main_app.root_path,
         icon: :home
       ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "AI overview",
+        href: recording_studio_ai.admin_root_path,
+        icon: :dashboard
+      ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "AI activity",
+        href: recording_studio_ai.admin_runs_path,
+        icon: :table
+      ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Custom tools",
+        href: recording_studio_ai.admin_custom_tools_path,
+        icon: :settings
+      ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Provider batches",
+        href: recording_studio_ai.admin_batches_path,
+        icon: :inbox
+      ) %>
     </nav>
   <% end %>
 
   <% sidebar.footer do %>
-    <%= render FlatPack::Sidebar::Footer::Component.new(class: "text-sm text-[var(--surface-muted-content-color)]") do %>
+    <%= render FlatPack::Sidebar::Footer::Component.new(class: "text-sm text-(--surface-muted-content-color)") do %>
       <%= render FlatPack::Sidebar::Item::Component.new(
         label: "Sign out",
         href: main_app.destroy_user_session_path,
