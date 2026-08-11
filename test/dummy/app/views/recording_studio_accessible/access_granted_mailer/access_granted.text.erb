@@ -1,0 +1,6 @@
+Hello <%%= @actor.respond_to?(:email) ? @actor.email : "there" %>,
+
+<%%= @manager_actor.present? ? @manager_actor.email : "Someone" %> granted you <%%= @role.humanize.downcase %> access.
+<%% if @access_url.present? %>
+Open the shared item: <%%= @access_url %>
+<%% end %>

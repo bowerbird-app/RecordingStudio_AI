@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_11_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_11_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -25,6 +25,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_11_130000) do
     t.datetime "created_at", null: false
     t.string "title"
     t.datetime "updated_at", null: false
+  end
+
+  create_table "recording_studio_access_boundaries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "minimum_role"
+  end
+
+  create_table "recording_studio_accesses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "actor_id", null: false
+    t.string "actor_type", null: false
+    t.datetime "created_at", null: false
+    t.integer "role", default: 0, null: false
+    t.index ["actor_type", "actor_id", "role"], name: "index_recording_studio_accesses_on_actor_and_role"
+    t.index ["actor_type", "actor_id"], name: "index_recording_studio_accesses_on_actor"
   end
 
   create_table "recording_studio_ai_attempts", force: :cascade do |t|
@@ -362,6 +376,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_11_130000) do
     t.datetime "trashed_at"
     t.datetime "updated_at", null: false
     t.index ["parent_recording_id"], name: "index_recording_studio_recordings_on_parent_recording_id"
+    t.index ["parent_recording_id"], name: "index_rs_unique_active_access_boundary_per_parent", unique: true, where: "(((recordable_type)::text = 'RecordingStudio::AccessBoundary'::text) AND (trashed_at IS NULL))"
+    t.index ["recordable_id", "root_recording_id"], name: "idx_rs_recordings_root_access", where: "(((recordable_type)::text = 'RecordingStudio::Access'::text) AND (parent_recording_id IS NOT NULL) AND (trashed_at IS NULL))"
     t.index ["recordable_type", "recordable_id", "parent_recording_id", "trashed_at"], name: "index_recording_studio_recordings_on_recordable_parent_trashed"
     t.index ["recordable_type", "recordable_id"], name: "index_recording_studio_recordings_on_recordable"
     t.index ["root_recording_id"], name: "index_rs_recordings_on_root_recording"
