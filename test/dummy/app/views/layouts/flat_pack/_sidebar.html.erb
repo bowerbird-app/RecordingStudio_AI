@@ -10,29 +10,14 @@
   <% sidebar.items do %>
     <nav class="py-4 space-y-1" aria-label="Main navigation">
       <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Foundation",
-        href: main_app.root_path,
-        icon: :home
-      ) %>
-      <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "AI overview",
-        href: recording_studio_ai.admin_root_path,
+        label: "AI Admin",
+        href: "/admin",
         icon: :dashboard
       ) %>
       <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "AI activity",
-        href: recording_studio_ai.admin_runs_path,
-        icon: :table
-      ) %>
-      <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Custom tools",
-        href: recording_studio_ai.admin_custom_tools_path,
-        icon: :settings
-      ) %>
-      <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Provider batches",
-        href: recording_studio_ai.admin_batches_path,
-        icon: :inbox
+        label: "Recording tree",
+        href: main_app.recording_tree_path,
+        icon: :folder
       ) %>
     </nav>
   <% end %>

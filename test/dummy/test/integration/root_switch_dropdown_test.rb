@@ -44,7 +44,8 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     get "/recording_studio_root_switchable/v1/root_switch?scope=all_workspaces"
 
     assert_response :success
-    assert_includes response.body, "Foundation"
+    assert_includes response.body, "AI Admin"
+    assert_includes response.body, "Recording tree"
   end
 
   test "switching returns to the current page when it is a valid internal route" do

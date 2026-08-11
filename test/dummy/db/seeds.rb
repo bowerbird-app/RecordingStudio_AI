@@ -41,7 +41,23 @@ begin
   folder_recording = find_or_record_child.call(folder, root_recording, root_recording)
 
   find_or_record_child.call(page, root_recording, folder_recording)
+
+  previous_access_authorizer = RecordingStudioAccessible.configuration.access_management_authorizer
+  RecordingStudioAccessible.configuration.access_management_authorizer = ->(**) { true }
+
+  [root_recording, accessible_root_recording, private_root_recording].each do |seed_root|
+    grant_result = RecordingStudioAccessible.grant_access(
+      recording: seed_root,
+      actor: user,
+      role: :admin,
+      manager_actor: user
+    )
+    raise("Failed to seed admin access for root #{seed_root.id}: #{grant_result.error}") unless grant_result.success?
+  end
+
+  RecordingStudioAccessible.configuration.access_management_authorizer = previous_access_authorizer
 ensure
+  RecordingStudioAccessible.configuration.access_management_authorizer = previous_access_authorizer if defined?(previous_access_authorizer)
   Current.actor = previous_actor
 end
 
@@ -50,3 +66,4 @@ puts "Seeded: Workspace '#{workspace.name}' with root recording ##{root_recordin
 puts "Seeded: Workspace '#{accessible_workspace.name}' with root recording ##{accessible_root_recording.id}"
 puts "Seeded: Workspace '#{private_workspace.name}' with root recording ##{private_root_recording.id}"
 puts "Seeded: Folder '#{folder.name}' and page '#{page.title}'"
+puts "Seeded: Admin access granted for #{user.email} on seeded root recordings"
