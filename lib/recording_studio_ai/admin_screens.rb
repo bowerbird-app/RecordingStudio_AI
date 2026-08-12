@@ -58,7 +58,7 @@ module AdminScreens
       current_week_start = Time.current.beginning_of_week
       start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
       calls_by_week = scope.where(created_at: start_week..Time.current)
-        .group_by { |run| run.created_at.beginning_of_week.to_date }
+                           .group_by { |run| run.created_at.beginning_of_week.to_date }
 
       week_starts = []
       cursor = start_week
@@ -67,7 +67,7 @@ module AdminScreens
         cursor += 1.week
       end
 
-      [ {
+      [{
         name: series_name,
         data: week_starts.map do |week_start|
           {
@@ -75,16 +75,16 @@ module AdminScreens
             y: calls_by_week.fetch(week_start.to_date, []).count
           }
         end
-      } ]
+      }]
     end
 
     def top_model_token_rows(scope, range:, limit: 5)
       scope.where(created_at: range)
-        .where.not(total_tokens: nil)
-        .group(:resolved_model)
-        .sum(:total_tokens)
-        .sort_by { |_model, total_tokens| -total_tokens.to_i }
-        .first(limit)
+           .where.not(total_tokens: nil)
+           .group(:resolved_model)
+           .sum(:total_tokens)
+           .sort_by { |_model, total_tokens| -total_tokens.to_i }
+           .first(limit)
     end
 
     def token_change_label(scope, current_range:, previous_range:)
@@ -130,7 +130,7 @@ module AdminScreens
         }
       end
 
-      warnings.presence || [ { text: "No warning thresholds triggered in the last 24h.", icon: "check-circle" } ]
+      warnings.presence || [{ text: "No warning thresholds triggered in the last 24h.", icon: "check-circle" }]
     end
   end
 
@@ -185,8 +185,8 @@ module AdminScreens
     metadata { { period_label: "This week" } }
     value do |context|
       count = AdminScreens::RecordingStudioAIWidgets.tool_scope(context)
-        .where(created_at: AdminScreens::RecordingStudioAIWidgets.trailing_weeks_range(weeks_back: 4))
-        .count
+                                                    .where(created_at: AdminScreens::RecordingStudioAIWidgets.trailing_weeks_range(weeks_back: 4))
+                                                    .count
       AdminScreens::RecordingStudioAIWidgets.number(count)
     end
     change do |context|
@@ -292,10 +292,10 @@ module AdminScreens
         limit: 5
       )
 
-      [ {
+      [{
         name: "Token usage",
         data: rows.map { |_model, total_tokens| total_tokens.to_i }
-      } ]
+      }]
     end
     chart_options do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.top_model_token_rows(
@@ -348,24 +348,24 @@ module AdminScreens
     chart_type :bar
     series do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-        .where(created_at: 30.days.ago..Time.current)
-        .group(:resolved_model)
-        .count
-        .sort_by { |_model, count| -count.to_i }
-        .first(5)
+                                                   .where(created_at: 30.days.ago..Time.current)
+                                                   .group(:resolved_model)
+                                                   .count
+                                                   .sort_by { |_model, count| -count.to_i }
+                                                   .first(5)
 
-      [ {
+      [{
         name: "Call volume",
         data: rows.map { |_model, count| count.to_i }
-      } ]
+      }]
     end
     chart_options do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-        .where(created_at: 30.days.ago..Time.current)
-        .group(:resolved_model)
-        .count
-        .sort_by { |_model, count| -count.to_i }
-        .first(5)
+                                                   .where(created_at: 30.days.ago..Time.current)
+                                                   .group(:resolved_model)
+                                                   .count
+                                                   .sort_by { |_model, count| -count.to_i }
+                                                   .first(5)
 
       {
         height: 240,
@@ -399,8 +399,8 @@ module AdminScreens
     metadata { { period_label: "Last 30 days" } }
     value do |context|
       runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-        .where(created_at: 30.days.ago..Time.current)
-        .where.not(latency_ms: nil)
+                                                   .where(created_at: 30.days.ago..Time.current)
+                                                   .where.not(latency_ms: nil)
       max_latency = runs.maximum(:latency_ms).to_i
       "#{AdminScreens::RecordingStudioAIWidgets.number(max_latency)} ms"
     end
@@ -414,22 +414,22 @@ module AdminScreens
     chart_type :bar
     series do |context|
       runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-        .where(created_at: 30.days.ago..Time.current)
-        .where.not(latency_ms: nil)
-        .order(latency_ms: :desc)
-        .limit(5)
+                                                   .where(created_at: 30.days.ago..Time.current)
+                                                   .where.not(latency_ms: nil)
+                                                   .order(latency_ms: :desc)
+                                                   .limit(5)
 
-      [ {
+      [{
         name: "Latency (ms)",
         data: runs.map { |run| run.latency_ms.to_i }
-      } ]
+      }]
     end
     chart_options do |context|
       runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-        .where(created_at: 30.days.ago..Time.current)
-        .where.not(latency_ms: nil)
-        .order(latency_ms: :desc)
-        .limit(5)
+                                                   .where(created_at: 30.days.ago..Time.current)
+                                                   .where.not(latency_ms: nil)
+                                                   .order(latency_ms: :desc)
+                                                   .limit(5)
 
       {
         height: 240,
@@ -495,14 +495,18 @@ module AdminScreens
     filter_presentation :modal, inline_count: 3
     filter :date_range, field: :created_at, default: :last_30_days
     filter :type,
-           values: -> { RecordingStudioAI::Response.distinct.order(:response_type).pluck(:response_type).compact_blank },
+           values: lambda {
+             RecordingStudioAI::Response.distinct.order(:response_type).pluck(:response_type).compact_blank
+           },
            apply: ->(relation, value, _context) { relation.where(response_type: value) }
     filter :provider,
            options: -> { RecordingStudioAI::Response.distinct.order(:provider).pluck(:provider).compact_blank }
     filter :model,
            options: -> { RecordingStudioAI::Response.distinct.order(:model).pluck(:model).compact_blank }
     filter :finish,
-           options: -> { RecordingStudioAI::Response.distinct.order(:finish_reason).pluck(:finish_reason).compact_blank },
+           options: lambda {
+             RecordingStudioAI::Response.distinct.order(:finish_reason).pluck(:finish_reason).compact_blank
+           },
            apply: ->(relation, value, _context) { relation.where(finish_reason: value) }
     filter :complete,
            values: ["1"],
@@ -552,7 +556,9 @@ module AdminScreens
              }
       column :source,
              sortable: false,
-             value: ->(row, _context) { row.attempt_id.present? ? "Attempt ##{row.attempt_id}" : "Batch item ##{row.batch_item_id}" }
+             value: lambda { |row, _context|
+               row.attempt_id.present? ? "Attempt ##{row.attempt_id}" : "Batch item ##{row.batch_item_id}"
+             }
       column :run_id,
              title: "Run",
              sortable: false,
