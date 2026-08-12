@@ -3,6 +3,7 @@
 RecordingStudioAdmin.configure do |config|
   config.default_mount_path = "/admin"
   config.engine_layout = "recording_studio_admin_blank"
+  config.async_widgets.enabled = false
   config.authentication_method = :authenticate_user!
   config.current_actor_method = :current_user
 
@@ -37,9 +38,4 @@ Rails.application.config.to_prepare do
       !RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudioAdminRootAnchorDefault)
     RecordingStudioAdmin::ApplicationController.prepend(RecordingStudioAdminRootAnchorDefault)
   end
-
-  load Rails.root.join("app/admin/manifest.rb")
-  AdminScreens.load!
-  RecordingStudioAdmin.register_screen(AdminScreens::RecordingStudioAIOverviewScreen)
-  RecordingStudioAdmin.register_section(AdminScreens::RecordingStudioAISection)
 end

@@ -8,3 +8,29 @@
  *
  * Consider organizing styles into separate files for maintainability.
  */
+
+/* Host overrides for admin semantic delta colors */
+:root,
+html,
+html[data-theme],
+html[data-theme="rounded"] {
+	--color-success-background-color: #16a34a;
+	--color-danger-background-color: #dc2626;
+}
+
+/* Match compact metric typography with the expanded widget headline style. */
+p.flex.items-baseline.gap-1.leading-none {
+	flex-wrap: wrap;
+	column-gap: 0.5rem;
+}
+
+p.flex.items-baseline.gap-1.leading-none > span.whitespace-nowrap.text-4xl.font-bold.tabular-nums {
+	font-size: 3rem;
+	line-height: 1;
+}
+
+/* Fallback for expanded widget metric value sizing in admin cards. */
+p.flex.flex-wrap.items-baseline.gap-2.leading-none > span.text-5xl.font-bold {
+	font-size: 3rem;
+	line-height: 1;
+}
