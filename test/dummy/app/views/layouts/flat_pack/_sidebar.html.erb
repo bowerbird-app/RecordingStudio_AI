@@ -15,6 +15,11 @@
         icon: :dashboard
       ) %>
       <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "AI Calls",
+        href: "/admin/screens/ai_calls",
+        icon: :cpu_chip
+      ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
         label: "AI Responses",
         href: "/admin/screens/recording_studio_ai_responses",
         icon: :table
@@ -23,6 +28,21 @@
         label: "Recording tree",
         href: main_app.recording_tree_path,
         icon: :folder
+      ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Install",
+        href: main_app.install_path,
+        icon: :document_text
+      ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Config",
+        href: main_app.gem_config_path,
+        icon: :cog_6_tooth
+      ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Tables",
+        href: main_app.gem_tables_path,
+        icon: :server_stack
       ) %>
       <%= render FlatPack::Sidebar::Item::Component.new(
         label: "AI playground",

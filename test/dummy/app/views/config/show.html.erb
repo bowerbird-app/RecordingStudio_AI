@@ -1,0 +1,105 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Config",
+    subtitle: "Set up your initializer after installation.",
+    variant: :h1
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Steps",
+      subtitle: "Follow these steps to configure the gem in your app.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Open <span class="font-mono">config/initializers/recording_studio_ai.rb</span>.</li>
+      <li>Paste the initializer template below and adjust values for your environment.</li>
+      <li>Add provider API keys and choose the profile/fallback strategy you want to support.</li>
+      <li>Restart the app so initializer changes are loaded.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Initializer example",
+    language: "ruby",
+    code: @config_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Add a Provider",
+      subtitle: "How to register providers from a host app or from another gem.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Create a provider class that implements the Recording Studio AI provider contract.</li>
+      <li>Register it from the host initializer or in another gem's engine initializer.</li>
+      <li>Add the provider to one or more profile candidate lists.</li>
+      <li>Optionally enable discovery if your provider class is in the expected providers path.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Provider registration examples",
+    language: "ruby",
+    code: @provider_extension_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Create Custom Tools",
+      subtitle: "Register a tool and call it from generate/stream requests.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Define a stable key and version for your tool.</li>
+      <li>Provide clear parameter schema and usage guidance.</li>
+      <li>Implement a deterministic executor that returns serializable data.</li>
+      <li>Pass the tool reference in the request's custom_tools array.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Custom tool registration and usage",
+    language: "ruby",
+    code: @custom_tools_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Configuration Reference",
+      subtitle: "Meaning, accepted values, and requirement level for each option.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-left text-sm">
+        <thead>
+          <tr class="border-b border-(--surface-border-color)">
+            <th class="px-2 py-2 font-semibold">Key</th>
+            <th class="px-2 py-2 font-semibold">Required</th>
+            <th class="px-2 py-2 font-semibold">Accepted values</th>
+            <th class="px-2 py-2 font-semibold">Explanation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @config_options.each do |option| %>
+            <tr class="border-b border-(--surface-border-color)">
+              <td class="px-2 py-2 align-top font-mono text-xs"><%= option[:key] %></td>
+              <td class="px-2 py-2 align-top"><%= option[:required] %></td>
+              <td class="px-2 py-2 align-top"><%= option[:accepted_values] %></td>
+              <td class="px-2 py-2 align-top"><%= option[:explanation] %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

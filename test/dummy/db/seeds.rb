@@ -83,8 +83,8 @@ begin
 
   (thirty_days_ago..Date.current).each do |day|
     rand(5..12).times do |index|
-      correlation_id = "seed-rsai-run-#{day.iso8601}-#{index}"
-      next if RecordingStudioAI::Run.exists?(correlation_id: correlation_id)
+      request_id = "seed-rsai-run-#{day.iso8601}-#{index}"
+      next if RecordingStudioAI::Run.exists?(request_id: request_id)
 
       provider = providers.keys.sample
       model = providers.fetch(provider).sample
@@ -114,7 +114,7 @@ begin
       run = RecordingStudioAI::Run.create!(
         operation: operation,
         status: status,
-        correlation_id: correlation_id,
+        request_id: request_id,
         profile_key: ["default", "balanced", "fast"].sample,
         requested_provider: provider,
         resolved_provider: provider,
@@ -254,18 +254,19 @@ begin
     end
   end
 
-  warning_seed_run = lambda do |correlation_id:, root_id:, started_at:, status:, provider:, model:, latency_ms:, total_tokens:|
+  warning_seed_run = lambda do |request_id:, root_id:, started_at:, status:, provider:, model:, latency_ms:, total_tokens:|
     input_tokens = [((total_tokens * 0.55).to_i), 1].max
     output_tokens = [total_tokens - input_tokens, 1].max
     completed_at = started_at + (latency_ms / 1000.0)
     cost_per_token = model.match?(/gpt-5|opus|2\.5-pro/i) ? 6.5 : 2.2
 
-    run = RecordingStudioAI::Run.find_or_initialize_by(correlation_id: correlation_id)
+    run = RecordingStudioAI::Run.find_or_initialize_by(request_id: request_id, created_at: started_at)
+    return run if run.persisted?
 
     run.assign_attributes(
       operation: "generation",
       status: status,
-      correlation_id: correlation_id,
+      request_id: request_id,
       profile_key: "default",
       requested_provider: provider,
       resolved_provider: provider,
@@ -313,7 +314,7 @@ begin
     baseline_days.each_with_index do |days_ago, index|
       started_at = days_ago.days.ago.beginning_of_day + (10 + index).hours
       warning_seed_run.call(
-        correlation_id: "seed-rsai-warning-baseline-#{seed_root.id}-#{days_ago}",
+        request_id: "seed-rsai-warning-baseline-#{seed_root.id}-#{days_ago}",
         root_id: seed_root.id,
         started_at: started_at,
         status: "completed",
@@ -326,12 +327,12 @@ begin
 
     # Force all records into the previous 24h window so warning thresholds trigger reliably.
     24.times do |index|
-      started_at = (23.5.hours.ago + (index * 60).minutes)
+      started_at = Time.current - (index * 10).minutes
       warning_seed_run.call(
-        correlation_id: "seed-rsai-warning-last24h-#{seed_root.id}-#{index}",
+        request_id: "seed-rsai-warning-preview-v3-#{seed_root.id}-#{index}",
         root_id: seed_root.id,
         started_at: started_at,
-        status: index < 10 ? "failed" : "completed",
+        status: "failed",
         provider: "openai",
         model: index < 12 ? "gpt-5-mini" : "gpt-4o",
         latency_ms: 900 + (index * 40),

@@ -20,6 +20,21 @@ class AIPlaygroundController < ApplicationController
     "high" => "High"
   }.freeze
 
+  TOOL_CATALOG = {
+    "dummy_echo_tool" => {
+      label: "Dummy Echo Tool",
+      description: "Echoes the prompt text and returns run metadata. Useful for validating the end-to-end tool-call loop."
+    },
+    "dummy_summary_tool" => {
+      label: "Dummy Summary Tool",
+      description: "Produces a short preview summary with truncation metadata for quick summarization demos."
+    },
+    "dummy_keyword_tool" => {
+      label: "Dummy Keyword Tool",
+      description: "Extracts simple keyword candidates from the prompt for classification/tagging demos."
+    }
+  }.freeze
+
   def show
     setup_page_state
   end
@@ -71,8 +86,13 @@ class AIPlaygroundController < ApplicationController
     @provider_options = PROVIDERS.map { |value, label| { value: value, label: label } }
     @profile_options = PROFILES.map { |value, label| { value: value, label: label } }
     @form = default_form
+    @tool_options = TOOL_CATALOG.map do |key, meta|
+      { value: key, label: meta.fetch(:label), description: meta.fetch(:description) }
+    end
+    @selected_tool_key = default_form.fetch("tool_key")
+    @selected_tool_description = TOOL_CATALOG.fetch(@selected_tool_key).fetch(:description)
     @stream_events = []
-    @stream_text = ""
+    @stream_text = String.new
     @response_payload = nil
     @error_message = nil
     @created_runs = []
@@ -83,6 +103,7 @@ class AIPlaygroundController < ApplicationController
     capability = @form.fetch("capability")
     prompt = @form.fetch("prompt")
     web_search_enabled = web_search_enabled?
+    tool_key = selected_tool_key
 
     case capability
     when "chat"
@@ -107,10 +128,10 @@ class AIPlaygroundController < ApplicationController
     when "tool_calls"
       RecordingStudioAI.generate(
         **base_request.merge(
-          messages: [user_message("#{prompt}\n\nCall dummy_echo_tool with the input field before answering.")],
+          messages: [user_message(tool_call_prompt(prompt: prompt, tool_key: tool_key))],
           custom_tools: [
             {
-              key: "dummy_echo_tool",
+              key: tool_key,
               version: 1
             }
           ]
@@ -118,8 +139,12 @@ class AIPlaygroundController < ApplicationController
       )
     when "batch_calls"
       RecordingStudioAI.submit_batch(
-        **base_request.merge(
-          items: batch_items_for(prompt, web_search_enabled: web_search_enabled)
+        **base_request.except(:purpose).merge(
+          items: batch_items_for(
+            @form.fetch("batch_items", []),
+            shared_prompt: @form.fetch("prompt", ""),
+            web_search_enabled: web_search_enabled
+          )
         )
       )
     else
@@ -127,27 +152,19 @@ class AIPlaygroundController < ApplicationController
     end
   end
 
-  def batch_items_for(prompt, web_search_enabled: false)
-    [
+  def batch_items_for(prompts, shared_prompt: "", web_search_enabled: false)
+    prompts = Array(prompts).map(&:to_s).map(&:strip).reject(&:blank?)
+    prompts = [default_form.fetch("prompt")] if prompts.empty?
+
+    prompts.each_with_index.map do |item_prompt, index|
+      content = [shared_prompt.to_s.strip, item_prompt].reject(&:blank?).join("\n\n")
       {
-        reference: "item-1",
-        messages: [user_message("#{prompt} (batch item 1)")],
-        purpose: "dummy_batch_call",
-        provider_native_tools: web_search_enabled ? [:web_search] : []
-      },
-      {
-        reference: "item-2",
-        messages: [user_message("#{prompt} (batch item 2)")],
-        purpose: "dummy_batch_call",
-        provider_native_tools: web_search_enabled ? [:web_search] : []
-      },
-      {
-        reference: "item-3",
-        messages: [user_message("#{prompt} (batch item 3)")],
+        reference: "item-#{index + 1}",
+        messages: [user_message(content)],
         purpose: "dummy_batch_call",
         provider_native_tools: web_search_enabled ? [:web_search] : []
       }
-    ]
+    end
   end
 
   def user_message(content)
@@ -165,8 +182,27 @@ class AIPlaygroundController < ApplicationController
       "provider" => "",
       "profile" => "medium",
       "prompt" => "what's the weather in Osaka",
-      "web_search" => "0"
+      "batch_items" => [
+        "Summarize the latest weather conditions in Osaka.",
+        "Summarize the latest weather conditions in Tokyo.",
+        "Summarize the latest weather conditions in Kyoto."
+      ],
+      "web_search" => "0",
+      "tool_key" => "dummy_echo_tool"
     }
+  end
+
+  def selected_tool_key
+    key = @form.fetch("tool_key", default_form.fetch("tool_key")).to_s
+    key = default_form.fetch("tool_key") unless TOOL_CATALOG.key?(key)
+
+    @selected_tool_key = key
+    @selected_tool_description = TOOL_CATALOG.fetch(key).fetch(:description)
+    key
+  end
+
+  def tool_call_prompt(prompt:, tool_key:)
+    "#{prompt}\n\nCall #{tool_key} with the input field before answering."
   end
 
   def web_search_enabled?
@@ -174,6 +210,6 @@ class AIPlaygroundController < ApplicationController
   end
 
   def form_params
-    params.require(:ai_playground).permit(:capability, :provider, :profile, :prompt, :web_search)
+    params.require(:ai_playground).permit(:capability, :provider, :profile, :prompt, :web_search, :tool_key, batch_items: [])
   end
 end

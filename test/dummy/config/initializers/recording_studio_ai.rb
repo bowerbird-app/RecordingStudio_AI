@@ -33,8 +33,8 @@ RecordingStudioAI.configure do |config|
   config.stream_idle_timeout = 30
 end
 
-unless RecordingStudioAI.tools.fetch("dummy_echo_tool", version: 1)
-  RecordingStudioAI.tools.register(
+DUMMY_TOOLS = [
+  {
     key: "dummy_echo_tool",
     version: 1,
     name: "Dummy Echo Tool",
@@ -65,5 +65,77 @@ unless RecordingStudioAI.tools.fetch("dummy_echo_tool", version: 1)
         requested_at: Time.current.iso8601
       }
     end
-  )
+  },
+  {
+    key: "dummy_summary_tool",
+    version: 1,
+    name: "Dummy Summary Tool",
+    description: "Returns a short summary preview of the provided text.",
+    use_when: "You need a compact summary-style preview before finalizing an answer.",
+    do_not_use_when: "The prompt is already concise or a verbatim response is required.",
+    parameters: [
+      {
+        name: "input",
+        type: "string",
+        required: true,
+        description: "The text to summarize."
+      }
+    ],
+    returns: "A hash with summary text and character counts.",
+    cost: "negligible",
+    latency: "instant",
+    read_only: true,
+    destructive: false,
+    requires_confirmation: false,
+    idempotent: true,
+    executor_label: "Dummy",
+    executor: lambda do |arguments, _context|
+      input = arguments.fetch("input").to_s.strip
+      preview = input[0, 180]
+      {
+        summary: preview,
+        truncated: input.length > preview.length,
+        input_characters: input.length,
+        summary_characters: preview.length
+      }
+    end
+  },
+  {
+    key: "dummy_keyword_tool",
+    version: 1,
+    name: "Dummy Keyword Tool",
+    description: "Extracts a simple set of keywords from input text for classification demos.",
+    use_when: "You want rough topical tags for a sentence or paragraph.",
+    do_not_use_when: "Precise NLP extraction is required.",
+    parameters: [
+      {
+        name: "input",
+        type: "string",
+        required: true,
+        description: "The text to analyze for keyword candidates."
+      }
+    ],
+    returns: "A hash with up to 8 deduplicated keyword candidates.",
+    cost: "negligible",
+    latency: "instant",
+    read_only: true,
+    destructive: false,
+    requires_confirmation: false,
+    idempotent: true,
+    executor_label: "Dummy",
+    executor: lambda do |arguments, _context|
+      tokens = arguments.fetch("input").to_s.downcase.scan(/[a-z0-9_]{3,}/)
+      keywords = tokens.uniq.first(8)
+      {
+        keywords: keywords,
+        keyword_count: keywords.length
+      }
+    end
+  }
+].freeze
+
+DUMMY_TOOLS.each do |tool_definition|
+  next if RecordingStudioAI.tools.fetch(tool_definition.fetch(:key), version: tool_definition.fetch(:version))
+
+  RecordingStudioAI.tools.register(**tool_definition)
 end

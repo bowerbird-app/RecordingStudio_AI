@@ -8,8 +8,18 @@ RecordingStudioAdmin.configure do |config|
   config.current_actor_method = :current_user
 
   config.access_recording_resolver = lambda do |context|
-    context.controller.current_root_recording ||
-      RecordingStudio::Recording.where(parent_recording_id: nil).order(:created_at).first
+    current_root = context.controller.current_root_recording
+    actor = context.current_actor
+
+    if actor
+      accessible_root_ids = RecordingStudioAccessible.root_recording_ids_for(actor: actor, minimum_role: :view)
+      return current_root if current_root.present? && accessible_root_ids.include?(current_root.id)
+
+      accessible_root = RecordingStudio::Recording.where(id: accessible_root_ids).order(:created_at).first
+      return accessible_root if accessible_root.present?
+    end
+
+    current_root || RecordingStudio::Recording.where(parent_recording_id: nil).order(:created_at).first
   end
 
   config.admin_sections_resolver = lambda do |recording:, context:, **|

@@ -1,0 +1,54 @@
+<div class="mx-auto flex w-full max-w-7xl flex-col gap-8">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Tables",
+    subtitle: "Persistence schema reference for Recording Studio AI.",
+    variant: :h1
+  ) %>
+
+  <div class="space-y-2 text-sm leading-6 text-(--surface-muted-content-color)">
+    <p>
+      This page documents every persistence table introduced by this gem.
+      For each column, you get a realistic sample value and a high-level explanation of what role that field plays.
+    </p>
+    <p>
+      Use this as an implementation map when wiring analytics, retention policies, admin reporting,
+      data backfills, and incident debugging workflows.
+    </p>
+  </div>
+
+  <% @tables.each do |table| %>
+    <section class="space-y-3">
+      <%= render FlatPack::PageTitle::Component.new(
+        title: table[:name],
+        subtitle: table[:purpose],
+        variant: :h3,
+        class: "mb-0 pb-0"
+      ) %>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-(--surface-border-color)">
+              <th class="px-2 py-2 font-semibold">Column</th>
+              <th class="px-2 py-2 font-semibold">Type</th>
+              <th class="px-2 py-2 font-semibold">Required</th>
+              <th class="px-2 py-2 font-semibold">Sample data</th>
+              <th class="px-2 py-2 font-semibold">High-level explanation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% table[:columns].each do |column| %>
+              <tr class="border-b border-(--surface-border-color)">
+                <td class="px-2 py-2 align-top font-mono text-xs"><%= column[:name] %></td>
+                <td class="px-2 py-2 align-top"><%= column[:type] %></td>
+                <td class="px-2 py-2 align-top"><%= column[:required] ? "Yes" : "No" %></td>
+                <td class="px-2 py-2 align-top font-mono text-xs"><%= column[:sample] %></td>
+                <td class="px-2 py-2 align-top"><%= column[:explanation] %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% end %>
+</div>

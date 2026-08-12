@@ -1,0 +1,41 @@
+<div class="mx-auto flex w-full max-w-4xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Install",
+    variant: :h1
+  ) %>
+
+  <ol class="list-decimal space-y-4 pl-5 text-sm leading-6">
+    <li>
+      Add the gem to your app.
+      <%= render FlatPack::CodeBlock::Component.new(
+        title: "Command",
+        language: "bash",
+        code: "bundle add recording_studio_ai"
+      ) %>
+    </li>
+    <li>
+      Run the installer generator.
+      <%= render FlatPack::CodeBlock::Component.new(
+        title: "Command",
+        language: "bash",
+        code: "bin/rails generate recording_studio_ai:install"
+      ) %>
+    </li>
+    <li>
+      Run migrations.
+      <%= render FlatPack::CodeBlock::Component.new(
+        title: "Command",
+        language: "bash",
+        code: "bin/rails db:migrate"
+      ) %>
+    </li>
+    <li>
+      Restart your Rails server.
+      <%= render FlatPack::CodeBlock::Component.new(
+        title: "Command",
+        language: "bash",
+        code: "bin/dev"
+      ) %>
+    </li>
+  </ol>
+</div>

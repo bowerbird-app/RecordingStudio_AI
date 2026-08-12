@@ -21,6 +21,9 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   get "recording_tree", to: "recording_tree#show"
+  get "install", to: "install#show"
+  get "config", to: "config#show", as: :gem_config
+  get "tables", to: "tables#show", as: :gem_tables
   get "ai_playground", to: "ai_playground#show"
   post "ai_playground", to: "ai_playground#create"
   root "home#index"

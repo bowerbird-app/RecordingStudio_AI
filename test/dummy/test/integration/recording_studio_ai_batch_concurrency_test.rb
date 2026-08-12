@@ -5,7 +5,7 @@ require "test_helper"
 class RecordingStudioAIBatchConcurrencyTest < ActiveSupport::TestCase
   self.use_transactional_tests = false
 
-  class ConcurrentAdapter < RecordingStudioAI::Adapters::Base
+  class ConcurrentProvider < RecordingStudioAI::Providers::Base
     attr_reader :entered, :release
 
     def initialize
@@ -16,10 +16,10 @@ class RecordingStudioAIBatchConcurrencyTest < ActiveSupport::TestCase
     def refresh_batch(batch:, candidate:)
       entered << true
       release.pop
-      RecordingStudioAI::Adapters::BatchResult.new(
+      RecordingStudioAI::Providers::BatchResult.new(
         provider_batch_id: batch.provider_batch_id,
         status: "completed",
-        items: [ RecordingStudioAI::Adapters::BatchItemResult.new(
+        items: [ RecordingStudioAI::Providers::BatchItemResult.new(
           reference: "concurrent-item",
           status: "completed",
           text: "one retained result",
@@ -32,9 +32,9 @@ class RecordingStudioAIBatchConcurrencyTest < ActiveSupport::TestCase
   setup do
     cleanup_test_records
     @original_configuration = RecordingStudioAI.instance_variable_get(:@configuration)
-    @adapter = ConcurrentAdapter.new
+    @provider = ConcurrentProvider.new
     configuration = RecordingStudioAI::Configuration.new
-    configuration.adapters[:concurrent] = @adapter
+    configuration.providers[:concurrent] = @provider
     configuration.authorization_handler = ->(**) { true }
     configuration.retain_responses = true
     RecordingStudioAI.instance_variable_set(:@configuration, configuration)
@@ -47,7 +47,6 @@ class RecordingStudioAIBatchConcurrencyTest < ActiveSupport::TestCase
       provider: "concurrent",
       model: "contract-model",
       provider_batch_id: "concurrent-batch",
-      correlation_id: SecureRandom.uuid,
       root_recording_id: @root.id,
       initiator_type: "User",
       initiator_id: @user.id,
@@ -58,7 +57,6 @@ class RecordingStudioAIBatchConcurrencyTest < ActiveSupport::TestCase
     @run = RecordingStudioAI::Run.create!(
       operation: "batch",
       status: "running",
-      correlation_id: SecureRandom.uuid,
       resolved_provider: "concurrent",
       resolved_model: "contract-model",
       root_recording_id: @root.id,
@@ -99,9 +97,9 @@ class RecordingStudioAIBatchConcurrencyTest < ActiveSupport::TestCase
     end
 
     begin
-      Timeout.timeout(5) { 2.times { @adapter.entered.pop } }
+      Timeout.timeout(5) { 2.times { @provider.entered.pop } }
     ensure
-      2.times { @adapter.release << true }
+      2.times { @provider.release << true }
     end
     threads.each { |thread| assert thread.join(10), "concurrent refresh did not finish" }
 
