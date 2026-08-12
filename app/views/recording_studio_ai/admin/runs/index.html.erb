@@ -1,45 +1,53 @@
 <div class="mx-auto flex w-full max-w-7xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(title: "AI activity", subtitle: "Latest 100 runs across visible roots. Searches never inspect prompts or messages.", variant: :h1) %>
-
-  <%= render FlatPack::Card::Component.new(style: :flat) do |card| %>
-    <% card.body do %>
-      <%= form_with url: admin_runs_path, method: :get, class: "grid gap-3 md:grid-cols-4" do |form| %>
-        <%= form.search_field :q, value: params[:q], placeholder: "Safe IDs, purpose, error code", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.select :status, RecordingStudioAI::Run.statuses.keys.map { |status| [status.humanize, status] }, { include_blank: "All statuses", selected: params[:status] }, class: "rounded border px-3 py-2" %>
-        <%= form.select :resolved_provider, RecordingStudioAI.configuration.adapters.keys.map { |provider| [provider.to_s.humanize, provider] }, { include_blank: "All providers", selected: params[:resolved_provider] }, class: "rounded border px-3 py-2" %>
-        <%= form.text_field :operation, value: params[:operation], placeholder: "Operation", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.text_field :purpose, value: params[:purpose], placeholder: "Purpose", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.text_field :resolved_model, value: params[:resolved_model], placeholder: "Model", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.select :profile_key, %w[low medium high].map { |profile| [profile.humanize, profile] }, { include_blank: "All profiles", selected: params[:profile_key] }, class: "rounded border px-3 py-2" %>
-        <%= form.select :execution_source, RecordingStudioAI::Contracts::Attribution::EXECUTION_SOURCES.map { |source| [source.humanize, source] }, { include_blank: "All sources", selected: params[:execution_source] }, class: "rounded border px-3 py-2" %>
-        <%= form.text_field :error_category, value: params[:error_category], placeholder: "Error category", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.number_field :minimum_duration_ms, value: params[:minimum_duration_ms], min: 0, placeholder: "Minimum duration (ms)", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.number_field :minimum_tokens, value: params[:minimum_tokens], min: 0, placeholder: "Minimum tokens", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.number_field :minimum_cost_microunits, value: params[:minimum_cost_microunits], min: 0, placeholder: "Minimum cost (microunits)", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.text_field :root_recording_id, value: params[:root_recording_id], placeholder: "Root recording ID", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.text_field :context_recording_id, value: params[:context_recording_id], placeholder: "Context recording ID", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.text_field :initiator_id, value: params[:initiator_id], placeholder: "Initiator ID", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.text_field :executor_id, value: params[:executor_id], placeholder: "Executor ID", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.text_field :custom_tool_key, value: params[:custom_tool_key], placeholder: "Custom-tool key", class: "min-w-0 rounded border px-3 py-2" %>
-        <%= form.date_field :created_after, value: params[:created_after], class: "min-w-0 rounded border px-3 py-2", aria: { label: "Created after" } %>
-        <%= form.date_field :created_before, value: params[:created_before], class: "min-w-0 rounded border px-3 py-2", aria: { label: "Created before" } %>
-        <div class="flex items-center gap-2"><%= form.check_box :web_search, { checked: params[:web_search] == "1" }, "1", "0" %><%= form.label :web_search, "Web search" %></div>
-        <div class="flex items-center gap-2"><%= form.check_box :streaming, { checked: params[:streaming] == "1" }, "1", "0" %><%= form.label :streaming, "Streaming" %></div>
-        <div class="flex items-center gap-2"><%= form.check_box :custom_tool_use, { checked: params[:custom_tool_use] == "1" }, "1", "0" %><%= form.label :custom_tool_use, "Custom tools" %></div>
-        <div class="flex items-center gap-2"><%= form.check_box :retained_response, { checked: params[:retained_response] == "1" }, "1", "0" %><%= form.label :retained_response, "Retained response" %></div>
-        <div class="flex items-center gap-2"><%= form.check_box :batch, { checked: params[:batch] == "1" }, "1", "0" %><%= form.label :batch, "Batch" %></div>
-        <div class="flex items-center gap-2"><%= form.check_box :error, { checked: params[:error] == "1" }, "1", "0" %><%= form.label :error, "Has error" %></div>
-        <%= form.submit "Filter", class: "rounded bg-[var(--primary-background-color)] px-4 py-2 text-[var(--primary-content-color)]" %>
-      <% end %>
-    <% end %>
-  <% end %>
+  <%= render FlatPack::PageTitle::Component.new(title: "AI runs", subtitle: "Review recorded AI execution runs.") %>
 
   <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
     <% card.body do %>
       <% if @runs.any? %>
-        <div class="overflow-x-auto"><table class="w-full min-w-max text-left text-sm"><thead><tr class="border-b"><th class="p-3">Time / IDs</th><th class="p-3">Attribution</th><th class="p-3">Operation</th><th class="p-3">Provider / model</th><th class="p-3">Status</th><th class="p-3">Duration</th><th class="p-3">Tokens / cost</th><th class="p-3">Activity</th><th class="p-3">Source</th></tr></thead><tbody>
-          <% @runs.each do |run| %><tr class="border-b align-top"><td class="p-3"><%= link_to run.created_at.to_fs(:short), admin_run_path(run), class: "font-semibold" %><div class="mt-1 text-xs opacity-70">Run <%= run.id %><% if @sensitive_roots[run.root_recording_id] %><br>Correlation <%= run.correlation_id %><% end %></div></td><td class="p-3">Root <%= run.root_recording_id %><% if @sensitive_roots[run.root_recording_id] %><div class="text-xs opacity-70">Context <%= run.context_recording_id || "none" %><br>Initiator <%= [run.initiator_type, run.initiator_id].compact.join(" ") %><br>Executor <%= [run.executor_type, run.executor_id].compact.join(" ").presence || "none" %></div><% end %></td><td class="p-3"><%= run.operation %><div class="text-xs opacity-70"><%= run.purpose.presence || "No purpose" %> / <%= run.profile_key.presence || "No profile" %></div></td><td class="p-3"><%= [run.resolved_provider, run.resolved_model].compact.join(" / ").presence || "Unknown" %></td><td class="p-3"><%= render FlatPack::Badge::Component.new(text: run.status.humanize, style: admin_status_style(run.status), size: :sm) %></td><td class="p-3"><%= admin_duration(run.latency_ms) %></td><td class="p-3"><%= admin_tokens(run.input_tokens) %> / <%= admin_tokens(run.output_tokens) %> / <%= admin_tokens(run.total_tokens) %><div class="text-xs opacity-70">Input / output / total</div><div class="text-xs opacity-70"><%= admin_cost(run.cost_amount_microunits, run.cost_currency, run.cost_estimated) %></div></td><td class="p-3"><%= run.attempt_count %> attempts / <%= run.retry_count %> retries / <%= run.fallback_count %> fallbacks<br><%= run.custom_tool_invocation_count %> tools / <%= run.attachment_count %> attachments<div class="text-xs opacity-70"><%= run.citation_count %> citations / search <%= run.web_search_requested? ? "requested" : "not requested" %>, <%= run.web_search_used? ? "used" : "not used" %></div></td><td class="p-3"><%= run.execution_source.presence || "Unknown" %></td></tr><% end %>
-        </tbody></table></div>
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-max text-left text-sm">
+            <thead>
+              <tr class="border-b">
+                <th class="p-3">Time / ID</th>
+                <th class="p-3">Attribution</th>
+                <th class="p-3">Operation</th>
+                <th class="p-3">Provider / model</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Duration</th>
+                <th class="p-3">Tokens / cost</th>
+                <th class="p-3">Activity</th>
+                <th class="p-3">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @runs.each do |run| %>
+                <tr class="border-b align-top">
+                  <td class="p-3">
+                    <%= link_to run.created_at.to_fs(:short), admin_run_path(run), class: "font-semibold" %>
+                    <div class="mt-1 text-xs opacity-70">Run <%= run.id %></div>
+                  </td>
+                  <td class="p-3">
+                    Root <%= run.root_recording_id %>
+                    <% if @sensitive_roots[run.root_recording_id] %>
+                      <div class="text-xs opacity-70">
+                        Context <%= run.context_recording_id || "none" %><br>
+                        Initiator <%= [run.initiator_type, run.initiator_id].compact.join(" ") %><br>
+                        Executor <%= [run.executor_type, run.executor_id].compact.join(" ").presence || "none" %>
+                      </div>
+                    <% end %>
+                  </td>
+                  <td class="p-3"><%= run.operation %><div class="text-xs opacity-70"><%= run.purpose.presence || "No purpose" %> / <%= run.profile_key.presence || "No profile" %></div></td>
+                  <td class="p-3"><%= [run.resolved_provider, run.resolved_model].compact.join(" / ").presence || "Unknown" %></td>
+                  <td class="p-3"><%= render FlatPack::Badge::Component.new(text: run.status.humanize, style: admin_status_style(run.status), size: :sm) %></td>
+                  <td class="p-3"><%= admin_duration(run.latency_ms) %></td>
+                  <td class="p-3"><%= admin_tokens(run.input_tokens) %> / <%= admin_tokens(run.output_tokens) %> / <%= admin_tokens(run.total_tokens) %><div class="text-xs opacity-70">Input / output / total</div><div class="text-xs opacity-70"><%= admin_cost(run.cost_amount_microunits, run.cost_currency, run.cost_estimated) %></div></td>
+                  <td class="p-3"><%= run.attempt_count %> attempts / <%= run.retry_count %> retries / <%= run.fallback_count %> fallbacks<br><%= run.custom_tool_invocation_count %> tools / <%= run.attachment_count %> attachments<div class="text-xs opacity-70"><%= run.citation_count %> citations / search <%= run.web_search_requested? ? "requested" : "not requested" %>, <%= run.web_search_used? ? "used" : "not used" %></div></td>
+                  <td class="p-3"><%= run.execution_source.presence || "Unknown" %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
       <% else %>
         <%= render FlatPack::EmptyState::Component.new(title: "No runs found", description: "Adjust the filters or wait for new AI activity.") %>
       <% end %>

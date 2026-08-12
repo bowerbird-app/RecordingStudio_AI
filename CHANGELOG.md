@@ -22,9 +22,9 @@ Versioning and Keep a Changelog.
 	batches, batch items, and retained responses.
 - Terminal-state immutability protections on execution models.
 - Phase 5 capability-aware profiles, provider overrides, candidate resolution,
-	shared adapter contracts, and content-free run/attempt orchestration.
+	shared provider contracts, and content-free run/attempt orchestration.
 - Phase 6 synchronous OpenAI Responses API and Gemini `generateContent`
-	adapters with normalized text, usage, identifiers, finish reasons, and errors.
+	providers with normalized text, usage, identifiers, finish reasons, and errors.
 - Official OpenAI Ruby SDK integration and contained Gemini REST transport.
 - Phase 7 structured-output translation and local JSON Schema validation.
 - Request-scoped image/file validation, provider translation, and safe aggregate

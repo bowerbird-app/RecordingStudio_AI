@@ -14,9 +14,9 @@ six execution infrastructure tables, and a read-only FlatPack admin surface.
 - Rails 8.1
 - Recording Studio 3.x
 
-The OpenAI adapter uses the official `openai` Ruby SDK. Gemini uses its REST API
+The OpenAI provider uses the official `openai` Ruby SDK. Gemini uses its REST API
 behind an internal client because Google does not publish an official Gemini
-Ruby SDK. Both adapters support injected clients.
+Ruby SDK. Both providers support injected clients.
 
 ## Installation
 
@@ -129,7 +129,7 @@ end
 ```
 
 Profile candidate order expresses preference. Resolution selects the first
-candidate that has a configured adapter and supports every requested
+candidate that has a configured provider and supports every requested
 capability. Model names remain in configuration rather than application logic.
 Retries remain on the same candidate. Same-profile provider fallback follows
 candidate order, while profile-tier fallback only follows explicit
@@ -168,7 +168,7 @@ encrypted, recursively sanitized, size-bounded response per attempt or terminal
 batch item. Generation results, assembled streams, normalized provider errors,
 and batch item results are covered; prompts, stream chunks, attachments, and
 complete custom-tool payloads are never retained. Raw provider snapshots remain
-nil unless an adapter explicitly supplies a serializable retention snapshot.
+nil unless a provider explicitly supplies a serializable retention snapshot.
 
 Read retained content only through the authorization-gated API:
 
@@ -237,7 +237,7 @@ Phase 2 introduced validation and normalized return contracts for:
 
 Calls validate request contracts and return normalized contract objects.
 `generate` and `generate!` resolve configured OpenAI or Gemini candidates and
-dispatch through the shared adapter contract. `stream` returns an Enumerator
+dispatch through the shared provider contract. `stream` returns an Enumerator
 when called without a block, or yields normalized events to a supplied block.
 
 ## Provider batches (Phase 11)
@@ -281,11 +281,11 @@ assembled metrics, counts, digests, and sanitized metadata.
 ## Synchronous providers (Phase 6)
 
 OpenAI generation uses the Responses API with provider storage disabled.
-Gemini generation uses `generateContent`. Both adapters translate prompts,
+Gemini generation uses `generateContent`. Both providers translate prompts,
 messages, and system instructions and normalize text, provider identifiers,
 finish reasons, token usage, and provider failures. Unknown cost remains `nil`.
 
-Provider SDK and transport objects never escape the adapter boundary. Runs and
+Provider SDK and transport objects never escape the provider boundary. Runs and
 attempts retain safe execution metadata, usage, counts, and digests without
 persisting prompts, messages, or generated output.
 
@@ -357,8 +357,8 @@ keys are `generation`, `streaming`, `structured_output`, `image_input`,
 and `provider_batch_cancellation`.
 
 Resolution never removes requirements. Unsupported requests and disabled
-provider overrides fail before a run, attempt, or adapter call is created.
-Successful and failed adapter calls persist runs and actual attempts using safe
+provider overrides fail before a run, attempt, or provider call is created.
+Successful and failed provider calls persist runs and actual attempts using safe
 metadata, counts, and digests, without prompts, messages, or generated content.
 
 ## Persistence (Phase 3)

@@ -6,6 +6,7 @@ require "securerandom"
 
 migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb", __dir__)].first
 require migration_file
+require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
 require_relative "../app/models/recording_studio_ai/application_record"
 require_relative "../app/models/concerns/recording_studio_ai/terminal_immutability"
 require_relative "../app/models/recording_studio_ai/run"
@@ -22,6 +23,7 @@ class PhaseThirteenAdministrationTest < Minitest::Test
     ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
     ActiveRecord::Base.connection.create_table(:recording_studio_recordings) { |table| table.timestamps }
     ActiveRecord::Migration.suppress_messages { CreateRecordingStudioAIPersistenceTables.migrate(:up) }
+    ActiveRecord::Migration.suppress_messages { RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up) }
     @configuration = RecordingStudioAI::Configuration.new
     @configuration.attribution_validator = ->(**) {}
     @original_configuration = RecordingStudioAI.instance_variable_get(:@configuration)

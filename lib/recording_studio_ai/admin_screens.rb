@@ -5,6 +5,7 @@ module AdminScreens
     extend self
 
     EXPENSIVE_MODEL_MATCHER = /(gpt-5|o1|claude-opus|gemini-2\.5-pro)/i unless const_defined?(:EXPENSIVE_MODEL_MATCHER)
+    WarningRow = Data.define(:text) unless const_defined?(:WarningRow)
 
     def runs_scope(context)
       scope = RecordingStudioAI::Run.all
@@ -73,6 +74,31 @@ module AdminScreens
           {
             x: week_start.strftime("%b %-d"),
             y: calls_by_week.fetch(week_start.to_date, []).count
+          }
+        end
+      }]
+    end
+
+    def weekly_token_series(scope, weeks_back: 12, series_name: "Token usage")
+      current_week_start = Time.current.beginning_of_week
+      start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
+      tokens_by_week = scope.where(created_at: start_week..Time.current)
+                            .group_by { |run| run.created_at.beginning_of_week.to_date }
+
+      week_starts = []
+      cursor = start_week
+      while cursor <= current_week_start
+        week_starts << cursor
+        cursor += 1.week
+      end
+
+      [{
+        name: series_name,
+        data: week_starts.map do |week_start|
+          week_runs = tokens_by_week.fetch(week_start.to_date, [])
+          {
+            x: week_start.strftime("%b %-d"),
+            y: week_runs.sum { |run| run.total_tokens.to_i }
           }
         end
       }]
@@ -174,12 +200,12 @@ module AdminScreens
         yaxis: { min: 0, labels: { show: false } }
       }
     end
-    link_to { |context| context.admin_screen_path("recording_studio_ai_overview") }
+    link_to { |context| context.admin_screen_path("ai_calls") }
   end
 
   RecordingStudioAIToolCallsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.tool_calls") do
     type :chart
-    title "Tool calls"
+    title "Custom Tool Calls"
     subtitle "Weekly custom tool-call volume for the last 4 weeks."
     description "Tracks how many tool calls were made each day, including today."
     metadata { { period_label: "This week" } }
@@ -217,7 +243,7 @@ module AdminScreens
         yaxis: { min: 0, labels: { show: false } }
       }
     end
-    link_to { |context| context.admin_screen_path("recording_studio_ai_overview") }
+    link_to { |context| context.admin_screen_path("tool_calls") }
   end
 
   RecordingStudioAIErrorsFailedCallsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.errors_failed_calls") do
@@ -261,7 +287,7 @@ module AdminScreens
         yaxis: { min: 0, labels: { show: false } }
       }
     end
-    link_to { |context| context.admin_screen_path("recording_studio_ai_overview") }
+    link_to { |context| "#{context.admin_screen_path("ai_calls")}?run_status=failed" }
   end
 
   RecordingStudioAIEstimatedSpendWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.estimated_spend") do
@@ -325,7 +351,7 @@ module AdminScreens
         grid: { xaxis: { lines: { show: false } } }
       }
     end
-    link_to { |context| context.admin_screen_path("recording_studio_ai_overview") }
+    link_to { |context| context.admin_screen_path("estimated_spend") }
   end
 
   RecordingStudioAICallsByProviderModelWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.calls_by_provider_model") do
@@ -388,7 +414,7 @@ module AdminScreens
         grid: { xaxis: { lines: { show: false } } }
       }
     end
-    link_to { |context| context.admin_screen_path("recording_studio_ai_overview") }
+    link_to { |context| context.admin_screen_path("ai_calls") }
   end
 
   RecordingStudioAISlowCallsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.slow_calls") do
@@ -452,7 +478,7 @@ module AdminScreens
         grid: { xaxis: { lines: { show: false } } }
       }
     end
-    link_to { |context| context.admin_screen_path("recording_studio_ai_overview") }
+    link_to { |context| "#{context.admin_screen_path("ai_calls")}?slowest=1" }
   end
 
   RecordingStudioAIWarningsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.warnings") do
@@ -466,9 +492,7 @@ module AdminScreens
         AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
       )
     end
-    link_to do |context|
-      context.admin_screen_path("recording_studio_ai_overview")
-    end
+    link_to { |context| context.admin_screen_path("warnings") }
   end
 
   class RecordingStudioAIOverviewScreen < RecordingStudioAdmin::Screen
@@ -479,6 +503,27 @@ module AdminScreens
 
     query do |_context|
       RecordingStudioAI::Run.order(created_at: :desc)
+    end
+  end
+
+  class RecordingStudioAIWarningsScreen < RecordingStudioAdmin::Screen
+    key "warnings"
+    icon :shield_exclamation
+    title "Warnings"
+    subtitle "All currently active usage, reliability, and spend warnings."
+
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.warning_items(
+        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+      ).map { |warning| AdminScreens::RecordingStudioAIWidgets::WarningRow.new(warning[:text]) }
+    end
+
+    table do
+      title ""
+      hide_columns_button
+      hide_count
+
+      column :text, title: "", value: ->(warning, _context) { warning.text }
     end
   end
 
@@ -595,24 +640,345 @@ module AdminScreens
     end
   end
 
+  class RecordingStudioAICallsScreen < RecordingStudioAdmin::Screen
+    key "ai_calls"
+    icon :cpu_chip
+    title "AI Calls"
+    subtitle "Run-level execution history across generation, streaming, and batch operations."
+
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.runs_scope(context).order(created_at: :desc)
+    end
+
+    filter_presentation :modal, inline_count: 3
+    filter :date_range, field: :created_at, default: :last_30_days
+    filter :group_by, values: %i[hour day week month year], default: :day
+    filter :status,
+          param: :run_status,
+          field: :status,
+          options: -> { RecordingStudioAI::Run.distinct.order(:status).pluck(:status).compact_blank },
+          apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
+    filter :operation,
+          field: :operation,
+          values: -> { RecordingStudioAI::Run.distinct.order(:operation).pluck(:operation).compact_blank }
+    filter :provider,
+          values: -> { RecordingStudioAI::Run.distinct.order(:resolved_provider).pluck(:resolved_provider).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(resolved_provider: value) }
+    filter :slowest,
+           values: ["1"],
+           control: :checkbox,
+           apply: lambda { |relation, _value, _context|
+             relation.where.not(latency_ms: nil).reorder(Arel.sql("latency_ms IS NULL ASC, latency_ms DESC"))
+           }
+
+    chart do
+      title "AI calls trend"
+      subtitle "Weekly call volume for the last 12 weeks."
+      type :line
+      series do |context|
+        [{
+          name: "AI calls",
+          data: RecordingStudioAdmin::AdminActivityLogsSupport.date_series(
+            context.query_result.relation.reorder(nil),
+            field: :created_at,
+            bucket: context.filter_value(:group_by) || :day
+          )
+        }]
+      end
+      options do
+        {
+          height: 300,
+          stroke: { curve: "smooth", width: 3 },
+          xaxis: {
+            labels: { show: true },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+          },
+          yaxis: { min: 0 },
+          grid: { xaxis: { lines: { show: false } } }
+        }
+      end
+    end
+
+    table do
+      filter :search, apply: lambda { |relation, value, _context|
+        if value.present?
+          search = "%#{ActiveRecord::Base.sanitize_sql_like(value.to_s.strip)}%"
+
+          relation.where(
+            [
+              "status ILIKE :search",
+              "operation ILIKE :search",
+              "profile_key ILIKE :search",
+              "requested_provider ILIKE :search",
+              "resolved_provider ILIKE :search",
+              "resolved_model ILIKE :search",
+              "CAST(id AS TEXT) ILIKE :search"
+            ].join(" OR "),
+            search: search
+          )
+        else
+          relation
+        end
+      }
+
+      column :id, title: "Run"
+      column :created_at, title: "Created"
+      column :operation,
+             display: :badge,
+             display_options: ->(_row, _context, value) { { text: value.to_s.humanize, style: :default, size: :sm } }
+      column :status,
+             display: :badge,
+             display_options: lambda { |_row, _context, value|
+               style = case value.to_s
+                       when "completed" then :success
+                       when "failed" then :danger
+                       when "cancelled" then :warning
+                       else :default
+                       end
+               { text: value.to_s.humanize, style: style, size: :sm }
+             }
+      column :profile_key, title: "Profile"
+      column :requested_provider, title: "Requested"
+      column :resolved_provider, title: "Resolved"
+      column :resolved_model, title: "Model"
+      column :attempt_count, title: "Attempts"
+      column :custom_tool_invocation_count, title: "Tool calls"
+      column :total_tokens, title: "Tokens"
+      column :latency_ms, title: "Latency (ms)"
+
+      default_sort :created_at, direction: :desc
+      paginate per_page: 25
+    end
+  end
+
+  class RecordingStudioAIToolCallsScreen < RecordingStudioAdmin::Screen
+    key "tool_calls"
+    icon :wrench_screwdriver
+    title "Custom Tool Calls"
+    subtitle "Custom tool invocation history with status, confirmation, and latency signals."
+
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.tool_scope(context).includes(:run).order(created_at: :desc)
+    end
+
+    filter_presentation :modal, inline_count: 2
+    filter :date_range, field: :created_at, default: :last_30_days
+    filter :group_by, values: %i[hour day week month year], default: :day
+    filter :status,
+          param: :tool_status,
+          field: :status,
+          options: -> { RecordingStudioAI::CustomToolInvocation.distinct.order(:status).pluck(:status).compact_blank },
+          apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
+    filter :tool_key,
+           field: :tool_key,
+           values: -> { RecordingStudioAI::CustomToolInvocation.distinct.order(:tool_key).pluck(:tool_key).compact_blank }
+    filter :confirmation,
+           field: :confirmation_status,
+           options: lambda {
+             RecordingStudioAI::CustomToolInvocation.distinct.order(:confirmation_status).pluck(:confirmation_status).compact_blank
+           },
+           apply: ->(relation, value, _context) { relation.where(confirmation_status: value) }
+
+    chart do
+      title "Custom tool calls trend"
+      subtitle "Custom tool call volume over time."
+      type :line
+      series do |context|
+        [{
+          name: "Tool calls",
+          data: RecordingStudioAdmin::AdminActivityLogsSupport.date_series(
+            context.query_result.relation.reorder(nil),
+            field: "recording_studio_ai_custom_tool_invocations.created_at",
+            bucket: context.filter_value(:group_by) || :day
+          )
+        }]
+      end
+      options do
+        {
+          height: 300,
+          stroke: { curve: "smooth", width: 3 },
+          xaxis: {
+            labels: { show: true },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+          },
+          yaxis: { min: 0 },
+          grid: { xaxis: { lines: { show: false } } }
+        }
+      end
+    end
+
+    table do
+      filter :search, apply: lambda { |relation, value, _context|
+        if value.present?
+          search = "%#{ActiveRecord::Base.sanitize_sql_like(value.to_s.strip)}%"
+
+          relation.where(
+            [
+              "status ILIKE :search",
+              "tool_key ILIKE :search",
+              "tool_name_snapshot ILIKE :search",
+              "provider_tool_call_id ILIKE :search",
+              "error_category ILIKE :search",
+              "error_code ILIKE :search",
+              "error_message ILIKE :search",
+              "CAST(id AS TEXT) ILIKE :search",
+              "CAST(run_id AS TEXT) ILIKE :search"
+            ].join(" OR "),
+            search: search
+          )
+        else
+          relation
+        end
+      }
+
+      column :id, title: "Invocation"
+      column :created_at, title: "Created"
+      column :run_id, title: "Run"
+      column :tool_key, title: "Tool"
+      column :tool_version, title: "Version"
+      column :status,
+             display: :badge,
+             display_options: lambda { |_row, _context, value|
+               style = case value.to_s
+                       when "completed" then :success
+                       when "failed", "denied", "rejected" then :danger
+                       when "cancelled" then :warning
+                       else :default
+                       end
+               { text: value.to_s.humanize, style: style, size: :sm }
+             }
+      column :confirmation_status, title: "Confirmation"
+      column :requires_confirmation, title: "Needs confirm"
+      column :read_only, title: "Read-only"
+      column :destructive, title: "Destructive"
+      column :latency_ms, title: "Latency (ms)"
+      column :error_code, title: "Error code"
+
+      default_sort :created_at, direction: :desc
+      paginate per_page: 25
+    end
+  end
+
+  class RecordingStudioAIEstimatedSpendScreen < RecordingStudioAdmin::Screen
+    key "estimated_spend"
+    icon :currency_dollar
+    title "Estimated token/model spend"
+    subtitle "Token usage trends and model-level consumption across AI runs."
+
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+                                            .where.not(total_tokens: nil)
+                                            .order(created_at: :desc)
+    end
+
+    filter_presentation :inline
+    filter :date_range, field: :created_at, default: :last_30_days
+    filter :group_by, values: %i[hour day week month year], default: :day
+    filter :model,
+           field: :resolved_model,
+           values: -> { RecordingStudioAI::Run.distinct.order(:resolved_model).pluck(:resolved_model).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(resolved_model: value) }
+    filter :provider,
+           field: :resolved_provider,
+           values: -> { RecordingStudioAI::Run.distinct.order(:resolved_provider).pluck(:resolved_provider).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(resolved_provider: value) }
+
+    chart do
+      title "Estimated spend trend"
+      subtitle "Token usage over time."
+      type :line
+      series do |context|
+        [{
+          name: "Total tokens",
+          data: RecordingStudioAdmin::AdminActivityLogsSupport.date_series(
+            context.query_result.relation.reorder(nil),
+            field: :created_at,
+            bucket: context.filter_value(:group_by) || :day
+          ).map { |point| { x: point[:x], y: point[:y] } }
+        }]
+      end
+      options do
+        {
+          height: 300,
+          stroke: { curve: "smooth", width: 3 },
+          xaxis: {
+            labels: { show: true },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+          },
+          yaxis: { min: 0 },
+          grid: { xaxis: { lines: { show: false } } }
+        }
+      end
+    end
+
+    table do
+      column :id, title: "Run"
+      column :created_at, title: "Created"
+      column :status,
+             display: :badge,
+             display_options: lambda { |_row, _context, value|
+               style = case value.to_s
+                       when "completed" then :success
+                       when "failed" then :danger
+                       when "cancelled" then :warning
+                       else :default
+                       end
+               { text: value.to_s.humanize, style: style, size: :sm }
+             }
+      column :resolved_provider, title: "Provider"
+      column :resolved_model, title: "Model"
+      column :total_tokens, title: "Total tokens"
+      column :input_tokens, title: "Input"
+      column :output_tokens, title: "Output"
+      column :cost_amount_microunits, title: "Cost (microunits)"
+      column :cost_currency, title: "Currency"
+
+      default_sort :created_at, direction: :desc
+      paginate per_page: 25
+    end
+  end
+
   class RecordingStudioAISection < RecordingStudioAdmin::Section
     key "recording_studio_ai"
     icon :cpu_chip
     title "Recording Studio AI"
     subtitle "Runs, custom tools, provider batches, and retained responses"
 
+        link :calls,
+          text: "AI Calls",
+          url: ->(context) { context.admin_screen_path("ai_calls") },
+          style: :secondary
+
+    link :tool_calls,
+          text: "Custom Tool Calls",
+         url: ->(context) { context.admin_screen_path("tool_calls") },
+         style: :secondary
+
+        link :estimated_spend,
+          text: "Estimated Spend",
+          url: ->(context) { context.admin_screen_path("estimated_spend") },
+          style: :secondary
+
+        link :warnings,
+         text: "Warnings",
+         url: ->(context) { context.admin_screen_path("warnings") },
+         style: :secondary
+
     link :responses,
          text: "AI Responses",
          url: ->(context) { context.admin_screen_path("recording_studio_ai_responses") },
          style: :secondary
 
+    widget "widgets.recording_studio_ai.warnings", view_variant: :compact
     widget "widgets.recording_studio_ai.ai_calls_windows"
     widget "widgets.recording_studio_ai.tool_calls"
     widget "widgets.recording_studio_ai.errors_failed_calls"
     widget "widgets.recording_studio_ai.estimated_spend"
     widget "widgets.recording_studio_ai.calls_by_provider_model"
     widget "widgets.recording_studio_ai.slow_calls"
-    widget "widgets.recording_studio_ai.warnings"
   end
 
   REGISTERABLE_WIDGETS = [
@@ -630,6 +996,10 @@ module AdminScreens
 
     REGISTERABLE_WIDGETS.each { |widget| RecordingStudioAdmin.register_widget(widget) }
     RecordingStudioAdmin.register_screen(RecordingStudioAIOverviewScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAIWarningsScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAICallsScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAIToolCallsScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAIEstimatedSpendScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIResponsesScreen)
     RecordingStudioAdmin.register_section(RecordingStudioAISection)
   end

@@ -22,7 +22,7 @@
         <div><dt class="opacity-70">Source</dt><dd class="mt-1"><%= @run.execution_source.presence || "Unknown" %></dd></div>
         <div class="md:col-span-3"><dt class="opacity-70">Metadata</dt><dd class="mt-1"><pre class="overflow-x-auto whitespace-pre-wrap text-xs"><%= admin_json(@run.metadata) %></pre></dd></div>
         <% if @sensitive %>
-          <div><dt class="opacity-70">Correlation / request / job</dt><dd class="mt-1 break-all"><%= [@run.correlation_id, @run.request_id, @run.job_id].compact.join(" / ") %></dd></div>
+          <div><dt class="opacity-70">Request / job</dt><dd class="mt-1 break-all"><%= [@run.request_id, @run.job_id].compact.join(" / ") %></dd></div>
           <div><dt class="opacity-70">Error</dt><dd class="mt-1"><%= [@run.error_category, @run.error_code, @run.error_message].compact.join(": ").presence || "None" %></dd></div>
           <div><dt class="opacity-70">Input / output digests</dt><dd class="mt-1 break-all"><%= [@run.input_digest, @run.output_digest].compact.join(" / ").presence || "None" %></dd></div>
         <% end %>
