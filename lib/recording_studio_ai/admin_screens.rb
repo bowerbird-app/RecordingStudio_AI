@@ -492,9 +492,24 @@ module AdminScreens
       RecordingStudioAI::Response.includes(attempt: :run, batch_item: :run).order(created_at: :desc)
     end
 
-    table do
-      title "Responses"
+    filter_presentation :modal, inline_count: 3
+    filter :date_range, field: :created_at, default: :last_30_days
+    filter :type,
+           values: -> { RecordingStudioAI::Response.distinct.order(:response_type).pluck(:response_type).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(response_type: value) }
+    filter :provider,
+           options: -> { RecordingStudioAI::Response.distinct.order(:provider).pluck(:provider).compact_blank }
+    filter :model,
+           options: -> { RecordingStudioAI::Response.distinct.order(:model).pluck(:model).compact_blank }
+    filter :finish,
+           options: -> { RecordingStudioAI::Response.distinct.order(:finish_reason).pluck(:finish_reason).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(finish_reason: value) }
+    filter :complete,
+           values: ["1"],
+           control: :checkbox,
+           apply: ->(relation, _value, _context) { relation.where(complete: true) }
 
+    table do
       filter :search, apply: lambda { |relation, value, _context|
         if value.present?
           search = "%#{ActiveRecord::Base.sanitize_sql_like(value.to_s.strip)}%"
