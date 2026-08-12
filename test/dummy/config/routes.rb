@@ -5,6 +5,7 @@ Rails.application.routes.draw do
   # Keep legacy links working by redirecting the base path to the app home.
   get "/recording_studio", to: redirect("/"), as: nil
   mount RecordingStudio::Engine, at: "/recording_studio"
+  mount RecordingStudioAI::Engine, at: "/recording_studio_ai"
   mount RecordingStudioRootSwitchable::Engine, at: "/recording_studio_root_switchable"
   recording_studio_admin_for :admin, at: "/admin", root_section: :recording_studio_ai
 
@@ -20,5 +21,7 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   get "recording_tree", to: "recording_tree#show"
+  get "ai_playground", to: "ai_playground#show"
+  post "ai_playground", to: "ai_playground#create"
   root "home#index"
 end

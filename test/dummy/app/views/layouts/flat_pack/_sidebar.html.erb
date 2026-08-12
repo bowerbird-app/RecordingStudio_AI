@@ -15,9 +15,19 @@
         icon: :dashboard
       ) %>
       <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "AI Responses",
+        href: "/admin/screens/recording_studio_ai_responses",
+        icon: :table
+      ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
         label: "Recording tree",
         href: main_app.recording_tree_path,
         icon: :folder
+      ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "AI playground",
+        href: main_app.ai_playground_path,
+        icon: :cpu_chip
       ) %>
     </nav>
   <% end %>
