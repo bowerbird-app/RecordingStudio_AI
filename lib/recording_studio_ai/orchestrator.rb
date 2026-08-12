@@ -499,7 +499,7 @@ module RecordingStudioAI
     end
 
     def custom_tool_failure(code, category: "custom_tool_failed", message: "Custom tool execution failed.")
-      RecordingStudioAI::Adapters::Result.new(
+      RecordingStudioAI::Providers::Result.new(
         error: RecordingStudioAI::Contracts::NormalizedError.new(
           category: category,
           code: code,
@@ -534,13 +534,13 @@ module RecordingStudioAI
       timeout, timeout_error = provider_timeout(request)
       result = Timeout.timeout(timeout, timeout_error) do
         if operation == :stream
-          execute_stream_adapter(request, candidate)
+          execute_stream_provider(request, candidate)
         else
-          adapter_for!(candidate).generate(request: request, candidate: candidate)
+          provider_for!(candidate).generate(request: request, candidate: candidate)
         end
       end
-      unless result.is_a?(RecordingStudioAI::Adapters::Result)
-        raise TypeError, "Adapter must return RecordingStudioAI::Adapters::Result"
+      unless result.is_a?(RecordingStudioAI::Providers::Result)
+        raise TypeError, "Provider must return RecordingStudioAI::Providers::Result"
       end
       result = RecordingStudioAI::CostCalculator.apply(
         result, provider: candidate.provider, model: candidate.model, configuration: @configuration
@@ -556,7 +556,7 @@ module RecordingStudioAI
     rescue StreamConsumerError
       raise
     rescue StreamIdleTimeout
-      RecordingStudioAI::Adapters::Result.new(
+      RecordingStudioAI::Providers::Result.new(
         error: RecordingStudioAI::Contracts::NormalizedError.new(
           category: "timeout",
           code: "stream_idle_timeout",
@@ -566,7 +566,7 @@ module RecordingStudioAI
         )
       )
     rescue ProviderRequestTimeout
-      RecordingStudioAI::Adapters::Result.new(
+      RecordingStudioAI::Providers::Result.new(
         error: RecordingStudioAI::Contracts::NormalizedError.new(
           category: "timeout",
           code: "provider_timeout",
@@ -576,7 +576,7 @@ module RecordingStudioAI
         )
       )
     rescue Timeout::Error
-      RecordingStudioAI::Adapters::Result.new(
+      RecordingStudioAI::Providers::Result.new(
         error: RecordingStudioAI::Contracts::NormalizedError.new(
           category: "timeout",
           code: "execution_deadline_exceeded",
@@ -586,11 +586,11 @@ module RecordingStudioAI
         )
       )
     rescue StandardError
-      RecordingStudioAI::Adapters::Result.new(
+      RecordingStudioAI::Providers::Result.new(
         error: RecordingStudioAI::Contracts::NormalizedError.new(
           category: "provider_error",
-          code: "adapter_error",
-          message: "Adapter execution failed.",
+          code: "provider_execution_error",
+          message: "Provider execution failed.",
           retryable: false,
           provider: candidate.provider.to_s
         )
@@ -599,10 +599,10 @@ module RecordingStudioAI
       @stream_event_buffer = nil if buffer_stream_events
     end
 
-    def execute_stream_adapter(request, candidate)
+    def execute_stream_provider(request, candidate)
       messages = SizedQueue.new(1)
       worker = Thread.new do
-        result = adapter_for!(candidate).stream(request: request, candidate: candidate) do |event|
+        result = provider_for!(candidate).stream(request: request, candidate: candidate) do |event|
           messages << [:event, event]
         end
         messages << [:result, result]
@@ -612,7 +612,7 @@ module RecordingStudioAI
 
       loop do
         type, payload = Timeout.timeout(stream_idle_timeout(request), StreamIdleTimeout) { messages.pop }
-        emit_adapter_stream_event(payload) if type == :event
+        emit_provider_stream_event(payload) if type == :event
         return payload if type == :result
         raise payload if type == :error
       end
@@ -644,10 +644,10 @@ module RecordingStudioAI
       remaining
     end
 
-    def adapter_for!(candidate)
-      @configuration.adapters.fetch(candidate.provider) do
+    def provider_for!(candidate)
+      @configuration.providers.fetch(candidate.provider) do
         raise RecordingStudioAI::Errors::ContractValidationError.new(
-          "No adapter is configured for #{candidate.provider}",
+          "No provider is configured for #{candidate.provider}",
           code: "configuration"
         )
       end
@@ -680,7 +680,6 @@ module RecordingStudioAI
         execution_source: attribution.execution_source,
         request_id: attribution.request_id,
         job_id: attribution.job_id,
-        correlation_id: SecureRandom.uuid,
         started_at: Time.current,
         input_digest: digest(input),
         input_character_count: input.length,
@@ -909,23 +908,23 @@ module RecordingStudioAI
       run.custom_tool_invocations.count
     end
 
-    def emit_adapter_stream_event(event)
-      unless event.is_a?(RecordingStudioAI::Adapters::StreamEvent)
-        raise TypeError, "Adapter must yield RecordingStudioAI::Adapters::StreamEvent"
+    def emit_provider_stream_event(event)
+      unless event.is_a?(RecordingStudioAI::Providers::StreamEvent)
+        raise TypeError, "Provider must yield RecordingStudioAI::Providers::StreamEvent"
       end
 
       return @stream_event_buffer << event if @stream_event_buffer
 
-      deliver_adapter_stream_event(event)
+      deliver_provider_stream_event(event)
     end
 
     def flush_stream_event_buffer
       events = @stream_event_buffer
       @stream_event_buffer = nil
-      events.each { |event| deliver_adapter_stream_event(event) }
+      events.each { |event| deliver_provider_stream_event(event) }
     end
 
-    def deliver_adapter_stream_event(event)
+    def deliver_provider_stream_event(event)
       emit_stream_event(
         event.type,
         text_delta: event.text_delta,

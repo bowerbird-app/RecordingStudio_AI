@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module RecordingStudioAI
-  module Adapters
+  module Providers
     class ToolCall
       MAX_KEY_LENGTH = 64
       MAX_PROVIDER_TOOL_CALL_ID_LENGTH = 255
@@ -13,7 +13,7 @@ module RecordingStudioAI
         @key = key.to_s
         @arguments = RecordingStudioAI::Contracts::Containment.ensure_serializable!(
           arguments,
-          path: "adapter_tool_call.arguments"
+          path: "provider_tool_call.arguments"
         )
 
         validate!

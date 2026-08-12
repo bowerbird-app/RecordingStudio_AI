@@ -87,7 +87,7 @@ module RecordingStudioAI
           query: query
         ).select(:id)
         scope.where(
-          "correlation_id LIKE :query OR purpose LIKE :query OR error_code LIKE :query OR " \
+          "purpose LIKE :query OR error_code LIKE :query OR " \
           "request_id LIKE :query OR job_id LIKE :query OR id IN (:snapshot_runs) OR id IN (:attempt_runs) OR " \
           "id IN (:batch_runs) OR id IN (:tool_runs)",
           query: query, snapshot_runs: snapshot_runs, attempt_runs: attempt_runs,

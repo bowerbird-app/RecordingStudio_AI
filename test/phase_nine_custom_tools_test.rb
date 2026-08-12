@@ -36,7 +36,7 @@ class PhaseNineCustomToolsTest < Minitest::Test
     end
   end
 
-  class ToolAdapter < RecordingStudioAI::Adapters::Base
+  class ToolProvider < RecordingStudioAI::Providers::Base
     attr_reader :requests
 
     def initialize(*results)
@@ -91,11 +91,11 @@ class PhaseNineCustomToolsTest < Minitest::Test
 
   def test_custom_tool_executor_receives_restricted_context_with_cancellation_state
     received_context = nil
-    adapter = ToolAdapter.new(
+    provider = ToolProvider.new(
       tool_result("call-context", "summarize_record", { "topic" => "Rails" }),
       success_result("continued")
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
     register_tool(executor: lambda { |_arguments, context|
       received_context = context
       { value: "ok" }
@@ -133,15 +133,15 @@ class PhaseNineCustomToolsTest < Minitest::Test
   end
 
   def test_unknown_tool_reference_is_rejected_before_provider_contact
-    adapter = ToolAdapter.new(success_result("must not run"))
-    configure_adapter(adapter)
+    provider = ToolProvider.new(success_result("must not run"))
+    configure_provider(provider)
 
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
       generate(custom_tools: [{ key: :missing_tool, version: 1 }])
     end
 
     assert_equal "custom_tool_validation", error.code
-    assert_empty adapter.requests
+    assert_empty provider.requests
     assert_equal 0, RecordingStudioAI::Run.count
   end
 
@@ -151,20 +151,20 @@ class PhaseNineCustomToolsTest < Minitest::Test
       executed_context = context
       { summary: "#{arguments.fetch('topic')} summary" }
     end)
-    adapter = ToolAdapter.new(
+    provider = ToolProvider.new(
       tool_result("call-1", "summarize_record", topic: "Rails"),
       success_result("Final answer")
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
 
     response = generate
 
     assert response.success?
     assert_equal "Final answer", response.text
     assert_equal %w[primary continuation], response.attempts.map(&:kind)
-    assert_equal 2, adapter.requests.length
-    assert_equal "call-1", adapter.requests.last[:request][:custom_tool_results].first[:provider_tool_call_id]
-    assert_equal "summarize_record", adapter.requests.last[:request][:custom_tool_results].first[:tool_key]
+    assert_equal 2, provider.requests.length
+    assert_equal "call-1", provider.requests.last[:request][:custom_tool_results].first[:provider_tool_call_id]
+    assert_equal "summarize_record", provider.requests.last[:request][:custom_tool_results].first[:tool_key]
     assert_equal @root_recording, executed_context.root_recording
     assert_equal @initiator, executed_context.initiator
     assert_equal 1, response.custom_tool_invocations.length
@@ -187,14 +187,14 @@ class PhaseNineCustomToolsTest < Minitest::Test
       executor: ->(*) { executed = true }
     )
     RecordingStudioAI.configuration.custom_tool_confirmation_handler = ->(**) { false }
-    adapter = ToolAdapter.new(tool_result("call-1", "summarize_record", topic: "Rails"))
-    configure_adapter(adapter)
+    provider = ToolProvider.new(tool_result("call-1", "summarize_record", topic: "Rails"))
+    configure_provider(provider)
 
     response = generate
 
     refute response.success?
     refute executed
-    assert_equal 1, adapter.requests.length
+    assert_equal 1, provider.requests.length
     assert_equal "custom_tool_rejected", response.error.category
     invocation = RecordingStudioAI::CustomToolInvocation.first
     assert_equal "rejected", invocation.status
@@ -205,7 +205,7 @@ class PhaseNineCustomToolsTest < Minitest::Test
     executed = false
     register_tool(requires_confirmation: true, executor: ->(*) { executed = true })
     RecordingStudioAI.configuration.custom_tool_confirmation_handler = ->(**) { :pending }
-    configure_adapter(ToolAdapter.new(tool_result("call-1", "summarize_record", topic: "Rails")))
+    configure_provider(ToolProvider.new(tool_result("call-1", "summarize_record", topic: "Rails")))
 
     response = generate
 
@@ -222,7 +222,7 @@ class PhaseNineCustomToolsTest < Minitest::Test
     executed = false
     register_tool(requires_confirmation: true, executor: ->(*) { executed = true })
     RecordingStudioAI.configuration.custom_tool_confirmation_handler = ->(**) { :expired }
-    configure_adapter(ToolAdapter.new(tool_result("call-1", "summarize_record", topic: "Rails")))
+    configure_provider(ToolProvider.new(tool_result("call-1", "summarize_record", topic: "Rails")))
 
     response = generate
 
@@ -238,14 +238,14 @@ class PhaseNineCustomToolsTest < Minitest::Test
       context.cancellation_state.cancel!
       "discarded result"
     })
-    adapter = ToolAdapter.new(tool_result("call-1", "summarize_record", topic: "Rails"))
-    configure_adapter(adapter)
+    provider = ToolProvider.new(tool_result("call-1", "summarize_record", topic: "Rails"))
+    configure_provider(provider)
 
     response = generate
 
     refute response.success?
     assert_equal "cancelled", response.error.category
-    assert_equal 1, adapter.requests.length
+    assert_equal 1, provider.requests.length
     assert_equal "cancelled", RecordingStudioAI::CustomToolInvocation.first.status
   end
 
@@ -255,8 +255,8 @@ class PhaseNineCustomToolsTest < Minitest::Test
     RecordingStudioAI.configuration.authorization_handler = lambda do |action:, **|
       action != "recording_studio_ai.use_custom_tool"
     end
-    adapter = ToolAdapter.new(tool_result("call-1", "summarize_record", topic: "Rails"))
-    configure_adapter(adapter)
+    provider = ToolProvider.new(tool_result("call-1", "summarize_record", topic: "Rails"))
+    configure_provider(provider)
 
     response = generate
 
@@ -264,7 +264,7 @@ class PhaseNineCustomToolsTest < Minitest::Test
     refute executed
     assert_equal "custom_tool_denied", response.error.category
     assert_equal "denied", RecordingStudioAI::CustomToolInvocation.first.status
-    assert_equal 1, adapter.requests.length
+    assert_equal 1, provider.requests.length
   end
 
   def test_destructive_tool_requires_confirmation_and_records_confirmer
@@ -275,11 +275,11 @@ class PhaseNineCustomToolsTest < Minitest::Test
       true
     end
     RecordingStudioAI.configuration.custom_tool_confirmation_handler = ->(**) { true }
-    adapter = ToolAdapter.new(
+    provider = ToolProvider.new(
       tool_result("call-1", "summarize_record", topic: "Rails"),
       success_result("confirmed")
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
 
     response = generate
 
@@ -295,11 +295,11 @@ class PhaseNineCustomToolsTest < Minitest::Test
   def test_custom_tool_round_limit_stops_repeated_requests
     register_tool
     RecordingStudioAI.configuration.maximum_custom_tool_rounds = 1
-    adapter = ToolAdapter.new(
+    provider = ToolProvider.new(
       tool_result("call-1", "summarize_record", topic: "Rails"),
       tool_result("call-2", "summarize_record", topic: "Ruby")
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
 
     response = generate
 
@@ -311,19 +311,19 @@ class PhaseNineCustomToolsTest < Minitest::Test
 
   def test_multiple_tool_rounds_accumulate_request_scoped_history
     register_tool
-    adapter = ToolAdapter.new(
+    provider = ToolProvider.new(
       tool_result("call-1", "summarize_record", topic: "Rails"),
       tool_result("call-2", "summarize_record", topic: "Ruby"),
       success_result("done")
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
 
     response = generate
 
     assert response.success?
     assert_equal %w[primary continuation continuation], response.attempts.map(&:kind)
-    assert_equal 2, adapter.requests.last[:request][:custom_tool_history].length
-    call_ids = adapter.requests.last[:request][:custom_tool_history].map do |round|
+    assert_equal 2, provider.requests.last[:request][:custom_tool_history].length
+    call_ids = provider.requests.last[:request][:custom_tool_history].map do |round|
       round.fetch(:calls).first.fetch(:provider_tool_call_id)
     end
     assert_equal %w[call-1 call-2], call_ids
@@ -341,15 +341,15 @@ class PhaseNineCustomToolsTest < Minitest::Test
         provider: "test"
       )
     )
-    adapter = ToolAdapter.new(result)
-    configure_adapter(adapter)
+    provider = ToolProvider.new(result)
+    configure_provider(provider)
 
     response = generate
 
     refute response.success?
     refute executed
     assert_equal 0, RecordingStudioAI::CustomToolInvocation.count
-    assert_equal 1, adapter.requests.length
+    assert_equal 1, provider.requests.length
   end
 
   def test_provider_error_on_final_allowed_round_is_not_masked
@@ -362,11 +362,11 @@ class PhaseNineCustomToolsTest < Minitest::Test
       retryable: true,
       provider: "test"
     )
-    adapter = ToolAdapter.new(
+    provider = ToolProvider.new(
       tool_result("call-1", "summarize_record", topic: "Rails"),
       tool_result("call-2", "summarize_record", topic: "Ruby").with(error: provider_error)
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
 
     response = generate
 
@@ -378,7 +378,7 @@ class PhaseNineCustomToolsTest < Minitest::Test
 
   def test_provider_tool_identifiers_are_length_bounded
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
-      RecordingStudioAI::Adapters::ToolCall.new(
+      RecordingStudioAI::Providers::ToolCall.new(
         provider_tool_call_id: "x" * 256,
         key: "summarize_record",
         arguments: {}
@@ -390,8 +390,8 @@ class PhaseNineCustomToolsTest < Minitest::Test
 
   def test_total_execution_deadline_stops_before_provider_contact
     register_tool
-    adapter = ToolAdapter.new(success_result("must not run"))
-    configure_adapter(adapter)
+    provider = ToolProvider.new(success_result("must not run"))
+    configure_provider(provider)
     RecordingStudioAI.configuration.total_execution_timeout = 0
 
     response = generate
@@ -399,24 +399,24 @@ class PhaseNineCustomToolsTest < Minitest::Test
     refute response.success?
     assert_equal "timeout", response.error.category
     assert_equal "execution_deadline_exceeded", response.error.code
-    assert_empty adapter.requests
+    assert_empty provider.requests
   end
 
   def test_all_invocations_become_terminal_when_one_of_multiple_tool_calls_fails
     register_tool
-    adapter = ToolAdapter.new(
-      RecordingStudioAI::Adapters::Result.new(
+    provider = ToolProvider.new(
+      RecordingStudioAI::Providers::Result.new(
         tool_calls: [
-          RecordingStudioAI::Adapters::ToolCall.new(
+          RecordingStudioAI::Providers::ToolCall.new(
             provider_tool_call_id: "call-1", key: "summarize_record", arguments: { topic: "Rails" }
           ),
-          RecordingStudioAI::Adapters::ToolCall.new(
+          RecordingStudioAI::Providers::ToolCall.new(
             provider_tool_call_id: "call-2", key: "summarize_record", arguments: { "private-value" => true }
           )
         ]
       )
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
 
     response = generate
 
@@ -433,8 +433,8 @@ class PhaseNineCustomToolsTest < Minitest::Test
     provider_result = tool_result("call-1", "summarize_record", topic: "Rails").with(
       usage: RecordingStudioAI::Contracts::Usage.new(input_tokens: 7, output_tokens: 2, total_tokens: 9)
     )
-    adapter = ToolAdapter.new(provider_result)
-    configure_adapter(adapter)
+    provider = ToolProvider.new(provider_result)
+    configure_provider(provider)
 
     response = generate
 
@@ -451,7 +451,7 @@ class PhaseNineCustomToolsTest < Minitest::Test
 
   def test_non_idempotent_tool_does_not_retry_or_fallback_failed_continuation
     register_tool(idempotent: false)
-    retryable_failure = RecordingStudioAI::Adapters::Result.new(
+    retryable_failure = RecordingStudioAI::Providers::Result.new(
       error: RecordingStudioAI::Contracts::NormalizedError.new(
         category: "timeout",
         code: "provider_timeout",
@@ -460,19 +460,19 @@ class PhaseNineCustomToolsTest < Minitest::Test
         provider: "test"
       )
     )
-    adapter = ToolAdapter.new(
+    provider = ToolProvider.new(
       tool_result("call-1", "summarize_record", topic: "Rails"),
       retryable_failure,
       success_result("must not retry")
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
     RecordingStudioAI.configuration.maximum_retries_per_candidate = 2
 
     response = generate
 
     refute response.success?
     assert_equal %w[primary continuation], response.attempts.map(&:kind)
-    assert_equal 2, adapter.requests.length
+    assert_equal 2, provider.requests.length
     assert_equal "completed", RecordingStudioAI::CustomToolInvocation.first.status
   end
 
@@ -486,7 +486,7 @@ class PhaseNineCustomToolsTest < Minitest::Test
       },
       { id: "resp_final", status: "completed", output_text: "OpenAI final", output: [] }
     )
-    configure_provider(:openai, OpenAIClient.new(responses))
+    configure_external_provider(:openai, OpenAIClient.new(responses))
 
     response = generate(provider: :openai)
 
@@ -517,7 +517,7 @@ class PhaseNineCustomToolsTest < Minitest::Test
         "candidates" => [{ "content" => { "parts" => [{ "text" => "Gemini final" }] }, "finishReason" => "STOP" }]
       }
     )
-    configure_provider(:gemini, GeminiClient.new(models))
+    configure_external_provider(:gemini, GeminiClient.new(models))
 
     response = generate(provider: :gemini)
 
@@ -614,9 +614,9 @@ class PhaseNineCustomToolsTest < Minitest::Test
   end
 
   def tool_result(call_id, key, arguments)
-    RecordingStudioAI::Adapters::Result.new(
+    RecordingStudioAI::Providers::Result.new(
       tool_calls: [
-        RecordingStudioAI::Adapters::ToolCall.new(
+        RecordingStudioAI::Providers::ToolCall.new(
           provider_tool_call_id: call_id,
           key: key,
           arguments: arguments
@@ -627,18 +627,18 @@ class PhaseNineCustomToolsTest < Minitest::Test
   end
 
   def success_result(text)
-    RecordingStudioAI::Adapters::Result.new(text: text, finish_reason: "stop")
+    RecordingStudioAI::Providers::Result.new(text: text, finish_reason: "stop")
   end
 
-  def configure_adapter(adapter)
+  def configure_provider(provider)
     configuration = RecordingStudioAI.configuration
-    configuration.adapters = { test: adapter }
+    configuration.providers = { test: provider }
     configuration.profiles[:medium] = [
       { provider: :test, model: "tool-model", capabilities: %i[generation custom_tools] }
     ]
   end
 
-  def configure_provider(provider, client)
+  def configure_external_provider(provider, client)
     configuration = RecordingStudioAI.configuration
     configuration.public_send("#{provider}_client=", client)
     configuration.allowed_provider_overrides = [provider]

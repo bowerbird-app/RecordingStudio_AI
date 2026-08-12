@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module RecordingStudioAI
-  module Adapters
+  module Providers
     class StreamEvent
       TYPES = %w[text_delta citation].freeze
 
@@ -11,7 +11,7 @@ module RecordingStudioAI
         @type = type.to_s
         @text_delta = text_delta
         @citation = citation
-        @metadata = RecordingStudioAI::Metadata.sanitize!(metadata, path: "adapter_stream_event.metadata")
+        @metadata = RecordingStudioAI::Metadata.sanitize!(metadata, path: "provider_stream_event.metadata")
         validate!
       end
 
@@ -29,7 +29,7 @@ module RecordingStudioAI
       def validate!
         unless TYPES.include?(type)
           raise RecordingStudioAI::Errors::ContractValidationError.new(
-            "adapter stream event type must be one of: #{TYPES.join(', ')}",
+            "provider stream event type must be one of: #{TYPES.join(', ')}",
             code: "invalid_request"
           )
         end

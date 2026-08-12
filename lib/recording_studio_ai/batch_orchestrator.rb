@@ -16,7 +16,7 @@ module RecordingStudioAI
         required_capabilities: Capabilities.for_batch(request.fetch(:items))
       )
       batch = create_records!(request, candidate)
-      result = adapter_for!(candidate).submit_batch(request: request, candidate: candidate)
+      result = provider_for!(candidate).submit_batch(request: request, candidate: candidate)
       ensure_batch_result!(result)
       result = normalize_submission_result(result, candidate)
       result = apply_result!(batch, result, fail_pending_items: !result.success?)
@@ -34,7 +34,7 @@ module RecordingStudioAI
     def refresh(request)
       batch = find_batch!(request)
       candidate = stored_candidate!(batch, cancellation: false)
-      result = adapter_for!(candidate).refresh_batch(batch: batch, candidate: candidate)
+      result = provider_for!(candidate).refresh_batch(batch: batch, candidate: candidate)
       ensure_batch_result!(result)
       result = apply_result!(batch, result)
       build_response(batch.reload, result, operation: "batch_refresh", transient_items: result.items)
@@ -43,7 +43,7 @@ module RecordingStudioAI
     def cancel(request)
       batch = find_batch!(request)
       candidate = stored_candidate!(batch, cancellation: true)
-      result = adapter_for!(candidate).cancel_batch(batch: batch, candidate: candidate)
+      result = provider_for!(candidate).cancel_batch(batch: batch, candidate: candidate)
       ensure_batch_result!(result)
       result = apply_result!(batch, result)
       build_response(batch.reload, result, operation: "batch_cancel", transient_items: result.items)
@@ -69,7 +69,7 @@ module RecordingStudioAI
           impersonator_id: identifier(attribution.impersonator),
           impersonator_snapshot: attribution.snapshot(:impersonator, configuration: @configuration),
           execution_source: attribution.execution_source,
-          request_id: attribution.request_id, job_id: attribution.job_id, correlation_id: SecureRandom.uuid,
+          request_id: attribution.request_id, job_id: attribution.job_id,
           item_count: request.fetch(:items).length,
           metadata: request.fetch(:metadata).merge(
             "_recording_studio_ai" => { "capabilities" => candidate.capabilities.map(&:to_s) }
@@ -90,7 +90,7 @@ module RecordingStudioAI
             impersonator_id: identifier(attribution.impersonator),
             impersonator_snapshot: attribution.snapshot(:impersonator, configuration: @configuration),
             execution_source: attribution.execution_source,
-            request_id: attribution.request_id, job_id: attribution.job_id, correlation_id: SecureRandom.uuid,
+            request_id: attribution.request_id, job_id: attribution.job_id,
             attachment_count: item[:attachments].length,
             attachment_total_bytes: item[:attachments].sum { |attachment| attachment[:byte_size] },
             attachment_content_types: item[:attachments].map { |attachment| attachment[:content_type] }.uniq,
@@ -133,7 +133,7 @@ module RecordingStudioAI
       batch.batch_items.each do |item|
         next if BatchItem.terminal_statuses.include?(item.status)
 
-        apply_item_result!(batch, Adapters::BatchItemResult.new(
+        apply_item_result!(batch, Providers::BatchItemResult.new(
           reference: item.reference, status: item_status, error: error
         ))
       end
@@ -189,7 +189,7 @@ module RecordingStudioAI
       batch.batch_items.each do |item|
         next if BatchItem.terminal_statuses.include?(item.status)
 
-        normalized = Adapters::BatchItemResult.new(
+        normalized = Providers::BatchItemResult.new(
           reference: item.reference, status: "failed",
           error: Contracts::NormalizedError.new(
             category: "batch_submission", code: error&.code || "batch_submission_failed",
@@ -267,7 +267,7 @@ module RecordingStudioAI
       return result unless schema && result.status == "completed"
 
       validated = StructuredOutput.apply(
-        Adapters::Result.new(text: result.text), schema: schema, provider: provider
+        Providers::Result.new(text: result.text), schema: schema, provider: provider
       )
       if validated.success?
         result.with(structured_data: validated.structured_data)
@@ -287,7 +287,7 @@ module RecordingStudioAI
       required << :provider_batch_cancellation if cancellation
       capabilities = batch.metadata.dig("_recording_studio_ai", "capabilities") || []
       candidate = Candidate.new(provider: batch.provider, model: batch.model, capabilities: capabilities)
-      return candidate if @configuration.adapters.key?(candidate.provider) && candidate.supports?(required)
+      return candidate if @configuration.providers.key?(candidate.provider) && candidate.supports?(required)
 
       raise Errors::ResolutionError.new(
         category: "unsupported_capability", code: "unsupported_capability",
@@ -295,20 +295,20 @@ module RecordingStudioAI
       )
     end
 
-    def adapter_for!(candidate) = @configuration.adapters.fetch(candidate.provider)
+    def provider_for!(candidate) = @configuration.providers.fetch(candidate.provider)
 
     def ensure_batch_result!(result)
-      raise TypeError, "Adapter must return RecordingStudioAI::Adapters::BatchResult" unless result.is_a?(Adapters::BatchResult)
+      raise TypeError, "Provider must return RecordingStudioAI::Providers::BatchResult" unless result.is_a?(Providers::BatchResult)
     end
 
     def build_response(batch, result, operation:, transient_items: [])
       transient_by_reference = transient_items.index_by(&:reference)
       items = batch ? batch.batch_items.order(:position).map do |item|
-        adapter_item = transient_by_reference[item.reference]
+        provider_item = transient_by_reference[item.reference]
         Contracts::BatchItemResult.new(
           reference: item.reference, provider_item_id: item.provider_item_id, status: item.status,
-          text: adapter_item&.text, structured_data: adapter_item&.structured_data,
-          citations: adapter_item&.citations || [], provider_native_tools: adapter_item&.provider_native_tools || [],
+          text: provider_item&.text, structured_data: provider_item&.structured_data,
+          citations: provider_item&.citations || [], provider_native_tools: provider_item&.provider_native_tools || [],
           finish_reason: item.finish_reason, usage: usage_from(item), cost: cost_from(item),
           error: item_error(item), metadata: item.metadata || {}
         )
@@ -369,7 +369,7 @@ module RecordingStudioAI
     end
 
     def error_result(error, provider)
-      Adapters::BatchResult.new(
+      Providers::BatchResult.new(
         status: "failed",
         error: Contracts::NormalizedError.new(category: error.category, code: error.code, message: error.message,
                                               retryable: false, provider: provider&.to_s)
@@ -377,7 +377,7 @@ module RecordingStudioAI
     end
 
     def submission_failure(_error, candidate)
-      Adapters::BatchResult.new(
+      Providers::BatchResult.new(
         status: "failed",
         error: Contracts::NormalizedError.new(category: "batch_submission", code: "batch_submission_failed",
                                               message: "Provider batch submission failed.", retryable: false,
@@ -388,7 +388,7 @@ module RecordingStudioAI
     def normalize_submission_result(result, candidate)
       return result if result.success?
 
-      Adapters::BatchResult.new(
+      Providers::BatchResult.new(
         status: "failed", provider_batch_id: result.provider_batch_id,
         error: Contracts::NormalizedError.new(
           category: "batch_submission", code: result.error.code,

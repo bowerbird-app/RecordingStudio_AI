@@ -23,9 +23,9 @@ class RecordingStudioAITest < Minitest::Test
     assert migration_files.any? { |file| file.include?("create_recording_studio_ai_persistence_tables") }
     assert migration_files.any? { |file| file.include?("harden_recording_studio_ai_persistence") }
     assert migration_files.any? { |file| file.include?("enforce_recording_studio_ai_history_integrity") }
-    assert File.exist?(File.join(root, "lib/recording_studio_ai/adapters/base.rb"))
-    assert File.exist?(File.join(root, "lib/recording_studio_ai/adapters/open_ai.rb"))
-    assert File.exist?(File.join(root, "lib/recording_studio_ai/adapters/gemini.rb"))
+    assert File.exist?(File.join(root, "lib/recording_studio_ai/providers/base.rb"))
+    assert File.exist?(File.join(root, "lib/recording_studio_ai/providers/openai.rb"))
+    assert File.exist?(File.join(root, "lib/recording_studio_ai/providers/gemini.rb"))
     refute File.exist?(File.join(root, "lib/recording_studio_ai/services/example_service.rb"))
     refute File.exist?(File.join(root, "app/controllers/recording_studio_ai/home_controller.rb"))
   end

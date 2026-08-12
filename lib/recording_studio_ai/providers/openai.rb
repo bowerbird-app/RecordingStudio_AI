@@ -5,8 +5,10 @@ require "json"
 require "stringio"
 
 module RecordingStudioAI
-  module Adapters
+  module Providers
     class OpenAI < Base
+      provider_key :openai
+
       include ValueReader
 
       RETRYABLE_STREAM_ERROR_CODES = %w[
@@ -417,7 +419,7 @@ module RecordingStudioAI
         Array(read_value(response, :output)).filter_map do |item|
           next unless read_value(item, :type).to_s == "function_call"
 
-          RecordingStudioAI::Adapters::ToolCall.new(
+          RecordingStudioAI::Providers::ToolCall.new(
             provider_tool_call_id: read_value(item, :call_id, :id),
             key: read_value(item, :name),
             arguments: JSON.parse(read_value(item, :arguments).to_s)

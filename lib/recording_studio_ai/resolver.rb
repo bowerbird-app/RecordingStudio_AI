@@ -25,8 +25,8 @@ module RecordingStudioAI
       candidates = Array(@configuration.profiles[profile.to_sym]).map { |entry| build_candidate(entry) }
       candidates.select! { |candidate| candidate.provider == provider_key } if provider_key
       candidates.select! do |candidate|
-        adapter = @configuration.adapters[candidate.provider]
-        adapter && (!adapter.respond_to?(:configured?) || adapter.configured?)
+        provider = @configuration.providers[candidate.provider]
+        provider && (!provider.respond_to?(:configured?) || provider.configured?)
       end
 
       eligible = candidates.select { |candidate| candidate.supports?(required_capabilities) }

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module RecordingStudioAI
-  module Adapters
+  module Providers
     class BatchResult
       STATUSES = %w[preparing submitted processing completed partially_completed failed cancelled expired].freeze
 
@@ -34,7 +34,7 @@ module RecordingStudioAI
         failure_has_error = !%w[failed expired].include?(status) || !error.nil?
         return if STATUSES.include?(status) && valid_items && valid_error && failure_has_error
 
-        raise Errors::ContractValidationError.new("invalid adapter batch result", code: "invalid_request")
+        raise Errors::ContractValidationError.new("invalid provider batch result", code: "invalid_request")
       end
     end
   end

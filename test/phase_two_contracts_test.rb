@@ -314,7 +314,7 @@ class PhaseTwoContractsTest < Minitest::Test
       }
     }
 
-    result = RecordingStudioAI::Adapters::Result.new(metadata: metadata)
+    result = RecordingStudioAI::Providers::Result.new(metadata: metadata)
     event = RecordingStudioAI::Contracts::StreamingEvent.new(type: :completed, metadata: metadata)
 
     [result.metadata, event.metadata].each do |sanitized|

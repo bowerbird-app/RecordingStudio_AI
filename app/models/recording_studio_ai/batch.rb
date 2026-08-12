@@ -26,7 +26,7 @@ module RecordingStudioAI
              dependent: :restrict_with_exception,
              inverse_of: :batch
 
-    validates :status, :correlation_id, :initiator_type, :initiator_id, :initiator_kind, :root_recording_id,
+    validates :status, :initiator_type, :initiator_id, :initiator_kind, :root_recording_id,
               presence: true
 
     class << self

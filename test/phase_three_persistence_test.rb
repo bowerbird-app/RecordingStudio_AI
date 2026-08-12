@@ -50,14 +50,10 @@ class PhaseThreePersistenceTest < Minitest::Test
     connection = ActiveRecord::Base.connection
 
     run_indexes = connection.indexes(:recording_studio_ai_runs)
-    assert(run_indexes.any? { |index| index.columns == ["correlation_id"] && index.unique })
-
     attempt_indexes = connection.indexes(:recording_studio_ai_attempts)
     assert(attempt_indexes.any? { |index| index.columns == %w[run_id sequence] && index.unique })
 
     batch_indexes = connection.indexes(:recording_studio_ai_batches)
-    assert(batch_indexes.any? { |index| index.columns == ["correlation_id"] && index.unique })
-
     batch_item_indexes = connection.indexes(:recording_studio_ai_batch_items)
     assert(batch_item_indexes.any? { |index| index.columns == ["run_id"] && index.unique })
     assert(batch_item_indexes.any? { |index| index.columns == %w[batch_id position] && index.unique })
@@ -130,8 +126,7 @@ class PhaseThreePersistenceTest < Minitest::Test
     root_recording_id = create_recording_id
     run = RecordingStudioAI::Run.create!(
       operation: "generation", status: "pending", root_recording_id: root_recording_id,
-      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user",
-      correlation_id: "run-#{SecureRandom.hex(8)}"
+      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user"
     )
 
     assert_raises(ActiveRecord::StatementInvalid) { run.update_column(:operation, "conversation") }
@@ -160,8 +155,7 @@ class PhaseThreePersistenceTest < Minitest::Test
       root_recording_id: root_recording_id,
       initiator_type: "User",
       initiator_id: 1,
-      initiator_kind: "user",
-      correlation_id: "corr-#{SecureRandom.hex(8)}"
+      initiator_kind: "user"
     )
 
     assert run.update(status: "completed")
@@ -174,8 +168,7 @@ class PhaseThreePersistenceTest < Minitest::Test
     root_recording_id = create_recording_id
     run = RecordingStudioAI::Run.create!(
       operation: "generation", status: "completed", root_recording_id: root_recording_id,
-      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user",
-      correlation_id: "run-#{SecureRandom.hex(8)}"
+      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user"
     )
     attempt = run.attempts.create!(sequence: 1, kind: "primary", status: "completed")
     invocation = run.custom_tool_invocations.create!(
@@ -185,7 +178,7 @@ class PhaseThreePersistenceTest < Minitest::Test
     batch = RecordingStudioAI::Batch.create!(
       status: "completed", root_recording_id: root_recording_id,
       initiator_type: "User", initiator_id: "user-1", initiator_kind: "user",
-      correlation_id: "batch-#{SecureRandom.hex(8)}", item_count: 1, completed_item_count: 1
+      item_count: 1, completed_item_count: 1
     )
     item = batch.batch_items.create!(run: run, position: 0, reference: "item-1", status: "completed")
 
@@ -205,13 +198,11 @@ class PhaseThreePersistenceTest < Minitest::Test
     second_root = create_recording_id
     first_run = RecordingStudioAI::Run.create!(
       operation: "generation", status: "pending", root_recording_id: first_root,
-      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user",
-      correlation_id: "run-#{SecureRandom.hex(8)}"
+      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user"
     )
     second_run = RecordingStudioAI::Run.create!(
       operation: "batch", status: "pending", root_recording_id: second_root,
-      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user",
-      correlation_id: "run-#{SecureRandom.hex(8)}"
+      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user"
     )
     first_attempt = first_run.attempts.create!(sequence: 1, kind: "primary", status: "pending")
     invocation = second_run.custom_tool_invocations.new(
@@ -223,8 +214,7 @@ class PhaseThreePersistenceTest < Minitest::Test
 
     batch = RecordingStudioAI::Batch.create!(
       status: "preparing", root_recording_id: first_root,
-      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user",
-      correlation_id: "batch-#{SecureRandom.hex(8)}"
+      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user"
     )
     item = batch.batch_items.new(run: second_run, position: 0, reference: "cross-root", status: "pending")
     refute item.valid?
@@ -245,8 +235,7 @@ class PhaseThreePersistenceTest < Minitest::Test
     root_recording_id = create_recording_id
     run = RecordingStudioAI::Run.create!(
       operation: "generation", status: "pending", root_recording_id: root_recording_id,
-      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user",
-      correlation_id: "run-#{SecureRandom.hex(8)}"
+      initiator_type: "User", initiator_id: "user-1", initiator_kind: "user"
     )
     attempt = run.attempts.create!(sequence: 1, kind: "primary", status: "pending")
     run.custom_tool_invocations.create!(

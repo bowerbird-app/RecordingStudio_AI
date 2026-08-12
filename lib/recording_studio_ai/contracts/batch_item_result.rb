@@ -38,7 +38,7 @@ module RecordingStudioAI
 
       def validate!
         valid = (text.nil? || text.is_a?(String)) &&
-          Adapters::BatchItemResult::STATUSES.include?(status) &&
+          Providers::BatchItemResult::STATUSES.include?(status) &&
                 citations.all? { |citation| citation.is_a?(Citation) } &&
                 (usage.nil? || usage.is_a?(Usage)) && (cost.nil? || cost.is_a?(Cost)) &&
                 (error.nil? || error.is_a?(NormalizedError))

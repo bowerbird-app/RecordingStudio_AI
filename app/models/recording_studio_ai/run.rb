@@ -35,7 +35,7 @@ module RecordingStudioAI
             dependent: :restrict_with_exception,
             inverse_of: :run
 
-    validates :operation, :status, :correlation_id, :initiator_type, :initiator_id, :initiator_kind,
+    validates :operation, :status, :initiator_type, :initiator_id, :initiator_kind,
               :root_recording_id, presence: true
     validates :operation, inclusion: { in: %w[generation stream batch] }
 

@@ -6,6 +6,7 @@ require "active_record"
 migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb",
                                       __dir__)].first
 require migration_file
+require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
 
 require_relative "../app/models/recording_studio_ai/application_record"
 require_relative "../app/models/concerns/recording_studio_ai/terminal_immutability"
@@ -66,6 +67,7 @@ class PhaseSixSynchronousProvidersTest < Minitest::Test
     bootstrap_external_recording_studio_table
     ActiveRecord::Migration.suppress_messages do
       CreateRecordingStudioAIPersistenceTables.migrate(:up)
+      RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up)
     end
 
     @root_recording = Actor.new(create_recording_id)
@@ -297,12 +299,12 @@ class PhaseSixSynchronousProvidersTest < Minitest::Test
     url = URI("https://api.openai.com/v1/responses")
 
     timeout = OpenAI::Errors::APITimeoutError.new(url: url)
-    timeout_error = RecordingStudioAI::Adapters::ProviderError.normalize(timeout, provider: :openai)
+    timeout_error = RecordingStudioAI::Providers::ProviderError.normalize(timeout, provider: :openai)
     assert_equal "timeout", timeout_error.category
     assert timeout_error.retryable?
 
     connection = OpenAI::Errors::APIConnectionError.new(url: url)
-    connection_error = RecordingStudioAI::Adapters::ProviderError.normalize(connection, provider: :openai)
+    connection_error = RecordingStudioAI::Providers::ProviderError.normalize(connection, provider: :openai)
     assert_equal "connection", connection_error.category
     assert connection_error.retryable?
   end

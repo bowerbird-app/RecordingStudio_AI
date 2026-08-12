@@ -5,6 +5,7 @@ require "active_record"
 
 migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb", __dir__)].first
 require migration_file
+require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
 require File.expand_path("../db/migrate/20260811120000_harden_recording_studio_ai_persistence.rb", __dir__)
 require File.expand_path("../db/migrate/20260811130000_enforce_recording_studio_ai_history_integrity.rb", __dir__)
 
@@ -18,7 +19,7 @@ require_relative "../app/jobs/recording_studio_ai/batch_synchronization_job"
 class PhaseElevenProviderBatchesTest < Minitest::Test
   Actor = Struct.new(:id)
 
-  class BatchAdapter < RecordingStudioAI::Adapters::Base
+  class BatchProvider < RecordingStudioAI::Providers::Base
     attr_reader :submissions, :refreshes, :cancellations
     attr_accessor :submit_result, :refresh_result, :cancel_result
 
@@ -26,11 +27,11 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
       @submissions = []
       @refreshes = []
       @cancellations = []
-      @submit_result = RecordingStudioAI::Adapters::BatchResult.new(
+      @submit_result = RecordingStudioAI::Providers::BatchResult.new(
         status: "submitted", provider_batch_id: "provider-batch-1"
       )
       @refresh_result = @submit_result
-      @cancel_result = RecordingStudioAI::Adapters::BatchResult.new(
+      @cancel_result = RecordingStudioAI::Providers::BatchResult.new(
         status: "cancelled", provider_batch_id: "provider-batch-1"
       )
     end
@@ -51,7 +52,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     end
   end
 
-  class ExplodingBatchAdapter < BatchAdapter
+  class ExplodingBatchProvider < BatchProvider
     def submit_batch(request:, candidate:)
       raise "secret provider batch payload"
     end
@@ -62,6 +63,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     ActiveRecord::Base.connection.create_table(:recording_studio_recordings) { |table| table.timestamps }
     ActiveRecord::Migration.suppress_messages do
       CreateRecordingStudioAIPersistenceTables.migrate(:up)
+      RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up)
       HardenRecordingStudioAIPersistence.migrate(:up)
       EnforceRecordingStudioAIHistoryIntegrity.migrate(:up)
     end
@@ -69,7 +71,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     @root_recording = Actor.new(create_recording_id)
     @other_root = Actor.new(create_recording_id)
     @initiator = Actor.new(41)
-    @adapter = BatchAdapter.new
+    @provider = BatchProvider.new
     @original_configuration = RecordingStudioAI.instance_variable_get(:@configuration)
     RecordingStudioAI.instance_variable_set(:@configuration, configured_configuration)
   end
@@ -197,7 +199,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     assert_equal "unsupported_capability", response.error.category
     assert_equal 0, RecordingStudioAI::Batch.count
     assert_equal 0, RecordingStudioAI::Run.count
-    assert_empty @adapter.submissions
+    assert_empty @provider.submissions
   end
 
   def test_batch_web_search_authorization_receives_batch_attribution
@@ -263,7 +265,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
 
   def test_refresh_is_idempotent_and_aggregates_reported_item_metrics
     response = submit_two_items
-    @adapter.refresh_result = completed_result
+    @provider.refresh_result = completed_result
 
     first = RecordingStudioAI.refresh_batch(
       batch_id: response.batch.id, root_recording: @root_recording, initiator: @initiator
@@ -281,12 +283,12 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     assert_equal 300, second.cost.amount
     assert_equal "answer one", second.items.first.text
     assert_equal 2, RecordingStudioAI::Run.where(status: "completed").count
-    assert_equal 2, @adapter.refreshes.length
+    assert_equal 2, @provider.refreshes.length
   end
 
   def test_batch_catalog_costs_preserve_estimated_source
     response = submit_two_items
-    @adapter.refresh_result = completed_result(with_cost: false)
+    @provider.refresh_result = completed_result(with_cost: false)
     RecordingStudioAI.configuration.cost_catalogs = {
       test: { "batch-model" => { input_tokens: 1_000_000, output_tokens: 2_000_000, currency: "USD" } }
     }
@@ -303,7 +305,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
 
   def test_batch_mixed_currencies_leave_aggregate_cost_unknown
     response = submit_two_items
-    @adapter.refresh_result = RecordingStudioAI::Adapters::BatchResult.new(
+    @provider.refresh_result = RecordingStudioAI::Providers::BatchResult.new(
       status: "completed", provider_batch_id: "provider-batch-1",
       items: [
         completed_item("first", "one", input: 1, output: 1, cost: 100),
@@ -327,16 +329,16 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
       items: [{ reference: "structured", prompt: "private", schema: schema }],
       provider: :test, root_recording: @root_recording, initiator: @initiator
     )
-    @adapter.refresh_result = RecordingStudioAI::Adapters::BatchResult.new(
+    @provider.refresh_result = RecordingStudioAI::Providers::BatchResult.new(
       status: "completed", provider_batch_id: "provider-batch-1",
-      items: [RecordingStudioAI::Adapters::BatchItemResult.new(
+      items: [RecordingStudioAI::Providers::BatchItemResult.new(
         reference: "structured", status: "completed", text: '{"summary":"valid"}'
       )]
     )
     RecordingStudioAI.refresh_batch(batch_id: submitted.batch.id, root_recording: @root_recording, initiator: @initiator)
-    @adapter.refresh_result = RecordingStudioAI::Adapters::BatchResult.new(
+    @provider.refresh_result = RecordingStudioAI::Providers::BatchResult.new(
       status: "completed", provider_batch_id: "provider-batch-1",
-      items: [RecordingStudioAI::Adapters::BatchItemResult.new(
+      items: [RecordingStudioAI::Providers::BatchItemResult.new(
         reference: "structured", status: "completed", text: '{"wrong":true}'
       )]
     )
@@ -352,14 +354,14 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
 
   def test_refresh_does_not_regress_processing_state
     response = submit_two_items
-    @adapter.refresh_result = RecordingStudioAI::Adapters::BatchResult.new(
+    @provider.refresh_result = RecordingStudioAI::Providers::BatchResult.new(
       status: "processing", provider_batch_id: "provider-batch-1",
-      items: [RecordingStudioAI::Adapters::BatchItemResult.new(reference: "first", status: "processing")]
+      items: [RecordingStudioAI::Providers::BatchItemResult.new(reference: "first", status: "processing")]
     )
     RecordingStudioAI.refresh_batch(batch_id: response.batch.id, root_recording: @root_recording, initiator: @initiator)
-    @adapter.refresh_result = RecordingStudioAI::Adapters::BatchResult.new(
+    @provider.refresh_result = RecordingStudioAI::Providers::BatchResult.new(
       status: "submitted", provider_batch_id: "provider-batch-1",
-      items: [RecordingStudioAI::Adapters::BatchItemResult.new(reference: "first", status: "pending")]
+      items: [RecordingStudioAI::Providers::BatchItemResult.new(reference: "first", status: "pending")]
     )
 
     refreshed = RecordingStudioAI.refresh_batch(
@@ -373,7 +375,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
 
   def test_completed_provider_batch_terminalizes_missing_items_as_failed
     response = submit_two_items
-    @adapter.refresh_result = RecordingStudioAI::Adapters::BatchResult.new(
+    @provider.refresh_result = RecordingStudioAI::Providers::BatchResult.new(
       status: "completed",
       provider_batch_id: "provider-batch-1",
       items: [completed_item("first", "answer one", input: 4, output: 6, cost: 100)]
@@ -399,9 +401,9 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
       items: [{ reference: "structured", prompt: "private prompt", schema: schema }],
       provider: :test, root_recording: @root_recording, initiator: @initiator
     )
-    @adapter.refresh_result = RecordingStudioAI::Adapters::BatchResult.new(
+    @provider.refresh_result = RecordingStudioAI::Providers::BatchResult.new(
       status: "completed", provider_batch_id: "provider-batch-1",
-      items: [RecordingStudioAI::Adapters::BatchItemResult.new(
+      items: [RecordingStudioAI::Providers::BatchItemResult.new(
         reference: "structured", status: "completed", text: '{"wrong":true}'
       )]
     )
@@ -418,11 +420,11 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
 
   def test_batch_usage_remains_unknown_when_any_item_usage_is_unknown
     response = submit_two_items
-    @adapter.refresh_result = RecordingStudioAI::Adapters::BatchResult.new(
+    @provider.refresh_result = RecordingStudioAI::Providers::BatchResult.new(
       status: "completed", provider_batch_id: "provider-batch-1",
       items: [
         completed_item("first", "answer one", input: 4, output: 6, cost: 100),
-        RecordingStudioAI::Adapters::BatchItemResult.new(reference: "second", status: "completed", text: "answer two")
+        RecordingStudioAI::Providers::BatchItemResult.new(reference: "second", status: "completed", text: "answer two")
       ]
     )
 
@@ -436,7 +438,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
 
   def test_terminal_batch_item_and_run_statuses_cannot_be_reopened
     response = submit_two_items
-    @adapter.refresh_result = completed_result
+    @provider.refresh_result = completed_result
     RecordingStudioAI.refresh_batch(
       batch_id: response.batch.id, root_recording: @root_recording, initiator: @initiator
     )
@@ -449,7 +451,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
   def test_refresh_uses_persisted_provider_capabilities_after_profile_changes
     response = submit_two_items
     RecordingStudioAI.configuration.profiles[:medium] = []
-    @adapter.refresh_result = completed_result
+    @provider.refresh_result = completed_result
 
     refreshed = RecordingStudioAI.refresh_batch(
       batch_id: response.batch.id, root_recording: @root_recording, initiator: @initiator
@@ -469,10 +471,10 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
 
     refute cancelled.success?
     assert_equal "unsupported_capability", cancelled.error.category
-    assert_empty @adapter.cancellations
+    assert_empty @provider.cancellations
   end
 
-  def test_cancel_calls_supported_adapter_and_updates_status
+  def test_cancel_calls_supported_provider_and_updates_status
     response = submit_two_items
     cancelled = RecordingStudioAI.cancel_batch(
       batch_id: response.batch.id, root_recording: @root_recording, initiator: @initiator
@@ -480,7 +482,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
 
     assert cancelled.success?
     assert_equal "cancelled", cancelled.status
-    assert_equal 1, @adapter.cancellations.length
+    assert_equal 1, @provider.cancellations.length
     assert_equal %w[cancelled cancelled], cancelled.batch.batch_items.order(:position).pluck(:status)
     assert_equal %w[cancelled cancelled], RecordingStudioAI::Run.order(:id).pluck(:status)
   end
@@ -496,7 +498,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
   end
 
   def test_submit_failure_is_normalized_and_terminalizes_all_records
-    RecordingStudioAI.configuration.adapters[:test] = ExplodingBatchAdapter.new
+    RecordingStudioAI.configuration.providers[:test] = ExplodingBatchProvider.new
 
     response = submit_two_items
 
@@ -510,25 +512,25 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
 
   def test_batch_values_reject_sdk_objects_at_containment_boundary
     assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
-      RecordingStudioAI::Adapters::BatchItemResult.new(
+      RecordingStudioAI::Providers::BatchItemResult.new(
         reference: "item", status: "completed", metadata: { sdk: Object.new }
       )
     end
     assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
-      RecordingStudioAI::Adapters::BatchResult.new(status: "failed")
+      RecordingStudioAI::Providers::BatchResult.new(status: "failed")
     end
   end
 
-  def test_openai_adapter_uses_responses_jsonl_and_parses_output
+  def test_openai_provider_uses_responses_jsonl_and_parses_output
     files = FakeOpenAIFiles.new
     client = Struct.new(:files, :batches).new(files, FakeOpenAIBatches.new)
     RecordingStudioAI.configuration.openai_client = client
-    adapter = RecordingStudioAI::Adapters::OpenAI.new(configuration: RecordingStudioAI.configuration)
+    provider = RecordingStudioAI::Providers::OpenAI.new(configuration: RecordingStudioAI.configuration)
     candidate = RecordingStudioAI::Candidate.new(provider: :openai, model: "gpt-test", capabilities: %i[generation provider_batch])
     request = normalized_request([{ reference: "ref-1", prompt: "private prompt" }])
 
-    submitted = adapter.submit_batch(request: request, candidate: candidate)
-    refreshed = adapter.refresh_batch(batch: Struct.new(:provider_batch_id).new("batch-1"), candidate: candidate)
+    submitted = provider.submit_batch(request: request, candidate: candidate)
+    refreshed = provider.refresh_batch(batch: Struct.new(:provider_batch_id).new("batch-1"), candidate: candidate)
 
     assert_equal "batch-1", submitted.provider_batch_id
     line = JSON.parse(files.uploaded.string.lines.first)
@@ -539,25 +541,25 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     assert_equal "batch answer", refreshed.items.first.text
   end
 
-  def test_openai_adapter_normalizes_malformed_batch_jsonl
+  def test_openai_provider_normalizes_malformed_batch_jsonl
     files = FakeOpenAIFiles.new
     files.malformed = true
     client = Struct.new(:files, :batches).new(files, FakeOpenAIBatches.new)
     RecordingStudioAI.configuration.openai_client = client
-    adapter = RecordingStudioAI::Adapters::OpenAI.new(configuration: RecordingStudioAI.configuration)
+    provider = RecordingStudioAI::Providers::OpenAI.new(configuration: RecordingStudioAI.configuration)
     candidate = RecordingStudioAI::Candidate.new(provider: :openai, model: "gpt-test", capabilities: %i[generation provider_batch])
 
-    result = adapter.refresh_batch(batch: Struct.new(:provider_batch_id, :status).new("batch-1", "processing"), candidate: candidate)
+    result = provider.refresh_batch(batch: Struct.new(:provider_batch_id, :status).new("batch-1", "processing"), candidate: candidate)
 
     refute result.success?
     assert_equal "invalid_response", result.error.category
   end
 
-  def test_openai_adapter_cancels_and_normalizes_provider_batch
+  def test_openai_provider_cancels_and_normalizes_provider_batch
     batches = FakeOpenAIBatches.new
     client = Struct.new(:files, :batches).new(FakeOpenAIFiles.new, batches)
     RecordingStudioAI.configuration.openai_client = client
-    adapter = RecordingStudioAI::Adapters::OpenAI.new(configuration: RecordingStudioAI.configuration)
+    provider = RecordingStudioAI::Providers::OpenAI.new(configuration: RecordingStudioAI.configuration)
     candidate = RecordingStudioAI::Candidate.new(
       provider: :openai,
       model: "gpt-test",
@@ -565,23 +567,23 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     )
     batch = Struct.new(:provider_batch_id, :status).new("batch-1", "processing")
 
-    result = adapter.cancel_batch(batch: batch, candidate: candidate)
+    result = provider.cancel_batch(batch: batch, candidate: candidate)
 
     assert_equal "batch-1", batches.cancelled_id
     assert_equal "cancelled", result.status
     assert_equal "batch-1", result.provider_batch_id
   end
 
-  def test_gemini_adapter_uses_verified_keyed_batch_semantics
+  def test_gemini_provider_uses_verified_keyed_batch_semantics
     client = FakeGeminiBatchClient.new
     RecordingStudioAI.configuration.gemini_client = client
-    adapter = RecordingStudioAI::Adapters::Gemini.new(configuration: RecordingStudioAI.configuration)
+    provider = RecordingStudioAI::Providers::Gemini.new(configuration: RecordingStudioAI.configuration)
     candidate = RecordingStudioAI::Candidate.new(provider: :gemini, model: "gemini-test", capabilities: %i[generation provider_batch])
 
-    submitted = adapter.submit_batch(
+    submitted = provider.submit_batch(
       request: normalized_request([{ reference: "ref-1", prompt: "private prompt" }]), candidate: candidate
     )
-    refreshed = adapter.refresh_batch(batch: Struct.new(:provider_batch_id).new("batches/1"), candidate: candidate)
+    refreshed = provider.refresh_batch(batch: Struct.new(:provider_batch_id).new("batches/1"), candidate: candidate)
 
     assert_equal "ref-1", client.requests.first.fetch(:key)
     assert_equal "private prompt", client.requests.first.dig(:contents, 0, :parts, 0, :text)
@@ -589,10 +591,10 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     assert_equal "gemini answer", refreshed.items.first.text
   end
 
-  def test_gemini_adapter_cancels_and_normalizes_provider_batch
+  def test_gemini_provider_cancels_and_normalizes_provider_batch
     client = FakeGeminiBatchClient.new
     RecordingStudioAI.configuration.gemini_client = client
-    adapter = RecordingStudioAI::Adapters::Gemini.new(configuration: RecordingStudioAI.configuration)
+    provider = RecordingStudioAI::Providers::Gemini.new(configuration: RecordingStudioAI.configuration)
     candidate = RecordingStudioAI::Candidate.new(
       provider: :gemini,
       model: "gemini-test",
@@ -600,7 +602,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     )
     batch = Struct.new(:provider_batch_id, :status).new("batches/1", "processing")
 
-    result = adapter.cancel_batch(batch: batch, candidate: candidate)
+    result = provider.cancel_batch(batch: batch, candidate: candidate)
 
     assert_equal "batches/1", client.cancelled_name
     assert_equal "cancelled", result.status
@@ -680,7 +682,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
   end
 
   def completed_result(with_cost: true)
-    RecordingStudioAI::Adapters::BatchResult.new(
+    RecordingStudioAI::Providers::BatchResult.new(
       status: "completed", provider_batch_id: "provider-batch-1",
       items: [
         completed_item("first", "answer one", input: 4, output: 6, cost: with_cost ? 100 : nil),
@@ -690,7 +692,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
   end
 
   def completed_item(reference, text, input:, output:, cost:, currency: "USD")
-    RecordingStudioAI::Adapters::BatchItemResult.new(
+    RecordingStudioAI::Providers::BatchItemResult.new(
       reference: reference, status: "completed", text: text, finish_reason: "stop",
       usage: RecordingStudioAI::Contracts::Usage.new(
         input_tokens: input, output_tokens: output, total_tokens: input + output
@@ -711,7 +713,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     RecordingStudioAI::Configuration.new.tap do |configuration|
       configuration.attribution_validator = ->(**) {}
       configuration.authorization_handler = ->(**) { true }
-      configuration.adapters[:test] = @adapter
+      configuration.providers[:test] = @provider
       configuration.allowed_provider_overrides = [:test]
       configuration.profiles[:medium] = [{
         provider: :test, model: "batch-model",

@@ -3,8 +3,10 @@
 require "base64"
 
 module RecordingStudioAI
-  module Adapters
+  module Providers
     class Gemini < Base
+      provider_key :gemini
+
       include ValueReader
 
       def initialize(configuration:)
@@ -359,7 +361,7 @@ module RecordingStudioAI
 
           name = read_value(function_call, :name).to_s
           response_id = read_value(response, :response_id, :responseId).to_s
-          RecordingStudioAI::Adapters::ToolCall.new(
+          RecordingStudioAI::Providers::ToolCall.new(
             provider_tool_call_id: "#{response_id.empty? ? 'gemini-tool-call' : response_id}:#{index}",
             key: name,
             arguments: read_value(function_call, :args) || {}

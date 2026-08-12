@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_11_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_12_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -134,7 +134,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_11_150000) do
     t.datetime "completed_at"
     t.integer "completed_item_count", default: 0, null: false
     t.uuid "context_recording_id"
-    t.string "correlation_id", null: false
     t.bigint "cost_amount_microunits"
     t.string "cost_currency"
     t.boolean "cost_estimated"
@@ -174,7 +173,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_11_150000) do
     t.bigint "total_tokens"
     t.datetime "updated_at", null: false
     t.index ["context_recording_id"], name: "index_recording_studio_ai_batches_on_context_recording_id"
-    t.index ["correlation_id"], name: "index_recording_studio_ai_batches_on_correlation_id", unique: true
     t.index ["expires_at"], name: "index_recording_studio_ai_batches_on_expires_at"
     t.index ["impersonator_type", "impersonator_id"], name: "idx_on_impersonator_type_impersonator_id_8de192b4a5"
     t.index ["initiator_type", "initiator_id"], name: "idx_on_initiator_type_initiator_id_b02d5c76ac"
@@ -280,7 +278,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_11_150000) do
     t.integer "citation_count", default: 0, null: false
     t.datetime "completed_at"
     t.uuid "context_recording_id"
-    t.string "correlation_id", null: false
     t.bigint "cost_amount_microunits"
     t.string "cost_currency"
     t.boolean "cost_estimated"
@@ -329,7 +326,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_11_150000) do
     t.boolean "web_search_requested", default: false, null: false
     t.boolean "web_search_used", default: false, null: false
     t.index ["context_recording_id"], name: "index_recording_studio_ai_runs_on_context_recording_id"
-    t.index ["correlation_id"], name: "index_recording_studio_ai_runs_on_correlation_id", unique: true
     t.index ["executor_type", "executor_id"], name: "idx_on_executor_type_executor_id_ff99c66eda"
     t.index ["initiator_type", "initiator_id"], name: "idx_on_initiator_type_initiator_id_c688e18770"
     t.index ["job_id"], name: "index_recording_studio_ai_runs_on_job_id"

@@ -196,7 +196,7 @@ class ProviderCapabilityContractTest < Minitest::Test
       )
       client = OpenAIClient.new(responses, OpenAIFiles.new, OpenAIBatches.new)
       configuration.openai_client = client
-      [RecordingStudioAI::Adapters::OpenAI.new(configuration: configuration), client]
+      [RecordingStudioAI::Providers::OpenAI.new(configuration: configuration), client]
     else
       models = GeminiModels.new(
         responses: [gemini_advanced_response, gemini_continuation_response],
@@ -204,7 +204,7 @@ class ProviderCapabilityContractTest < Minitest::Test
       )
       client = GeminiClient.new(models)
       configuration.gemini_client = client
-      [RecordingStudioAI::Adapters::Gemini.new(configuration: configuration), client]
+      [RecordingStudioAI::Providers::Gemini.new(configuration: configuration), client]
     end
   end
 

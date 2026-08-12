@@ -15,7 +15,7 @@ require "recording_studio_ai/structured_output"
 require "recording_studio_ai/capabilities"
 require "recording_studio_ai/candidate"
 require "recording_studio_ai/resolver"
-require "recording_studio_ai/adapters"
+require "recording_studio_ai/providers"
 require "recording_studio_ai/retention"
 require "recording_studio_ai/instrumentation"
 require "recording_studio_ai/response_reader"
@@ -36,7 +36,35 @@ module RecordingStudioAI
       return unless block_given?
 
       yield(configuration)
+      discover_providers! if configuration.discovery_enabled
       configuration.validate!
+    end
+
+    def register_provider(key, provider)
+      unless provider.is_a?(RecordingStudioAI::Providers::Base)
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          "provider must inherit from RecordingStudioAI::Providers::Base",
+          code: "configuration"
+        )
+      end
+
+      configuration.providers[key.to_sym] = provider
+    end
+
+    def discover_providers!
+      loaded_files = provider_discovery_globs.flat_map { |glob| Dir.glob(glob) }.uniq.sort
+      loaded_files.each { |file| require file }
+
+      discovered = []
+      discovered_provider_classes.each do |provider_class|
+        provider_key = provider_class.provider_key
+        next if configuration.providers.key?(provider_key)
+
+        configuration.providers[provider_key] = provider_class.new(configuration: configuration)
+        discovered << provider_key
+      end
+
+      discovered
     end
 
     def generate(**kwargs)
@@ -200,6 +228,27 @@ module RecordingStudioAI
         message: "Provider execution is not implemented yet.",
         retryable: false
       )
+    end
+
+    def provider_discovery_globs
+      globs = [File.expand_path("recording_studio_ai/providers/*.rb", __dir__)]
+
+      if defined?(Rails) && Rails.respond_to?(:root) && Rails.root
+        globs << Rails.root.join("lib/recording_studio_ai/providers/*.rb").to_s
+      end
+
+      globs.uniq
+    end
+
+    def discovered_provider_classes
+      RecordingStudioAI::Providers.constants.filter_map do |constant_name|
+        constant = RecordingStudioAI::Providers.const_get(constant_name)
+        next unless constant.is_a?(Class)
+        next if constant == RecordingStudioAI::Providers::Base
+        next unless constant < RecordingStudioAI::Providers::Base
+
+        constant
+      end.sort_by(&:name)
     end
   end
 end

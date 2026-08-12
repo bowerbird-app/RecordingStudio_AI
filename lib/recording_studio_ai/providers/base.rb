@@ -1,8 +1,15 @@
 # frozen_string_literal: true
 
 module RecordingStudioAI
-  module Adapters
+  module Providers
     class Base
+      class << self
+        def provider_key(value = nil)
+          @provider_key = value&.to_sym if value
+          @provider_key ||= name.split("::").last.downcase.to_sym
+        end
+      end
+
       def generate(request:, candidate:)
         raise NotImplementedError, "#{self.class} must implement #generate"
       end

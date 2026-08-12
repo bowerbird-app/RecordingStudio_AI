@@ -211,7 +211,7 @@ module RecordingStudioAI
       end
 
       def validate!
-        if key.empty? || key.length > RecordingStudioAI::Adapters::ToolCall::MAX_KEY_LENGTH || !key.match?(/\A[a-z0-9_]+\z/)
+        if key.empty? || key.length > RecordingStudioAI::Providers::ToolCall::MAX_KEY_LENGTH || !key.match?(/\A[a-z0-9_]+\z/)
           raise RecordingStudioAI::Errors::ContractValidationError.new(
             "tool key must be snake_case",
             code: "invalid_request"

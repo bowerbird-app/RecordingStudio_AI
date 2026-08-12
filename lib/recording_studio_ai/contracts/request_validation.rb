@@ -326,7 +326,7 @@ module RecordingStudioAI
 
           key = normalized[:key].to_s
           version = normalized[:version]
-          valid_key = key.length <= RecordingStudioAI::Adapters::ToolCall::MAX_KEY_LENGTH && key.match?(/\A[a-z0-9_]+\z/)
+          valid_key = key.length <= RecordingStudioAI::Providers::ToolCall::MAX_KEY_LENGTH && key.match?(/\A[a-z0-9_]+\z/)
           unless valid_key && version.is_a?(Integer) && version.positive?
             custom_tool_error!("custom_tools[#{index}] requires a snake_case key and positive integer version")
           end

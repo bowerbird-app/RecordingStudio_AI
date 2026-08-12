@@ -19,9 +19,9 @@ require_relative "../app/jobs/recording_studio_ai/response_cleanup_job"
 class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
   Actor = Struct.new(:id)
 
-  class Adapter < RecordingStudioAI::Adapters::Base
+  class Provider < RecordingStudioAI::Providers::Base
     def generate(request:, candidate:)
-      RecordingStudioAI::Adapters::Result.new(
+      RecordingStudioAI::Providers::Result.new(
         text: "assembled response",
         provider_request_id: "provider-response-1",
         finish_reason: "stop"
@@ -29,9 +29,9 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     end
   end
 
-  class ErrorAdapter < RecordingStudioAI::Adapters::Base
+  class ErrorProvider < RecordingStudioAI::Providers::Base
     def generate(request:, candidate:)
-      RecordingStudioAI::Adapters::Result.new(
+      RecordingStudioAI::Providers::Result.new(
         error: RecordingStudioAI::Contracts::NormalizedError.new(
           category: "provider_error", code: "provider_failed", message: "Safe provider failure",
           retryable: false, provider: candidate.provider
@@ -40,11 +40,11 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     end
   end
 
-  class StreamAdapter < RecordingStudioAI::Adapters::Base
+  class StreamProvider < RecordingStudioAI::Providers::Base
     def stream(request:, candidate:)
-      yield RecordingStudioAI::Adapters::StreamEvent.new(type: :text_delta, text_delta: "private-chunk-one")
-      yield RecordingStudioAI::Adapters::StreamEvent.new(type: :text_delta, text_delta: "private-chunk-two")
-      RecordingStudioAI::Adapters::Result.new(text: "assembled stream", provider_request_id: "stream-1")
+      yield RecordingStudioAI::Providers::StreamEvent.new(type: :text_delta, text_delta: "private-chunk-one")
+      yield RecordingStudioAI::Providers::StreamEvent.new(type: :text_delta, text_delta: "private-chunk-two")
+      RecordingStudioAI::Providers::Result.new(text: "assembled stream", provider_request_id: "stream-1")
     end
   end
 
@@ -157,7 +157,7 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
   end
 
   def test_raw_snapshot_is_serializable_allowlisted_and_sanitized
-    result = RecordingStudioAI::Adapters::Result.new(
+    result = RecordingStudioAI::Providers::Result.new(
       text: "response",
       retention_snapshot: {
         id: "raw-1", status: "completed", authorization_header: "Bearer secret",
@@ -192,7 +192,7 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
 
   def test_bounded_retention_is_valid_utf8_and_json
     RecordingStudioAI.configuration.maximum_retained_response_size = 96
-    result = RecordingStudioAI::Adapters::Result.new(text: "é" * 200, metadata: { note: "x" * 200 })
+    result = RecordingStudioAI::Providers::Result.new(text: "é" * 200, metadata: { note: "x" * 200 })
     run = create_run
     attempt = run.attempts.create!(sequence: 1, kind: "primary", status: "completed", provider: "test",
                                    model: "bounded", started_at: Time.current, completed_at: Time.current)
@@ -224,7 +224,7 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
 
   def test_truncated_structured_content_is_omitted_instead_of_becoming_invalid_json
     RecordingStudioAI.configuration.maximum_retained_response_size = 80
-    result = RecordingStudioAI::Adapters::Result.new(
+    result = RecordingStudioAI::Providers::Result.new(
       text: JSON.generate(summary: "é" * 200),
       structured_data: { "summary" => "é" * 200 }
     )
@@ -241,11 +241,11 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     assert_instance_of Hash, JSON.parse(retained.normalized_response)
   end
 
-  def test_failed_retention_is_incomplete_and_omits_adapter_metadata
+  def test_failed_retention_is_incomplete_and_omits_provider_metadata
     error = RecordingStudioAI::Contracts::NormalizedError.new(
       category: "provider_error", code: "failed", message: "Safe failure", provider: "test"
     )
-    result = RecordingStudioAI::Adapters::Result.new(
+    result = RecordingStudioAI::Providers::Result.new(
       error: error,
       metadata: { prompt: "private prompt", messages: ["private message"], tool_arguments: { secret: "value" } }
     )
@@ -263,8 +263,8 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     refute_includes retained.normalized_response, "private message"
   end
 
-  def test_stream_retains_only_adapter_assembled_result
-    RecordingStudioAI.configuration.adapters[:test] = StreamAdapter.new
+  def test_stream_retains_only_provider_assembled_result
+    RecordingStudioAI.configuration.providers[:test] = StreamProvider.new
     RecordingStudioAI.configuration.profiles[:medium].first[:capabilities] << :streaming
     events = []
 
@@ -286,11 +286,11 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     run = create_run
     attempt = run.attempts.create!(sequence: 1, kind: "primary", status: "failed", provider: "test",
                                    model: "error-model", started_at: Time.current, completed_at: Time.current)
-    RecordingStudioAI::Retention.retain_attempt!(attempt, RecordingStudioAI::Adapters::Result.new(error: error))
+    RecordingStudioAI::Retention.retain_attempt!(attempt, RecordingStudioAI::Providers::Result.new(error: error))
     assert_equal "safe_code", JSON.parse(attempt.response.normalized_response).dig("error", "code")
 
     batch_item = create_batch_item
-    item_result = RecordingStudioAI::Adapters::BatchItemResult.new(
+    item_result = RecordingStudioAI::Providers::BatchItemResult.new(
       reference: batch_item.reference, provider_item_id: "provider-item-1", status: "completed", text: "batch output"
     )
     2.times { RecordingStudioAI::Retention.retain_batch_item!(batch_item, item_result) }
@@ -394,7 +394,7 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     )
     create_batch_item
     processing_batch = RecordingStudioAI::Batch.create!(
-      status: "processing", correlation_id: SecureRandom.uuid, root_recording_id: @root_recording.id,
+      status: "processing", root_recording_id: @root_recording.id,
       initiator_type: @initiator.class.name, initiator_id: @initiator.id, initiator_kind: "user", metadata: {}
     )
     processing_batch.update!(metadata: { refreshed: true })
@@ -433,7 +433,7 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
 
   def test_warning_metrics_are_deterministic_and_report_threshold_breaches
     generate
-    RecordingStudioAI.configuration.adapters[:test] = ErrorAdapter.new
+    RecordingStudioAI.configuration.providers[:test] = ErrorProvider.new
     generate
     thresholds = RecordingStudioAI.configuration.admin_warning_thresholds.merge(
       error_rate: 0.5, total_tokens: 1, provider_error_rate: 0.5
@@ -488,8 +488,8 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
   end
 
   def test_concrete_provider_results_include_allowlisted_retention_snapshots
-    openai = RecordingStudioAI::Adapters::OpenAI.new(configuration: RecordingStudioAI.configuration)
-    gemini = RecordingStudioAI::Adapters::Gemini.new(configuration: RecordingStudioAI.configuration)
+    openai = RecordingStudioAI::Providers::OpenAI.new(configuration: RecordingStudioAI.configuration)
+    gemini = RecordingStudioAI::Providers::Gemini.new(configuration: RecordingStudioAI.configuration)
     openai_response = {
       id: "resp-1", model: "gpt-test", status: "completed", output_text: "answer",
       usage: { input_tokens: 2, output_tokens: 1, total_tokens: 3 }
@@ -538,7 +538,7 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
       configuration.attribution_validator = ->(**) {}
       configuration.authorization_handler = ->(**) { true }
       configuration.retain_responses = true
-      configuration.adapters[:test] = Adapter.new
+      configuration.providers[:test] = Provider.new
       configuration.allowed_provider_overrides = [:test]
       configuration.profiles[:medium] = [{ provider: :test, model: "test-model", capabilities: [:generation] }]
     end
@@ -552,7 +552,7 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
 
   def create_run(status: "completed")
     RecordingStudioAI::Run.create!(
-      operation: "generation", status: status, correlation_id: SecureRandom.uuid,
+      operation: "generation", status: status,
       root_recording_id: @root_recording.id, initiator_type: @initiator.class.name,
       initiator_id: @initiator.id, initiator_kind: "user", started_at: Time.current,
       completed_at: RecordingStudioAI::Run.terminal_statuses.include?(status) ? Time.current : nil,
@@ -563,7 +563,7 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
   def create_batch_item
     run = create_run
     batch = RecordingStudioAI::Batch.create!(
-      status: "completed", provider: "test", model: "batch-model", correlation_id: SecureRandom.uuid,
+      status: "completed", provider: "test", model: "batch-model",
       root_recording_id: @root_recording.id, initiator_type: @initiator.class.name,
       initiator_id: @initiator.id, initiator_kind: "user", item_count: 1, completed_item_count: 1,
       metadata: {}

@@ -144,7 +144,6 @@ class PhaseThirteenAdministrationTest < Minitest::Test
     RecordingStudioAI::Run.create!(
       operation: "generation",
       status: status,
-      correlation_id: SecureRandom.uuid,
       root_recording_id: root_id,
       initiator_type: "User",
       initiator_id: @actor.id,

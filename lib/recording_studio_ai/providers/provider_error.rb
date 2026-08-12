@@ -4,7 +4,7 @@ require "timeout"
 require "socket"
 
 module RecordingStudioAI
-  module Adapters
+  module Providers
     module ProviderError
       module_function
 

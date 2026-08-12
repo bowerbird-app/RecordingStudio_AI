@@ -15,7 +15,7 @@ require_relative "../app/models/recording_studio_ai/attempt"
 class PhaseEightResilienceAccountingTest < Minitest::Test
   Actor = Struct.new(:id)
 
-  class QueueAdapter < RecordingStudioAI::Adapters::Base
+  class QueueProvider < RecordingStudioAI::Providers::Base
     attr_reader :calls
 
     def initialize(*results)
@@ -51,16 +51,16 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
   end
 
   def test_retry_then_provider_fallback_tracks_attempt_kinds_and_aggregates_accounting
-    first_adapter = QueueAdapter.new(
+    first_provider = QueueProvider.new(
       failed_result("rate_limit", usage: usage(10, 0), cost: cost(100)),
       failed_result("timeout", usage: usage(4, 0), cost: cost(40))
     )
-    second_adapter = QueueAdapter.new(
+    second_provider = QueueProvider.new(
       success_result("Fallback answer", usage: usage(8, 6), cost: cost(90))
     )
     configure_candidates(
-      first: first_adapter,
-      second: second_adapter,
+      first: first_provider,
+      second: second_provider,
       profile: :medium
     )
 
@@ -93,10 +93,10 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
     configuration.retry_backoff_max = 3
     configuration.retry_jitter = 0
     configuration.retry_sleeper = ->(seconds) { delays << seconds }
-    adapter = QueueAdapter.new(
+    provider = QueueProvider.new(
       failed_result("timeout"), failed_result("timeout"), success_result("Recovered")
     )
-    configure_single_candidate(:medium, :retry_provider, adapter)
+    configure_single_candidate(:medium, :retry_provider, provider)
 
     response = generate
 
@@ -106,14 +106,14 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
   end
 
   def test_provider_request_timeout_has_distinct_normalized_code
-    adapter = Class.new(RecordingStudioAI::Adapters::Base) do
+    provider = Class.new(RecordingStudioAI::Providers::Base) do
       def generate(request:, candidate:)
         Queue.new.pop
       end
     end.new
     RecordingStudioAI.configuration.request_timeout = 0.01
     RecordingStudioAI.configuration.maximum_retries_per_candidate = 0
-    configure_single_candidate(:medium, :slow_provider, adapter)
+    configure_single_candidate(:medium, :slow_provider, provider)
 
     response = generate
 
@@ -123,8 +123,8 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
   end
 
   def test_catalog_estimates_cost_when_provider_reports_usage_without_cost
-    adapter = QueueAdapter.new(success_result("Estimated", usage: usage(10, 5)))
-    configure_single_candidate(:medium, :catalog_provider, adapter)
+    provider = QueueProvider.new(success_result("Estimated", usage: usage(10, 5)))
+    configure_single_candidate(:medium, :catalog_provider, provider)
     RecordingStudioAI.configuration.cost_catalogs = {
       catalog_provider: {
         "catalog_provider-model" => { input_tokens: 2_000_000, output_tokens: 4_000_000, currency: "USD" }
@@ -144,13 +144,13 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
     configuration = RecordingStudioAI.configuration
     configuration.maximum_retries_per_candidate = 0
     configuration.maximum_provider_fallbacks = 0
-    medium_adapter = QueueAdapter.new(failed_result("timeout"))
-    other_medium_adapter = QueueAdapter.new(success_result("must not run"))
-    low_adapter = QueueAdapter.new(success_result("lower tier"))
-    configuration.adapters = {
-      medium_provider: medium_adapter,
-      other_medium_provider: other_medium_adapter,
-      low_provider: low_adapter
+    medium_provider = QueueProvider.new(failed_result("timeout"))
+    other_medium_provider = QueueProvider.new(success_result("must not run"))
+    low_provider = QueueProvider.new(success_result("lower tier"))
+    configuration.providers = {
+      medium_provider: medium_provider,
+      other_medium_provider: other_medium_provider,
+      low_provider: low_provider
     }
     configuration.profiles[:medium] = [
       { provider: :medium_provider, model: "medium-model", capabilities: %i[generation] },
@@ -165,39 +165,39 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
 
     assert response.success?
     assert_equal %w[primary fallback], response.attempts.map(&:kind)
-    assert_empty other_medium_adapter.calls
-    assert_equal 1, low_adapter.calls.length
+    assert_empty other_medium_provider.calls
+    assert_equal 1, low_provider.calls.length
   end
 
   def test_profile_fallback_limit_bounds_explicit_mappings
     configuration = RecordingStudioAI.configuration
     configuration.maximum_retries_per_candidate = 0
     configuration.maximum_profile_fallbacks = 0
-    medium_adapter = QueueAdapter.new(failed_result("timeout"))
-    low_adapter = QueueAdapter.new(success_result("must not run"))
-    configure_single_candidate(:medium, :medium_provider, medium_adapter)
-    configure_single_candidate(:low, :low_provider, low_adapter)
+    medium_provider = QueueProvider.new(failed_result("timeout"))
+    low_provider = QueueProvider.new(success_result("must not run"))
+    configure_single_candidate(:medium, :medium_provider, medium_provider)
+    configure_single_candidate(:low, :low_provider, low_provider)
     configuration.profile_fallbacks = { medium: [:low] }
 
     response = generate
 
     refute response.success?
     assert_equal ["primary"], response.attempts.map(&:kind)
-    assert_empty low_adapter.calls
+    assert_empty low_provider.calls
   end
 
   def test_non_retryable_failure_stops_without_retry_or_fallback
-    first_adapter = QueueAdapter.new(failed_result("invalid_request", retryable: false))
-    second_adapter = QueueAdapter.new(success_result("must not run"))
-    configure_candidates(first: first_adapter, second: second_adapter, profile: :medium)
+    first_provider = QueueProvider.new(failed_result("invalid_request", retryable: false))
+    second_provider = QueueProvider.new(success_result("must not run"))
+    configure_candidates(first: first_provider, second: second_provider, profile: :medium)
 
     response = generate
 
     refute response.success?
     assert_equal 1, response.attempts.length
     assert_equal "primary", response.attempts.first.kind
-    assert_equal 1, first_adapter.calls.length
-    assert_empty second_adapter.calls
+    assert_equal 1, first_provider.calls.length
+    assert_empty second_provider.calls
     assert_equal 0, response.run.retry_count
     assert_equal 0, response.run.fallback_count
   end
@@ -207,34 +207,34 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
     configuration.maximum_attempts = 2
     configuration.maximum_retries_per_candidate = 3
     configuration.maximum_provider_fallbacks = 3
-    first_adapter = QueueAdapter.new(failed_result("timeout"), failed_result("timeout"))
-    second_adapter = QueueAdapter.new(success_result("must not run"))
-    configure_candidates(first: first_adapter, second: second_adapter, profile: :medium)
+    first_provider = QueueProvider.new(failed_result("timeout"), failed_result("timeout"))
+    second_provider = QueueProvider.new(success_result("must not run"))
+    configure_candidates(first: first_provider, second: second_provider, profile: :medium)
 
     response = generate
 
     refute response.success?
     assert_equal %w[primary retry], response.attempts.map(&:kind)
-    assert_equal 2, first_adapter.calls.length
-    assert_empty second_adapter.calls
+    assert_equal 2, first_provider.calls.length
+    assert_empty second_provider.calls
     assert_equal 2, response.run.attempt_count
   end
 
   def test_profile_tier_fallback_requires_explicit_configuration
-    medium_adapter = QueueAdapter.new(failed_result("timeout"), failed_result("timeout"))
-    low_adapter = QueueAdapter.new(success_result("lower tier"))
-    configure_single_candidate(:medium, :medium_provider, medium_adapter)
-    configure_single_candidate(:low, :low_provider, low_adapter)
+    medium_provider = QueueProvider.new(failed_result("timeout"), failed_result("timeout"))
+    low_provider = QueueProvider.new(success_result("lower tier"))
+    configure_single_candidate(:medium, :medium_provider, medium_provider)
+    configure_single_candidate(:low, :low_provider, low_provider)
 
     without_fallback = generate
     refute without_fallback.success?
-    assert_empty low_adapter.calls
+    assert_empty low_provider.calls
 
     reset_execution_records
-    medium_adapter = QueueAdapter.new(failed_result("timeout"), failed_result("timeout"))
-    low_adapter = QueueAdapter.new(success_result("lower tier"))
-    configure_single_candidate(:medium, :medium_provider, medium_adapter)
-    configure_single_candidate(:low, :low_provider, low_adapter)
+    medium_provider = QueueProvider.new(failed_result("timeout"), failed_result("timeout"))
+    low_provider = QueueProvider.new(success_result("lower tier"))
+    configure_single_candidate(:medium, :medium_provider, medium_provider)
+    configure_single_candidate(:low, :low_provider, low_provider)
     RecordingStudioAI.configuration.profile_fallbacks = { medium: [:low] }
 
     with_fallback = generate
@@ -245,11 +245,11 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
   end
 
   def test_mixed_currency_cost_remains_unknown_while_usage_still_aggregates
-    first_adapter = QueueAdapter.new(
+    first_provider = QueueProvider.new(
       failed_result("timeout", usage: usage(3, 0), cost: cost(20, currency: "USD")),
       success_result("done", usage: usage(4, 5), cost: cost(30, currency: "EUR"))
     )
-    configure_single_candidate(:medium, :first, first_adapter)
+    configure_single_candidate(:medium, :first, first_provider)
 
     response = generate
 
@@ -275,11 +275,11 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
       cached_input_tokens: 0,
       reasoning_tokens: 2
     )
-    adapter = QueueAdapter.new(
+    provider = QueueProvider.new(
       failed_result("timeout", usage: partial_usage),
       success_result("done", usage: complete_usage)
     )
-    configure_single_candidate(:medium, :first, adapter)
+    configure_single_candidate(:medium, :first, provider)
 
     response = generate
 
@@ -304,23 +304,23 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
 
   def configure_candidates(first:, second:, profile:)
     configuration = RecordingStudioAI.configuration
-    configuration.adapters = { first: first, second: second }
+    configuration.providers = { first: first, second: second }
     configuration.profiles[profile] = [
       { provider: :first, model: "first-model", capabilities: %i[generation] },
       { provider: :second, model: "second-model", capabilities: %i[generation] }
     ]
   end
 
-  def configure_single_candidate(profile, provider, adapter)
+  def configure_single_candidate(profile, provider_key, provider)
     configuration = RecordingStudioAI.configuration
-    configuration.adapters[provider] = adapter
+    configuration.providers[provider_key] = provider
     configuration.profiles[profile] = [
-      { provider: provider, model: "#{provider}-model", capabilities: %i[generation] }
+      { provider: provider_key, model: "#{provider_key}-model", capabilities: %i[generation] }
     ]
   end
 
   def success_result(text, usage: nil, cost: nil)
-    RecordingStudioAI::Adapters::Result.new(
+    RecordingStudioAI::Providers::Result.new(
       text: text,
       usage: usage,
       cost: cost,
@@ -329,7 +329,7 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
   end
 
   def failed_result(category, retryable: true, usage: nil, cost: nil)
-    RecordingStudioAI::Adapters::Result.new(
+    RecordingStudioAI::Providers::Result.new(
       usage: usage,
       cost: cost,
       error: RecordingStudioAI::Contracts::NormalizedError.new(

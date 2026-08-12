@@ -8,7 +8,7 @@ module RecordingStudioAI
     attr_accessor(
       :default_profile,
       :authorization_handler,
-      :adapters,
+      :providers,
       :allowed_provider_overrides,
       :allowed_attachment_content_types,
       :attribution_snapshotter,
@@ -23,6 +23,7 @@ module RecordingStudioAI
       :custom_tool_confirmation_handler,
       :custom_tool_timeout,
       :cost_catalogs,
+      :discovery_enabled,
       :execution_history_retention_period,
       :gemini_api_key,
       :gemini_client,
@@ -58,11 +59,12 @@ module RecordingStudioAI
     def initialize
       @default_profile = :medium
       @authorization_handler = ->(**) { false }
-      @adapters = {
-        openai: RecordingStudioAI::Adapters::OpenAI.new(configuration: self),
-        gemini: RecordingStudioAI::Adapters::Gemini.new(configuration: self)
+      @providers = {
+        openai: RecordingStudioAI::Providers::OpenAI.new(configuration: self),
+        gemini: RecordingStudioAI::Providers::Gemini.new(configuration: self)
       }
       @allowed_provider_overrides = []
+      @discovery_enabled = false
       @attribution_snapshotter = nil
       @attribution_validator = method(:validate_recording_attribution!)
       @batch_synchronization_interval = 1.minute

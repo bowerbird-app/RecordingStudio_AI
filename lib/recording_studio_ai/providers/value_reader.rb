@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module RecordingStudioAI
-  module Adapters
+  module Providers
     module ValueReader
       private
 

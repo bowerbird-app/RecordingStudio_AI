@@ -15,11 +15,11 @@ require_relative "../app/models/recording_studio_ai/attempt"
 class PhaseFiveResolutionExecutionTest < Minitest::Test
   Actor = Struct.new(:id)
 
-  class TestAdapter < RecordingStudioAI::Adapters::Base
+  class TestProvider < RecordingStudioAI::Providers::Base
     attr_reader :requests
 
     def initialize(result: nil)
-      @result = result || RecordingStudioAI::Adapters::Result.new(text: "Generated", finish_reason: "stop")
+      @result = result || RecordingStudioAI::Providers::Result.new(text: "Generated", finish_reason: "stop")
       @requests = []
     end
 
@@ -29,7 +29,7 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
     end
   end
 
-  class FailingAdapter < RecordingStudioAI::Adapters::Base
+  class FailingProvider < RecordingStudioAI::Providers::Base
     def generate(request:, candidate:)
       raise "secret provider payload"
     end
@@ -44,7 +44,7 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
 
     @root_recording = Actor.new(create_recording_id)
     @initiator = Actor.new(17)
-    @adapter = TestAdapter.new
+    @provider = TestProvider.new
     @original_configuration = RecordingStudioAI.instance_variable_get(:@configuration)
     RecordingStudioAI.instance_variable_set(:@configuration, configured_configuration)
   end
@@ -87,7 +87,7 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
     assert_equal "economy", response.model
   end
 
-  def test_unsupported_capability_creates_no_run_or_attempt_and_never_calls_adapter
+  def test_unsupported_capability_creates_no_run_or_attempt_and_never_calls_provider
     response = RecordingStudioAI.generate(
       prompt: "Summarize",
       schema: { type: "object" },
@@ -99,7 +99,7 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
     assert_equal "unsupported_capability", response.error.category
     assert_equal 0, RecordingStudioAI::Run.count
     assert_equal 0, RecordingStudioAI::Attempt.count
-    assert_empty @adapter.requests
+    assert_empty @provider.requests
   end
 
   def test_provider_override_must_be_explicitly_allowed
@@ -114,10 +114,10 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
 
     assert_equal "configuration", error.code
     assert_equal 0, RecordingStudioAI::Run.count
-    assert_empty @adapter.requests
+    assert_empty @provider.requests
   end
 
-  def test_candidate_without_an_adapter_creates_no_execution_records
+  def test_candidate_without_a_provider_creates_no_execution_records
     RecordingStudioAI.configuration.profiles[:medium] = [
       { provider: :missing, model: "unavailable", capabilities: %i[generation] }
     ]
@@ -134,7 +134,7 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
     assert_equal 0, RecordingStudioAI::Attempt.count
   end
 
-  def test_generate_dispatches_through_adapter_and_persists_safe_execution_records
+  def test_generate_dispatches_through_provider_and_persists_safe_execution_records
     response = RecordingStudioAI.generate(
       prompt: "Sensitive prompt that must not persist",
       purpose: "summarize_page",
@@ -149,7 +149,7 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
     assert_equal "Generated", response.text
     assert_equal "test", response.provider
     assert_equal "balanced", response.model
-    assert_equal 1, @adapter.requests.length
+    assert_equal 1, @provider.requests.length
 
     run = RecordingStudioAI::Run.first
     attempt = RecordingStudioAI::Attempt.first
@@ -187,8 +187,8 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
     )
   end
 
-  def test_adapter_failure_is_normalized_and_does_not_persist_exception_payload
-    RecordingStudioAI.configuration.adapters[:test] = FailingAdapter.new
+  def test_provider_failure_is_normalized_and_does_not_persist_exception_payload
+    RecordingStudioAI.configuration.providers[:test] = FailingProvider.new
 
     response = RecordingStudioAI.generate(
       prompt: "Summarize",
@@ -198,7 +198,7 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
 
     refute response.success?
     assert_equal "provider_error", response.error.category
-    assert_equal "Adapter execution failed.", response.error.message
+    assert_equal "Provider execution failed.", response.error.message
     assert_equal "failed", RecordingStudioAI::Run.first.status
     assert_equal "failed", RecordingStudioAI::Attempt.first.status
     refute_includes RecordingStudioAI::Run.first.attributes.values, "secret provider payload"
@@ -211,7 +211,7 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
     RecordingStudioAI::Configuration.new.tap do |configuration|
       configuration.attribution_validator = ->(**) {}
       configuration.authorization_handler = ->(**) { true }
-      configuration.adapters[:test] = @adapter
+      configuration.providers[:test] = @provider
       configuration.allowed_provider_overrides = [:test]
       configuration.profiles[:medium] = [
         { provider: :test, model: "balanced", capabilities: %i[generation] }

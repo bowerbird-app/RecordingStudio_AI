@@ -17,7 +17,7 @@ class PhaseTenStreamingTest < Minitest::Test
   OpenAIClient = Struct.new(:responses)
   GeminiClient = Struct.new(:models)
 
-  class StreamAdapter < RecordingStudioAI::Adapters::Base
+  class StreamProvider < RecordingStudioAI::Providers::Base
     attr_reader :requests
 
     def initialize(*streams)
@@ -33,7 +33,7 @@ class PhaseTenStreamingTest < Minitest::Test
     end
   end
 
-  class StalledStreamAdapter < RecordingStudioAI::Adapters::Base
+  class StalledStreamProvider < RecordingStudioAI::Providers::Base
     attr_reader :worker
 
     def stream(request:, candidate:)
@@ -105,19 +105,19 @@ class PhaseTenStreamingTest < Minitest::Test
 
   def test_stream_emits_normalized_events_and_persists_assembled_execution_only
     usage = RecordingStudioAI::Contracts::Usage.new(input_tokens: 4, output_tokens: 2, total_tokens: 6)
-    adapter = StreamAdapter.new([
+    provider = StreamProvider.new([
       [
         stream_event(:text_delta, text_delta: "Hello "),
         stream_event(:text_delta, text_delta: "world")
       ],
-      RecordingStudioAI::Adapters::Result.new(
+      RecordingStudioAI::Providers::Result.new(
         text: "Hello world",
         usage: usage,
         provider_request_id: "stream-1",
         finish_reason: "stop"
       )
     ])
-    configure_adapter(adapter)
+    configure_provider(provider)
     events = []
 
     response = stream { |event| events << event }
@@ -149,8 +149,8 @@ class PhaseTenStreamingTest < Minitest::Test
       retryable: false,
       provider: "test"
     )
-    adapter = StreamAdapter.new([[], RecordingStudioAI::Adapters::Result.new(error: error)])
-    configure_adapter(adapter)
+    provider = StreamProvider.new([[], RecordingStudioAI::Providers::Result.new(error: error)])
+    configure_provider(provider)
     events = []
 
     response = stream { |event| events << event }
@@ -162,8 +162,8 @@ class PhaseTenStreamingTest < Minitest::Test
   end
 
   def test_stream_idle_timeout_terminalizes_execution
-    adapter = StalledStreamAdapter.new
-    configure_adapter(adapter)
+    provider = StalledStreamProvider.new
+    configure_provider(provider)
     RecordingStudioAI.configuration.stream_idle_timeout = 0.01
     events = []
 
@@ -174,11 +174,11 @@ class PhaseTenStreamingTest < Minitest::Test
     assert_equal ["error"], events.map(&:type)
     assert_equal "failed", RecordingStudioAI::Run.first.status
     assert_equal "failed", RecordingStudioAI::Attempt.first.status
-    refute adapter.worker.alive?
+    refute provider.worker.alive?
   end
 
   def test_retryable_failure_retries_before_visible_output
-    failure = RecordingStudioAI::Adapters::Result.new(
+    failure = RecordingStudioAI::Providers::Result.new(
       error: RecordingStudioAI::Contracts::NormalizedError.new(
         category: "provider_unavailable",
         code: "http_503",
@@ -187,11 +187,11 @@ class PhaseTenStreamingTest < Minitest::Test
         provider: "test"
       )
     )
-    adapter = StreamAdapter.new(
+    provider = StreamProvider.new(
       [[], failure],
-      [[stream_event(:text_delta, text_delta: "Recovered")], RecordingStudioAI::Adapters::Result.new(text: "Recovered")]
+      [[stream_event(:text_delta, text_delta: "Recovered")], RecordingStudioAI::Providers::Result.new(text: "Recovered")]
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
     events = []
 
     response = stream { |event| events << event }
@@ -202,7 +202,7 @@ class PhaseTenStreamingTest < Minitest::Test
   end
 
   def test_retryable_failure_does_not_retry_after_visible_output
-    failure = RecordingStudioAI::Adapters::Result.new(
+    failure = RecordingStudioAI::Providers::Result.new(
       error: RecordingStudioAI::Contracts::NormalizedError.new(
         category: "connection",
         code: "connection",
@@ -211,25 +211,25 @@ class PhaseTenStreamingTest < Minitest::Test
         provider: "test"
       )
     )
-    adapter = StreamAdapter.new(
+    provider = StreamProvider.new(
       [[stream_event(:text_delta, text_delta: "Partial")], failure],
-      [[stream_event(:text_delta, text_delta: "must not run")], RecordingStudioAI::Adapters::Result.new(text: "no")]
+      [[stream_event(:text_delta, text_delta: "must not run")], RecordingStudioAI::Providers::Result.new(text: "no")]
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
     events = []
 
     response = stream { |event| events << event }
 
     refute response.success?
     assert_equal %w[text_delta error], events.map(&:type)
-    assert_equal 1, adapter.requests.length
+    assert_equal 1, provider.requests.length
   end
 
   def test_consumer_exception_cancels_records_and_propagates
-    adapter = StreamAdapter.new(
-      [[stream_event(:text_delta, text_delta: "Hi")], RecordingStudioAI::Adapters::Result.new(text: "Hi")]
+    provider = StreamProvider.new(
+      [[stream_event(:text_delta, text_delta: "Hi")], RecordingStudioAI::Providers::Result.new(text: "Hi")]
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
 
     error = assert_raises(RuntimeError) do
       stream { |_event| raise "consumer disconnected" }
@@ -242,10 +242,10 @@ class PhaseTenStreamingTest < Minitest::Test
   end
 
   def test_stream_without_block_returns_enumerator
-    adapter = StreamAdapter.new(
-      [[stream_event(:text_delta, text_delta: "Hi")], RecordingStudioAI::Adapters::Result.new(text: "Hi")]
+    provider = StreamProvider.new(
+      [[stream_event(:text_delta, text_delta: "Hi")], RecordingStudioAI::Providers::Result.new(text: "Hi")]
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
 
     events = RecordingStudioAI.stream(**stream_arguments).to_a
 
@@ -253,11 +253,11 @@ class PhaseTenStreamingTest < Minitest::Test
   end
 
   def test_stopping_enumerator_early_cancels_active_records
-    adapter = StreamAdapter.new(
+    provider = StreamProvider.new(
       [[stream_event(:text_delta, text_delta: "Hi"), stream_event(:text_delta, text_delta: " later")],
-       RecordingStudioAI::Adapters::Result.new(text: "Hi later")]
+       RecordingStudioAI::Providers::Result.new(text: "Hi later")]
     )
-    configure_adapter(adapter)
+    configure_provider(provider)
 
     RecordingStudioAI.stream(**stream_arguments).each { |_event| break }
 
@@ -285,7 +285,7 @@ class PhaseTenStreamingTest < Minitest::Test
       { type: "response.output_text.delta", delta: "lo" },
       { type: "response.completed", response: response }
     ])
-    configure_provider(:openai, OpenAIClient.new(streams))
+    configure_external_provider(:openai, OpenAIClient.new(streams))
     events = []
 
     result = stream(provider: :openai) { |event| events << event }
@@ -301,7 +301,7 @@ class PhaseTenStreamingTest < Minitest::Test
     streams = OpenAIStreams.new([
       { type: "error", error: { code: "rate_limit_exceeded" } }
     ])
-    configure_provider(:openai, OpenAIClient.new(streams))
+    configure_external_provider(:openai, OpenAIClient.new(streams))
     events = []
 
     result = stream(provider: :openai) { |event| events << event }
@@ -323,7 +323,7 @@ class PhaseTenStreamingTest < Minitest::Test
     streams = OpenAIStreams.new([
       { type: "response.failed", response: failed_response }
     ])
-    configure_provider(:openai, OpenAIClient.new(streams))
+    configure_external_provider(:openai, OpenAIClient.new(streams))
 
     result = stream(provider: :openai) { |_event| }
 
@@ -351,7 +351,7 @@ class PhaseTenStreamingTest < Minitest::Test
         "usageMetadata" => { "promptTokenCount" => 2, "candidatesTokenCount" => 2, "totalTokenCount" => 4 }
       }
     ])
-    configure_provider(:gemini, GeminiClient.new(streams))
+    configure_external_provider(:gemini, GeminiClient.new(streams))
     events = []
 
     result = stream(provider: :gemini) { |event| events << event }
@@ -374,7 +374,7 @@ class PhaseTenStreamingTest < Minitest::Test
         "candidates" => [{ "content" => { "parts" => [{ "text" => "Gemini" }] }, "finishReason" => "STOP" }]
       }, text_mode: :cumulative)
     ])
-    configure_provider(:gemini, GeminiClient.new(streams))
+    configure_external_provider(:gemini, GeminiClient.new(streams))
     events = []
 
     response = stream(provider: :gemini) { |event| events << event }
@@ -388,7 +388,7 @@ class PhaseTenStreamingTest < Minitest::Test
       { "candidates" => [{ "content" => { "parts" => [{ "text" => "ha" }] } }] },
       { "candidates" => [{ "content" => { "parts" => [{ "text" => "ha" }] }, "finishReason" => "STOP" }] }
     ])
-    configure_provider(:gemini, GeminiClient.new(streams))
+    configure_external_provider(:gemini, GeminiClient.new(streams))
     events = []
 
     response = stream(provider: :gemini) { |event| events << event }
@@ -424,11 +424,11 @@ class PhaseTenStreamingTest < Minitest::Test
   end
 
   def test_invalid_structured_stream_discards_buffered_deltas_and_emits_one_terminal_error
-    adapter = StreamAdapter.new([
+    provider = StreamProvider.new([
       [stream_event(:text_delta, text_delta: '{"wrong":true}')],
-      RecordingStudioAI::Adapters::Result.new(text: '{"wrong":true}')
+      RecordingStudioAI::Providers::Result.new(text: '{"wrong":true}')
     ])
-    configure_adapter(adapter, capabilities: %i[generation streaming structured_output])
+    configure_provider(provider, capabilities: %i[generation streaming structured_output])
     events = []
     schema = {
       "type" => "object",
@@ -446,16 +446,16 @@ class PhaseTenStreamingTest < Minitest::Test
 
   def test_stream_custom_tool_lifecycle_and_continuation
     register_tool
-    tool_call = RecordingStudioAI::Adapters::ToolCall.new(
+    tool_call = RecordingStudioAI::Providers::ToolCall.new(
       provider_tool_call_id: "call-1",
       key: "lookup_topic",
       arguments: { topic: "Rails" }
     )
-    adapter = StreamAdapter.new(
-      [[], RecordingStudioAI::Adapters::Result.new(tool_calls: [tool_call], finish_reason: "tool_calls")],
-      [[stream_event(:text_delta, text_delta: "Found")], RecordingStudioAI::Adapters::Result.new(text: "Found")]
+    provider = StreamProvider.new(
+      [[], RecordingStudioAI::Providers::Result.new(tool_calls: [tool_call], finish_reason: "tool_calls")],
+      [[stream_event(:text_delta, text_delta: "Found")], RecordingStudioAI::Providers::Result.new(text: "Found")]
     )
-    configure_adapter(adapter, capabilities: %i[generation streaming custom_tools])
+    configure_provider(provider, capabilities: %i[generation streaming custom_tools])
     events = []
 
     completion_transaction_depths = []
@@ -475,19 +475,19 @@ class PhaseTenStreamingTest < Minitest::Test
 
   def test_structured_stream_supports_custom_tool_continuation
     register_tool
-    tool_call = RecordingStudioAI::Adapters::ToolCall.new(
+    tool_call = RecordingStudioAI::Providers::ToolCall.new(
       provider_tool_call_id: "call-schema",
       key: "lookup_topic",
       arguments: { topic: "Rails" }
     )
-    adapter = StreamAdapter.new(
-      [[], RecordingStudioAI::Adapters::Result.new(tool_calls: [tool_call], finish_reason: "tool_calls")],
+    provider = StreamProvider.new(
+      [[], RecordingStudioAI::Providers::Result.new(tool_calls: [tool_call], finish_reason: "tool_calls")],
       [
         [stream_event(:text_delta, text_delta: '{"summary":"Found"}')],
-        RecordingStudioAI::Adapters::Result.new(text: '{"summary":"Found"}')
+        RecordingStudioAI::Providers::Result.new(text: '{"summary":"Found"}')
       ]
     )
-    configure_adapter(adapter, capabilities: %i[generation streaming structured_output custom_tools])
+    configure_provider(provider, capabilities: %i[generation streaming structured_output custom_tools])
     schema = {
       "type" => "object",
       "properties" => { "summary" => { "type" => "string" } },
@@ -507,16 +507,16 @@ class PhaseTenStreamingTest < Minitest::Test
 
   def test_consumer_exception_on_tool_completion_terminalizes_continuation
     register_tool
-    tool_call = RecordingStudioAI::Adapters::ToolCall.new(
+    tool_call = RecordingStudioAI::Providers::ToolCall.new(
       provider_tool_call_id: "call-disconnect",
       key: "lookup_topic",
       arguments: { topic: "Rails" }
     )
-    adapter = StreamAdapter.new(
-      [[], RecordingStudioAI::Adapters::Result.new(tool_calls: [tool_call], finish_reason: "tool_calls")],
-      [[stream_event(:text_delta, text_delta: "unused")], RecordingStudioAI::Adapters::Result.new(text: "unused")]
+    provider = StreamProvider.new(
+      [[], RecordingStudioAI::Providers::Result.new(tool_calls: [tool_call], finish_reason: "tool_calls")],
+      [[stream_event(:text_delta, text_delta: "unused")], RecordingStudioAI::Providers::Result.new(text: "unused")]
     )
-    configure_adapter(adapter, capabilities: %i[generation streaming custom_tools])
+    configure_provider(provider, capabilities: %i[generation streaming custom_tools])
 
     error = assert_raises(RuntimeError) do
       stream(custom_tools: [{ key: :lookup_topic, version: 1 }]) do |event|
@@ -535,20 +535,20 @@ class PhaseTenStreamingTest < Minitest::Test
 
   def test_stream_payload_contracts_reject_non_serializable_content
     assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
-      RecordingStudioAI::Adapters::StreamEvent.new(type: :text_delta, text_delta: Object.new)
+      RecordingStudioAI::Providers::StreamEvent.new(type: :text_delta, text_delta: Object.new)
     end
     assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
-      RecordingStudioAI::Adapters::Result.new(text: Object.new)
+      RecordingStudioAI::Providers::Result.new(text: Object.new)
     end
     assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
-      RecordingStudioAI::Adapters::Result.new(structured_data: Object.new)
+      RecordingStudioAI::Providers::Result.new(structured_data: Object.new)
     end
   end
 
   private
 
   def stream_event(type, **attributes)
-    RecordingStudioAI::Adapters::StreamEvent.new(type: type, **attributes)
+    RecordingStudioAI::Providers::StreamEvent.new(type: type, **attributes)
   end
 
   def stream(provider: nil, custom_tools: [], &block)
@@ -565,15 +565,15 @@ class PhaseTenStreamingTest < Minitest::Test
     }
   end
 
-  def configure_adapter(adapter, capabilities: %i[generation streaming])
+  def configure_provider(provider, capabilities: %i[generation streaming])
     configuration = RecordingStudioAI.configuration
-    configuration.adapters = { test: adapter }
+    configuration.providers = { test: provider }
     configuration.profiles[:medium] = [
       { provider: :test, model: "stream-model", capabilities: capabilities }
     ]
   end
 
-  def configure_provider(provider, client)
+  def configure_external_provider(provider, client)
     configuration = RecordingStudioAI.configuration
     configuration.public_send("#{provider}_client=", client)
     configuration.allowed_provider_overrides = [provider]
