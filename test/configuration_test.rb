@@ -42,6 +42,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal 30, configuration.custom_tool_timeout
     assert_equal 256.kilobytes, configuration.maximum_custom_tool_result_size
     assert_empty configuration.cost_catalogs
+    assert_equal "RecordingStudioAI::BatchSynchronizationJob", configuration.batch_synchronization_job
     assert_equal 1.minute, configuration.batch_synchronization_interval
     assert_equal 300, configuration.total_execution_timeout
     refute configuration.custom_tool_confirmation_handler.call
@@ -50,7 +51,6 @@ class ConfigurationTest < Minitest::Test
     assert_nil configuration.gemini_api_key
     assert_nil configuration.gemini_client
     assert_equal 120, configuration.request_timeout
-    assert_nil configuration.attribution_snapshotter
     assert_raises(ArgumentError) do
       configuration.attribution_validator.call(root_recording: Object.new, context_recording: nil)
     end

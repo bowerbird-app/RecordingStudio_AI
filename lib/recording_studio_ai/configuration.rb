@@ -11,8 +11,8 @@ module RecordingStudioAI
       :providers,
       :allowed_provider_overrides,
       :allowed_attachment_content_types,
-      :attribution_snapshotter,
       :attribution_validator,
+      :batch_synchronization_job,
       :batch_synchronization_interval,
       :admin_actor_resolver,
       :admin_expensive_models,
@@ -65,8 +65,8 @@ module RecordingStudioAI
       }
       @allowed_provider_overrides = []
       @discovery_enabled = false
-      @attribution_snapshotter = nil
       @attribution_validator = method(:validate_recording_attribution!)
+      @batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"
       @batch_synchronization_interval = 1.minute
       @admin_actor_resolver = nil
       @admin_expensive_models = []
@@ -180,7 +180,16 @@ module RecordingStudioAI
         value = public_send(name)
         invalid_configuration!("#{name} must be a positive duration") unless value.respond_to?(:positive?) && value.positive?
       end
+      unless batch_synchronization_job.is_a?(String) || batch_synchronization_job.respond_to?(:perform_later)
+        invalid_configuration!("batch_synchronization_job must respond to perform_later")
+      end
       self
+    end
+
+    def batch_synchronization_job_class
+      return batch_synchronization_job.constantize if batch_synchronization_job.is_a?(String)
+
+      batch_synchronization_job
     end
 
     private

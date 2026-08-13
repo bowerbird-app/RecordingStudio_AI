@@ -161,6 +161,20 @@ module RecordingStudioAI
       BatchOrchestrator.new.refresh(request)
     end
 
+    def refresh_batch_async(**kwargs)
+      request = Contracts::RequestValidation.validate_batch_lookup_request!(**kwargs)
+      configuration.validate!
+      Authorization.authorize!(
+        :view_execution,
+        attribution: request[:attribution],
+        context: {
+          operation: "batch_refresh",
+          batch_id: request[:batch_id]
+        }
+      )
+      enqueue_batch_synchronization(request)
+    end
+
     def cancel_batch(**kwargs)
       request = Contracts::RequestValidation.validate_batch_lookup_request!(**kwargs)
       configuration.validate!
@@ -184,6 +198,21 @@ module RecordingStudioAI
     end
 
     private
+
+    def enqueue_batch_synchronization(request)
+      attribution = request.fetch(:attribution)
+      configuration.batch_synchronization_job_class.perform_later(
+        batch_id: request.fetch(:batch_id),
+        root_recording: attribution.root_recording,
+        initiator: attribution.initiator,
+        initiator_kind: attribution.initiator_kind,
+        context_recording: attribution.context_recording,
+        executor: attribution.executor,
+        impersonator: attribution.impersonator,
+        execution_source: :job,
+        request_id: attribution.request_id
+      )
+    end
 
     def authorize_provider_native_tools!(request, operation: "generation")
       return unless request[:provider_native_tools].include?(:web_search)

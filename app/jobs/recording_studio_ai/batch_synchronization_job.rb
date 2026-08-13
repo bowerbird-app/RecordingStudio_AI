@@ -30,7 +30,8 @@ module RecordingStudioAI
     private
 
     def reschedule(arguments)
-      self.class.set(wait: RecordingStudioAI.configuration.batch_synchronization_interval)
+      RecordingStudioAI.configuration.batch_synchronization_job_class
+        .set(wait: RecordingStudioAI.configuration.batch_synchronization_interval)
         .perform_later(**arguments)
     end
   end

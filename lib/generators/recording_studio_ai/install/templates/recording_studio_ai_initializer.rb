@@ -11,15 +11,36 @@ RecordingStudioAI.configure do |config|
   # config.gemini_client = MyGeminiClientFactory.build
 
   config.default_profile = :medium
+  # Route each tier to ordered provider/model candidates. Edit this map for your own cost and quality targets.
+  config.profiles = {
+    low: [
+      { provider: :openai, model: "gpt-5-mini",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
+      { provider: :gemini, model: "gemini-2.5-flash",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+    ],
+    medium: [
+      { provider: :openai, model: "gpt-5",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
+      { provider: :gemini, model: "gemini-2.5-pro",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+    ],
+    high: [
+      { provider: :openai, model: "gpt-5-pro",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
+      { provider: :gemini, model: "gemini-2.5-pro",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+    ]
+  }
   # Rates are integer microunits per one million tokens, keyed by provider/model.
   config.cost_catalogs = {}
+  # Polling runs through ActiveJob. Configure Rails with :sidekiq to use Sidekiq.
+  config.batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"
   config.batch_synchronization_interval = 1.minute
   # Replace this deny-by-default handler with the host's RecordingStudioAccessible policy.
   config.authorization_handler = ->(**) { false }
   # Core validates Recording Studio root/context tenancy. Override only for a stricter host policy.
   # config.attribution_validator = ->(root_recording:, context_recording:) { ... }
-  # Return a small, non-sensitive Hash for optional admin identity snapshots.
-  # config.attribution_snapshotter = ->(role:, value:) { { label: value.to_s } }
   # Normal application code should use profiles. Enable only intentional overrides.
   config.allowed_provider_overrides = []
   config.retain_responses = false

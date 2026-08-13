@@ -54,6 +54,9 @@ class InstallGeneratorTest < Minitest::Test
       assert_includes initializer, "config.openai_client"
       assert_includes initializer, "config.gemini_client"
       assert_includes initializer, "config.default_profile = :medium"
+      assert_includes initializer, "config.profiles = {"
+      assert_includes initializer, "gpt-5-mini"
+      assert_includes initializer, "gpt-5-pro"
       assert_includes initializer, "config.cost_catalogs = {}"
       assert_includes initializer, "config.batch_synchronization_interval = 1.minute"
       assert_includes initializer, "config.allowed_provider_overrides"
@@ -82,7 +85,6 @@ class InstallGeneratorTest < Minitest::Test
       assert_includes initializer, "config.stream_idle_timeout = 30"
       assert_includes initializer, "config.authorization_handler"
       assert_includes initializer, "config.attribution_validator"
-      assert_includes initializer, "config.attribution_snapshotter"
     end
   end
 

@@ -6,6 +6,26 @@ RecordingStudioAI.configure do |config|
   config.allowed_provider_overrides = %i[openai gemini]
 
   config.default_profile = :medium
+  config.profiles = {
+    low: [
+      { provider: :openai, model: "gpt-5-mini",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
+      { provider: :gemini, model: "gemini-2.5-flash",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+    ],
+    medium: [
+      { provider: :openai, model: "gpt-5",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
+      { provider: :gemini, model: "gemini-2.5-pro",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+    ],
+    high: [
+      { provider: :openai, model: "gpt-5-pro",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
+      { provider: :gemini, model: "gemini-2.5-pro",
+        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+    ]
+  }
   config.authorization_handler = ->(action:, attribution:, context:) { true }
   config.attribution_validator = lambda do |root_recording:, context_recording:|
     unless root_recording.is_a?(RecordingStudio::Recording) &&

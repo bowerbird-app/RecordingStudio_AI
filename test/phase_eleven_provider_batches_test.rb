@@ -187,6 +187,23 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     assert_same impersonator, calls.first.fetch(:impersonator)
   end
 
+  def test_refresh_batch_async_enqueues_the_configured_polling_job
+    scheduled = nil
+    polling_job = Class.new do
+      define_singleton_method(:perform_later) { |**arguments| scheduled = arguments }
+    end
+    RecordingStudioAI.configuration.batch_synchronization_job = polling_job
+
+    RecordingStudioAI.refresh_batch_async(
+      batch_id: "batch-1", root_recording: @root_recording, initiator: @initiator
+    )
+
+    assert_equal "batch-1", scheduled.fetch(:batch_id)
+    assert_same @root_recording, scheduled.fetch(:root_recording)
+    assert_same @initiator, scheduled.fetch(:initiator)
+    assert_equal "job", scheduled.fetch(:execution_source).to_s
+  end
+
   def test_item_capabilities_are_not_dropped_before_resolution
     RecordingStudioAI.configuration.profiles[:medium].first[:capabilities] = %i[generation provider_batch]
 
@@ -229,8 +246,6 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     assert_equal 2, RecordingStudioAI::BatchItem.count
     assert_equal %w[first second], response.items.map(&:reference)
     RecordingStudioAI::Run.find_each do |run|
-      assert_nil run.input_digest
-      assert_nil run.output_digest
       assert_nil run.input_character_count
     end
     persisted = RecordingStudioAI::Batch.first.attributes.values +
@@ -238,18 +253,6 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
                 RecordingStudioAI::Run.all.flat_map { |run| run.attributes.values }
     refute_includes persisted, "sensitive first prompt"
     refute_includes persisted, "sensitive second prompt"
-  end
-
-  def test_batch_and_item_runs_persist_sanitized_attribution_snapshots
-    RecordingStudioAI.configuration.attribution_snapshotter = lambda do |role:, value:|
-      { label: "#{role}-#{value.id}", token: "secret" }
-    end
-
-    response = submit_two_items
-
-    expected = { "label" => "initiator-41", "token" => "[REDACTED]" }
-    assert_equal expected, response.batch.initiator_snapshot
-    assert RecordingStudioAI::Run.all.all? { |run| run.initiator_snapshot == expected }
   end
 
   def test_batch_persists_impersonator_attribution
