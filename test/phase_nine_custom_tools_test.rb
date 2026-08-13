@@ -174,8 +174,6 @@ class PhaseNineCustomToolsTest < Minitest::Test
     assert_equal "summarize_record", invocation.tool_key
     assert_equal RecordingStudioAI::Attempt.first.id, invocation.requested_by_attempt_id
     assert_equal RecordingStudioAI::Attempt.second.id, invocation.continued_by_attempt_id
-    assert_equal 64, invocation.arguments_digest.length
-    assert_equal 64, invocation.result_digest.length
     refute_includes invocation.attributes.values, "Rails summary"
     assert_equal 1, response.run.custom_tool_invocation_count
   end
@@ -525,6 +523,7 @@ class PhaseNineCustomToolsTest < Minitest::Test
     assert_equal "Gemini final", response.text
     declaration = models.requests.first.dig(:config, :tools).first[:function_declarations].first
     assert_equal "summarize_record", declaration[:name]
+    refute declaration[:parameters].key?("additionalProperties")
     continuation_contents = models.requests.second[:contents]
     assert_equal "summarize_record", continuation_contents[-2].dig(:parts, 0, :function_call, :name)
     assert_equal "summarize_record", continuation_contents[-1].dig(:parts, 0, :function_response, :name)

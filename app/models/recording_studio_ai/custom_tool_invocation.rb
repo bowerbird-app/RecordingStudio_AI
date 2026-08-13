@@ -68,9 +68,6 @@ module RecordingStudioAI
           confirmed_by_type
           confirmed_by_id
           confirmed_at
-          arguments_digest
-          arguments_summary
-          result_digest
           result_summary
           started_at
           completed_at

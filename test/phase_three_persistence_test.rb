@@ -184,7 +184,7 @@ class PhaseThreePersistenceTest < Minitest::Test
 
     {
       attempt => { provider_request_id: "provider-request" },
-      invocation => { result_digest: "changed" },
+      invocation => { result_summary: "changed" },
       batch => { provider_batch_id: "provider-batch" },
       item => { provider_item_id: "provider-item" }
     }.each do |record, attributes|

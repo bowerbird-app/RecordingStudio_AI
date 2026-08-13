@@ -78,19 +78,11 @@ module RecordingStudioAI
             query: query
           ).select(:run_id)
         tool_runs = visible_tool_invocations.where("tool_key LIKE ?", query).select(:run_id)
-        sensitive_root_ids = @admin_access.root_ids.select do |root_id|
-          @admin_access.allowed?(:view_sensitive_execution, root_id: root_id, context: { search: "runs" })
-        end
-        snapshot_runs = scope.where(root_recording_id: sensitive_root_ids).where(
-          "CAST(initiator_snapshot AS TEXT) LIKE :query OR CAST(executor_snapshot AS TEXT) LIKE :query OR " \
-          "CAST(impersonator_snapshot AS TEXT) LIKE :query",
-          query: query
-        ).select(:id)
         scope.where(
           "purpose LIKE :query OR error_code LIKE :query OR " \
-          "request_id LIKE :query OR job_id LIKE :query OR id IN (:snapshot_runs) OR id IN (:attempt_runs) OR " \
+          "request_id LIKE :query OR job_id LIKE :query OR id IN (:attempt_runs) OR " \
           "id IN (:batch_runs) OR id IN (:tool_runs)",
-          query: query, snapshot_runs: snapshot_runs, attempt_runs: attempt_runs,
+          query: query, attempt_runs: attempt_runs,
           batch_runs: batch_runs, tool_runs: tool_runs
         )
       end

@@ -159,9 +159,7 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
     assert_equal "balanced", run.resolved_model
     assert_equal 1, run.attempt_count
     assert_equal "Sensitive prompt that must not persist".length, run.input_character_count
-    assert_equal 64, run.input_digest.length
     assert_equal "Generated".length, run.output_character_count
-    assert_equal 64, run.output_digest.length
     assert_equal "completed", attempt.status
     assert_equal "primary", attempt.kind
     assert_equal "test", attempt.provider
@@ -169,22 +167,6 @@ class PhaseFiveResolutionExecutionTest < Minitest::Test
     refute_includes run.attributes.values, "Sensitive prompt that must not persist"
     refute_includes attempt.attributes.values, "Sensitive prompt that must not persist"
     assert_equal 0, ActiveRecord::Base.connection.select_value("SELECT COUNT(*) FROM recording_studio_events")
-  end
-
-  def test_generate_persists_only_sanitized_host_attribution_snapshots
-    RecordingStudioAI.configuration.attribution_snapshotter = lambda do |role:, value:|
-      { label: "#{role}-#{value.id}", api_key: "secret" }
-    end
-
-    generate_response = RecordingStudioAI.generate(
-      prompt: "Summarize", root_recording: @root_recording, initiator: @initiator
-    )
-
-    assert generate_response.success?
-    assert_equal(
-      { "label" => "initiator-17", "api_key" => "[REDACTED]" },
-      generate_response.run.initiator_snapshot
-    )
   end
 
   def test_provider_failure_is_normalized_and_does_not_persist_exception_payload

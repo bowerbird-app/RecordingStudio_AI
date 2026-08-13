@@ -21,16 +21,13 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
       t.string :initiator_type, null: false
       t.string :initiator_id, null: false
       t.string :initiator_kind, null: false
-      t.json :initiator_snapshot
 
       t.string :executor_type
       t.string :executor_id
       t.string :executor_kind
-      t.json :executor_snapshot
 
       t.string :impersonator_type
       t.string :impersonator_id
-      t.json :impersonator_snapshot
 
       t.string :execution_source
       t.string :request_id
@@ -56,8 +53,6 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
       t.integer :fallback_count, null: false, default: 0
       t.integer :custom_tool_invocation_count, null: false, default: 0
 
-      t.string :input_digest
-      t.string :output_digest
       t.integer :input_character_count
       t.integer :output_character_count
 
@@ -202,9 +197,6 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
       t.string :confirmed_by_id
       t.datetime :confirmed_at
 
-      t.string :arguments_digest
-      t.text :arguments_summary
-      t.string :result_digest
       t.text :result_summary
 
       t.datetime :started_at
@@ -254,12 +246,10 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
       t.string :initiator_type, null: false
       t.string :initiator_id, null: false
       t.string :initiator_kind, null: false
-      t.json :initiator_snapshot
 
       t.string :executor_type
       t.string :executor_id
       t.string :executor_kind
-      t.json :executor_snapshot
 
       t.string :execution_source
       t.string :request_id

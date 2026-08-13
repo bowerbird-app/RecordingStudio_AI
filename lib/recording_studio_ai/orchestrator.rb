@@ -385,9 +385,6 @@ module RecordingStudioAI
     end
 
     def create_custom_tool_invocation!(run, requesting_attempt, tool_call, definition)
-      serialized_arguments = JSON.generate(tool_call.arguments)
-      registered_names = definition.parameters.map { |parameter| parameter.fetch(:name) }
-      recognized_names = tool_call.arguments.keys & registered_names
       run.custom_tool_invocations.create!(
         requested_by_attempt: requesting_attempt,
         provider_tool_call_id: tool_call.provider_tool_call_id,
@@ -401,12 +398,6 @@ module RecordingStudioAI
         idempotent: definition.idempotent,
         cost_category: definition.cost,
         latency_category: definition.latency,
-        arguments_digest: digest(serialized_arguments),
-        arguments_summary: JSON.generate(
-          parameter_count: tool_call.arguments.length,
-          recognized_parameters: recognized_names.sort,
-          byte_size: serialized_arguments.bytesize
-        ),
         metadata: {}
       )
     end
@@ -417,7 +408,6 @@ module RecordingStudioAI
       invocation.update!(
         status: "completed",
         continued_by_attempt: continuation,
-        result_digest: digest(serialized_result),
         result_summary: JSON.generate(type: result.class.name, byte_size: serialized_result.bytesize),
         completed_at: completed_at,
         latency_ms: elapsed_ms(invocation.started_at, completed_at)
@@ -454,13 +444,11 @@ module RecordingStudioAI
         destructive: false,
         requires_confirmation: false,
         idempotent: false,
-        arguments_digest: digest(JSON.generate(tool_call.arguments)),
-        arguments_summary: JSON.generate(parameter_count: tool_call.arguments.length),
         completed_at: Time.current,
         error_category: "custom_tool_not_found",
         error_code: "custom_tool_not_found",
         error_message: "Provider requested an unavailable custom tool.",
-        metadata: {}
+        metadata: { "parameter_count" => tool_call.arguments.length }
       )
       {
         invocation: invocation,
@@ -670,18 +658,14 @@ module RecordingStudioAI
         initiator_type: attribution.initiator.class.name,
         initiator_id: identifier(attribution.initiator),
         initiator_kind: attribution.initiator_kind,
-        initiator_snapshot: attribution.snapshot(:initiator, configuration: @configuration),
         executor_type: attribution.executor&.class&.name,
         executor_id: identifier(attribution.executor),
-        executor_snapshot: attribution.snapshot(:executor, configuration: @configuration),
         impersonator_type: attribution.impersonator&.class&.name,
         impersonator_id: identifier(attribution.impersonator),
-        impersonator_snapshot: attribution.snapshot(:impersonator, configuration: @configuration),
         execution_source: attribution.execution_source,
         request_id: attribution.request_id,
         job_id: attribution.job_id,
         started_at: Time.current,
-        input_digest: digest(input),
         input_character_count: input.length,
         **attachment_metadata,
         web_search_requested: request[:provider_native_tools].include?(:web_search),
@@ -741,7 +725,6 @@ module RecordingStudioAI
                     custom_tool_invocation_count: custom_tool_invocation_count(run),
                     completed_at: completed_at,
                     latency_ms: elapsed_ms(run.started_at, completed_at),
-                    output_digest: digest(final_result.text),
                     output_character_count: final_result.text&.length,
                     web_search_used: executions.any? do |execution|
                       execution.result.provider_native_tools.include?("web_search")

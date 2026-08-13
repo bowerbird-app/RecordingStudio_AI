@@ -47,22 +47,6 @@ module RecordingStudioAI
         }
       end
 
-      def snapshot(role, configuration: RecordingStudioAI.configuration)
-        callback = configuration.attribution_snapshotter
-        value = public_send(role)
-        return if callback.nil? || value.nil?
-
-        snapshot = RecordingStudioAI::Metadata.sanitize!(
-          callback.call(role: role, value: value), path: "attribution.#{role}_snapshot"
-        )
-        return snapshot if snapshot.is_a?(Hash)
-
-        raise RecordingStudioAI::Errors::ContractValidationError.new(
-          "attribution snapshot must be a Hash",
-          code: "invalid_request"
-        )
-      end
-
       private
 
       def normalize_initiator_kind(kind)

@@ -4,7 +4,6 @@ class HardenRecordingStudioAIPersistence < ActiveRecord::Migration[8.1]
   def up
     add_column :recording_studio_ai_batches, :impersonator_type, :string
     add_column :recording_studio_ai_batches, :impersonator_id, :string
-    add_column :recording_studio_ai_batches, :impersonator_snapshot, :json
     add_index :recording_studio_ai_batches, %i[impersonator_type impersonator_id]
 
     add_check_constraint :recording_studio_ai_runs,
@@ -70,7 +69,6 @@ class HardenRecordingStudioAIPersistence < ActiveRecord::Migration[8.1]
     remove_check_constraint :recording_studio_ai_runs, name: "chk_rsai_runs_operation"
 
     remove_index :recording_studio_ai_batches, %i[impersonator_type impersonator_id]
-    remove_column :recording_studio_ai_batches, :impersonator_snapshot
     remove_column :recording_studio_ai_batches, :impersonator_id
     remove_column :recording_studio_ai_batches, :impersonator_type
   end

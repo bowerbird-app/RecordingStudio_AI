@@ -45,14 +45,11 @@ module RecordingStudioAI
           initiator_type
           initiator_id
           initiator_kind
-          initiator_snapshot
           executor_type
           executor_id
           executor_kind
-          executor_snapshot
           impersonator_type
           impersonator_id
-          impersonator_snapshot
           execution_source
           request_id
           job_id

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_12_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_13_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -144,16 +144,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_150000) do
     t.string "execution_source"
     t.string "executor_id"
     t.string "executor_kind"
-    t.json "executor_snapshot"
     t.string "executor_type"
     t.datetime "expires_at"
     t.integer "failed_item_count", default: 0, null: false
     t.string "impersonator_id"
-    t.json "impersonator_snapshot"
     t.string "impersonator_type"
     t.string "initiator_id", null: false
     t.string "initiator_kind", null: false
-    t.json "initiator_snapshot"
     t.string "initiator_type", null: false
     t.bigint "input_tokens"
     t.integer "item_count", default: 0, null: false
@@ -191,8 +188,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_150000) do
   end
 
   create_table "recording_studio_ai_custom_tool_invocations", force: :cascade do |t|
-    t.string "arguments_digest"
-    t.text "arguments_summary"
     t.datetime "completed_at"
     t.string "confirmation_status"
     t.datetime "confirmed_at"
@@ -214,7 +209,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_150000) do
     t.boolean "read_only", null: false
     t.bigint "requested_by_attempt_id"
     t.boolean "requires_confirmation", null: false
-    t.string "result_digest"
     t.text "result_summary"
     t.bigint "run_id", null: false
     t.datetime "started_at"
@@ -289,18 +283,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_150000) do
     t.string "execution_source"
     t.string "executor_id"
     t.string "executor_kind"
-    t.json "executor_snapshot"
     t.string "executor_type"
     t.integer "fallback_count", default: 0, null: false
     t.string "impersonator_id"
-    t.json "impersonator_snapshot"
     t.string "impersonator_type"
     t.string "initiator_id", null: false
     t.string "initiator_kind", null: false
-    t.json "initiator_snapshot"
     t.string "initiator_type", null: false
     t.integer "input_character_count"
-    t.string "input_digest"
     t.bigint "input_tokens"
     t.string "job_id"
     t.bigint "latency_ms"
@@ -308,7 +298,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_12_150000) do
     t.json "metadata"
     t.string "operation", null: false
     t.integer "output_character_count"
-    t.string "output_digest"
     t.bigint "output_tokens"
     t.string "profile_key"
     t.string "purpose"
