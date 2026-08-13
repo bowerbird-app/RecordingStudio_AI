@@ -63,13 +63,12 @@ begin
     "anthropic" => %w[claude-3-5-sonnet claude-opus-4],
     "google" => %w[gemini-2.0-flash gemini-2.5-pro]
   }
-  tool_keys = [
-    "web.search",
-    "workspace.lookup",
-    "recording.fetch",
-    "summarize.recordings",
-    "attachments.scan"
-  ]
+  registered_tools = RecordingStudioAI.tools.all
+  raise "Register dummy custom tools before seeding invocations" if registered_tools.empty?
+
+  # Tool-call snapshots become immutable once terminal. Replace only synthetic
+  # rows so re-seeding can adopt the current registered definitions.
+  RecordingStudioAI::CustomToolInvocation.where("provider_tool_call_id LIKE ?", "tool-%").delete_all
 
   run_status_for = lambda do
     roll = rand
@@ -79,18 +78,20 @@ begin
     "cancelled"
   end
 
-  thirty_days_ago = 29.days.ago.to_date
+  random_seed_time = lambda do
+    30.days.ago + rand(60..(30.days.to_i - 60)).seconds
+  end
 
-  (thirty_days_ago..Date.current).each do |day|
-    rand(5..12).times do |index|
-      request_id = "seed-rsai-run-#{day.iso8601}-#{index}"
+  30.times do |day_offset|
+    8.times do |index|
+      request_id = "seed-rsai-run-v2-#{day_offset}-#{index}"
       next if RecordingStudioAI::Run.exists?(request_id: request_id)
 
       provider = providers.keys.sample
       model = providers.fetch(provider).sample
       status = run_status_for.call
       operation = rand < 0.82 ? "generation" : "stream"
-      started_at = day.beginning_of_day + rand(0..86_399).seconds
+      started_at = random_seed_time.call
       latency_ms = rand(120..6_200)
       completed_at = started_at + (latency_ms / 1000.0)
       input_tokens = rand(120..2_800)
@@ -124,11 +125,9 @@ begin
         initiator_type: "User",
         initiator_id: user.id,
         initiator_kind: "human",
-        initiator_snapshot: { email: user.email },
         executor_type: "User",
         executor_id: user.id,
         executor_kind: "manual",
-        executor_snapshot: { email: user.email },
         execution_source: ["sync", "job"].sample,
         started_at: started_at,
         completed_at: completed_at,
@@ -206,11 +205,12 @@ begin
         next if tool_invocation_count.zero?
 
         tool_invocation_count.times do |tool_index|
+          tool_definition = registered_tools.sample
           tool_status = rand < 0.84 ? "completed" : ["failed", "denied", "rejected"].sample
           tool_started_at = attempt_started_at + rand(1..30).seconds
           tool_latency = rand(40..1_900)
           tool_completed_at = tool_started_at + (tool_latency / 1000.0)
-          confirmation_required = rand < 0.3
+          confirmation_required = tool_definition.requires_confirmation
           confirmation_status = confirmation_required ? %w[pending confirmed rejected].sample : "not_required"
 
           confirmed_at = confirmation_status == "confirmed" ? (tool_started_at + rand(1..10).seconds) : nil
@@ -221,24 +221,21 @@ begin
             run: run,
             requested_by_attempt: attempt,
             continued_by_attempt: nil,
-            tool_key: tool_keys.sample,
-            tool_version: rand(1..3),
-            tool_name_snapshot: "Seeded Tool #{tool_index + 1}",
+            tool_key: tool_definition.key,
+            tool_version: tool_definition.version,
+            tool_name_snapshot: tool_definition.name,
             status: tool_status,
             provider_tool_call_id: "tool-#{run.id}-#{sequence + 1}-#{tool_index + 1}",
-            read_only: rand < 0.65,
-            destructive: rand < 0.08,
+            read_only: tool_definition.read_only,
+            destructive: tool_definition.destructive,
             requires_confirmation: confirmation_required,
-            idempotent: rand < 0.85,
-            cost_category: %w[negligible low medium high].sample,
-            latency_category: tool_latency < 250 ? "instant" : (tool_latency < 900 ? "fast" : "slow"),
+            idempotent: tool_definition.idempotent,
+            cost_category: tool_definition.cost,
+            latency_category: tool_definition.latency,
             confirmation_status: confirmation_status,
             confirmed_at: confirmed_at,
             confirmed_by_type: confirmed_by_type,
             confirmed_by_id: confirmed_by_id,
-            arguments_digest: "seed-args-#{run.id}-#{tool_index + 1}",
-            arguments_summary: "Seeded invocation arguments",
-            result_digest: "seed-result-#{run.id}-#{tool_index + 1}",
             result_summary: tool_status == "completed" ? "Seeded successful result" : "Seeded failed result",
             started_at: tool_started_at,
             completed_at: tool_completed_at,
@@ -260,7 +257,7 @@ begin
     completed_at = started_at + (latency_ms / 1000.0)
     cost_per_token = model.match?(/gpt-5|opus|2\.5-pro/i) ? 6.5 : 2.2
 
-    run = RecordingStudioAI::Run.find_or_initialize_by(request_id: request_id, created_at: started_at)
+    run = RecordingStudioAI::Run.find_or_initialize_by(request_id: request_id)
     return run if run.persisted?
 
     run.assign_attributes(
@@ -276,11 +273,9 @@ begin
       initiator_type: "User",
       initiator_id: user.id,
       initiator_kind: "human",
-      initiator_snapshot: { email: user.email },
       executor_type: "User",
       executor_id: user.id,
       executor_kind: "manual",
-      executor_snapshot: { email: user.email },
       execution_source: "sync",
       started_at: started_at,
       completed_at: completed_at,
@@ -325,9 +320,8 @@ begin
       )
     end
 
-    # Force all records into the previous 24h window so warning thresholds trigger reliably.
     24.times do |index|
-      started_at = Time.current - (index * 10).minutes
+      started_at = random_seed_time.call
       warning_seed_run.call(
         request_id: "seed-rsai-warning-preview-v3-#{seed_root.id}-#{index}",
         root_id: seed_root.id,

@@ -69,16 +69,16 @@ class ConfigController < ApplicationController
       explanation: "Validates recording attribution boundaries before execution."
     },
     {
-      key: "attribution_snapshotter",
-      required: "No",
-      accepted_values: "Callable(role:, value:) or nil",
-      explanation: "Optional actor attribution snapshotting for admin/audit context."
-    },
-    {
       key: "cost_catalogs",
       required: "No",
       accepted_values: "Hash",
       explanation: "Per-model pricing metadata for spend reporting and estimation."
+    },
+    {
+      key: "batch_synchronization_job",
+      required: "No",
+      accepted_values: "ActiveJob class or class-name String",
+      explanation: "Asynchronous batch polling job. Defaults to RecordingStudioAI::BatchSynchronizationJob and uses Sidekiq when configured as the ActiveJob adapter."
     },
     {
       key: "batch_synchronization_interval",
@@ -340,7 +340,6 @@ class ConfigController < ApplicationController
           raise ArgumentError, "context must belong to root"
         end
       end
-      config.attribution_snapshotter = nil
 
       # Cost + batch behavior.
       config.cost_catalogs = {}

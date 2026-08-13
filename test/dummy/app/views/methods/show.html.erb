@@ -1,0 +1,152 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-8">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Methods",
+    subtitle: "Use Recording Studio AI from application services, controllers, jobs, and workflows.",
+    variant: :h1
+  ) %>
+
+  <section class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Shared Attribution",
+      subtitle: "Every operation requires a root recording and initiator. Add context, executor, and request metadata when available.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Request context",
+      language: "ruby",
+      code: <<~'RUBY'
+        root_recording = workspace.root_recording
+
+        attribution = {
+          root_recording: root_recording,
+          context_recording: page.recording,
+          initiator: current_user,
+          initiator_kind: :user,
+          execution_source: :web,
+          request_id: request.request_id
+        }
+      RUBY
+    ) %>
+  </section>
+
+  <section class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Generate",
+      subtitle: "Generate a complete response. The non-bang method returns a response object with success and error details.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Synchronous generation",
+      language: "ruby",
+      code: <<~'RUBY'
+        response = RecordingStudioAI.generate(
+          prompt: "Summarize this page for an editor.",
+          purpose: "page_summary",
+          profile: :medium,
+          metadata: { feature: "page_editor" },
+          **attribution
+        )
+
+        if response.success?
+          response.text
+        else
+          Rails.logger.warn(response.error.message)
+        end
+
+        # Use generate! when a failed generation should raise RecordingStudioAI::Errors::ExecutionError.
+        response = RecordingStudioAI.generate!(prompt: "Draft a title", **attribution)
+      RUBY
+    ) %>
+  </section>
+
+  <section class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Stream",
+      subtitle: "Receive provider output incrementally. Provide a block, or use the returned Enumerator when no block is supplied.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Streaming generation",
+      language: "ruby",
+      code: <<~'RUBY'
+        RecordingStudioAI.stream(
+          prompt: "Explain this report in three bullets.",
+          purpose: "report_explanation",
+          **attribution
+        ) do |event|
+          next unless event.type == "content_delta"
+
+          broadcast_append_to("generation_#{current_user.id}", target: "output", html: event.text)
+        end
+
+        events = RecordingStudioAI.stream(prompt: "Draft an outline", **attribution)
+        events.each { |event| process_event(event) }
+      RUBY
+    ) %>
+  </section>
+
+  <section class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Batch",
+      subtitle: "Submit independent items to a provider batch, then refresh synchronously or enqueue polling with Sidekiq through ActiveJob.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Submit and poll a batch",
+      language: "ruby",
+      code: <<~'RUBY'
+        batch = RecordingStudioAI.submit_batch(
+          purpose: "nightly_page_summaries",
+          items: pages.map do |page|
+            {
+              reference: page.id.to_s,
+              prompt: "Summarize #{page.title}.",
+              purpose: "page_summary",
+              metadata: { page_id: page.id }
+            }
+          end,
+          **attribution
+        )
+
+        # Fetch the provider's latest status in the current process.
+        RecordingStudioAI.refresh_batch(batch_id: batch.batch.id, **attribution)
+
+        # Enqueue polling. The configured batch_synchronization_job reschedules
+        # itself until the batch reaches a terminal status.
+        RecordingStudioAI.refresh_batch_async(batch_id: batch.batch.id, **attribution)
+
+        RecordingStudioAI.cancel_batch(batch_id: batch.batch.id, **attribution)
+      RUBY
+    ) %>
+  </section>
+
+  <section class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Custom Tools",
+      subtitle: "Pass registered tool references to a generation or stream request. Confirmation and policy checks run before execution.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Tool-enabled generation",
+      language: "ruby",
+      code: <<~'RUBY'
+        response = RecordingStudioAI.generate(
+          prompt: "Find the latest project status.",
+          purpose: "project_status",
+          custom_tools: [{ key: "lookup_project", version: 1 }],
+          **attribution
+        )
+      RUBY
+    ) %>
+  </section>
+</div>

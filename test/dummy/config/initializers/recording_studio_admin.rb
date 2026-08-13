@@ -27,11 +27,27 @@ RecordingStudioAdmin.configure do |config|
   end
 end
 
+module RecordingStudioAdminLastFourWeeksPreset
+  def from_preset_key(key, reference_date: Date.current)
+    return super unless key.to_s == "last_4_weeks"
+
+    RecordingStudioAdmin::Period.new(
+      amount: 4,
+      unit: :week,
+      start_date: reference_date - 27.days,
+      end_date: reference_date,
+      preset_key: :last_4_weeks
+    )
+  end
+end
+
+RecordingStudioAdmin::Period.singleton_class.prepend(RecordingStudioAdminLastFourWeeksPreset)
+
 module RecordingStudioAdminRootAnchorDefault
   private
 
   def page_nav_anchor_url(default: nil)
-    super(default: main_app.root_path)
+    super(default: RecordingStudioAdmin.configuration.default_mount_path)
   end
 
   def preserve_anchor_url(url)

@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class AIPlaygroundController < ApplicationController
+  include ActionController::Live
+
   CAPABILITIES = {
     "chat" => "Chat",
     "streaming" => "Streaming",
@@ -48,20 +50,7 @@ class AIPlaygroundController < ApplicationController
     root_recording = current_root_recording || RecordingStudio.root_recording_for(Workspace.order(:created_at).first)
     raise "No root recording is available for AI execution." if root_recording.nil?
 
-    base_request = {
-      root_recording: root_recording,
-      initiator: current_user,
-      initiator_kind: "user",
-      execution_source: "web",
-      profile: @form.fetch("profile").to_sym,
-      purpose: "dummy_ai_playground",
-      provider: provider_override,
-      request_id: @request_id,
-      metadata: {
-        source: "dummy_ai_playground",
-        capability: @form.fetch("capability")
-      }
-    }
+    base_request = base_request_for(@form, root_recording: root_recording, request_id: @request_id)
 
     @response = execute_capability(base_request)
     @response_payload = @response.to_h
@@ -80,7 +69,56 @@ class AIPlaygroundController < ApplicationController
     render :show, status: :unprocessable_entity
   end
 
+  def stream
+    form = default_form.merge(form_params.to_h).merge("capability" => "streaming")
+    request_id = SecureRandom.uuid
+    root_recording = current_root_recording || RecordingStudio.root_recording_for(Workspace.order(:created_at).first)
+    raise "No root recording is available for AI execution." if root_recording.nil?
+
+    response.headers["Content-Type"] = "text/event-stream"
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
+    response.headers["Last-Modified"] = Time.current.httpdate
+    write_stream_event(type: "started", request_id: request_id)
+
+    RecordingStudioAI.stream(
+      **base_request_for(form, root_recording: root_recording, request_id: request_id).merge(
+        messages: [user_message(form.fetch("prompt"))],
+        provider_native_tools: form.fetch("web_search", "0") == "1" ? [:web_search] : []
+      )
+    ) do |event|
+      text = event.text_delta.to_s if event.respond_to?(:text_delta)
+      write_stream_event(type: "delta", text: text) if text.present?
+    end
+    write_stream_event(type: "complete")
+  rescue StandardError => error
+    write_stream_event(type: "error", message: "#{error.class}: #{error.message}")
+  ensure
+    response.stream.close
+  end
+
   private
+
+  def base_request_for(form, root_recording:, request_id:)
+    {
+      root_recording: root_recording,
+      initiator: current_user,
+      initiator_kind: "user",
+      execution_source: "web",
+      profile: form.fetch("profile").to_sym,
+      purpose: "dummy_ai_playground",
+      provider: form.fetch("provider").present? ? form.fetch("provider").to_sym : nil,
+      request_id: request_id,
+      metadata: {
+        source: "dummy_ai_playground",
+        capability: form.fetch("capability")
+      }
+    }
+  end
+
+  def write_stream_event(payload)
+    response.stream.write("data: #{JSON.generate(payload)}\n\n")
+  end
 
   def setup_page_state
     @provider_options = PROVIDERS.map { |value, label| { value: value, label: label } }

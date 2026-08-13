@@ -55,28 +55,25 @@
     <% end %>
 
     <% tabs.tab(label: "Streaming", id: "streaming") do %>
-      <%= form_with url: main_app.ai_playground_path, method: :post, scope: :ai_playground, local: true, data: { turbo: false }, class: "space-y-4" do %>
+      <div data-controller="ai-playground-stream" data-ai-playground-stream-url-value="<%= main_app.stream_ai_playground_path %>">
+      <%= form_with url: main_app.ai_playground_path, method: :post, scope: :ai_playground, local: true, data: { turbo: false, action: "submit->ai-playground-stream#submit" }, class: "space-y-4" do %>
         <%= hidden_field_tag "ai_playground[capability]", "streaming" %>
         <%= hidden_field_tag "ai_playground[web_search]", "0" %>
 
         <%= render FlatPack::Select::Component.new(name: "ai_playground[provider]", label: "Provider", options: @provider_options, value: @form.fetch("provider")) %>
         <%= render FlatPack::Select::Component.new(name: "ai_playground[profile]", label: "Profile", options: @profile_options, value: @form.fetch("profile")) %>
         <%= render FlatPack::TextArea::Component.new(name: "ai_playground[prompt]", label: "Prompt", value: @form.fetch("prompt"), rows: 5, required: true) %>
-        <div class="space-y-3">
-          <p class="text-sm font-semibold">Batch items</p>
-          <% @form.fetch("batch_items").each_with_index do |item_prompt, index| %>
-            <%= render FlatPack::TextArea::Component.new(
-              name: "ai_playground[batch_items][]",
-              label: "Item #{index + 1}",
-              value: item_prompt,
-              rows: 4,
-              required: true
-            ) %>
-          <% end %>
-        </div>
         <%= render FlatPack::Checkbox::Component.new(name: "ai_playground[web_search]", label: "Enable web search", checked: @form.fetch("web_search", "0") == "1") %>
-        <%= button_tag "Run Streaming", type: "submit", class: "inline-flex items-center justify-center rounded-[var(--button-border-radius)] bg-[var(--button-primary-background-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm font-medium text-[var(--button-primary-text-color)]" %>
+        <%= button_tag "Run Streaming", type: "submit", data: { ai_playground_stream_target: "submit" }, class: "inline-flex items-center justify-center rounded-[var(--button-border-radius)] bg-[var(--button-primary-background-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm font-medium text-[var(--button-primary-text-color)] disabled:cursor-not-allowed disabled:opacity-60" %>
       <% end %>
+      <div class="hidden space-y-2 rounded-md border border-(--surface-border-color) bg-(--surface-subtle-background-color) p-4" data-ai-playground-stream-target="panel" aria-live="polite">
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-sm font-semibold">Live response</p>
+          <span class="text-xs text-(--surface-muted-content-color)" data-ai-playground-stream-target="status">Waiting</span>
+        </div>
+        <pre class="min-h-24 max-h-96 overflow-y-auto whitespace-pre-wrap wrap-break-word text-sm text-(--surface-content-color)" data-ai-playground-stream-target="output"></pre>
+      </div>
+      </div>
     <% end %>
 
     <% tabs.tab(label: "Tool Calls", id: "tool_calls") do %>

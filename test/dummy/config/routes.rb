@@ -1,5 +1,11 @@
+require "sidekiq/web"
+
 Rails.application.routes.draw do
   devise_for :users
+
+  authenticate :user do
+    mount Sidekiq::Web => "/sidekiq"
+  end
 
   # RecordingStudio engine is data/API-focused and has no browser root route.
   # Keep legacy links working by redirecting the base path to the app home.
@@ -24,7 +30,9 @@ Rails.application.routes.draw do
   get "install", to: "install#show"
   get "config", to: "config#show", as: :gem_config
   get "tables", to: "tables#show", as: :gem_tables
+  get "methods", to: "methods#show", as: :gem_methods
   get "ai_playground", to: "ai_playground#show"
   post "ai_playground", to: "ai_playground#create"
+  post "ai_playground/stream", to: "ai_playground#stream", as: :stream_ai_playground
   root "home#index"
 end
