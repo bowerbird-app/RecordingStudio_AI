@@ -348,8 +348,20 @@ module RecordingStudioAI
           {
             name: definition.key,
             description: definition.provider_description,
-            parameters: definition.json_schema
+            parameters: gemini_function_schema(definition.json_schema)
           }
+        end
+      end
+
+      def gemini_function_schema(schema)
+        schema.each_with_object({}) do |(key, value), translated|
+          next if key == "additionalProperties"
+
+          translated[key] = case value
+                            when Hash then gemini_function_schema(value)
+                            when Array then value.map { |item| item.is_a?(Hash) ? gemini_function_schema(item) : item }
+                            else value
+                            end
         end
       end
 
