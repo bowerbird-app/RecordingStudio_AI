@@ -114,6 +114,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "value=\"last_4_weeks\""
+    assert_includes response.body, "Tool Key"
+    refute_includes response.body, ">Short name<"
   end
 
   test "ai calls chart marks increased failed and cancelled runs as unfavorable" do
@@ -185,11 +187,34 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Registered custom tools"
     assert_includes response.body, "Cost class"
-    assert_includes response.body, "Calls / 30 days"
+    assert_includes response.body, "Calls"
     refute_includes response.body, "Calls today"
     assert_includes response.body, "Success rate"
     assert_includes response.body, "Error rate"
     assert_includes response.body, "Average duration"
+  end
+
+  test "registered custom tools screen includes unused registered tools" do
+    authenticate_for_admin!
+    unused_tool_key = "unused_tool_#{SecureRandom.hex(4)}"
+    unused_tool_name = "Unused Tool #{unused_tool_key}"
+    RecordingStudioAI.tools.register(**DUMMY_TOOLS.first.merge(key: unused_tool_key, name: unused_tool_name))
+
+    get "/admin/screens/registered_custom_tools/table"
+
+    assert_response :success
+    assert_includes response.body, unused_tool_name
+
+    unused_tool_row = AdminScreens::RecordingStudioAIWidgets.custom_tool_rows(
+      RecordingStudioAdmin::Context.new(
+        params: {},
+        current_actor: @user,
+        controller: self
+      )
+    ).find { |row| row.key == unused_tool_key }
+    assert_equal 0.0, unused_tool_row.success_rate
+    assert_equal 0.0, unused_tool_row.error_rate
+    assert_equal "No data", unused_tool_row.average_duration
   end
 
   test "registered custom tool opens its definition in a modal" do
@@ -202,6 +227,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "<button"
     assert_includes response.body, "data-modal-id=\"custom-tool-definition-dummy_echo_tool-1\""
     assert_includes response.body, "data-controller=\"flat-pack--modal\""
+    assert_includes response.body, "class=\"grid gap-4 text-sm\""
+    refute_includes response.body, "md:grid-cols-2"
     assert_includes response.body, "#000000"
     assert_includes response.body, "Echoes input text with lightweight context metadata"
     refute_includes response.body, "Parameters"
@@ -212,13 +239,36 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "tool calls defaults its date range to the last four weeks" do
+  test "registered custom tools default reliability metrics to the last thirty days" do
+    authenticate_for_admin!
+
+    get "/admin/screens/registered_custom_tools"
+
+    assert_response :success
+    assert_includes response.body, "value=\"last_30_days\""
+  end
+
+  test "tool calls defaults its date range to the last thirty days" do
     authenticate_for_admin!
 
     get "/admin/screens/tool_calls"
 
     assert_response :success
-    assert_includes response.body, "value=\"last_4_weeks\""
+    assert_includes response.body, "value=\"last_30_days\""
+    filters = AdminScreens::RecordingStudioAIToolCallsScreen.filters
+    assert_equal %i[date_range group_by tool_key], filters.first(3).map(&:key)
+    assert_equal %i[run_id status prompt], filters.drop(3).map(&:key)
+    assert_equal RecordingStudioAI::CustomToolInvocation::STATUSES.values,
+           filters.find { |filter| filter.key == :status }.allowed_values
+    assert_equal %i[created_at tool_key prompt status latency_ms],
+                 AdminScreens::RecordingStudioAIToolCallsScreen.table.default_column_keys
+    assert_includes AdminScreens::RecordingStudioAIToolCallsScreen.table.columns.map(&:key), :requires_confirmation
+    assert_includes AdminScreens::RecordingStudioAIToolCallsScreen.table.columns.map(&:key), :read_only
+    assert_includes AdminScreens::RecordingStudioAIToolCallsScreen.table.columns.map(&:key), :destructive
+    assert_includes AdminScreens::RecordingStudioAIToolCallsScreen.table.columns.map(&:key), :error_code
+    assert AdminScreens::RecordingStudioAIToolCallsScreen.table.show_columns_button?
+    assert_equal "Unique identifier for this tool invocation.",
+                 AdminScreens::RecordingStudioAIToolCallsScreen.table.columns.find { |column| column.key == :id }.header_tooltip
   end
 
   test "ai call tool-call count links to that run's tool calls" do
@@ -258,7 +308,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "other_tool"
   end
 
-  test "registered tool mini chart links to last thirty days of matching ai calls" do
+  test "registered tool mini chart preserves the selected date range for matching ai calls" do
     authenticate_for_admin!
     RecordingStudioAI.tools.register(**DUMMY_TOOLS.first) unless RecordingStudioAI.tools.fetch("dummy_echo_tool", version: 1)
     matching_run = create_run!(status: "completed", operation: "generation", resolved_model: "matching-tool-run")
@@ -266,14 +316,26 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     matching_run.custom_tool_invocations.create!(tool_key: "dummy_echo_tool", tool_version: 1, status: "completed", read_only: true, destructive: false, requires_confirmation: false, idempotent: true)
     other_run.custom_tool_invocations.create!(tool_key: "other_tool", tool_version: 1, status: "completed", read_only: true, destructive: false, requires_confirmation: false, idempotent: true)
 
-    get "/admin/screens/registered_custom_tools/table"
+    start_date = 3.days.ago.to_date
+    end_date = Date.current
+    get "/admin/screens/registered_custom_tools/table", params: {
+      start_date: start_date.iso8601,
+      end_date: end_date.iso8601
+    }
 
     assert_response :success
     assert_includes response.body, "flat-pack--chart-series-value"
-    assert_includes response.body, "date_range_preset=last_30_days"
+    assert_includes response.body, "start_date=#{start_date.iso8601}"
+    assert_includes response.body, "end_date=#{end_date.iso8601}"
     assert_includes response.body, "custom_tool_key=dummy_echo_tool"
+    chart_payload = response.body.match(/custom_tool_key=dummy_echo_tool[^>]*>.*?data-flat-pack--chart-series-value="([^"]+)"/m).captures.first
+    assert_equal 4, chart_payload.scan(/&quot;x&quot;/).size
 
-    get "/admin/screens/ai_calls/table", params: { date_range_preset: "last_30_days", custom_tool_key: "dummy_echo_tool" }
+    get "/admin/screens/ai_calls/table", params: {
+      start_date: start_date.iso8601,
+      end_date: end_date.iso8601,
+      custom_tool_key: "dummy_echo_tool"
+    }
 
     assert_response :success
     assert_includes response.body, "matching-tool-run"
@@ -399,6 +461,23 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "completed_tool"
   end
 
+  test "tool calls table filters by prompt" do
+    authenticate_for_admin!
+
+    matching_run = create_run!(status: "completed", operation: "generation", prompt_key: "matching-prompt", prompt_name_snapshot: "Matching prompt")
+    other_run = create_run!(status: "completed", operation: "generation", prompt_key: "other-prompt", prompt_name_snapshot: "Other prompt")
+    matching_run.custom_tool_invocations.create!(tool_key: "matching_prompt_tool", tool_version: 1, status: "completed", read_only: true, destructive: false, requires_confirmation: false, idempotent: true)
+    other_run.custom_tool_invocations.create!(tool_key: "other_prompt_tool", tool_version: 1, status: "completed", read_only: true, destructive: false, requires_confirmation: false, idempotent: true)
+
+    get "/admin/screens/tool_calls/table", params: { prompt: "matching-prompt" }
+
+    assert_response :success
+    assert_includes response.body, "matching_prompt_tool"
+    assert_includes response.body, "Matching prompt"
+    refute_includes response.body, "other_prompt_tool"
+    refute_includes response.body, "Other prompt"
+  end
+
   test "tool calls chart accepts a grouping filter" do
     authenticate_for_admin!
 
@@ -447,6 +526,11 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "input[value='Last 4 weeks']", minimum: 1
+    filters = AdminScreens::RecordingStudioAIEstimatedSpendScreen.filters
+    assert_includes filters.map(&:key), :prompt
+    assert_equal %i[created_at prompt_name_snapshot status resolved_provider resolved_model total_tokens input_tokens output_tokens],
+                 AdminScreens::RecordingStudioAIEstimatedSpendScreen.table.default_column_keys
+    assert_includes AdminScreens::RecordingStudioAIEstimatedSpendScreen.table.columns.map(&:key), :id
   end
 
   test "estimated spend treats decreased token usage as favorable" do
@@ -517,13 +601,107 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "token-range-excluded-minimum"
   end
 
-  test "slow calls widget links to ai calls with slowest filter" do
+  test "estimated spend table filters by prompt" do
+    authenticate_for_admin!
+
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_key: "included-spend-prompt",
+      prompt_name_snapshot: "Included spend prompt",
+      resolved_model: "included-spend-model",
+      total_tokens: 1_500
+    )
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_key: "excluded-spend-prompt",
+      prompt_name_snapshot: "Excluded spend prompt",
+      resolved_model: "excluded-spend-model",
+      total_tokens: 1_500
+    )
+
+    get "/admin/screens/estimated_spend/table", params: { prompt: "included-spend-prompt" }
+
+    assert_response :success
+    assert_includes response.body, "Included spend prompt"
+    assert_includes response.body, "included-spend-model"
+    refute_includes response.body, "Excluded spend prompt"
+    refute_includes response.body, "excluded-spend-model"
+  end
+
+  test "ai calls p90 latency widget links to latency by model" do
     authenticate_for_admin!
 
     get "/admin"
 
     assert_response :success
-    assert_includes response.body, "href=\"/admin/screens/ai_calls?slowest=1\""
+    assert_includes response.body, "AI Calls P90 Latency"
+    assert_includes response.body, "href=\"/admin/screens/latency_by_model\""
+  end
+
+  test "prompt p90 latency widget links to latency by prompt" do
+    authenticate_for_admin!
+
+    get "/admin"
+
+    assert_response :success
+    assert_includes response.body, "Prompt P90 latency"
+    assert_includes response.body, "href=\"/admin/screens/latency_by_prompt\""
+  end
+
+  test "p90 latency uses the nearest-rank percentile" do
+    assert_equal 900, AdminScreens::RecordingStudioAIWidgets.percentile_latency([100, 200, 300, 400, 500, 600, 700, 800, 900, 10_000], percentile: 0.9)
+    assert_equal 0, AdminScreens::RecordingStudioAIWidgets.percentile_latency([], percentile: 0.9)
+  end
+
+  test "latency by model shows grouped P90 latency" do
+    authenticate_for_admin!
+
+    [100, 200, 300, 400, 500, 600, 700, 800, 900, 10_000].each do |latency_ms|
+      create_run!(status: "completed", operation: "generation", resolved_model: "p90-model", latency_ms: latency_ms)
+    end
+
+    get "/admin/screens/latency_by_model/table"
+
+    assert_response :success
+    assert_includes response.body, "p90-model"
+    assert_includes response.body, ">900<"
+    assert_includes response.body, "Median (ms)"
+    assert_includes response.body, "Average (ms)"
+
+    get "/admin/screens/latency_by_model/chart"
+
+    assert_response :success
+    assert_includes response.body, "Model P90 latency"
+    assert_includes response.body, "P90 latency (ms)"
+  end
+
+  test "latency by prompt shows grouped P90 latency" do
+    authenticate_for_admin!
+
+    [100, 200, 300, 400, 500, 600, 700, 800, 900, 10_000].each do |latency_ms|
+      create_run!(
+        status: "completed",
+        operation: "generation",
+        prompt_key: "p90-prompt",
+        prompt_name_snapshot: "P90 Prompt",
+        latency_ms: latency_ms
+      )
+    end
+
+    get "/admin/screens/latency_by_prompt/table"
+
+    assert_response :success
+    assert_includes response.body, "P90 Prompt"
+    assert_includes response.body, ">900<"
+    assert_includes response.body, "Median (ms)"
+
+    get "/admin/screens/latency_by_prompt/chart"
+
+    assert_response :success
+    assert_includes response.body, "Prompt P90 latency"
+    assert_includes response.body, "P90 latency (ms)"
   end
 
   test "warnings screen is not registered" do
@@ -596,11 +774,13 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     follow_redirect!
   end
 
-  def create_run!(status:, operation:, resolved_model: nil, resolved_provider: nil,
+  def create_run!(status:, operation:, prompt_key: nil, prompt_name_snapshot: nil, resolved_model: nil, resolved_provider: nil,
                   total_tokens: nil, input_tokens: nil, output_tokens: nil, latency_ms: nil)
     RecordingStudioAI::Run.create!(
       operation: operation,
       status: status,
+      prompt_key: prompt_key,
+      prompt_name_snapshot: prompt_name_snapshot,
       resolved_model: resolved_model,
       resolved_provider: resolved_provider,
       latency_ms: latency_ms,

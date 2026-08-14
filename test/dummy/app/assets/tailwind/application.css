@@ -33,3 +33,9 @@
 [class~="text-[var(--color-danger-background-color)]"] {
 	color: var(--color-danger-background-color) !important;
 }
+
+/* Table header labels are uppercase; tooltip panels should remain readable sentence case. */
+th [data-flat-pack--tooltip-target] {
+	text-transform: none;
+	letter-spacing: normal;
+}

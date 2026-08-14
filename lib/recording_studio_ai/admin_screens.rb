@@ -10,6 +10,7 @@ module AdminScreens
       ToolRow = Data.define(:key, :version, :name, :description, :cost_class, :safety, :calls_series, :success_rate,
                             :error_rate, :average_duration)
     end
+    LatencyRow = Data.define(:name, :calls, :p50_latency_ms, :p90_latency_ms, :average_latency_ms, :max_latency_ms) unless const_defined?(:LatencyRow)
 
     def runs_scope(context)
       scope = RecordingStudioAI::Run.all
@@ -25,6 +26,59 @@ module AdminScreens
       RecordingStudioAI::Attempt.joins(:run).merge(runs_scope(context))
     end
 
+    def p90_latency(scope)
+      percentile_latency(scope.pluck(:latency_ms), percentile: 0.9)
+    end
+
+    def daily_p90_latency_series(scope, range: 30.days.ago..Time.current)
+      scope.where(created_at: range).pluck(:created_at, :latency_ms).group_by { |created_at, _latency_ms| created_at.to_date }.sort_by(&:first).map do |date, rows|
+        { x: date.strftime("%b %-d"), y: percentile_latency(rows.map(&:last), percentile: 0.9) }
+      end
+    end
+
+    def percentile_latency(latencies, percentile:)
+      values = latencies.compact.map(&:to_i).sort
+      return 0 if values.empty?
+
+      values[(values.length * percentile).ceil - 1]
+    end
+
+    def latency_rows(context, dimension:)
+      date_range = latency_date_range(context, dimension: dimension)
+      runs = runs_scope(context).where(created_at: date_range).where.not(latency_ms: nil)
+      latency_rows_for_runs(runs, dimension: dimension)
+    end
+
+    def latency_rows_for_runs(runs, dimension:)
+      grouped_latencies = runs.pluck(:resolved_model, :prompt_name_snapshot, :prompt_key, :prompt_version, :latency_ms).group_by do |model, prompt_name, prompt_key, prompt_version, _latency_ms|
+        if dimension == :model
+          model.presence || "Unknown model"
+        elsif prompt_name.present?
+          "#{prompt_name}#{" v#{prompt_version}" if prompt_version.present?}"
+        else
+          prompt_key.presence || "No prompt"
+        end
+      end
+
+      grouped_latencies.map do |name, rows|
+        latencies = rows.map(&:last)
+        LatencyRow.new(
+          name,
+          latencies.length,
+          percentile_latency(latencies, percentile: 0.5),
+          percentile_latency(latencies, percentile: 0.9),
+          (latencies.sum.to_f / latencies.length).round,
+          latencies.max
+        )
+      end.sort_by { |row| [-row.p90_latency_ms, row.name] }
+    end
+
+    def latency_date_range(context, dimension:)
+      screen = dimension == :model ? AdminScreens::RecordingStudioAILatencyByModelScreen : AdminScreens::RecordingStudioAILatencyByPromptScreen
+      date_range = context.filter_value(:date_range) || screen.filters.find { |filter| filter.key == :date_range }.normalize(context.params)
+      date_range.start_date.beginning_of_day..date_range.end_date.end_of_day
+    end
+
     def retry_rate_by_model_rows(scope, range: 30.days.ago..Time.current, limit: 3)
       runs = scope.where(created_at: range).where.not(resolved_model: nil)
       run_counts = runs.group(:resolved_model).count
@@ -36,21 +90,25 @@ module AdminScreens
     end
 
     def custom_tool_rows(context)
-      now = Time.current
       invocations = tool_scope(context)
-      thirty_day_invocations = invocations.where(created_at: 30.days.ago..now)
-      thirty_day_counts = thirty_day_invocations.group(:tool_key, :tool_version).count
-      daily_counts = thirty_day_invocations.group_by do |invocation|
+      date_range_value = registered_custom_tools_date_range_value(context)
+      date_range = if date_range_value.respond_to?(:start_date) && date_range_value.respond_to?(:end_date)
+                     date_range_value.start_date.beginning_of_day..date_range_value.end_date.end_of_day
+                   else
+                     30.days.ago..Time.current
+                   end
+      range_invocations = invocations.where(created_at: date_range)
+      range_counts = range_invocations.group(:tool_key, :tool_version).count
+      daily_counts = range_invocations.group_by do |invocation|
         [invocation.tool_key, invocation.tool_version, invocation.created_at.to_date]
       end.transform_values(&:count)
-      completed_counts = thirty_day_invocations.where(status: "completed").group(:tool_key, :tool_version).count
-      error_counts = thirty_day_invocations.where(status: %w[failed denied rejected cancelled]).group(:tool_key,
-                                                                                                      :tool_version).count
-      average_latencies = thirty_day_invocations.group(:tool_key, :tool_version).average(:latency_ms)
+      completed_counts = range_invocations.where(status: "completed").group(:tool_key, :tool_version).count
+      error_counts = range_invocations.where(status: %w[failed denied rejected cancelled]).group(:tool_key, :tool_version).count
+      average_latencies = range_invocations.group(:tool_key, :tool_version).average(:latency_ms)
 
       RecordingStudioAI.tools.all.map do |definition|
         key = [definition.key, definition.version]
-        total = thirty_day_counts.fetch(key, 0)
+        total = range_counts.fetch(key, 0)
         safety = definition.read_only ? "Read-only" : "Writes"
         safety = "#{safety}, destructive" if definition.destructive
 
@@ -61,7 +119,7 @@ module AdminScreens
           definition.description,
           definition.cost,
           safety,
-          (29.days.ago.to_date..Date.current).map do |date|
+          (date_range.begin.to_date..date_range.end.to_date).map do |date|
             { x: date.strftime("%b %-d"), y: daily_counts.fetch([*key, date], 0) }
           end,
           percentage(completed_counts.fetch(key, 0), total),
@@ -69,6 +127,24 @@ module AdminScreens
           duration(average_latencies[key])
         )
       end
+    end
+
+    def date_range_query(context)
+      date_range = registered_custom_tools_date_range_value(context)
+      return { date_range_preset: date_range.preset_key } if date_range&.preset_key.present?
+      return { date_range_preset: :last_30_days } unless date_range&.start_date && date_range.end_date
+
+      {
+        start_date: date_range.start_date.iso8601,
+        end_date: date_range.end_date.iso8601
+      }
+    end
+
+    def registered_custom_tools_date_range_value(context)
+      return context.filter_value(:date_range) if context.filter_value(:date_range)
+
+      screen = AdminScreens::RecordingStudioAIRegisteredCustomToolsScreen
+      screen.filters.find { |filter| filter.key == :date_range }.normalize(context.params)
     end
 
     def number(value)
@@ -118,7 +194,7 @@ module AdminScreens
         "Executor" => definition.executor_label,
         "Safety" => "#{definition.read_only ? 'Read only' : 'Writes'}; destructive: #{definition.destructive ? 'yes' : 'no'}; confirmation: #{definition.requires_confirmation ? 'required' : 'not required'}; idempotent: #{definition.idempotent ? 'yes' : 'no'}"
       }
-      body = helpers.content_tag(:dl, class: "grid gap-4 text-sm md:grid-cols-2") do
+      body = helpers.content_tag(:dl, class: "grid gap-4 text-sm") do
         helpers.safe_join(fields.map do |label, value|
           helpers.content_tag(:div) do
             helpers.safe_join([
@@ -640,66 +716,113 @@ module AdminScreens
 
   RecordingStudioAISlowCallsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.slow_calls") do
     type :chart
-    title "Slow calls"
-    subtitle "Top 5 slowest calls in the last 30 days."
-    description "Highlights the slowest calls by model so latency hot spots are easy to scan."
+    title "AI Calls P90 Latency"
+    subtitle "90th-percentile AI call latency over the last 30 days."
+    description "Shows the latency at or below which 90% of AI calls completed, without letting isolated outliers dominate."
     metadata { { period_label: "Last 30 days" } }
     value do |context|
       runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
                                                    .where(created_at: 30.days.ago..Time.current)
                                                    .where.not(latency_ms: nil)
-      max_latency = runs.maximum(:latency_ms).to_i
-      "#{AdminScreens::RecordingStudioAIWidgets.number(max_latency)} ms"
+      p90_latency = AdminScreens::RecordingStudioAIWidgets.p90_latency(runs)
+      "#{AdminScreens::RecordingStudioAIWidgets.number(p90_latency)} ms"
     end
     change do |context|
       runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context).where.not(latency_ms: nil)
-      current_avg = runs.where(created_at: 30.days.ago..Time.current).average(:latency_ms).to_f
-      previous_avg = runs.where(created_at: 60.days.ago..30.days.ago).average(:latency_ms).to_f
-      AdminScreens::RecordingStudioAIWidgets.percentage_change_label(current: current_avg, previous: previous_avg)
+      current_p90 = AdminScreens::RecordingStudioAIWidgets.p90_latency(runs.where(created_at: 30.days.ago..Time.current))
+      previous_p90 = AdminScreens::RecordingStudioAIWidgets.p90_latency(runs.where(created_at: 60.days.ago..30.days.ago))
+      AdminScreens::RecordingStudioAIWidgets.percentage_change_label(current: current_p90, previous: previous_p90)
     end
     change_good_when :down
     chart_type :bar
     series do |context|
-      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-                                                   .where(created_at: 30.days.ago..Time.current)
-                                                   .where.not(latency_ms: nil)
-                                                   .order(latency_ms: :desc)
-                                                   .limit(5)
-
-      [{
-        name: "Latency (ms)",
-        data: runs.map { |run| run.latency_ms.to_i }
-      }]
+      rows = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
+        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+                                             .where(created_at: 30.days.ago..Time.current)
+                                             .where.not(latency_ms: nil),
+        dimension: :model
+      ).first(5)
+      [{ name: "P90 latency (ms)", data: rows.map(&:p90_latency_ms) }]
     end
     chart_options do |context|
-      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-                                                   .where(created_at: 30.days.ago..Time.current)
-                                                   .where.not(latency_ms: nil)
-                                                   .order(latency_ms: :desc)
-                                                   .limit(5)
-
+      rows = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
+        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+                                             .where(created_at: 30.days.ago..Time.current)
+                                             .where.not(latency_ms: nil),
+        dimension: :model
+      ).first(5)
       {
         height: 240,
-        plotOptions: {
-          bar: {
-            horizontal: true,
-            barHeight: "55%"
-          }
-        },
+        plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
         xaxis: {
-          categories: runs.map { |run| run.resolved_model.presence || "Unknown" },
+          categories: rows.map(&:name),
+          min: 0,
           labels: { show: false },
           axisBorder: { show: false },
           axisTicks: { show: false }
         },
         yaxis: {
+          min: 0,
           labels: { show: true }
         },
         dataLabels: { enabled: false },
         grid: { xaxis: { lines: { show: false } } }
       }
     end
-    link_to { |context| "#{context.admin_screen_path('ai_calls')}?slowest=1" }
+    link_to { |context| context.admin_screen_path("latency_by_model") }
+  end
+
+  RecordingStudioAIPromptP90LatencyWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.prompt_p90_latency") do
+    type :chart
+    title "Prompt P90 latency"
+    subtitle "Top 5 prompts by P90 latency over the last 30 days."
+    description "Compares prompt response speed using the latency at or below which 90% of calls completed."
+    metadata { { period_label: "Last 30 days" } }
+    value do |context|
+      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+                                                   .where(created_at: 30.days.ago..Time.current)
+                                                   .where.not(latency_ms: nil)
+      p90_latency = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(runs, dimension: :prompt).first&.p90_latency_ms.to_i
+      "#{AdminScreens::RecordingStudioAIWidgets.number(p90_latency)} ms"
+    end
+    change do |context|
+      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context).where.not(latency_ms: nil)
+      current_p90 = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
+        runs.where(created_at: 30.days.ago..Time.current), dimension: :prompt
+      ).first&.p90_latency_ms.to_i
+      previous_p90 = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
+        runs.where(created_at: 60.days.ago..30.days.ago), dimension: :prompt
+      ).first&.p90_latency_ms.to_i
+      AdminScreens::RecordingStudioAIWidgets.percentage_change_label(current: current_p90, previous: previous_p90)
+    end
+    change_good_when :down
+    chart_type :bar
+    series do |context|
+      rows = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
+        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+                                             .where(created_at: 30.days.ago..Time.current)
+                                             .where.not(latency_ms: nil),
+        dimension: :prompt
+      ).first(5)
+      [{ name: "P90 latency (ms)", data: rows.map(&:p90_latency_ms) }]
+    end
+    chart_options do |context|
+      rows = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
+        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+                                             .where(created_at: 30.days.ago..Time.current)
+                                             .where.not(latency_ms: nil),
+        dimension: :prompt
+      ).first(5)
+      {
+        height: 240,
+        plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
+        xaxis: { categories: rows.map(&:name), min: 0, labels: { show: false } },
+        yaxis: { labels: { show: true } },
+        dataLabels: { enabled: false },
+        grid: { xaxis: { lines: { show: false } } }
+      }
+    end
+    link_to { |context| context.admin_screen_path("latency_by_prompt") }
   end
 
   class RecordingStudioAIOverviewScreen < RecordingStudioAdmin::Screen
@@ -850,6 +973,7 @@ module AdminScreens
            field: :operation,
            values: -> { RecordingStudioAI::Run.distinct.order(:operation).pluck(:operation).compact_blank }
     filter :prompt,
+           title: "Prompt",
            field: :prompt_key,
            values: -> { RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key) }
     filter :provider,
@@ -857,19 +981,18 @@ module AdminScreens
              RecordingStudioAI::Run.distinct.order(:resolved_provider).pluck(:resolved_provider).compact_blank
            },
            apply: ->(relation, value, _context) { relation.where(resolved_provider: value) }
-    filter :custom_tool_key,
+        filter :tool_key,
+          param: :custom_tool_key,
            values: lambda {
              RecordingStudioAI::CustomToolInvocation.distinct.order(:tool_key).pluck(:tool_key).compact_blank
            },
            apply: lambda { |relation, value, _context|
              relation.where(id: RecordingStudioAI::CustomToolInvocation.where(tool_key: value).select(:run_id))
            }
-    filter :slowest,
-           values: ["1"],
-           control: :checkbox,
-           apply: lambda { |relation, _value, _context|
-             relation.where.not(latency_ms: nil).reorder(Arel.sql("latency_ms IS NULL ASC, latency_ms DESC"))
-           }
+    filter :model,
+           field: :resolved_model,
+           values: -> { RecordingStudioAI::Run.distinct.order(:resolved_model).pluck(:resolved_model).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(resolved_model: value) }
 
     summary do
       change_good_when do |context|
@@ -933,9 +1056,6 @@ module AdminScreens
       }
 
       column :created_at, title: "Created"
-      column :operation,
-             display: :badge,
-             display_options: ->(_row, _context, value) { { text: value.to_s.humanize, style: :default, size: :sm } }
       column :status,
              display: :badge,
              display_options: lambda { |_row, _context, value|
@@ -948,7 +1068,7 @@ module AdminScreens
                { text: value.to_s.humanize, style: style, size: :sm }
              }
       column :profile_key, title: "Profile"
-      column :prompt_short_name_snapshot, title: "Prompt"
+      column :prompt_name_snapshot, title: "Prompt"
       column :requested_provider, title: "Requested"
       column :resolved_provider, title: "Resolved"
       column :resolved_model, title: "Model"
@@ -981,7 +1101,7 @@ module AdminScreens
       column :total_tokens, title: "Tokens"
       column :latency_ms, title: "Latency (ms)"
 
-      default_sort :created_at, direction: :desc
+      default_sort :latency_ms, direction: :desc
       paginate per_page: 25
     end
   end
@@ -1057,25 +1177,25 @@ module AdminScreens
     end
 
     filter_presentation :modal, inline_count: 3
-    filter :date_range, field: :created_at, default: :last_4_weeks
+    filter :date_range, field: :created_at, default: :last_30_days
     filter :group_by, values: %i[hour day week month year], default: :day
+    filter :tool_key,
+           field: :tool_key,
+           values: -> { RecordingStudioAI::CustomToolInvocation.distinct.order(:tool_key).pluck(:tool_key).compact_blank }
     filter :run_id,
            field: :run_id,
            apply: ->(relation, value, _context) { relation.where(run_id: value) }
     filter :status,
            param: :tool_status,
            field: :status,
-           options: -> { RecordingStudioAI::CustomToolInvocation.distinct.order(:status).pluck(:status).compact_blank },
+          options: -> { RecordingStudioAI::CustomToolInvocation::STATUSES.values },
            apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
-    filter :tool_key,
-           field: :tool_key,
-           values: -> { RecordingStudioAI::CustomToolInvocation.distinct.order(:tool_key).pluck(:tool_key).compact_blank }
-    filter :confirmation,
-           field: :confirmation_status,
-           options: lambda {
-             RecordingStudioAI::CustomToolInvocation.distinct.order(:confirmation_status).pluck(:confirmation_status).compact_blank
-           },
-           apply: ->(relation, value, _context) { relation.where(confirmation_status: value) }
+    filter :prompt,
+           field: :prompt_key,
+           values: -> { RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key) },
+           apply: lambda { |relation, value, _context|
+             relation.where(run_id: RecordingStudioAI::Run.where(prompt_key: value).select(:id))
+           }
 
     summary do
       change_good_when do |context|
@@ -1113,6 +1233,7 @@ module AdminScreens
     end
 
     table do
+      show_columns_button
       filter :search, apply: lambda { |relation, value, _context|
         if value.present?
           search = "%#{ActiveRecord::Base.sanitize_sql_like(value.to_s.strip)}%"
@@ -1136,12 +1257,18 @@ module AdminScreens
         end
       }
 
-      column :id, title: "Invocation"
-      column :created_at, title: "Created"
-      column :run_id, title: "Run"
-      column :tool_key, title: "Tool"
-      column :tool_version, title: "Version"
+            column :id, title: "Invocation", header_tooltip: "Unique identifier for this tool invocation."
+            column :created_at, title: "Created", header_tooltip: "When the tool invocation was recorded."
+            column :run_id, title: "Run", header_tooltip: "AI call that requested this tool invocation."
+            column :tool_key, title: "Tool", header_tooltip: "Registered key of the tool that was called."
+                 column :prompt,
+                   title: "Prompt",
+                   sortable: false,
+                   header_tooltip: "Prompt used by the AI call that requested this tool invocation.",
+                   value: ->(invocation, _context) { invocation.run&.prompt_name_snapshot.presence || invocation.run&.prompt_key || "No prompt" }
+            column :tool_version, title: "Version", header_tooltip: "Registered version of the tool used for this invocation."
       column :status,
+              header_tooltip: "Current execution outcome of the tool invocation.",
              display: :badge,
              display_options: lambda { |_row, _context, value|
                style = case value.to_s
@@ -1152,12 +1279,14 @@ module AdminScreens
                        end
                { text: value.to_s.humanize, style: style, size: :sm }
              }
-      column :confirmation_status, title: "Confirmation"
-      column :requires_confirmation, title: "Needs confirm"
-      column :read_only, title: "Read-only"
-      column :destructive, title: "Destructive"
-      column :latency_ms, title: "Latency (ms)"
-      column :error_code, title: "Error code"
+      column :confirmation_status, title: "Confirmation", header_tooltip: "Whether required confirmation was obtained."
+      column :requires_confirmation, title: "Needs confirm", header_tooltip: "Whether the tool requires confirmation before it can run."
+      column :read_only, title: "Read-only", header_tooltip: "Whether the tool can only read data."
+      column :destructive, title: "Destructive", header_tooltip: "Whether the tool can make destructive changes."
+      column :latency_ms, title: "Latency (ms)", header_tooltip: "Elapsed execution time in milliseconds."
+      column :error_code, title: "Error code", header_tooltip: "Provider or tool error code when the invocation did not succeed."
+
+      default_columns :created_at, :tool_key, :prompt, :status, :latency_ms
 
       default_sort :created_at, direction: :desc
       paginate per_page: 25
@@ -1174,6 +1303,9 @@ module AdminScreens
       AdminScreens::RecordingStudioAIWidgets.custom_tool_rows(context)
     end
 
+    filter_presentation :modal, inline_count: 1
+    filter :date_range, field: :created_at, default: :last_30_days
+
     table do
       title ""
       hide_columns_button
@@ -1188,16 +1320,16 @@ module AdminScreens
       column :cost_class, title: "Cost class"
       column :safety, title: "Safety"
       column :calls_series,
-             title: "Calls / 30 days",
-             value: lambda { |row, _context|
-               url = "/admin/screens/ai_calls?#{{ date_range_preset: :last_30_days,
-                                                  custom_tool_key: row.key }.to_query}"
+              title: "Calls",
+             value: lambda { |row, context|
+               date_range_query = AdminScreens::RecordingStudioAIWidgets.date_range_query(context)
+               url = "/admin/screens/ai_calls?#{{ **date_range_query, custom_tool_key: row.key }.to_query}"
                ActionController::Base.helpers.link_to(
                  AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
                  url,
                  class: "inline-block",
                  data: { turbo_frame: "_top" },
-                 aria: { label: "AI calls for #{row.name} in the last 30 days" }
+                 aria: { label: "AI calls for #{row.name} in the selected date range" }
                )
              }
       column :success_rate, title: "Success rate", value: ->(row, _context) { "#{row.success_rate}%" }
@@ -1236,6 +1368,10 @@ module AdminScreens
              RecordingStudioAI::Run.distinct.order(:resolved_provider).pluck(:resolved_provider).compact_blank
            },
            apply: ->(relation, value, _context) { relation.where(resolved_provider: value) }
+        filter :prompt,
+          field: :prompt_key,
+          values: -> { RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key) },
+          apply: ->(relation, value, _context) { relation.where(prompt_key: value) }
     filter :token_min,
            param: :min_tokens,
            max: 1_000_000,
@@ -1285,6 +1421,10 @@ module AdminScreens
     table do
       column :id, title: "Run"
       column :created_at, title: "Created"
+      column :prompt_name_snapshot,
+             title: "Prompt",
+             sortable: false,
+             value: ->(run, _context) { run.prompt_name_snapshot.presence || run.prompt_key || "No prompt" }
       column :status,
              display: :badge,
              display_options: lambda { |_row, _context, value|
@@ -1302,8 +1442,89 @@ module AdminScreens
       column :input_tokens, title: "Input"
       column :output_tokens, title: "Output"
 
+      default_columns :created_at, :prompt_name_snapshot, :status, :resolved_provider, :resolved_model, :total_tokens,
+              :input_tokens, :output_tokens
+
       default_sort :created_at, direction: :desc
       paginate per_page: 25
+    end
+  end
+
+  class RecordingStudioAILatencyByModelScreen < RecordingStudioAdmin::Screen
+    key "latency_by_model"
+    icon :chart_bar
+    title "Latency by model"
+    subtitle "Compare model response speed using P90 latency."
+
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.latency_rows(context, dimension: :model)
+    end
+
+    filter_presentation :modal, inline_count: 1
+    filter :date_range, field: :created_at, default: :last_30_days
+
+    chart do
+      title "Model P90 latency"
+      subtitle "Latency at or below which 90% of calls completed."
+      type :bar
+      series { |context| [{ name: "P90 latency (ms)", data: context.query_result.relation.map(&:p90_latency_ms) }] }
+      options do |context|
+        {
+          height: 300,
+          plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
+          xaxis: { categories: context.query_result.relation.map(&:name), min: 0 },
+          dataLabels: { enabled: false }
+        }
+      end
+    end
+
+    table do
+      hide_columns_button
+      column :name, title: "Model"
+      column :calls, title: "Calls"
+      column :p50_latency_ms, title: "Median (ms)", header_tooltip: "Median latency: half of calls completed within this time."
+      column :p90_latency_ms, title: "P90 (ms)", header_tooltip: "90% of calls completed within this time."
+      column :average_latency_ms, title: "Average (ms)"
+      column :max_latency_ms, title: "Max (ms)"
+    end
+  end
+
+  class RecordingStudioAILatencyByPromptScreen < RecordingStudioAdmin::Screen
+    key "latency_by_prompt"
+    icon :chart_bar
+    title "Latency by prompt"
+    subtitle "Compare prompt response speed using P90 latency."
+
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.latency_rows(context, dimension: :prompt)
+    end
+
+    filter_presentation :modal, inline_count: 1
+    filter :date_range, field: :created_at, default: :last_30_days
+
+    chart do
+      title "Prompt P90 latency"
+      subtitle "Latency at or below which 90% of calls completed."
+      type :bar
+      series { |context| [{ name: "P90 latency (ms)", data: context.query_result.relation.map(&:p90_latency_ms) }] }
+      options do |context|
+        {
+          height: 300,
+          plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
+          xaxis: { categories: context.query_result.relation.map(&:name), min: 0 },
+          dataLabels: { enabled: false }
+        }
+      end
+    end
+
+    table do
+      hide_columns_button
+      column :name, title: "Prompt"
+      column :calls, title: "Calls"
+      column :p50_latency_ms, title: "Median (ms)", header_tooltip: "Median latency: half of calls completed within this time."
+      column :p90_latency_ms, title: "P90 (ms)", header_tooltip: "90% of calls completed within this time."
+      column :average_latency_ms, title: "Average (ms)"
+      column :max_latency_ms, title: "Max (ms)"
     end
   end
 
@@ -1338,6 +1559,16 @@ module AdminScreens
          url: ->(context) { context.admin_screen_path("estimated_spend") },
          style: :secondary
 
+        link :latency_by_model,
+          text: "Latency by Model",
+          url: ->(context) { context.admin_screen_path("latency_by_model") },
+          style: :secondary
+
+        link :latency_by_prompt,
+          text: "Latency by Prompt",
+          url: ->(context) { context.admin_screen_path("latency_by_prompt") },
+          style: :secondary
+
     link :responses,
          text: "AI Responses",
          url: ->(context) { context.admin_screen_path("recording_studio_ai_responses") },
@@ -1351,6 +1582,7 @@ module AdminScreens
     widget "widgets.recording_studio_ai.estimated_spend"
     widget "widgets.recording_studio_ai.calls_by_provider_model"
     widget "widgets.recording_studio_ai.slow_calls"
+    widget "widgets.recording_studio_ai.prompt_p90_latency"
   end
 
   REGISTERABLE_WIDGETS = [
@@ -1361,7 +1593,8 @@ module AdminScreens
     RecordingStudioAIErrorsFailedCallsWidget,
     RecordingStudioAIEstimatedSpendWidget,
     RecordingStudioAICallsByProviderModelWidget,
-    RecordingStudioAISlowCallsWidget
+    RecordingStudioAISlowCallsWidget,
+    RecordingStudioAIPromptP90LatencyWidget
   ].freeze
 
   def self.register!
@@ -1374,6 +1607,8 @@ module AdminScreens
     RecordingStudioAdmin.register_screen(RecordingStudioAIToolCallsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredCustomToolsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIEstimatedSpendScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAILatencyByModelScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAILatencyByPromptScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIResponsesScreen)
     RecordingStudioAdmin.register_section(RecordingStudioAISection)
   end

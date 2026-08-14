@@ -50,11 +50,17 @@ class RecordingStudioV3HostTest < ActiveSupport::TestCase
     assert_equal root_recording, page_recording.root_recording
     assert_equal 3, Workspace.count
 
+    seeded_run = RecordingStudioAI::Run.find_by!("request_id LIKE ?", "seed-rsai-run-v2-%")
+    seeded_run.update_columns(prompt_name_snapshot: nil, prompt_short_name_snapshot: nil)
+
     assert_no_difference -> { User.count } do
       assert_no_difference -> { RecordingStudio::Recording.count } do
         load Rails.root.join("db/seeds.rb").to_s
       end
     end
+    seeded_run.reload
+    assert_predicate seeded_run.prompt_name_snapshot, :present?
+    assert_predicate seeded_run.prompt_short_name_snapshot, :present?
     assert_nil Current.actor
   ensure
     Current.actor = nil

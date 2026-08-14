@@ -66,11 +66,31 @@ begin
   registered_tools = RecordingStudioAI.tools.all
   raise "Register dummy custom tools before seeding invocations" if registered_tools.empty?
   registered_tool_keys = registered_tools.map(&:key)
+  registered_prompts = RecordingStudioAI.prompts.all
+  raise "Register dummy prompts before seeding AI calls" if registered_prompts.empty?
+
+  prompt_attributes = lambda do |prompt_definition|
+    {
+      prompt_namespace: prompt_definition.namespace,
+      prompt_key: prompt_definition.key,
+      prompt_version: prompt_definition.version,
+      prompt_name_snapshot: prompt_definition.name,
+      prompt_short_name_snapshot: prompt_definition.short_name
+    }
+  end
 
   # Tool-call snapshots become immutable once terminal. Replace only synthetic
   # rows so re-seeding can adopt the current registered definitions.
   synthetic_tool_invocations = RecordingStudioAI::CustomToolInvocation.where("provider_tool_call_id LIKE ?", "tool-%")
   synthetic_tool_invocations.where.not(tool_key: registered_tool_keys).delete_all
+
+  RecordingStudioAI::Run.where("request_id LIKE ?", "seed-rsai-%").find_each do |run|
+    prompt_definition = registered_prompts.fetch(run.request_id.to_s.bytes.sum % registered_prompts.length)
+    missing_prompt_attributes = prompt_attributes.call(prompt_definition).select do |attribute, _value|
+      run.public_send(attribute).blank?
+    end
+    run.update_columns(missing_prompt_attributes) if missing_prompt_attributes.any?
+  end
 
   run_status_for = lambda do
     roll = rand
@@ -91,6 +111,7 @@ begin
 
       provider = providers.keys.sample
       model = providers.fetch(provider).sample
+      prompt_definition = registered_prompts.fetch((day_offset * 8 + index) % registered_prompts.length)
       status = run_status_for.call
       operation = rand < 0.82 ? "generation" : "stream"
       started_at = random_seed_time.call
@@ -141,6 +162,7 @@ begin
         error_code: status == "failed" ? "seed_failure" : nil,
         error_message: status == "failed" ? "Simulated seeded failure" : nil,
         purpose: ["assistant", "draft", "analysis"].sample,
+        **prompt_attributes.call(prompt_definition),
         created_at: started_at,
         updated_at: completed_at
       )
@@ -238,7 +260,7 @@ begin
     end
   end
 
-  warning_seed_run = lambda do |request_id:, root_id:, started_at:, status:, provider:, model:, latency_ms:, total_tokens:|
+  warning_seed_run = lambda do |request_id:, root_id:, started_at:, status:, provider:, model:, latency_ms:, total_tokens:, prompt_definition:|
     input_tokens = [((total_tokens * 0.55).to_i), 1].max
     output_tokens = [total_tokens - input_tokens, 1].max
     completed_at = started_at + (latency_ms / 1000.0)
@@ -280,6 +302,7 @@ begin
       error_code: status == "failed" ? "warning_seed_failure" : nil,
       error_message: status == "failed" ? "Synthetic failure for warning widget seed" : nil,
       purpose: "analysis",
+      **prompt_attributes.call(prompt_definition),
       created_at: started_at
     )
     run.updated_at = completed_at
@@ -341,7 +364,8 @@ begin
         provider: "openai",
         model: "gpt-4.1-mini",
         latency_ms: 700 + (index * 25),
-        total_tokens: 850 + (index * 30)
+        total_tokens: 850 + (index * 30),
+        prompt_definition: registered_prompts.fetch(index % registered_prompts.length)
       )
     end
 
@@ -355,7 +379,8 @@ begin
         provider: "openai",
         model: index < 12 ? "gpt-5-mini" : "gpt-4o",
         latency_ms: 900 + (index * 40),
-        total_tokens: 1_200 + (index * 55)
+        total_tokens: 1_200 + (index * 55),
+        prompt_definition: registered_prompts.fetch((index + 1) % registered_prompts.length)
       )
     end
   end
@@ -372,7 +397,8 @@ begin
         provider: "openai",
         model: "gpt-5-mini",
         latency_ms: 1_200 + (index * 100),
-        total_tokens: 1_500 + (index * 100)
+        total_tokens: 1_500 + (index * 100),
+        prompt_definition: registered_prompts.fetch((index + 2) % registered_prompts.length)
       )
     end
   end
