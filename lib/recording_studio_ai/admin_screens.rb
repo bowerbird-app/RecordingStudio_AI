@@ -286,7 +286,7 @@ module AdminScreens
         }
       end
 
-      warnings.presence || [{ text: "No warning thresholds triggered in the last 24h.", icon: "check-circle" }]
+      warnings
     end
   end
 

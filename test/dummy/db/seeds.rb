@@ -65,10 +65,12 @@ begin
   }
   registered_tools = RecordingStudioAI.tools.all
   raise "Register dummy custom tools before seeding invocations" if registered_tools.empty?
+  registered_tool_keys = registered_tools.map(&:key)
 
   # Tool-call snapshots become immutable once terminal. Replace only synthetic
   # rows so re-seeding can adopt the current registered definitions.
-  RecordingStudioAI::CustomToolInvocation.where("provider_tool_call_id LIKE ?", "tool-%").delete_all
+  synthetic_tool_invocations = RecordingStudioAI::CustomToolInvocation.where("provider_tool_call_id LIKE ?", "tool-%")
+  synthetic_tool_invocations.where.not(tool_key: registered_tool_keys).delete_all
 
   run_status_for = lambda do
     roll = rand
@@ -205,7 +207,7 @@ begin
         next if tool_invocation_count.zero?
 
         tool_invocation_count.times do |tool_index|
-          tool_definition = registered_tools.sample
+          tool_definition = registered_tools.fetch(tool_index % registered_tools.length)
           tool_status = rand < 0.84 ? "completed" : ["failed", "denied", "rejected"].sample
           tool_started_at = attempt_started_at + rand(1..30).seconds
           tool_latency = rand(40..1_900)
@@ -303,11 +305,54 @@ begin
     run.save!
   end
 
+  # Backfill registered tool calls for seeded runs created before tool snapshots existed.
+  RecordingStudioAI::Run.where("request_id LIKE ?", "seed-rsai-run-v2-%").find_each do |run|
+    next if run.custom_tool_invocations.exists?
+    next if run.custom_tool_invocation_count.to_i.zero?
+
+    attempt = run.attempts.order(:sequence).first
+    next unless attempt
+
+    run.custom_tool_invocation_count.times do |tool_index|
+      tool_definition = registered_tools.fetch(tool_index % registered_tools.length)
+      tool_started_at = attempt.started_at + (tool_index + 1).seconds
+      tool_latency = 100 + (tool_index * 25)
+      tool_completed_at = tool_started_at + (tool_latency / 1000.0)
+
+      RecordingStudioAI::CustomToolInvocation.create!(
+        run: run,
+        requested_by_attempt: attempt,
+        continued_by_attempt: nil,
+        tool_key: tool_definition.key,
+        tool_version: tool_definition.version,
+        tool_name_snapshot: tool_definition.name,
+        status: "completed",
+        provider_tool_call_id: "tool-backfill-#{run.id}-#{tool_index + 1}",
+        read_only: tool_definition.read_only,
+        destructive: tool_definition.destructive,
+        requires_confirmation: tool_definition.requires_confirmation,
+        idempotent: tool_definition.idempotent,
+        cost_category: tool_definition.cost,
+        latency_category: tool_definition.latency,
+        confirmation_status: "not_required",
+        result_summary: "Seeded successful result",
+        started_at: tool_started_at,
+        completed_at: tool_completed_at,
+        latency_ms: tool_latency,
+        created_at: tool_started_at,
+        updated_at: tool_completed_at
+      )
+    end
+  end
+
   # Dedicated warning seed set so warning widget states are easy to preview.
-  baseline_days = [8, 7, 6, 5, 4, 3, 2]
+  baseline_days = [8, 7, 6, 5, 4, 3, 2, 0]
   seed_roots.each_with_index do |seed_root, root_index|
     baseline_days.each_with_index do |days_ago, index|
-      started_at = days_ago.days.ago.beginning_of_day + (10 + index).hours
+      started_at = [
+        days_ago.days.ago.beginning_of_day + (10 + index).hours,
+        Time.current - 1.minute
+      ].min
       warning_seed_run.call(
         request_id: "seed-rsai-warning-baseline-#{seed_root.id}-#{days_ago}",
         root_id: seed_root.id,
@@ -331,6 +376,23 @@ begin
         model: index < 12 ? "gpt-5-mini" : "gpt-4o",
         latency_ms: 900 + (index * 40),
         total_tokens: 1_200 + (index * 55)
+      )
+    end
+  end
+
+  # Keep a small, current warning set available for previewing the warning widgets.
+  warning_seed_now = Time.current - 1.minute
+  seed_roots.each do |seed_root|
+    3.times do |index|
+      warning_seed_run.call(
+        request_id: "seed-rsai-warning-active-#{seed_root.id}-#{index}",
+        root_id: seed_root.id,
+        started_at: warning_seed_now - index.minutes,
+        status: "failed",
+        provider: "openai",
+        model: "gpt-5-mini",
+        latency_ms: 1_200 + (index * 100),
+        total_tokens: 1_500 + (index * 100)
       )
     end
   end
