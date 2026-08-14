@@ -871,6 +871,9 @@ module AdminScreens
     filter :operation,
           field: :operation,
           values: -> { RecordingStudioAI::Run.distinct.order(:operation).pluck(:operation).compact_blank }
+        filter :prompt,
+          field: :prompt_key,
+          values: -> { RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key) }
     filter :provider,
           values: -> { RecordingStudioAI::Run.distinct.order(:resolved_provider).pluck(:resolved_provider).compact_blank },
            apply: ->(relation, value, _context) { relation.where(resolved_provider: value) }
@@ -934,6 +937,10 @@ module AdminScreens
               "requested_provider ILIKE :search",
               "resolved_provider ILIKE :search",
               "resolved_model ILIKE :search",
+              "prompt_namespace ILIKE :search",
+              "prompt_key ILIKE :search",
+              "prompt_name_snapshot ILIKE :search",
+              "prompt_short_name_snapshot ILIKE :search",
               "CAST(id AS TEXT) ILIKE :search"
             ].join(" OR "),
             search: search
@@ -959,6 +966,7 @@ module AdminScreens
                { text: value.to_s.humanize, style: style, size: :sm }
              }
       column :profile_key, title: "Profile"
+      column :prompt_short_name_snapshot, title: "Prompt"
       column :requested_provider, title: "Requested"
       column :resolved_provider, title: "Resolved"
       column :resolved_model, title: "Model"

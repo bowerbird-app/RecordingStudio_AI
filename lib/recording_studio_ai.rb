@@ -9,6 +9,7 @@ require "recording_studio_ai/contracts"
 require "recording_studio_ai/metadata"
 require "recording_studio_ai/authorization"
 require "recording_studio_ai/tools"
+require "recording_studio_ai/prompts"
 require "recording_studio_ai/attachments"
 require "recording_studio_ai/cost_calculator"
 require "recording_studio_ai/structured_output"
@@ -195,6 +196,26 @@ module RecordingStudioAI
 
     def tools
       @tools ||= RecordingStudioAI::Tools::Registry.new
+    end
+
+    def prompts
+      @prompts ||= RecordingStudioAI::Prompts::Registry.new
+    end
+
+    def prompt(namespace, key, version: nil)
+      definition = prompts.fetch(namespace, key, version: version)
+      unless definition
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          "prompt #{namespace}.#{key}#{" version #{version}" if version} is not registered",
+          code: "invalid_request"
+        )
+      end
+
+      RecordingStudioAI::Prompts::Invocation.new(definition)
+    end
+
+    def prompt_methods
+      @prompt_methods ||= RecordingStudioAI::Prompts::MethodProxy.new(prompts)
     end
 
     private

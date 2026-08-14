@@ -48,6 +48,11 @@ module RecordingStudioAI
         %i[
           operation
           profile_key
+          prompt_namespace
+          prompt_key
+          prompt_version
+          prompt_name_snapshot
+          prompt_short_name_snapshot
           requested_provider
           resolved_provider
           resolved_model

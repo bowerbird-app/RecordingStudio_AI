@@ -349,6 +349,62 @@ bounded summaries, safety snapshots, timing, and errors are persisted. Complete
 arguments and results remain request-scoped. Non-idempotent tool execution is
 never automatically repeated.
 
+## Registered prompts
+
+Register versioned prompts in an engine or host initializer. Prompts define a
+stable key, display labels, message templates, required inputs, defaults, and an
+allowlist of registered custom tools:
+
+```ruby
+RecordingStudioAI.prompts.register(
+  owner: "support_app",
+  namespace: :support,
+  key: :customer_reply,
+  version: 1,
+  name: "Customer Support Reply",
+  short_name: "Support Reply",
+  description: "Creates a concise response to a customer message.",
+  inputs: %i[customer_name message],
+  messages: [
+    { role: :system, content: "Write a concise, helpful customer response." },
+    { role: :user, content: "{{customer_name}}: {{message}}" }
+  ],
+  tools: [{ key: :summarize_record, version: 1 }],
+  defaults: { profile: :medium, purpose: "customer_reply" }
+)
+
+RecordingStudioAI.prompt(:support, :customer_reply, version: 1).call(
+  inputs: { customer_name: customer.name, message: message.body },
+  root_recording: root_recording,
+  initiator: current_user
+)
+```
+
+The method-style facade is also available for the latest registered version:
+
+```ruby
+RecordingStudioAI.prompt_methods.support.customer_reply(
+  inputs: { customer_name: customer.name, message: message.body },
+  root_recording: root_recording,
+  initiator: current_user
+)
+```
+
+Hosts and extension gems can replace only their own reloadable declarations:
+
+```ruby
+Rails.application.reloader.to_prepare do
+  RecordingStudioAI.prompts.replace_owner("support_app") do |registry|
+    SupportPrompts.register(registry)
+  end
+end
+```
+
+Prompt inputs use strict `{{snake_case}}` placeholders. Rendered templates and
+values are never persisted. Runs snapshot the prompt namespace, key, version,
+name, and short name, allowing AI Calls reporting to filter and group prompt
+usage. Custom tool invocations inherit prompt attribution through their run.
+
 ## Resolution and execution (Phase 5)
 
 Candidates declare a provider, model, and capabilities. Supported capability

@@ -14,7 +14,7 @@ module RecordingStudioAI
                                        attachments: [], provider_native_tools: [], custom_tools: [], context_recording: nil,
                                        executor: nil, impersonator: nil, initiator_kind: nil,
                                        execution_source: nil, request_id: nil, job_id: nil,
-                                       metadata: {}, **unknown)
+                                       metadata: {}, prompt_definition: nil, **unknown)
         reject_unknown_keys!(unknown, path: "generation request")
         profile ||= RecordingStudioAI.configuration.default_profile
         ensure_profile!(profile)
@@ -53,6 +53,7 @@ module RecordingStudioAI
           provider_native_tools: normalized_provider_tools,
           custom_tools: normalized_custom_tools,
           custom_tool_definitions: resolve_custom_tools!(normalized_custom_tools),
+          prompt_definition: ensure_prompt_definition!(prompt_definition),
           attribution: attribution,
           metadata: RecordingStudioAI::Metadata.sanitize!(metadata, path: "metadata")
         }
@@ -192,6 +193,19 @@ module RecordingStudioAI
 
         raise RecordingStudioAI::Errors::ContractValidationError.new(
           "profile must be one of: #{PROFILES.join(', ')}",
+          code: "invalid_request"
+        )
+      end
+
+      def ensure_prompt_definition!(prompt_definition)
+        return nil if prompt_definition.nil?
+        if prompt_definition.is_a?(RecordingStudioAI::Prompts::Definition) &&
+           RecordingStudioAI.prompts.all.include?(prompt_definition)
+          return prompt_definition
+        end
+
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          "prompt_definition must be a registered prompt definition",
           code: "invalid_request"
         )
       end

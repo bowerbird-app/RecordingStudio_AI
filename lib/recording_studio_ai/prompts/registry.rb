@@ -1,0 +1,67 @@
+# frozen_string_literal: true
+
+module RecordingStudioAI
+  module Prompts
+    class Registry
+      def initialize
+        @definitions = {}
+      end
+
+      def register(**)
+        definition = RecordingStudioAI::Prompts::Definition.new(**)
+        key = storage_key(definition.namespace, definition.key, definition.version)
+        if @definitions.key?(key)
+          raise RecordingStudioAI::Errors::ContractValidationError.new(
+            "prompt #{definition.namespace}.#{definition.key} version #{definition.version} is already registered",
+            code: "invalid_request"
+          )
+        end
+
+        @definitions[key] = definition
+        definition
+      end
+
+      def fetch(namespace, key, version: nil)
+        namespace = namespace.to_s
+        key = key.to_s
+        return @definitions[storage_key(namespace, key, version)] if version
+
+        @definitions.values.select { |definition| definition.namespace == namespace && definition.key == key }.max_by(&:version)
+      end
+
+      def all
+        @definitions.values.sort_by { |definition| [definition.namespace, definition.key, definition.version] }
+      end
+
+      def replace_owner(owner)
+        owner = owner.to_s
+        replacements = Registry.new
+        yield replacements
+        unless replacements.all.all? { |definition| definition.owner == owner }
+          raise RecordingStudioAI::Errors::ContractValidationError.new(
+            "replacement prompts must use owner #{owner}",
+            code: "invalid_request"
+          )
+        end
+
+        retained = @definitions.reject { |_key, definition| definition.owner == owner }
+        additions = replacements.all.to_h { |definition| [storage_key(definition.namespace, definition.key, definition.version), definition] }
+        collisions = retained.keys & additions.keys
+        if collisions.any?
+          raise RecordingStudioAI::Errors::ContractValidationError.new(
+            "replacement prompt conflicts with an existing registered prompt",
+            code: "invalid_request"
+          )
+        end
+
+        @definitions = retained.merge(additions)
+      end
+
+      private
+
+      def storage_key(namespace, key, version)
+        "#{namespace}:#{key}:#{version}"
+      end
+    end
+  end
+end

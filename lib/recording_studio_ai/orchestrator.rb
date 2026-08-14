@@ -645,9 +645,15 @@ module RecordingStudioAI
       attribution = request[:attribution]
       input = request_input(request)
       attachment_metadata = RecordingStudioAI::Attachments.metadata(request[:attachments])
+      prompt = request[:prompt_definition]
       RecordingStudioAI::Run.create!(
         operation: operation.to_s,
         purpose: request[:purpose],
+        prompt_namespace: prompt&.namespace,
+        prompt_key: prompt&.key,
+        prompt_version: prompt&.version,
+        prompt_name_snapshot: prompt&.name,
+        prompt_short_name_snapshot: prompt&.short_name,
         status: "running",
         profile_key: request[:profile],
         requested_provider: request[:provider],
