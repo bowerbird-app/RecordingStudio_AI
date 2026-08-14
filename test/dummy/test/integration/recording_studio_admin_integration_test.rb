@@ -37,8 +37,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Recording Studio AI"
     refute_includes response.body, "href=\"/admin/screens/recording_studio_ai_overview\""
-    assert_includes response.body, "href=\"/admin/screens/warnings\""
-    assert_includes response.body, "Warnings"
+    refute_includes response.body, "href=\"/admin/screens/warnings\""
     refute_includes response.body, "/admin/screens/recording_studio_ai_overview?anchor_url="
     refute_includes response.body, "/admin/recording_studio_ai/admin"
     assert_includes response.body, "Close"
@@ -527,21 +526,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "href=\"/admin/screens/ai_calls?slowest=1\""
   end
 
-  test "warnings screen lists computed warnings" do
+  test "warnings screen is not registered" do
     authenticate_for_admin!
 
     get "/admin/screens/warnings"
 
-    assert_response :success
-    assert_includes response.body, "Warnings"
-    refute_includes response.body, "Active warnings"
-    refute_includes response.body, "Signal"
-    refute_includes response.body, "Obvious usage, reliability, and spend signals."
-
-    get "/admin/screens/warnings/table"
-
-    assert_response :success
-    refute_includes response.body, "Signal"
+    assert_response :not_found
   end
 
   test "ai calls table slowest filter orders by latency descending" do

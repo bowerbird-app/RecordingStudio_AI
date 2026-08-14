@@ -702,20 +702,6 @@ module AdminScreens
     link_to { |context| "#{context.admin_screen_path('ai_calls')}?slowest=1" }
   end
 
-  RecordingStudioAIWarningsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.warnings") do
-    type :list
-    title "Warnings"
-    subtitle "Obvious usage, reliability, and spend signals."
-    description "Deterministic checks for high usage, error spikes, and expensive model concentration."
-    list_options { { divider: true } }
-    items do |context|
-      AdminScreens::RecordingStudioAIWidgets.warning_items(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-      )
-    end
-    link_to { |context| context.admin_screen_path("warnings") }
-  end
-
   class RecordingStudioAIOverviewScreen < RecordingStudioAdmin::Screen
     key "recording_studio_ai_overview"
     icon :cpu_chip
@@ -724,27 +710,6 @@ module AdminScreens
 
     query do |_context|
       RecordingStudioAI::Run.order(created_at: :desc)
-    end
-  end
-
-  class RecordingStudioAIWarningsScreen < RecordingStudioAdmin::Screen
-    key "warnings"
-    icon :shield_exclamation
-    title "Warnings"
-    subtitle "All currently active usage, reliability, and spend warnings."
-
-    query do |context|
-      AdminScreens::RecordingStudioAIWidgets.warning_items(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-      ).map { |warning| AdminScreens::RecordingStudioAIWidgets::WarningRow.new(warning[:text]) }
-    end
-
-    table do
-      title ""
-      hide_columns_button
-      hide_count
-
-      column :text, title: "", value: ->(warning, _context) { warning.text }
     end
   end
 
@@ -1373,17 +1338,11 @@ module AdminScreens
          url: ->(context) { context.admin_screen_path("estimated_spend") },
          style: :secondary
 
-    link :warnings,
-         text: "Warnings",
-         url: ->(context) { context.admin_screen_path("warnings") },
-         style: :secondary
-
     link :responses,
          text: "AI Responses",
          url: ->(context) { context.admin_screen_path("recording_studio_ai_responses") },
          style: :secondary
 
-    widget "widgets.recording_studio_ai.warnings", view_variant: :compact
     widget "widgets.recording_studio_ai.ai_calls_windows"
     widget "widgets.recording_studio_ai.tool_calls"
     widget "widgets.recording_studio_ai.registered_custom_tools"
@@ -1402,8 +1361,7 @@ module AdminScreens
     RecordingStudioAIErrorsFailedCallsWidget,
     RecordingStudioAIEstimatedSpendWidget,
     RecordingStudioAICallsByProviderModelWidget,
-    RecordingStudioAISlowCallsWidget,
-    RecordingStudioAIWarningsWidget
+    RecordingStudioAISlowCallsWidget
   ].freeze
 
   def self.register!
@@ -1411,7 +1369,6 @@ module AdminScreens
 
     REGISTERABLE_WIDGETS.each { |widget| RecordingStudioAdmin.register_widget(widget) }
     RecordingStudioAdmin.register_screen(RecordingStudioAIOverviewScreen)
-    RecordingStudioAdmin.register_screen(RecordingStudioAIWarningsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAICallsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIAttemptsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIToolCallsScreen)
