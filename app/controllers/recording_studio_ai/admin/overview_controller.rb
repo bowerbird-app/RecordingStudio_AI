@@ -51,7 +51,6 @@ module RecordingStudioAI
         values = scope.pluck(field)
         values.empty? || values.any?(&:nil?) ? nil : values.sum
       end
-
     end
   end
 end

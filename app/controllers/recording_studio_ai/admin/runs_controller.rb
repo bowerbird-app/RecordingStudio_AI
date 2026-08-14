@@ -41,7 +41,9 @@ module RecordingStudioAI
         end
         scope = scope.where(web_search_used: true) if params[:web_search] == "1"
         scope = scope.where(root_recording_id: params[:root_recording_id]) if params[:root_recording_id].present?
-        scope = scope.where(context_recording_id: params[:context_recording_id]) if params[:context_recording_id].present?
+        if params[:context_recording_id].present?
+          scope = scope.where(context_recording_id: params[:context_recording_id])
+        end
         scope = scope.where(initiator_id: params[:initiator_id]) if params[:initiator_id].present?
         scope = scope.where(executor_id: params[:executor_id]) if params[:executor_id].present?
         scope = scope.where(created_at: parsed_time(:created_after)..) if parsed_time(:created_after)
@@ -54,12 +56,17 @@ module RecordingStudioAI
         end
         scope = scope.where(id: RecordingStudioAI::BatchItem.select(:run_id)) if params[:batch] == "1"
         if params[:retained_response] == "1"
-          unexpired = ["recording_studio_ai_responses.expires_at IS NULL OR recording_studio_ai_responses.expires_at > ?", Time.current]
+          unexpired = [
+            "recording_studio_ai_responses.expires_at IS NULL OR recording_studio_ai_responses.expires_at > ?", Time.current
+          ]
           attempt_runs = visible_attempts.joins(:response).where(*unexpired).select(:run_id)
           batch_runs = RecordingStudioAI::BatchItem.joins(:response).where(*unexpired).select(:run_id)
           scope = scope.where(id: attempt_runs).or(scope.where(id: batch_runs))
         end
-        scope = scope.where("latency_ms >= ?", params[:minimum_duration_ms].to_i) if params[:minimum_duration_ms].present?
+        if params[:minimum_duration_ms].present?
+          scope = scope.where("latency_ms >= ?",
+                              params[:minimum_duration_ms].to_i)
+        end
         scope = scope.where("total_tokens >= ?", params[:minimum_tokens].to_i) if params[:minimum_tokens].present?
         apply_search(scope)
       end
@@ -70,12 +77,12 @@ module RecordingStudioAI
         query = "%#{ActiveRecord::Base.sanitize_sql_like(params[:q].to_s)}%"
         attempt_runs = visible_attempts.where("provider_request_id LIKE ?", query).select(:run_id)
         batch_runs = RecordingStudioAI::BatchItem.joins(:batch).merge(visible_batches)
-          .where(
-            "recording_studio_ai_batch_items.reference LIKE :query OR " \
-            "recording_studio_ai_batch_items.provider_item_id LIKE :query OR " \
-            "recording_studio_ai_batches.provider_batch_id LIKE :query",
-            query: query
-          ).select(:run_id)
+                                                 .where(
+                                                   "recording_studio_ai_batch_items.reference LIKE :query OR " \
+                                                   "recording_studio_ai_batch_items.provider_item_id LIKE :query OR " \
+                                                   "recording_studio_ai_batches.provider_batch_id LIKE :query",
+                                                   query: query
+                                                 ).select(:run_id)
         tool_runs = visible_tool_invocations.where("tool_key LIKE ?", query).select(:run_id)
         scope.where(
           "purpose LIKE :query OR error_code LIKE :query OR " \

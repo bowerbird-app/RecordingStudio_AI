@@ -40,7 +40,8 @@ module RecordingStudioAI
 
     validates :run, :tool_key, :tool_version, :status, presence: true
     validates :latency_category, inclusion: { in: %w[instant fast slow] }, allow_nil: true
-    validates :confirmation_status, inclusion: { in: %w[not_required pending confirmed rejected expired] }, allow_nil: true
+    validates :confirmation_status, inclusion: { in: %w[not_required pending confirmed rejected expired] },
+                                    allow_nil: true
     validate :attempts_belong_to_same_run
 
     class << self

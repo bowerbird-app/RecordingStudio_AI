@@ -69,9 +69,9 @@ module RecordingStudioAI
       emit_final_stream_events(response)
       completed = true
       response
-    rescue StreamConsumerError => error
+    rescue StreamConsumerError => e
       cancel_active_stream_records!
-      raise error.original_error
+      raise e.original_error
     ensure
       cancel_active_stream_records! unless completed
       @event_handler = nil
@@ -282,8 +282,8 @@ module RecordingStudioAI
         },
         error: nil
       }
-    rescue RecordingStudioAI::Errors::ContractValidationError => error
-      status, category = case error.code
+    rescue RecordingStudioAI::Errors::ContractValidationError => e
+      status, category = case e.code
                          when "authorization" then %w[denied custom_tool_denied]
                          when "custom_tool_confirmation_rejected", "custom_tool_confirmation_expired"
                            %w[rejected custom_tool_rejected]
@@ -292,8 +292,8 @@ module RecordingStudioAI
                          when "custom_tool_validation" then %w[failed custom_tool_validation]
                          else %w[failed custom_tool_failed]
                          end
-      fail_custom_tool_invocation!(invocation, status, category, error.code, error.message) if invocation && status
-      { error: custom_tool_failure(error.code, category: category, message: error.message) }
+      fail_custom_tool_invocation!(invocation, status, category, e.code, e.message) if invocation && status
+      { error: custom_tool_failure(e.code, category: category, message: e.message) }
     rescue Timeout::Error
       fail_custom_tool_invocation!(invocation, "failed", "custom_tool_failed", "custom_tool_timeout",
                                    "Custom tool execution timed out.")
@@ -327,10 +327,11 @@ module RecordingStudioAI
         context: custom_tool_authorization_context(definition, invocation)
       )
       outcome = normalize_confirmation_outcome(@configuration.custom_tool_confirmation_handler.call(
-        definition: definition,
-        arguments: arguments,
-        context: custom_tool_context(request, invocation.run, invocation.requested_by_attempt)
-      ))
+                                                 definition: definition,
+                                                 arguments: arguments,
+                                                 context: custom_tool_context(request, invocation.run,
+                                                                              invocation.requested_by_attempt)
+                                               ))
       if outcome == :approved
         attribution = request.fetch(:attribution)
         confirmer = attribution.initiator
@@ -529,6 +530,7 @@ module RecordingStudioAI
       unless result.is_a?(RecordingStudioAI::Providers::Result)
         raise TypeError, "Provider must return RecordingStudioAI::Providers::Result"
       end
+
       result = RecordingStudioAI::CostCalculator.apply(
         result, provider: candidate.provider, model: candidate.model, configuration: @configuration
       )
@@ -935,14 +937,20 @@ module RecordingStudioAI
       @visible_stream_output = true
     rescue StreamConsumerError
       raise
-    rescue StandardError => error
-      raise StreamConsumerError.new(error)
+    rescue StandardError => e
+      raise StreamConsumerError.new(e)
     end
 
     def cancel_active_stream_records!
       @active_cancellation_state&.cancel!
       completed_at = Time.current
-      running_attempts = @active_run ? @active_run.attempts.where(status: "running") : Array(@active_attempt).select { |attempt| attempt.status == "running" }
+      running_attempts = if @active_run
+                           @active_run.attempts.where(status: "running")
+                         else
+                           Array(@active_attempt).select do |attempt|
+                             attempt.status == "running"
+                           end
+                         end
       running_attempts.each do |attempt|
         attempt.update!(
           status: "cancelled",

@@ -6,7 +6,10 @@ module AdminScreens
 
     EXPENSIVE_MODEL_MATCHER = /(gpt-5|o1|claude-opus|gemini-2\.5-pro)/i unless const_defined?(:EXPENSIVE_MODEL_MATCHER)
     WarningRow = Data.define(:text) unless const_defined?(:WarningRow)
-    ToolRow = Data.define(:key, :version, :name, :description, :cost_class, :safety, :calls_series, :success_rate, :error_rate, :average_duration) unless const_defined?(:ToolRow)
+    unless const_defined?(:ToolRow)
+      ToolRow = Data.define(:key, :version, :name, :description, :cost_class, :safety, :calls_series, :success_rate,
+                            :error_rate, :average_duration)
+    end
 
     def runs_scope(context)
       scope = RecordingStudioAI::Run.all
@@ -41,7 +44,8 @@ module AdminScreens
         [invocation.tool_key, invocation.tool_version, invocation.created_at.to_date]
       end.transform_values(&:count)
       completed_counts = thirty_day_invocations.where(status: "completed").group(:tool_key, :tool_version).count
-      error_counts = thirty_day_invocations.where(status: %w[failed denied rejected cancelled]).group(:tool_key, :tool_version).count
+      error_counts = thirty_day_invocations.where(status: %w[failed denied rejected cancelled]).group(:tool_key,
+                                                                                                      :tool_version).count
       average_latencies = thirty_day_invocations.group(:tool_key, :tool_version).average(:latency_ms)
 
       RecordingStudioAI.tools.all.map do |definition|
@@ -112,42 +116,51 @@ module AdminScreens
         "Do not use when" => definition.do_not_use_when,
         "Returns" => definition.returns,
         "Executor" => definition.executor_label,
-        "Safety" => "#{definition.read_only ? "Read only" : "Writes"}; destructive: #{definition.destructive ? "yes" : "no"}; confirmation: #{definition.requires_confirmation ? "required" : "not required"}; idempotent: #{definition.idempotent ? "yes" : "no"}"
+        "Safety" => "#{definition.read_only ? 'Read only' : 'Writes'}; destructive: #{definition.destructive ? 'yes' : 'no'}; confirmation: #{definition.requires_confirmation ? 'required' : 'not required'}; idempotent: #{definition.idempotent ? 'yes' : 'no'}"
       }
       body = helpers.content_tag(:dl, class: "grid gap-4 text-sm md:grid-cols-2") do
         helpers.safe_join(fields.map do |label, value|
           helpers.content_tag(:div) do
             helpers.safe_join([
-              helpers.content_tag(:dt, label, class: "text-sm text-[var(--surface-muted-content-color)]"),
-              helpers.content_tag(:dd, value)
-            ])
+                                helpers.content_tag(:dt, label,
+                                                    class: "text-sm text-[var(--surface-muted-content-color)]"),
+                                helpers.content_tag(:dd, value)
+                              ])
           end
         end)
       end
       modal = helpers.content_tag(
         :div,
         helpers.safe_join([
-          helpers.content_tag(:div, nil, class: "absolute inset-0", data: { action: "click->flat-pack--modal#clickBackdrop" }),
-          helpers.content_tag(:div, class: "relative flex w-full min-h-screen items-start sm:items-center justify-center p-4 sm:p-6") do
-            helpers.content_tag(:div, class: "relative flex flex-col min-h-0 max-h-[calc(100vh-2rem)] w-full overflow-hidden max-w-2xl p-4 sm:p-6 bg-[var(--modal-surface-color)] rounded-lg shadow-lg border border-[var(--modal-border-color)] transform transition-all duration-300 scale-95 opacity-0", role: "dialog", aria: { modal: true }, data: { "flat-pack--modal-target": "dialog" }) do
-              helpers.safe_join([
-                helpers.content_tag(:div, class: "flex items-center justify-between gap-4") do
-                  helpers.safe_join([
-                    helpers.content_tag(:h2, "#{definition.name} v#{definition.version}", class: "text-lg font-semibold text-[var(--modal-title-color)]"),
-                    helpers.content_tag(:button, "×", type: "button", class: "text-xl", aria: { label: "Close" }, data: { action: "flat-pack--modal#close" })
-                  ])
-                end,
-                helpers.content_tag(:div, body, class: "mt-6")
-              ])
-            end
-          end
-        ]),
+                            helpers.content_tag(:div, nil, class: "absolute inset-0",
+                                                           data: { action: "click->flat-pack--modal#clickBackdrop" }),
+                            helpers.content_tag(:div,
+                                                class: "relative flex w-full min-h-screen items-start sm:items-center justify-center p-4 sm:p-6") do
+                              helpers.content_tag(:div,
+                                                  class: "relative flex flex-col min-h-0 max-h-[calc(100vh-2rem)] w-full overflow-hidden max-w-2xl p-4 sm:p-6 bg-[var(--modal-surface-color)] rounded-lg shadow-lg border border-[var(--modal-border-color)] transform transition-all duration-300 scale-95 opacity-0", role: "dialog", aria: { modal: true }, data: { "flat-pack--modal-target": "dialog" }) do
+                                helpers.safe_join([
+                                                    helpers.content_tag(:div,
+                                                                        class: "flex items-center justify-between gap-4") do
+                                                      helpers.safe_join([
+                                                                          helpers.content_tag(:h2, "#{definition.name} v#{definition.version}",
+                                                                                              class: "text-lg font-semibold text-[var(--modal-title-color)]"),
+                                                                          helpers.content_tag(:button, "×", type: "button", class: "text-xl", aria: { label: "Close" },
+                                                                                                            data: { action: "flat-pack--modal#close" })
+                                                                        ])
+                                                    end,
+                                                    helpers.content_tag(:div, body, class: "mt-6")
+                                                  ])
+                              end
+                            end
+                          ]),
         id: modal_id,
         class: "fixed inset-0 z-50 hidden overflow-y-auto bg-[var(--modal-backdrop-color)] backdrop-blur-[var(--modal-backdrop-blur)] transition-opacity duration-300",
-        data: { controller: "flat-pack--modal", "flat-pack--modal-close-on-backdrop-value": true, "flat-pack--modal-close-on-escape-value": true, action: "keydown.esc->flat-pack--modal#close" },
+        data: { controller: "flat-pack--modal", "flat-pack--modal-close-on-backdrop-value": true,
+                "flat-pack--modal-close-on-escape-value": true, action: "keydown.esc->flat-pack--modal#close" },
         aria: { hidden: true }
       )
-      trigger = helpers.content_tag(:button, "#{row.name} v#{row.version}", type: "button", class: "text-(--color-primary-background-color) underline", data: { modal_id: modal_id }, aria: { label: "Show definition for #{row.name}" })
+      trigger = helpers.content_tag(:button, "#{row.name} v#{row.version}", type: "button",
+                                                                            class: "text-(--color-primary-background-color) underline", data: { modal_id: modal_id }, aria: { label: "Show definition for #{row.name}" })
       helpers.safe_join([trigger, modal])
     end
 
@@ -412,8 +425,8 @@ module AdminScreens
     metadata { { period_label: "Last 30 days" } }
     value do |context|
       retries = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-                                                       .where(created_at: 30.days.ago..Time.current)
-                                                       .sum(:retry_count)
+                                                      .where(created_at: 30.days.ago..Time.current)
+                                                      .sum(:retry_count)
       AdminScreens::RecordingStudioAIWidgets.number(retries)
     end
     change do |context|
@@ -495,7 +508,7 @@ module AdminScreens
         yaxis: { min: 0, labels: { show: false } }
       }
     end
-    link_to { |context| "#{context.admin_screen_path("ai_calls")}?run_status=failed" }
+    link_to { |context| "#{context.admin_screen_path('ai_calls')}?run_status=failed" }
   end
 
   RecordingStudioAIEstimatedSpendWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.estimated_spend") do
@@ -686,7 +699,7 @@ module AdminScreens
         grid: { xaxis: { lines: { show: false } } }
       }
     end
-    link_to { |context| "#{context.admin_screen_path("ai_calls")}?slowest=1" }
+    link_to { |context| "#{context.admin_screen_path('ai_calls')}?slowest=1" }
   end
 
   RecordingStudioAIWarningsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.warnings") do
@@ -788,8 +801,8 @@ module AdminScreens
         end
       }
 
-          column :created_at, title: "Created"
-          column :created_at, title: "Created"
+      column :created_at, title: "Created"
+      column :created_at, title: "Created"
       column :response,
              title: "Response",
              sortable: false,
@@ -864,21 +877,25 @@ module AdminScreens
     filter :date_range, field: :created_at, default: :last_4_weeks
     filter :group_by, values: %i[hour day week month year], default: :day
     filter :status,
-          param: :run_status,
-          field: :status,
-          options: -> { RecordingStudioAI::Run.distinct.order(:status).pluck(:status).compact_blank },
-          apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
+           param: :run_status,
+           field: :status,
+           options: -> { RecordingStudioAI::Run.distinct.order(:status).pluck(:status).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
     filter :operation,
-          field: :operation,
-          values: -> { RecordingStudioAI::Run.distinct.order(:operation).pluck(:operation).compact_blank }
-        filter :prompt,
-          field: :prompt_key,
-          values: -> { RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key) }
+           field: :operation,
+           values: -> { RecordingStudioAI::Run.distinct.order(:operation).pluck(:operation).compact_blank }
+    filter :prompt,
+           field: :prompt_key,
+           values: -> { RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key) }
     filter :provider,
-          values: -> { RecordingStudioAI::Run.distinct.order(:resolved_provider).pluck(:resolved_provider).compact_blank },
+           values: lambda {
+             RecordingStudioAI::Run.distinct.order(:resolved_provider).pluck(:resolved_provider).compact_blank
+           },
            apply: ->(relation, value, _context) { relation.where(resolved_provider: value) }
     filter :custom_tool_key,
-           values: -> { RecordingStudioAI::CustomToolInvocation.distinct.order(:tool_key).pluck(:tool_key).compact_blank },
+           values: lambda {
+             RecordingStudioAI::CustomToolInvocation.distinct.order(:tool_key).pluck(:tool_key).compact_blank
+           },
            apply: lambda { |relation, value, _context|
              relation.where(id: RecordingStudioAI::CustomToolInvocation.where(tool_key: value).select(:run_id))
            }
@@ -978,7 +995,7 @@ module AdminScreens
 
                ActionController::Base.helpers.link_to(
                  count,
-                 "#{context.admin_screen_path("attempts")}?run_id=#{run.id}",
+                 "#{context.admin_screen_path('attempts')}?run_id=#{run.id}",
                  class: "text-(--color-primary-background-color)",
                  data: { turbo_frame: "_top" }
                )
@@ -991,7 +1008,7 @@ module AdminScreens
 
                ActionController::Base.helpers.link_to(
                  count,
-                 "#{context.admin_screen_path("tool_calls")}?run_id=#{run.id}",
+                 "#{context.admin_screen_path('tool_calls')}?run_id=#{run.id}",
                  class: "text-(--color-primary-background-color)",
                  data: { turbo_frame: "_top" }
                )
@@ -1014,32 +1031,34 @@ module AdminScreens
       AdminScreens::RecordingStudioAIWidgets.attempts_scope(context).includes(:run).order(:sequence)
     end
 
-        filter_presentation :modal, inline_count: 3
-        filter :date_range, field: :created_at, default: :last_4_weeks
-        filter :status,
-          param: :attempt_status,
-          field: :status,
-          options: -> { RecordingStudioAI::Attempt.distinct.order(:status).pluck(:status).compact_blank },
-          apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
-        filter :provider,
-          field: :provider,
-          values: -> { RecordingStudioAI::Attempt.distinct.order(:provider).pluck(:provider).compact_blank },
-          apply: ->(relation, value, _context) { relation.where(provider: value) }
+    filter_presentation :modal, inline_count: 3
+    filter :date_range, field: :created_at, default: :last_4_weeks
+    filter :status,
+           param: :attempt_status,
+           field: :status,
+           options: -> { RecordingStudioAI::Attempt.distinct.order(:status).pluck(:status).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
+    filter :provider,
+           field: :provider,
+           values: -> { RecordingStudioAI::Attempt.distinct.order(:provider).pluck(:provider).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(provider: value) }
     filter :run_id,
            field: :run_id,
            apply: ->(relation, value, _context) { relation.where(run_id: value) }
-        filter :kind,
-          field: :kind,
-          values: -> { RecordingStudioAI::Attempt.distinct.order(:kind).pluck(:kind).compact_blank },
-          apply: ->(relation, value, _context) { relation.where(kind: value) }
+    filter :kind,
+           field: :kind,
+           values: -> { RecordingStudioAI::Attempt.distinct.order(:kind).pluck(:kind).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(kind: value) }
 
     table do
-          column :created_at, title: "Created"
+      column :created_at, title: "Created"
       column :run_id, title: "AI call"
       column :sequence, title: "Sequence"
       column :kind,
              display: :badge,
-             display_options: ->(_row, _context, value) { { text: value.to_s.humanize, style: :default, size: :sm } }
+             display_options: lambda { |_row, _context, value|
+               { text: value.to_s.humanize, style: :default, size: :sm }
+             }
       column :status,
              display: :badge,
              display_options: lambda { |_row, _context, value|
@@ -1075,14 +1094,14 @@ module AdminScreens
     filter_presentation :modal, inline_count: 3
     filter :date_range, field: :created_at, default: :last_4_weeks
     filter :group_by, values: %i[hour day week month year], default: :day
-        filter :run_id,
-          field: :run_id,
-          apply: ->(relation, value, _context) { relation.where(run_id: value) }
+    filter :run_id,
+           field: :run_id,
+           apply: ->(relation, value, _context) { relation.where(run_id: value) }
     filter :status,
-          param: :tool_status,
-          field: :status,
-          options: -> { RecordingStudioAI::CustomToolInvocation.distinct.order(:status).pluck(:status).compact_blank },
-          apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
+           param: :tool_status,
+           field: :status,
+           options: -> { RecordingStudioAI::CustomToolInvocation.distinct.order(:status).pluck(:status).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
     filter :tool_key,
            field: :tool_key,
            values: -> { RecordingStudioAI::CustomToolInvocation.distinct.order(:tool_key).pluck(:tool_key).compact_blank }
@@ -1206,7 +1225,8 @@ module AdminScreens
       column :calls_series,
              title: "Calls / 30 days",
              value: lambda { |row, _context|
-               url = "/admin/screens/ai_calls?#{ { date_range_preset: :last_30_days, custom_tool_key: row.key }.to_query }"
+               url = "/admin/screens/ai_calls?#{{ date_range_preset: :last_30_days,
+                                                  custom_tool_key: row.key }.to_query}"
                ActionController::Base.helpers.link_to(
                  AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
                  url,
@@ -1233,36 +1253,40 @@ module AdminScreens
                                             .order(created_at: :desc)
     end
 
-        filter_presentation :modal, inline_count: 3
+    filter_presentation :modal, inline_count: 3
     filter :date_range, field: :created_at, default: :last_4_weeks
     filter :group_by, values: %i[hour day week month year], default: :day
-        filter :status,
-          param: :run_status,
-          field: :status,
-          options: -> { RecordingStudioAI::Run.distinct.order(:status).pluck(:status).compact_blank },
-          apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
+    filter :status,
+           param: :run_status,
+           field: :status,
+           options: -> { RecordingStudioAI::Run.distinct.order(:status).pluck(:status).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
     filter :model,
            field: :resolved_model,
            values: -> { RecordingStudioAI::Run.distinct.order(:resolved_model).pluck(:resolved_model).compact_blank },
            apply: ->(relation, value, _context) { relation.where(resolved_model: value) }
     filter :provider,
            field: :resolved_provider,
-           values: -> { RecordingStudioAI::Run.distinct.order(:resolved_provider).pluck(:resolved_provider).compact_blank },
+           values: lambda {
+             RecordingStudioAI::Run.distinct.order(:resolved_provider).pluck(:resolved_provider).compact_blank
+           },
            apply: ->(relation, value, _context) { relation.where(resolved_provider: value) }
-        filter :token_min,
-          param: :min_tokens,
-          max: 1_000_000,
-          apply: ->(relation, value, _context) { value.to_i.positive? ? relation.where("total_tokens >= ?", value.to_i) : relation }
-        filter :token_max,
-          param: :max_tokens,
-          max: 1_000_000,
-          apply: lambda { |relation, value, _context|
-            value.to_i.positive? && value.to_i < 1_000_000 ? relation.where("total_tokens <= ?", value.to_i) : relation
-          }
+    filter :token_min,
+           param: :min_tokens,
+           max: 1_000_000,
+           apply: lambda { |relation, value, _context|
+             value.to_i.positive? ? relation.where("total_tokens >= ?", value.to_i) : relation
+           }
+    filter :token_max,
+           param: :max_tokens,
+           max: 1_000_000,
+           apply: lambda { |relation, value, _context|
+             value.to_i.positive? && value.to_i < 1_000_000 ? relation.where("total_tokens <= ?", value.to_i) : relation
+           }
 
-        summary do
-          change_good_when :down
-        end
+    summary do
+      change_good_when :down
+    end
 
     chart do
       title "Estimated spend trend"
@@ -1324,32 +1348,32 @@ module AdminScreens
     title "Recording Studio AI"
     subtitle "Runs, custom tools, provider batches, and retained responses"
 
-        link :calls,
-          text: "AI Calls",
-          url: ->(context) { context.admin_screen_path("ai_calls") },
-          style: :secondary
+    link :calls,
+         text: "AI Calls",
+         url: ->(context) { context.admin_screen_path("ai_calls") },
+         style: :secondary
 
     link :tool_calls,
-          text: "Custom Tool Calls",
+         text: "Custom Tool Calls",
          url: ->(context) { context.admin_screen_path("tool_calls") },
          style: :secondary
 
-        link :attempts,
-          text: "Attempts",
-          url: ->(context) { context.admin_screen_path("attempts") },
-          style: :secondary
+    link :attempts,
+         text: "Attempts",
+         url: ->(context) { context.admin_screen_path("attempts") },
+         style: :secondary
 
-        link :custom_tools,
-          text: "Registered Tools",
-              url: ->(context) { context.admin_screen_path("registered_custom_tools") },
-          style: :secondary
+    link :custom_tools,
+         text: "Registered Tools",
+         url: ->(context) { context.admin_screen_path("registered_custom_tools") },
+         style: :secondary
 
-        link :estimated_spend,
-          text: "Estimated Spend",
-          url: ->(context) { context.admin_screen_path("estimated_spend") },
-          style: :secondary
+    link :estimated_spend,
+         text: "Estimated Spend",
+         url: ->(context) { context.admin_screen_path("estimated_spend") },
+         style: :secondary
 
-        link :warnings,
+    link :warnings,
          text: "Warnings",
          url: ->(context) { context.admin_screen_path("warnings") },
          style: :secondary

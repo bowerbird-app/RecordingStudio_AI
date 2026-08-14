@@ -14,9 +14,9 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
       t.string :resolved_model
 
       t.references :root_recording, type: recording_id_type, null: false, index: false,
-                foreign_key: { to_table: :recording_studio_recordings }
+                                    foreign_key: { to_table: :recording_studio_recordings }
       t.references :context_recording, type: recording_id_type, index: false,
-                   foreign_key: { to_table: :recording_studio_recordings }
+                                       foreign_key: { to_table: :recording_studio_recordings }
 
       t.string :initiator_type, null: false
       t.string :initiator_id, null: false
@@ -228,9 +228,9 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
       t.string :provider_batch_id
 
       t.references :root_recording, type: recording_id_type, null: false,
-                foreign_key: { to_table: :recording_studio_recordings }
+                                    foreign_key: { to_table: :recording_studio_recordings }
       t.references :context_recording, type: recording_id_type,
-                   foreign_key: { to_table: :recording_studio_recordings }
+                                       foreign_key: { to_table: :recording_studio_recordings }
 
       t.string :initiator_type, null: false
       t.string :initiator_id, null: false

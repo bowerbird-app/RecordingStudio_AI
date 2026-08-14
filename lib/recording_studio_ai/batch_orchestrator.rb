@@ -21,12 +21,12 @@ module RecordingStudioAI
       result = normalize_submission_result(result, candidate)
       result = apply_result!(batch, result, fail_pending_items: !result.success?)
       build_response(batch, result, operation: "batch_submit", transient_items: result.items)
-    rescue Errors::ResolutionError => error
-      resolution_failure(request, error)
-    rescue StandardError => error
+    rescue Errors::ResolutionError => e
+      resolution_failure(request, e)
+    rescue StandardError => e
       raise unless batch
 
-      result = submission_failure(error, candidate)
+      result = submission_failure(e, candidate)
       apply_result!(batch, result, fail_pending_items: true)
       build_response(batch, result, operation: "batch_submit")
     end
@@ -47,8 +47,8 @@ module RecordingStudioAI
       ensure_batch_result!(result)
       result = apply_result!(batch, result)
       build_response(batch.reload, result, operation: "batch_cancel", transient_items: result.items)
-    rescue Errors::ResolutionError => error
-      build_response(batch, error_result(error, batch&.provider), operation: "batch_cancel")
+    rescue Errors::ResolutionError => e
+      build_response(batch, error_result(e, batch&.provider), operation: "batch_cancel")
     end
 
     private
@@ -115,7 +115,11 @@ module RecordingStudioAI
     end
 
     def terminalize_unresolved_items!(batch, result)
-      item_status = result.status == "expired" ? "expired" : (result.status == "cancelled" ? "cancelled" : "failed")
+      item_status = if result.status == "expired"
+                      "expired"
+                    else
+                      (result.status == "cancelled" ? "cancelled" : "failed")
+                    end
       error = result.error
       if result.status == "completed"
         error = Contracts::NormalizedError.new(
@@ -128,8 +132,8 @@ module RecordingStudioAI
         next if BatchItem.terminal_statuses.include?(item.status)
 
         apply_item_result!(batch, Providers::BatchItemResult.new(
-          reference: item.reference, status: item_status, error: error
-        ))
+                                    reference: item.reference, status: item_status, error: error
+                                  ))
       end
     end
 
@@ -153,14 +157,14 @@ module RecordingStudioAI
       completed_at = result.terminal? ? transition_at : nil
       item.update!(metrics(result).merge(
                      status: result.status, provider_item_id: result.provider_item_id,
-             started_at: item.started_at || (transition_at if result.status != "pending"),
+                     started_at: item.started_at || (transition_at if result.status != "pending"),
                      completed_at: completed_at, finish_reason: result.finish_reason,
                      error_category: result.error&.category, error_code: result.error&.code,
                      error_message: result.error&.message,
                      metadata: item.metadata.merge(result.metadata)
                    ))
       update_run_from_item!(item.run, result, completed_at)
-                    Retention.retain_batch_item!(item, result, configuration: @configuration) if result.terminal?
+      Retention.retain_batch_item!(item, result, configuration: @configuration) if result.terminal?
       result
     end
 
@@ -170,7 +174,9 @@ module RecordingStudioAI
       run_status = { "pending" => "pending", "processing" => "running", "completed" => "completed",
                      "failed" => "failed", "cancelled" => "cancelled", "expired" => "cancelled" }.fetch(result.status)
       run.update!(metrics(result).merge(
-                    status: run_status, started_at: run.started_at || (completed_at || Time.current if run_status != "pending"),
+                    status: run_status, started_at: run.started_at || (if run_status != "pending"
+                                                                         completed_at || Time.current
+                                                                       end),
                     completed_at: completed_at, attempt_count: 0,
                     output_character_count: result.text&.length,
                     web_search_used: result.provider_native_tools.include?("web_search"),
@@ -233,11 +239,10 @@ module RecordingStudioAI
     end
 
     def aggregate_metrics(items)
-      fields = Contracts::Usage::TOKEN_FIELDS.to_h do |field|
+      Contracts::Usage::TOKEN_FIELDS.to_h do |field|
         values = items.map { |item| item.public_send(field) }
         [field, values.empty? || values.any?(&:nil?) ? nil : values.sum]
       end
-      fields
     end
 
     def metrics(result)
@@ -263,7 +268,8 @@ module RecordingStudioAI
     end
 
     def find_batch!(request)
-      Batch.find_by!(id: request.fetch(:batch_id), root_recording_id: identifier(request.fetch(:attribution).root_recording))
+      Batch.find_by!(id: request.fetch(:batch_id),
+                     root_recording_id: identifier(request.fetch(:attribution).root_recording))
     rescue ActiveRecord::RecordNotFound
       raise Errors::ContractValidationError.new("batch was not found in the requested root", code: "invalid_request")
     end
@@ -284,21 +290,27 @@ module RecordingStudioAI
     def provider_for!(candidate) = @configuration.providers.fetch(candidate.provider)
 
     def ensure_batch_result!(result)
-      raise TypeError, "Provider must return RecordingStudioAI::Providers::BatchResult" unless result.is_a?(Providers::BatchResult)
+      return if result.is_a?(Providers::BatchResult)
+
+      raise TypeError, "Provider must return RecordingStudioAI::Providers::BatchResult"
     end
 
     def build_response(batch, result, operation:, transient_items: [])
       transient_by_reference = transient_items.index_by(&:reference)
-      items = batch ? batch.batch_items.order(:position).map do |item|
-        provider_item = transient_by_reference[item.reference]
-        Contracts::BatchItemResult.new(
-          reference: item.reference, provider_item_id: item.provider_item_id, status: item.status,
-          text: provider_item&.text, structured_data: provider_item&.structured_data,
-          citations: provider_item&.citations || [], provider_native_tools: provider_item&.provider_native_tools || [],
-          finish_reason: item.finish_reason, usage: usage_from(item), cost: cost_from(item),
-          error: item_error(item), metadata: item.metadata || {}
-        )
-      end : []
+      items = if batch
+                batch.batch_items.order(:position).map do |item|
+                  provider_item = transient_by_reference[item.reference]
+                  Contracts::BatchItemResult.new(
+                    reference: item.reference, provider_item_id: item.provider_item_id, status: item.status,
+                    text: provider_item&.text, structured_data: provider_item&.structured_data,
+                    citations: provider_item&.citations || [], provider_native_tools: provider_item&.provider_native_tools || [],
+                    finish_reason: item.finish_reason, usage: usage_from(item), cost: cost_from(item),
+                    error: item_error(item), metadata: item.metadata || {}
+                  )
+                end
+              else
+                []
+              end
       Contracts::BatchResponse.new(
         operation: operation, profile: batch&.profile_key&.to_sym || :medium, provider: batch&.provider,
         model: batch&.model, batch: batch, status: batch&.status || result.status, items: items,

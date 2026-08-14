@@ -3,7 +3,8 @@
 require "test_helper"
 require "active_record"
 
-migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb", __dir__)].first
+migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb",
+                                      __dir__)].first
 require migration_file
 require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
 require File.expand_path("../db/migrate/20260811120000_harden_recording_studio_ai_persistence.rb", __dir__)
@@ -134,7 +135,10 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     calls = []
     response = Struct.new(:status).new("completed")
 
-    RecordingStudioAI.stub(:refresh_batch, ->(**arguments) { calls << arguments; response }) do
+    RecordingStudioAI.stub(:refresh_batch, lambda { |**arguments|
+      calls << arguments
+      response
+    }) do
       result = RecordingStudioAI::BatchSynchronizationJob.perform_now(
         batch_id: "batch-1", root_recording: @root_recording, initiator: @initiator
       )
@@ -176,7 +180,10 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     calls = []
     response = Struct.new(:status).new("completed")
 
-    RecordingStudioAI.stub(:refresh_batch, ->(**arguments) { calls << arguments; response }) do
+    RecordingStudioAI.stub(:refresh_batch, lambda { |**arguments|
+      calls << arguments
+      response
+    }) do
       RecordingStudioAI::BatchSynchronizationJob.perform_now(
         batch_id: "batch-1", root_recording: @root_recording, initiator: @initiator,
         initiator_kind: :service, impersonator: impersonator
@@ -231,7 +238,9 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
       provider: :test, root_recording: @root_recording, initiator: @initiator
     )
 
-    authorization = authorizations.find { |action, _attribution, _context| action == "recording_studio_ai.use_provider_native_tool" }
+    authorization = authorizations.find do |action, _attribution, _context|
+      action == "recording_studio_ai.use_provider_native_tool"
+    end
     assert_same @root_recording, authorization.fetch(1).root_recording
     assert_equal "batch_submit", authorization.fetch(2).fetch("operation")
   end
@@ -335,7 +344,8 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
         reference: "structured", status: "completed", text: '{"summary":"valid"}'
       )]
     )
-    RecordingStudioAI.refresh_batch(batch_id: submitted.batch.id, root_recording: @root_recording, initiator: @initiator)
+    RecordingStudioAI.refresh_batch(batch_id: submitted.batch.id, root_recording: @root_recording,
+                                    initiator: @initiator)
     @provider.refresh_result = RecordingStudioAI::Providers::BatchResult.new(
       status: "completed", provider_batch_id: "provider-batch-1",
       items: [RecordingStudioAI::Providers::BatchItemResult.new(
@@ -526,7 +536,8 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     client = Struct.new(:files, :batches).new(files, FakeOpenAIBatches.new)
     RecordingStudioAI.configuration.openai_client = client
     provider = RecordingStudioAI::Providers::OpenAI.new(configuration: RecordingStudioAI.configuration)
-    candidate = RecordingStudioAI::Candidate.new(provider: :openai, model: "gpt-test", capabilities: %i[generation provider_batch])
+    candidate = RecordingStudioAI::Candidate.new(provider: :openai, model: "gpt-test",
+                                                 capabilities: %i[generation provider_batch])
     request = normalized_request([{ reference: "ref-1", prompt: "private prompt" }])
 
     submitted = provider.submit_batch(request: request, candidate: candidate)
@@ -547,9 +558,11 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     client = Struct.new(:files, :batches).new(files, FakeOpenAIBatches.new)
     RecordingStudioAI.configuration.openai_client = client
     provider = RecordingStudioAI::Providers::OpenAI.new(configuration: RecordingStudioAI.configuration)
-    candidate = RecordingStudioAI::Candidate.new(provider: :openai, model: "gpt-test", capabilities: %i[generation provider_batch])
+    candidate = RecordingStudioAI::Candidate.new(provider: :openai, model: "gpt-test",
+                                                 capabilities: %i[generation provider_batch])
 
-    result = provider.refresh_batch(batch: Struct.new(:provider_batch_id, :status).new("batch-1", "processing"), candidate: candidate)
+    result = provider.refresh_batch(batch: Struct.new(:provider_batch_id, :status).new("batch-1", "processing"),
+                                    candidate: candidate)
 
     refute result.success?
     assert_equal "invalid_response", result.error.category
@@ -578,7 +591,8 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     client = FakeGeminiBatchClient.new
     RecordingStudioAI.configuration.gemini_client = client
     provider = RecordingStudioAI::Providers::Gemini.new(configuration: RecordingStudioAI.configuration)
-    candidate = RecordingStudioAI::Candidate.new(provider: :gemini, model: "gemini-test", capabilities: %i[generation provider_batch])
+    candidate = RecordingStudioAI::Candidate.new(provider: :gemini, model: "gemini-test",
+                                                 capabilities: %i[generation provider_batch])
 
     submitted = provider.submit_batch(
       request: normalized_request([{ reference: "ref-1", prompt: "private prompt" }]), candidate: candidate

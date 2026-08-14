@@ -222,9 +222,9 @@ class PhaseThreePersistenceTest < Minitest::Test
 
     assert_raises(ActiveRecord::StatementInvalid) do
       RecordingStudioAI::BatchItem.insert_all!([{
-        batch_id: batch.id, run_id: second_run.id, position: 0, reference: "direct-cross-root",
-        status: "pending", created_at: Time.current, updated_at: Time.current
-      }])
+                                                 batch_id: batch.id, run_id: second_run.id, position: 0, reference: "direct-cross-root",
+                                                 status: "pending", created_at: Time.current, updated_at: Time.current
+                                               }])
     end
     assert_raises(ActiveRecord::StatementInvalid) { first_attempt.update_column(:run_id, second_run.id) }
     assert_raises(ActiveRecord::StatementInvalid) { first_run.update_column(:root_recording_id, second_root) }

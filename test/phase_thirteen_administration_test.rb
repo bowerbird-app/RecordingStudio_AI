@@ -4,7 +4,8 @@ require "test_helper"
 require "active_record"
 require "securerandom"
 
-migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb", __dir__)].first
+migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb",
+                                      __dir__)].first
 require migration_file
 require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
 require_relative "../app/models/recording_studio_ai/application_record"
@@ -57,7 +58,7 @@ class PhaseThirteenAdministrationTest < Minitest::Test
     access = RecordingStudioAI::Admin::Access.new(controller: Object.new, configuration: @configuration)
 
     assert_equal root_ids, access.root_ids
-    assert_equal 2, calls.count { |action, _, _| action == "recording_studio_ai.view_execution" }
+    assert_equal(2, calls.count { |action, _, _| action == "recording_studio_ai.view_execution" })
     refute access.allowed?(:view_sensitive_execution, root_id: root_ids.first, context: { record_id: 1 })
     assert_equal "recording_studio_ai.view_sensitive_execution", calls.last.first
   end
@@ -121,7 +122,9 @@ class PhaseThirteenAdministrationTest < Minitest::Test
 
     verbs = RecordingStudioAI::Engine.routes.routes.map(&:verb).compact.uniq
     assert_equal ["GET"], verbs
-    refute RecordingStudioAI::Engine.routes.routes.any? { |route| route.defaults[:action].match?(/create|update|destroy|replay|cancel|refresh/) }
+    refute(RecordingStudioAI::Engine.routes.routes.any? do |route|
+      route.defaults[:action].match?(/create|update|destroy|replay|cancel|refresh/)
+    end)
   end
 
   private

@@ -2,7 +2,8 @@
 
 module RecordingStudioAI
   class WarningMetrics
-    def initialize(since: 24.hours.ago, thresholds: RecordingStudioAI.configuration.admin_warning_thresholds, root_ids: nil)
+    def initialize(since: 24.hours.ago, thresholds: RecordingStudioAI.configuration.admin_warning_thresholds,
+                   root_ids: nil)
       @since = since
       @thresholds = thresholds.symbolize_keys
       @root_ids = root_ids
