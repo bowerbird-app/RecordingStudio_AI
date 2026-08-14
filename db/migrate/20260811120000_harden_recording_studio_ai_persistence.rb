@@ -13,14 +13,8 @@ class HardenRecordingStudioAIPersistence < ActiveRecord::Migration[8.1]
                          "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at",
                          name: "chk_rsai_runs_timeline"
     add_check_constraint :recording_studio_ai_attempts,
-                         "cost_source IS NULL OR cost_source IN ('provider','catalog','estimate','unavailable')",
-                         name: "chk_rsai_attempts_cost_source"
-    add_check_constraint :recording_studio_ai_attempts,
                          "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at",
                          name: "chk_rsai_attempts_timeline"
-    add_check_constraint :recording_studio_ai_custom_tool_invocations,
-                         "cost_category IS NULL OR cost_category IN ('negligible','low','medium','high')",
-                         name: "chk_rsai_tool_invocations_cost_category"
     add_check_constraint :recording_studio_ai_custom_tool_invocations,
                          "latency_category IS NULL OR latency_category IN ('instant','fast','slow')",
                          name: "chk_rsai_tool_invocations_latency_category"
@@ -61,10 +55,7 @@ class HardenRecordingStudioAIPersistence < ActiveRecord::Migration[8.1]
                             name: "chk_rsai_tool_invocations_confirmation_status"
     remove_check_constraint :recording_studio_ai_custom_tool_invocations,
                             name: "chk_rsai_tool_invocations_latency_category"
-    remove_check_constraint :recording_studio_ai_custom_tool_invocations,
-                            name: "chk_rsai_tool_invocations_cost_category"
     remove_check_constraint :recording_studio_ai_attempts, name: "chk_rsai_attempts_timeline"
-    remove_check_constraint :recording_studio_ai_attempts, name: "chk_rsai_attempts_cost_source"
     remove_check_constraint :recording_studio_ai_runs, name: "chk_rsai_runs_timeline"
     remove_check_constraint :recording_studio_ai_runs, name: "chk_rsai_runs_operation"
 

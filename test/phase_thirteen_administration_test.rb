@@ -81,8 +81,8 @@ class PhaseThirteenAdministrationTest < Minitest::Test
 
   def test_warning_metrics_leave_mixed_currency_spend_unknown
     root_id = create_recording_id
-    create_run(root_id: root_id, status: "completed", tokens: 10, cost: 100, currency: "USD")
-    create_run(root_id: root_id, status: "completed", tokens: 10, cost: 200, currency: "EUR")
+    create_run(root_id: root_id, status: "completed", tokens: 10)
+    create_run(root_id: root_id, status: "completed", tokens: 10)
 
     result = RecordingStudioAI::WarningMetrics.new(
       since: 1.hour.ago, root_ids: [root_id], thresholds: { spend_microunits: 1 }
@@ -142,7 +142,7 @@ class PhaseThirteenAdministrationTest < Minitest::Test
     )
   end
 
-  def create_run(root_id:, status:, tokens:, cost: nil, currency: nil)
+  def create_run(root_id:, status:, tokens:)
     RecordingStudioAI::Run.create!(
       operation: "generation",
       status: status,
@@ -151,8 +151,6 @@ class PhaseThirteenAdministrationTest < Minitest::Test
       initiator_id: @actor.id,
       initiator_kind: "user",
       total_tokens: tokens,
-      cost_amount_microunits: cost,
-      cost_currency: currency,
       created_at: Time.current
     )
   end

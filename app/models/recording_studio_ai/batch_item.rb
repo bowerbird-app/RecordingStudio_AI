@@ -57,9 +57,6 @@ module RecordingStudioAI
           total_tokens
           cached_input_tokens
           reasoning_tokens
-          cost_amount_microunits
-          cost_currency
-          cost_estimated
           finish_reason
           error_category
           error_code

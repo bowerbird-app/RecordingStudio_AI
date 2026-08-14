@@ -40,7 +40,7 @@
                   <td class="p-3"><%= [run.resolved_provider, run.resolved_model].compact.join(" / ").presence || "Unknown" %></td>
                   <td class="p-3"><%= render FlatPack::Badge::Component.new(text: run.status.humanize, style: admin_status_style(run.status), size: :sm) %></td>
                   <td class="p-3"><%= admin_duration(run.latency_ms) %></td>
-                  <td class="p-3"><%= admin_tokens(run.input_tokens) %> / <%= admin_tokens(run.output_tokens) %> / <%= admin_tokens(run.total_tokens) %><div class="text-xs opacity-70">Input / output / total</div><div class="text-xs opacity-70"><%= admin_cost(run.cost_amount_microunits, run.cost_currency, run.cost_estimated) %></div></td>
+                  <td class="p-3"><%= admin_tokens(run.input_tokens) %> / <%= admin_tokens(run.output_tokens) %> / <%= admin_tokens(run.total_tokens) %><div class="text-xs opacity-70">Input / output / total</div></td>
                   <td class="p-3"><%= run.attempt_count %> attempts / <%= run.retry_count %> retries / <%= run.fallback_count %> fallbacks<br><%= run.custom_tool_invocation_count %> tools / <%= run.attachment_count %> attachments<div class="text-xs opacity-70"><%= run.citation_count %> citations / search <%= run.web_search_requested? ? "requested" : "not requested" %>, <%= run.web_search_used? ? "used" : "not used" %></div></td>
                   <td class="p-3"><%= run.execution_source.presence || "Unknown" %></td>
                 </tr>

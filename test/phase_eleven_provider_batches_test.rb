@@ -321,9 +321,6 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     )
 
     assert_nil refreshed.cost
-    assert_nil refreshed.batch.cost_amount_microunits
-    assert_nil refreshed.batch.cost_currency
-    assert_nil refreshed.batch.metadata.dig("_recording_studio_ai", "cost_source")
   end
 
   def test_terminal_refresh_does_not_expose_later_unvalidated_provider_content

@@ -39,7 +39,6 @@ module RecordingStudioAI
                inverse_of: :continued_custom_tool_invocations
 
     validates :run, :tool_key, :tool_version, :status, presence: true
-    validates :cost_category, inclusion: { in: %w[negligible low medium high] }, allow_nil: true
     validates :latency_category, inclusion: { in: %w[instant fast slow] }, allow_nil: true
     validates :confirmation_status, inclusion: { in: %w[not_required pending confirmed rejected expired] }, allow_nil: true
     validate :attempts_belong_to_same_run
@@ -62,7 +61,6 @@ module RecordingStudioAI
           destructive
           requires_confirmation
           idempotent
-          cost_category
           latency_category
           confirmation_status
           confirmed_by_type

@@ -77,9 +77,6 @@ module RecordingStudioAI
           total_tokens
           cached_input_tokens
           reasoning_tokens
-          cost_amount_microunits
-          cost_currency
-          cost_estimated
           attempt_count
           retry_count
           fallback_count

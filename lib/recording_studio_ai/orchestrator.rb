@@ -396,7 +396,6 @@ module RecordingStudioAI
         destructive: definition.destructive,
         requires_confirmation: definition.requires_confirmation,
         idempotent: definition.idempotent,
-        cost_category: definition.cost,
         latency_category: definition.latency,
         metadata: {}
       )
@@ -800,19 +799,16 @@ module RecordingStudioAI
     end
 
     def persistence_metrics(result)
-      persistence_metrics_for(result.usage, result.cost).merge(cost_source: result.cost&.source)
+      persistence_metrics_for(result.usage)
     end
 
-    def persistence_metrics_for(usage, cost)
+    def persistence_metrics_for(usage, _cost = nil)
       {
         input_tokens: usage&.input_tokens,
         output_tokens: usage&.output_tokens,
         total_tokens: usage&.total_tokens,
         cached_input_tokens: usage&.cached_input_tokens,
-        reasoning_tokens: usage&.reasoning_tokens,
-        cost_amount_microunits: cost&.amount,
-        cost_currency: cost&.currency,
-        cost_estimated: cost&.estimated?
+        reasoning_tokens: usage&.reasoning_tokens
       }
     end
 

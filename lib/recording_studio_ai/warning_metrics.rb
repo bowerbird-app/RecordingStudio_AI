@@ -32,7 +32,6 @@ module RecordingStudioAI
         input_tokens: complete_sum(runs, :input_tokens),
         output_tokens: complete_sum(runs, :output_tokens),
         total_tokens: complete_sum(runs, :total_tokens),
-        spend_microunits: complete_cost_sum(runs),
         average_latency_ms: runs.exists? ? runs.average(:latency_ms)&.to_f : nil,
         slow_calls: runs.where("latency_ms >= ?", RecordingStudioAI.configuration.admin_slow_call_threshold_ms).count,
         retries: attempts.where(kind: "retry").count,
@@ -71,14 +70,6 @@ module RecordingStudioAI
     def complete_sum(scope, field)
       values = scope.pluck(field)
       values.empty? || values.any?(&:nil?) ? nil : values.sum
-    end
-
-    def complete_cost_sum(scope)
-      costs = scope.pluck(:cost_amount_microunits, :cost_currency)
-      currencies = costs.map(&:last).uniq
-      return nil if costs.empty? || costs.any? { |amount, currency| amount.nil? || currency.nil? } || !currencies.one?
-
-      costs.sum(&:first)
     end
 
     def expensive_model_runs(runs)

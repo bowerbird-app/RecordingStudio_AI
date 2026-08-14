@@ -21,13 +21,6 @@ module RecordingStudioAI
         value.nil? ? "Unknown" : number_with_delimiter(value)
       end
 
-      def admin_cost(microunits, currency, estimated = false)
-        return "Unknown" if microunits.nil?
-
-        amount = number_to_currency(microunits.to_f / 1_000_000, unit: currency.presence || "USD ")
-        estimated ? "#{amount} estimated" : amount
-      end
-
       def admin_identity(type, id, snapshot = nil)
         snapshot.presence || [type, id].compact.join(" #").presence || "Unknown"
       end

@@ -61,7 +61,6 @@ module RecordingStudioAI
         end
         scope = scope.where("latency_ms >= ?", params[:minimum_duration_ms].to_i) if params[:minimum_duration_ms].present?
         scope = scope.where("total_tokens >= ?", params[:minimum_tokens].to_i) if params[:minimum_tokens].present?
-        scope = scope.where("cost_amount_microunits >= ?", params[:minimum_cost_microunits].to_i) if params[:minimum_cost_microunits].present?
         apply_search(scope)
       end
 

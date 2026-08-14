@@ -79,8 +79,6 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
     assert_equal 1, response.run.retry_count
     assert_equal 1, response.run.fallback_count
     assert_equal 22, response.run.input_tokens
-    assert_equal 230, response.run.cost_amount_microunits
-    assert_equal %w[provider provider provider], RecordingStudioAI::Attempt.order(:sequence).pluck(:cost_source)
     assert_equal %w[first first second], RecordingStudioAI::Attempt.order(:sequence).pluck(:provider)
   end
 
@@ -137,7 +135,6 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
     assert_equal 40, response.cost.amount
     assert response.cost.estimated?
     assert_equal "catalog", response.cost.source
-    assert_equal "catalog", response.run.attempts.first.cost_source
   end
 
   def test_provider_and_profile_fallback_limits_are_independent
@@ -256,8 +253,6 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
     assert response.success?
     assert_equal 12, response.usage.total_tokens
     assert_nil response.cost
-    assert_nil response.run.cost_amount_microunits
-    assert_nil response.run.cost_currency
   end
 
   def test_partial_usage_keeps_each_incomplete_aggregate_unknown

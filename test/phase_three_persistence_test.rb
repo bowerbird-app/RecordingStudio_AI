@@ -135,13 +135,13 @@ class PhaseThreePersistenceTest < Minitest::Test
     end
 
     attempt = run.attempts.create!(sequence: 1, kind: "primary", status: "pending")
-    assert_raises(ActiveRecord::StatementInvalid) { attempt.update_column(:cost_source, "guessed") }
+    refute ActiveRecord::Base.connection.column_exists?(:recording_studio_ai_attempts, :cost_source)
 
     invocation = run.custom_tool_invocations.create!(
       tool_key: "lookup", tool_version: 1, status: "requested", read_only: true,
       destructive: false, requires_confirmation: false, idempotent: true
     )
-    assert_raises(ActiveRecord::StatementInvalid) { invocation.update_column(:cost_category, "extreme") }
+    refute ActiveRecord::Base.connection.column_exists?(:recording_studio_ai_custom_tool_invocations, :cost_category)
     assert_raises(ActiveRecord::StatementInvalid) { invocation.update_column(:confirmation_status, "approved_later") }
   end
 

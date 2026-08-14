@@ -35,20 +35,14 @@ module RecordingStudioAI
           runs = visible_runs.where(created_at: date.all_day)
           tools = visible_tool_invocations.where(created_at: date.all_day)
           items = RecordingStudioAI::BatchItem.joins(:batch).merge(visible_batches).where(created_at: date.all_day)
-          spend, currency = complete_cost(runs)
           [date, {
             runs: runs.count,
             errors: runs.where(status: "failed").count,
             tokens: complete_sum(runs, :total_tokens),
-            spend: spend,
-            spend_currency: currency,
             tools: tools.count,
             batch_items: items.count
           }]
         end
-        currencies = @daily_activity.values.filter_map { |values| values[:spend_currency] }.uniq
-        @daily_spend_currency = currencies.first if currencies.one?
-        @daily_activity.each_value { |values| values[:spend] = nil } if currencies.many?
       end
 
       private
@@ -58,13 +52,6 @@ module RecordingStudioAI
         values.empty? || values.any?(&:nil?) ? nil : values.sum
       end
 
-      def complete_cost(scope)
-        costs = scope.pluck(:cost_amount_microunits, :cost_currency)
-        currencies = costs.map(&:last).uniq
-        return [nil, nil] if costs.empty? || costs.any? { |amount, currency| amount.nil? || currency.nil? } || !currencies.one?
-
-        [costs.sum(&:first), currencies.first]
-      end
     end
   end
 end

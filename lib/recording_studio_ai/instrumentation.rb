@@ -6,7 +6,7 @@ module RecordingStudioAI
   module Instrumentation
     SAFE_FIELDS = %i[
       id status provider model latency_ms input_tokens output_tokens total_tokens
-      cost_amount_microunits error_category error_code attempt_count retry_count fallback_count
+      error_category error_code attempt_count retry_count fallback_count
       custom_tool_invocation_count item_count completed_item_count failed_item_count cancelled_item_count
       operation finish_reason citation_count
     ].freeze

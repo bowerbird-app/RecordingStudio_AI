@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_14_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_14_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -48,10 +48,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_120000) do
     t.bigint "cached_input_tokens"
     t.integer "citation_count", default: 0, null: false
     t.datetime "completed_at"
-    t.bigint "cost_amount_microunits"
-    t.string "cost_currency"
-    t.boolean "cost_estimated"
-    t.string "cost_source"
     t.datetime "created_at", null: false
     t.string "error_category"
     t.string "error_code"
@@ -84,9 +80,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_120000) do
     t.index ["run_id", "sequence"], name: "index_recording_studio_ai_attempts_on_run_id_and_sequence", unique: true
     t.index ["run_id"], name: "index_recording_studio_ai_attempts_on_run_id"
     t.index ["status", "created_at"], name: "index_recording_studio_ai_attempts_on_status_and_created_at"
-    t.check_constraint "(latency_ms IS NULL OR latency_ms >= 0) AND (input_tokens IS NULL OR input_tokens >= 0) AND (output_tokens IS NULL OR output_tokens >= 0) AND (total_tokens IS NULL OR total_tokens >= 0) AND (cached_input_tokens IS NULL OR cached_input_tokens >= 0) AND (reasoning_tokens IS NULL OR reasoning_tokens >= 0) AND (cost_amount_microunits IS NULL OR cost_amount_microunits >= 0)", name: "chk_rsai_attempts_nonnegative_metrics"
     t.check_constraint "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at", name: "chk_rsai_attempts_timeline"
-    t.check_constraint "cost_source IS NULL OR (cost_source::text = ANY (ARRAY['provider'::character varying::text, 'catalog'::character varying::text, 'estimate'::character varying::text, 'unavailable'::character varying::text]))", name: "chk_rsai_attempts_cost_source"
     t.check_constraint "kind::text = ANY (ARRAY['primary'::character varying::text, 'retry'::character varying::text, 'fallback'::character varying::text, 'continuation'::character varying::text])", name: "chk_rsai_attempts_kind"
     t.check_constraint "sequence > 0 AND citation_count >= 0 AND attachment_count >= 0 AND attachment_total_bytes >= 0 AND (provider_file_count IS NULL OR provider_file_count >= 0)", name: "chk_rsai_attempts_nonnegative_counts"
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "chk_rsai_attempts_status"
@@ -96,9 +90,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_120000) do
     t.bigint "batch_id", null: false
     t.bigint "cached_input_tokens"
     t.datetime "completed_at"
-    t.bigint "cost_amount_microunits"
-    t.string "cost_currency"
-    t.boolean "cost_estimated"
     t.datetime "created_at", null: false
     t.string "error_category"
     t.string "error_code"
@@ -122,7 +113,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_120000) do
     t.index ["provider_item_id"], name: "index_recording_studio_ai_batch_items_on_provider_item_id"
     t.index ["run_id"], name: "index_recording_studio_ai_batch_items_on_run_id", unique: true
     t.index ["status", "created_at"], name: "index_recording_studio_ai_batch_items_on_status_and_created_at"
-    t.check_constraint "(input_tokens IS NULL OR input_tokens >= 0) AND (output_tokens IS NULL OR output_tokens >= 0) AND (total_tokens IS NULL OR total_tokens >= 0) AND (cached_input_tokens IS NULL OR cached_input_tokens >= 0) AND (reasoning_tokens IS NULL OR reasoning_tokens >= 0) AND (cost_amount_microunits IS NULL OR cost_amount_microunits >= 0)", name: "chk_rsai_batch_items_nonnegative_metrics"
     t.check_constraint "\"position\" >= 0", name: "chk_rsai_batch_items_position"
     t.check_constraint "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at", name: "chk_rsai_batch_items_timeline"
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'processing'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text, 'expired'::character varying::text])", name: "chk_rsai_batch_items_status"
@@ -134,9 +124,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_120000) do
     t.datetime "completed_at"
     t.integer "completed_item_count", default: 0, null: false
     t.uuid "context_recording_id"
-    t.bigint "cost_amount_microunits"
-    t.string "cost_currency"
-    t.boolean "cost_estimated"
     t.datetime "created_at", null: false
     t.string "error_category"
     t.string "error_code"
@@ -180,7 +167,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_120000) do
     t.index ["root_recording_id", "created_at"], name: "idx_on_root_recording_id_created_at_42fdcd79d6"
     t.index ["root_recording_id"], name: "index_recording_studio_ai_batches_on_root_recording_id"
     t.index ["status", "created_at"], name: "index_recording_studio_ai_batches_on_status_and_created_at"
-    t.check_constraint "(input_tokens IS NULL OR input_tokens >= 0) AND (output_tokens IS NULL OR output_tokens >= 0) AND (total_tokens IS NULL OR total_tokens >= 0) AND (cached_input_tokens IS NULL OR cached_input_tokens >= 0) AND (reasoning_tokens IS NULL OR reasoning_tokens >= 0) AND (cost_amount_microunits IS NULL OR cost_amount_microunits >= 0)", name: "chk_rsai_batches_nonnegative_metrics"
     t.check_constraint "completed_at IS NULL OR submitted_at IS NULL OR completed_at >= submitted_at", name: "chk_rsai_batches_timeline"
     t.check_constraint "completed_item_count <= item_count AND failed_item_count <= item_count AND cancelled_item_count <= item_count", name: "chk_rsai_batches_item_bounds"
     t.check_constraint "item_count >= 0 AND completed_item_count >= 0 AND failed_item_count >= 0 AND cancelled_item_count >= 0", name: "chk_rsai_batches_nonnegative_counts"
@@ -194,7 +180,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_120000) do
     t.string "confirmed_by_id"
     t.string "confirmed_by_type"
     t.bigint "continued_by_attempt_id"
-    t.string "cost_category"
     t.datetime "created_at", null: false
     t.boolean "destructive", null: false
     t.string "error_category"
@@ -228,7 +213,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_120000) do
     t.check_constraint "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at", name: "chk_rsai_tool_invocations_timeline"
     t.check_constraint "confirmation_status IS NULL OR (confirmation_status::text = ANY (ARRAY['not_required'::character varying::text, 'pending'::character varying::text, 'confirmed'::character varying::text, 'rejected'::character varying::text, 'expired'::character varying::text]))", name: "chk_rsai_tool_invocations_confirmation_status"
     t.check_constraint "confirmation_status::text = 'confirmed'::text AND confirmed_by_type IS NOT NULL AND confirmed_by_id IS NOT NULL AND confirmed_at IS NOT NULL OR confirmation_status::text <> 'confirmed'::text AND confirmed_by_type IS NULL AND confirmed_by_id IS NULL AND confirmed_at IS NULL OR confirmation_status IS NULL", name: "chk_rsai_tool_invocations_confirmer"
-    t.check_constraint "cost_category IS NULL OR (cost_category::text = ANY (ARRAY['negligible'::character varying::text, 'low'::character varying::text, 'medium'::character varying::text, 'high'::character varying::text]))", name: "chk_rsai_tool_invocations_cost_category"
     t.check_constraint "latency_category IS NULL OR (latency_category::text = ANY (ARRAY['instant'::character varying::text, 'fast'::character varying::text, 'slow'::character varying::text]))", name: "chk_rsai_tool_invocations_latency_category"
     t.check_constraint "latency_ms IS NULL OR latency_ms >= 0", name: "chk_rsai_tool_invocations_latency"
     t.check_constraint "status::text = ANY (ARRAY['requested'::character varying::text, 'awaiting_confirmation'::character varying::text, 'authorized'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'denied'::character varying::text, 'rejected'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "chk_rsai_tool_invocations_status"
@@ -272,9 +256,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_120000) do
     t.integer "citation_count", default: 0, null: false
     t.datetime "completed_at"
     t.uuid "context_recording_id"
-    t.bigint "cost_amount_microunits"
-    t.string "cost_currency"
-    t.boolean "cost_estimated"
     t.datetime "created_at", null: false
     t.integer "custom_tool_invocation_count", default: 0, null: false
     t.string "error_category"
@@ -331,7 +312,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_120000) do
     t.index ["root_recording_id", "created_at"], name: "idx_on_root_recording_id_created_at_22709d290f"
     t.index ["root_recording_id"], name: "index_recording_studio_ai_runs_on_root_recording_id"
     t.index ["status", "created_at"], name: "index_recording_studio_ai_runs_on_status_and_created_at"
-    t.check_constraint "(latency_ms IS NULL OR latency_ms >= 0) AND (input_tokens IS NULL OR input_tokens >= 0) AND (output_tokens IS NULL OR output_tokens >= 0) AND (total_tokens IS NULL OR total_tokens >= 0) AND (cached_input_tokens IS NULL OR cached_input_tokens >= 0) AND (reasoning_tokens IS NULL OR reasoning_tokens >= 0) AND (cost_amount_microunits IS NULL OR cost_amount_microunits >= 0) AND (input_character_count IS NULL OR input_character_count >= 0) AND (output_character_count IS NULL OR output_character_count >= 0)", name: "chk_rsai_runs_nonnegative_metrics"
     t.check_constraint "attachment_count >= 0 AND attachment_total_bytes >= 0 AND citation_count >= 0", name: "chk_rsai_runs_nonnegative_attachment_counts"
     t.check_constraint "attempt_count >= 0 AND retry_count >= 0 AND fallback_count >= 0 AND custom_tool_invocation_count >= 0", name: "chk_rsai_runs_nonnegative_counts"
     t.check_constraint "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at", name: "chk_rsai_runs_timeline"

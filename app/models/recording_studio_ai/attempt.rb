@@ -50,7 +50,6 @@ module RecordingStudioAI
 
     validates :run, :sequence, :kind, :status, presence: true
     validates :sequence, numericality: { greater_than: 0 }
-    validates :cost_source, inclusion: { in: %w[provider catalog estimate unavailable] }, allow_nil: true
 
     class << self
       def terminal_statuses
@@ -75,10 +74,6 @@ module RecordingStudioAI
           total_tokens
           cached_input_tokens
           reasoning_tokens
-          cost_amount_microunits
-          cost_currency
-          cost_estimated
-          cost_source
           finish_reason
           retryable
           web_search_requested

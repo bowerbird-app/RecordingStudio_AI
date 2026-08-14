@@ -1312,8 +1312,6 @@ module AdminScreens
       column :total_tokens, title: "Total tokens"
       column :input_tokens, title: "Input"
       column :output_tokens, title: "Output"
-      column :cost_amount_microunits, title: "Cost (microunits)"
-      column :cost_currency, title: "Currency"
 
       default_sort :created_at, direction: :desc
       paginate per_page: 25

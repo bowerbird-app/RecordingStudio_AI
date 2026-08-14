@@ -157,7 +157,7 @@ module RecordingStudioAI
                      completed_at: completed_at, finish_reason: result.finish_reason,
                      error_category: result.error&.category, error_code: result.error&.code,
                      error_message: result.error&.message,
-                     metadata: metadata_with_cost_source(item.metadata.merge(result.metadata), result.cost)
+                     metadata: item.metadata.merge(result.metadata)
                    ))
       update_run_from_item!(item.run, result, completed_at)
                     Retention.retain_batch_item!(item, result, configuration: @configuration) if result.terminal?
@@ -207,7 +207,7 @@ module RecordingStudioAI
         cancelled_item_count: items.count { |item| item.cancelled? || item.expired? },
         error_category: result.error&.category, error_code: result.error&.code,
         error_message: result.error&.message,
-        metadata: metadata_with_aggregate_cost_source(batch.metadata.merge(result.metadata), items)
+        metadata: batch.metadata.merge(result.metadata)
       )
       return if Batch.terminal_statuses.include?(batch.status)
 
@@ -237,22 +237,14 @@ module RecordingStudioAI
         values = items.map { |item| item.public_send(field) }
         [field, values.empty? || values.any?(&:nil?) ? nil : values.sum]
       end
-      costs = items.map(&:cost_amount_microunits)
-      currencies = items.filter_map(&:cost_currency).uniq
-      complete_cost = costs.none?(&:nil?) && currencies.one?
-      fields.merge(
-        cost_amount_microunits: complete_cost ? costs.sum : nil,
-        cost_currency: complete_cost ? currencies.first : nil,
-        cost_estimated: complete_cost ? items.any?(&:cost_estimated) : nil
-      )
+      fields
     end
 
     def metrics(result)
       {
         input_tokens: result.usage&.input_tokens, output_tokens: result.usage&.output_tokens,
         total_tokens: result.usage&.total_tokens, cached_input_tokens: result.usage&.cached_input_tokens,
-        reasoning_tokens: result.usage&.reasoning_tokens, cost_amount_microunits: result.cost&.amount,
-        cost_currency: result.cost&.currency, cost_estimated: result.cost&.estimated?
+        reasoning_tokens: result.usage&.reasoning_tokens
       }
     end
 
@@ -320,33 +312,8 @@ module RecordingStudioAI
       Contracts::Usage.new(**Contracts::Usage::TOKEN_FIELDS.to_h { |field| [field, record.public_send(field)] })
     end
 
-    def cost_from(record)
-      return nil unless record&.cost_amount_microunits
-
-      source = record.metadata&.dig("_recording_studio_ai", "cost_source")
-      source ||= record.cost_estimated ? "estimate" : "provider"
-      Contracts::Cost.new(amount: record.cost_amount_microunits, currency: record.cost_currency,
-                          estimated: record.cost_estimated, source: source)
-    end
-
-    def metadata_with_cost_source(metadata, cost)
-      return metadata unless cost
-
-      metadata.deep_merge("_recording_studio_ai" => { "cost_source" => cost.source })
-    end
-
-    def metadata_with_aggregate_cost_source(metadata, items)
-      sources = items.map { |item| item.metadata&.dig("_recording_studio_ai", "cost_source") }
-      costs = items.map(&:cost_amount_microunits)
-      currencies = items.filter_map(&:cost_currency).uniq
-      internal = metadata.fetch("_recording_studio_ai", {}).dup
-      if costs.none?(&:nil?) && currencies.one? && sources.none?(&:nil?) && sources.uniq.one?
-        internal["cost_source"] = sources.first
-      else
-        internal.delete("cost_source")
-      end
-
-      metadata.merge("_recording_studio_ai" => internal)
+    def cost_from(_record)
+      nil
     end
 
     def item_error(item)

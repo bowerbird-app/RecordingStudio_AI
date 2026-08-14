@@ -99,13 +99,6 @@ begin
       input_tokens = rand(120..2_800)
       output_tokens = rand(80..2_600)
       total_tokens = input_tokens + output_tokens
-      estimated_cost_per_token =
-        if model.match?(/gpt-5|opus|2\.5-pro/i)
-          rand(4.0..8.0)
-        else
-          rand(1.2..3.8)
-        end
-      cost_amount_microunits = (total_tokens * estimated_cost_per_token).to_i
       tool_invocation_count = rand < 0.62 ? rand(0..3) : 0
       retry_count = status == "failed" ? rand(0..2) : rand(0..1)
       fallback_count = status == "failed" ? rand(0..1) : 0
@@ -137,9 +130,6 @@ begin
         input_tokens: input_tokens,
         output_tokens: output_tokens,
         total_tokens: total_tokens,
-        cost_amount_microunits: cost_amount_microunits,
-        cost_currency: "USD",
-        cost_estimated: true,
         attempt_count: attempt_count,
         retry_count: retry_count,
         fallback_count: fallback_count,
@@ -187,10 +177,6 @@ begin
           input_tokens: [input_tokens / attempt_count, 1].max,
           output_tokens: [output_tokens / attempt_count, 1].max,
           total_tokens: [total_tokens / attempt_count, 1].max,
-          cost_amount_microunits: [cost_amount_microunits / attempt_count, 1].max,
-          cost_currency: "USD",
-          cost_estimated: true,
-          cost_source: "estimate",
           finish_reason: attempt_status == "completed" ? "stop" : "error",
           retryable: attempt_status == "failed",
           web_search_requested: web_search_requested,
@@ -232,7 +218,6 @@ begin
             destructive: tool_definition.destructive,
             requires_confirmation: confirmation_required,
             idempotent: tool_definition.idempotent,
-            cost_category: tool_definition.cost,
             latency_category: tool_definition.latency,
             confirmation_status: confirmation_status,
             confirmed_at: confirmed_at,
@@ -257,7 +242,6 @@ begin
     input_tokens = [((total_tokens * 0.55).to_i), 1].max
     output_tokens = [total_tokens - input_tokens, 1].max
     completed_at = started_at + (latency_ms / 1000.0)
-    cost_per_token = model.match?(/gpt-5|opus|2\.5-pro/i) ? 6.5 : 2.2
 
     run = RecordingStudioAI::Run.find_or_initialize_by(request_id: request_id)
     return run if run.persisted?
@@ -285,9 +269,6 @@ begin
       input_tokens: input_tokens,
       output_tokens: output_tokens,
       total_tokens: total_tokens,
-      cost_amount_microunits: (total_tokens * cost_per_token).to_i,
-      cost_currency: "USD",
-      cost_estimated: true,
       attempt_count: 1,
       retry_count: 0,
       fallback_count: 0,
@@ -332,7 +313,6 @@ begin
         destructive: tool_definition.destructive,
         requires_confirmation: tool_definition.requires_confirmation,
         idempotent: tool_definition.idempotent,
-        cost_category: tool_definition.cost,
         latency_category: tool_definition.latency,
         confirmation_status: "not_required",
         result_summary: "Seeded successful result",

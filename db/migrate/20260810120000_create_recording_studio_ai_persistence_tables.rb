@@ -44,10 +44,6 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
       t.bigint :cached_input_tokens
       t.bigint :reasoning_tokens
 
-      t.bigint :cost_amount_microunits
-      t.string :cost_currency
-      t.boolean :cost_estimated
-
       t.integer :attempt_count, null: false, default: 0
       t.integer :retry_count, null: false, default: 0
       t.integer :fallback_count, null: false, default: 0
@@ -99,7 +95,6 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
                          "(latency_ms IS NULL OR latency_ms >= 0) AND (input_tokens IS NULL OR input_tokens >= 0) AND " \
                          "(output_tokens IS NULL OR output_tokens >= 0) AND (total_tokens IS NULL OR total_tokens >= 0) AND " \
                          "(cached_input_tokens IS NULL OR cached_input_tokens >= 0) AND (reasoning_tokens IS NULL OR reasoning_tokens >= 0) AND " \
-                         "(cost_amount_microunits IS NULL OR cost_amount_microunits >= 0) AND " \
                          "(input_character_count IS NULL OR input_character_count >= 0) AND " \
                          "(output_character_count IS NULL OR output_character_count >= 0)",
                          name: "chk_rsai_runs_nonnegative_metrics"
@@ -124,11 +119,6 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
       t.bigint :total_tokens
       t.bigint :cached_input_tokens
       t.bigint :reasoning_tokens
-
-      t.bigint :cost_amount_microunits
-      t.string :cost_currency
-      t.boolean :cost_estimated
-      t.string :cost_source
 
       t.string :finish_reason
       t.boolean :retryable
@@ -171,7 +161,7 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
                          "(latency_ms IS NULL OR latency_ms >= 0) AND (input_tokens IS NULL OR input_tokens >= 0) AND " \
                          "(output_tokens IS NULL OR output_tokens >= 0) AND (total_tokens IS NULL OR total_tokens >= 0) AND " \
                          "(cached_input_tokens IS NULL OR cached_input_tokens >= 0) AND (reasoning_tokens IS NULL OR reasoning_tokens >= 0) AND " \
-                         "(cost_amount_microunits IS NULL OR cost_amount_microunits >= 0)",
+                         "(latency_ms IS NULL OR latency_ms >= 0)",
                          name: "chk_rsai_attempts_nonnegative_metrics"
 
     create_table :recording_studio_ai_custom_tool_invocations do |t|
@@ -189,7 +179,6 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
       t.boolean :destructive, null: false
       t.boolean :requires_confirmation, null: false
       t.boolean :idempotent, null: false
-      t.string :cost_category
       t.string :latency_category
 
       t.string :confirmation_status
@@ -267,10 +256,6 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
       t.bigint :cached_input_tokens
       t.bigint :reasoning_tokens
 
-      t.bigint :cost_amount_microunits
-      t.string :cost_currency
-      t.boolean :cost_estimated
-
       t.datetime :submitted_at
       t.datetime :completed_at
       t.datetime :expires_at
@@ -307,8 +292,7 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
     add_check_constraint :recording_studio_ai_batches,
                          "(input_tokens IS NULL OR input_tokens >= 0) AND (output_tokens IS NULL OR output_tokens >= 0) AND " \
                          "(total_tokens IS NULL OR total_tokens >= 0) AND (cached_input_tokens IS NULL OR cached_input_tokens >= 0) AND " \
-                         "(reasoning_tokens IS NULL OR reasoning_tokens >= 0) AND " \
-                         "(cost_amount_microunits IS NULL OR cost_amount_microunits >= 0)",
+                         "(reasoning_tokens IS NULL OR reasoning_tokens >= 0)",
                          name: "chk_rsai_batches_nonnegative_metrics"
 
     create_table :recording_studio_ai_batch_items do |t|
@@ -327,10 +311,6 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
       t.bigint :total_tokens
       t.bigint :cached_input_tokens
       t.bigint :reasoning_tokens
-
-      t.bigint :cost_amount_microunits
-      t.string :cost_currency
-      t.boolean :cost_estimated
 
       t.string :finish_reason
       t.string :error_category
@@ -357,8 +337,7 @@ class CreateRecordingStudioAIPersistenceTables < ActiveRecord::Migration[8.1]
     add_check_constraint :recording_studio_ai_batch_items,
                          "(input_tokens IS NULL OR input_tokens >= 0) AND (output_tokens IS NULL OR output_tokens >= 0) AND " \
                          "(total_tokens IS NULL OR total_tokens >= 0) AND (cached_input_tokens IS NULL OR cached_input_tokens >= 0) AND " \
-                         "(reasoning_tokens IS NULL OR reasoning_tokens >= 0) AND " \
-                         "(cost_amount_microunits IS NULL OR cost_amount_microunits >= 0)",
+                         "(reasoning_tokens IS NULL OR reasoning_tokens >= 0)",
                          name: "chk_rsai_batch_items_nonnegative_metrics"
 
     create_table :recording_studio_ai_responses do |t|
