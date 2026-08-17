@@ -13,6 +13,7 @@ module RecordingStudioAI
       candidate = @resolver.resolve(
         profile: request.fetch(:profile),
         provider: request[:provider],
+        model: request[:model],
         required_capabilities: Capabilities.for_batch(request.fetch(:items))
       )
       batch = create_records!(request, candidate)

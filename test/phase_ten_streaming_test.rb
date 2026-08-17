@@ -251,7 +251,7 @@ class PhaseTenStreamingTest < Minitest::Test
     )
     configure_provider(provider)
 
-    events = RecordingStudioAI.stream(**stream_arguments).to_a
+    events = RecordingStudioAI.generate(stream: true, **stream_arguments).to_a
 
     assert_equal %w[text_delta completed], events.map(&:type)
   end
@@ -263,7 +263,7 @@ class PhaseTenStreamingTest < Minitest::Test
     )
     configure_provider(provider)
 
-    RecordingStudioAI.stream(**stream_arguments).each { |_event| break }
+    RecordingStudioAI.generate(stream: true, **stream_arguments).each { |_event| break }
 
     assert_equal "cancelled", RecordingStudioAI::Run.first.status
     assert_equal "cancelled", RecordingStudioAI::Attempt.first.status
@@ -440,7 +440,7 @@ class PhaseTenStreamingTest < Minitest::Test
       "required" => ["summary"]
     }
 
-    response = RecordingStudioAI.stream(**stream_arguments, schema: schema) { |event| events << event }
+    response = RecordingStudioAI.generate(stream: true, **stream_arguments, schema: schema) { |event| events << event }
 
     refute response.success?
     assert_equal ["error"], events.map(&:type)
@@ -499,7 +499,7 @@ class PhaseTenStreamingTest < Minitest::Test
     }
     events = []
 
-    response = RecordingStudioAI.stream(
+    response = RecordingStudioAI.generate(stream: true, 
       **stream_arguments(custom_tools: [{ key: :lookup_topic, version: 1 }]),
       schema: schema
     ) { |event| events << event }
@@ -556,7 +556,7 @@ class PhaseTenStreamingTest < Minitest::Test
   end
 
   def stream(provider: nil, custom_tools: [], &block)
-    RecordingStudioAI.stream(**stream_arguments(provider: provider, custom_tools: custom_tools), &block)
+    RecordingStudioAI.generate(stream: true, **stream_arguments(provider: provider, custom_tools: custom_tools), &block)
   end
 
   def stream_arguments(provider: nil, custom_tools: [])

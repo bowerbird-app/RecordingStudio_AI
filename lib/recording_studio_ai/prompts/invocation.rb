@@ -56,11 +56,11 @@ module RecordingStudioAI
       end
 
       def stream(inputs:, **options, &block)
-        RecordingStudioAI.stream(**request(inputs, options), &block)
+        RecordingStudioAI.generate(**request(inputs, options).merge(stream: true), &block)
       end
 
       def stream!(inputs:, **options, &block)
-        RecordingStudioAI.stream!(**request(inputs, options), &block)
+        RecordingStudioAI.generate!(**request(inputs, options).merge(stream: true), &block)
       end
 
       private

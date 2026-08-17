@@ -225,8 +225,6 @@ Phase 2 introduced validation and normalized return contracts for:
 
 - `RecordingStudioAI.generate(...)`
 - `RecordingStudioAI.generate!(...)`
-- `RecordingStudioAI.stream(...)`
-- `RecordingStudioAI.stream!(...)`
 - `RecordingStudioAI.submit_batch(...)`
 - `RecordingStudioAI.refresh_batch(...)`
 - `RecordingStudioAI.cancel_batch(...)`
@@ -237,8 +235,12 @@ Phase 2 introduced validation and normalized return contracts for:
 
 Calls validate request contracts and return normalized contract objects.
 `generate` and `generate!` resolve configured OpenAI or Gemini candidates and
-dispatch through the shared provider contract. `stream` returns an Enumerator
-when called without a block, or yields normalized events to a supplied block.
+dispatch through the shared provider contract. Pass `stream: true` to receive
+incremental events (block or Enumerator). Optional `model:` pins a profile
+candidate; flat generation parameters (`temperature`, `verbosity`,
+`max_output_tokens`, `reasoning_effort`) are validated against the model
+registry. `RecordingStudioAI.stream` / `stream!` were removed — use
+`generate(stream: true)`.
 
 ## Provider batches (Phase 11)
 

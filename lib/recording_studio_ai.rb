@@ -69,60 +69,55 @@ module RecordingStudioAI
       discovered
     end
 
-    def generate(**kwargs)
+    def generate(**kwargs, &block)
       request = Contracts::RequestValidation.validate_generation_request!(**kwargs)
       configuration.validate!
-      Authorization.authorize!(
-        :execute,
-        attribution: request[:attribution],
-        context: {
-          operation: "generation",
-          profile: request[:profile],
-          purpose: request[:purpose]
-        }
-      )
-      authorize_provider_native_tools!(request)
-      Orchestrator.new.generate(request)
-    end
 
-    def generate!(**kwargs)
-      response = generate(**kwargs)
-      raise Errors::ExecutionError, response unless response.success?
+      if request[:stream]
+        return stream_enumerator(**kwargs) unless block
 
-      response
-    end
-
-    def stream(**kwargs)
-      unless block_given?
-        return Enumerator.new do |events|
-          stream(**kwargs) { |event| events << event }
+        Authorization.authorize!(
+          :execute,
+          attribution: request[:attribution],
+          context: {
+            operation: "stream",
+            profile: request[:profile],
+            purpose: request[:purpose]
+          }
+        )
+        authorize_provider_native_tools!(request, operation: "stream")
+        Orchestrator.new.stream(request) { |event| yield event }
+      else
+        if block
+          raise Errors::ContractValidationError.new(
+            "generate only accepts a block when stream: true",
+            code: "invalid_request"
+          )
         end
-      end
 
-      request = Contracts::RequestValidation.validate_generation_request!(**kwargs)
-      configuration.validate!
-      Authorization.authorize!(
-        :execute,
-        attribution: request[:attribution],
-        context: {
-          operation: "stream",
-          profile: request[:profile],
-          purpose: request[:purpose]
-        }
-      )
-      authorize_provider_native_tools!(request, operation: "stream")
-      Orchestrator.new.stream(request) { |event| yield event }
+        Authorization.authorize!(
+          :execute,
+          attribution: request[:attribution],
+          context: {
+            operation: "generation",
+            profile: request[:profile],
+            purpose: request[:purpose]
+          }
+        )
+        authorize_provider_native_tools!(request)
+        Orchestrator.new.generate(request)
+      end
     end
 
-    def stream!(**kwargs, &block)
-      unless block
+    def generate!(**kwargs, &block)
+      if kwargs.fetch(:stream, false) && !block
         raise Errors::ContractValidationError.new(
-          "stream! requires a block to receive streaming events",
+          "generate!(stream: true) requires a block to receive streaming events",
           code: "invalid_request"
         )
       end
 
-      response = stream(**kwargs, &block)
+      response = generate(**kwargs, &block)
       raise Errors::ExecutionError, response unless response.success?
 
       response
@@ -234,6 +229,12 @@ module RecordingStudioAI
     end
 
     private
+
+    def stream_enumerator(**kwargs)
+      Enumerator.new do |events|
+        generate(**kwargs.merge(stream: true)) { |event| events << event }
+      end
+    end
 
     def enqueue_batch_synchronization(request)
       attribution = request.fetch(:attribution)

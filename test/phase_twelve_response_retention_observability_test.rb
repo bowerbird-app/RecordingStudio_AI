@@ -275,7 +275,7 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     RecordingStudioAI.configuration.profiles[:medium].first[:capabilities] << :streaming
     events = []
 
-    RecordingStudioAI.stream(
+    RecordingStudioAI.generate(stream: true, 
       prompt: "private prompt", root_recording: @root_recording, initiator: @initiator, provider: :test
     ) { |event| events << event }
 

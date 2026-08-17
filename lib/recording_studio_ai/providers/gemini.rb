@@ -331,6 +331,8 @@ module RecordingStudioAI
         instruction = [request[:system_instruction], system_messages(request)].compact.reject(&:empty?).join("\n")
         config = {}
         config[:system_instruction] = instruction unless instruction.empty?
+        config[:temperature] = request[:temperature] unless request[:temperature].nil?
+        config[:max_output_tokens] = request[:max_output_tokens] unless request[:max_output_tokens].nil?
         if request[:schema]
           config[:response_mime_type] = "application/json"
           config[:response_json_schema] = request[:schema]

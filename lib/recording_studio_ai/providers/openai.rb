@@ -338,7 +338,15 @@ module RecordingStudioAI
           instructions: request[:system_instruction],
           store: false
         }
-        parameters[:text] = structured_output_config(request[:schema]) if request[:schema]
+        parameters[:temperature] = request[:temperature] unless request[:temperature].nil?
+        parameters[:max_output_tokens] = request[:max_output_tokens] unless request[:max_output_tokens].nil?
+        text = {}
+        text[:verbosity] = request[:verbosity] if request[:verbosity]
+        text.merge!(structured_output_config(request[:schema])) if request[:schema]
+        parameters[:text] = text unless text.empty?
+        if request[:reasoning_effort]
+          parameters[:reasoning] = { effort: request[:reasoning_effort] }
+        end
         tools = []
         tools << { type: "web_search" } if request[:provider_native_tools].include?(:web_search)
         tools.concat(custom_tool_definitions(request))

@@ -5,6 +5,27 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- `RecordingStudioAI.generate` accepts `stream: true`, optional `model:` override,
+  and flat generation parameters (`temperature`, `verbosity`, `max_output_tokens`,
+  `reasoning_effort`) validated against the model registry.
+- AI Playground uses a single capability-driven generate form (plus a separate
+  batch section) instead of Chat / Streaming / Tool Calls / Batch tabs.
+
+### Changed
+
+- Streaming is configured with `stream: true` on `generate` / `generate!`.
+  Upgrade note: replace `RecordingStudioAI.stream(...)` with
+  `RecordingStudioAI.generate(stream: true, ...)` and
+  `RecordingStudioAI.stream!(...)` with `RecordingStudioAI.generate!(stream: true, ...)`.
+- Batch remains on `submit_batch` / `refresh_batch*` and is not folded into
+  `generate`. Playground batch demos use a secondary section on the same page.
+
+### Removed
+
+- `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
+
 ## [0.2.0] - 2026-08-17
 
 ### Added
