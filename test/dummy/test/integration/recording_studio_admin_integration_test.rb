@@ -75,19 +75,23 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "modalities"
   end
 
-  test "ai playground shows batch items only in the batch tab" do
+  test "ai playground shows capability-driven generate form and batch section" do
     authenticate_for_admin!
 
     get "/ai_playground"
 
     assert_response :success
+    assert_includes response.body, "Run generate"
+    assert_includes response.body, "ai-playground-form"
+    assert_includes response.body, "Auto (profile default)"
+    assert_includes response.body, "name=\"ai_playground[model]\""
+    assert_includes response.body, "Streaming"
+    assert_includes response.body, "Web search"
+    assert_includes response.body, "Live response"
     assert_equal 1, response.body.scan(/>Batch items</).size
     assert_equal 3, response.body.scan(/name="ai_playground\[batch_items\]\[\]"/).size
-    assert_includes response.body, "Live response"
-    assert_includes response.body, "ai-playground-stream#submit"
-    assert_includes response.body, "data-ai-playground-stream-target=\"submit\""
-    assert_includes response.body, "disabled:opacity-60"
-    assert_includes File.read(Rails.root.join("app/javascript/controllers/ai_playground_stream_controller.js")),
+    refute_includes response.body, "ai-playground-stream#submit"
+    assert_includes File.read(Rails.root.join("app/javascript/controllers/ai_playground_form_controller.js")),
                     "new FormData(event.currentTarget)"
   end
 
