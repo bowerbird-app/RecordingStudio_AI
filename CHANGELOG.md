@@ -21,6 +21,7 @@ Versioning and Keep a Changelog.
   `RecordingStudioAI.stream!(...)` with `RecordingStudioAI.generate!(stream: true, ...)`.
 - Batch remains on `submit_batch` / `refresh_batch*` and is not folded into
   `generate`. Playground batch demos use a secondary section on the same page.
+- Deduplicated the AI Responses admin table so `Created` appears once.
 
 ### Removed
 

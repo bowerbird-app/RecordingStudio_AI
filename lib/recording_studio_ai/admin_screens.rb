@@ -1165,7 +1165,6 @@ module AdminScreens
       }
 
       column :created_at, title: "Created"
-      column :created_at, title: "Created"
       column :response,
              title: "Response",
              sortable: false,
@@ -1177,7 +1176,6 @@ module AdminScreens
                  data: { turbo_frame: "_top" }
                )
              }
-      column :created_at, title: "Created"
       column :response_type,
              title: "Type",
              display: :badge,
