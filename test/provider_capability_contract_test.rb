@@ -143,8 +143,12 @@ class ProviderCapabilityContractTest < Minitest::Test
 
     assert_equal %i[gemini openai], declarations.map { |entry| entry.fetch(:provider) }.uniq.sort
     declarations.each do |entry|
-      assert_equal CONTRACT_CAPABILITIES.sort, entry.fetch(:capabilities).sort,
-                   "#{entry.fetch(:provider)} #{entry.fetch(:model)} changed the shared capability contract"
+      attributes = entry.transform_keys(&:to_sym)
+      capabilities = attributes[:capabilities] ||
+                     RecordingStudioAI.models.fetch(attributes.fetch(:provider), attributes.fetch(:model))&.capabilities
+      assert capabilities, "#{attributes.fetch(:provider)} #{attributes.fetch(:model)} is missing capabilities"
+      assert_equal CONTRACT_CAPABILITIES.sort, capabilities.sort,
+                   "#{attributes.fetch(:provider)} #{attributes.fetch(:model)} changed the shared capability contract"
     end
   end
 
