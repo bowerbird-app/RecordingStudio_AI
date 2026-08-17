@@ -31,36 +31,28 @@ module AdminScreens
 
     def attempt_kind_series(relation, date_range:, field: "recording_studio_ai_attempts.created_at", bucket: :day)
       bucket = bucket.to_sym
-      kinds = RecordingStudioAI::Attempt::KINDS.values
-      timestamps_by_kind = kinds.index_with { |_kind| [] }
+      buckets = attempt_kind_bucket_keys(date_range, bucket)
+      counts = attempt_kind_counts(relation, field, bucket)
 
-      relation.reorder(nil).pluck(:kind, Arel.sql(field)).each do |kind, created_at|
+      RecordingStudioAI::Attempt::KINDS.values.filter_map do |kind|
+        next unless counts.keys.any? { |count_kind, _bucket| count_kind == kind }
+
+        { name: kind.humanize, data: attempt_kind_data(kind, buckets, counts, bucket) }
+      end
+    end
+
+    def attempt_kind_counts(relation, field, bucket)
+      relation.reorder(nil).pluck(:kind, Arel.sql(field)).each_with_object(Hash.new(0)) do |row, counts|
+        kind, created_at = row
         next if created_at.blank?
 
-        key = kind.to_s
-        next unless timestamps_by_kind.key?(key)
-
-        timestamps_by_kind[key] << created_at
+        counts[[kind.to_s, attempt_kind_bucket_key(created_at, bucket)]] += 1
       end
+    end
 
-      buckets = attempt_kind_bucket_keys(date_range, bucket)
-      return [] if buckets.empty?
-
-      kinds.filter_map do |kind|
-        counts = timestamps_by_kind.fetch(kind).each_with_object(Hash.new(0)) do |created_at, memo|
-          memo[attempt_kind_bucket_key(created_at, bucket)] += 1
-        end
-        next if counts.values.sum.zero?
-
-        {
-          name: kind.to_s.humanize,
-          data: buckets.map do |bucket_key|
-            {
-              x: attempt_kind_bucket_label(bucket_key, bucket),
-              y: counts.fetch(bucket_key, 0)
-            }
-          end
-        }
+    def attempt_kind_data(kind, buckets, counts, bucket)
+      buckets.map do |bucket_key|
+        { x: attempt_kind_bucket_label(bucket_key, bucket), y: counts.fetch([kind, bucket_key], 0) }
       end
     end
 
@@ -69,21 +61,12 @@ module AdminScreens
 
       start_at = attempt_kind_bucket_key(date_range.start_date.beginning_of_day, bucket)
       end_at = attempt_kind_bucket_key(date_range.end_date.end_of_day, bucket)
-      step = case bucket
-             when :hour then 1.hour
-             when :week then 1.week
-             when :month then 1.month
-             when :year then 1.year
-             else 1.day
-             end
+      Enumerator.produce(start_at) { |value| value + attempt_kind_bucket_step(bucket) }
+                .take_while { |value| value <= end_at }
+    end
 
-      [].tap do |buckets|
-        current = start_at
-        while current <= end_at
-          buckets << current
-          current += step
-        end
-      end
+    def attempt_kind_bucket_step(bucket)
+      { hour: 1.hour, day: 1.day, week: 1.week, month: 1.month, year: 1.year }.fetch(bucket, 1.day)
     end
 
     def attempt_kind_bucket_key(value, bucket)
