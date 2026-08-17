@@ -75,6 +75,11 @@ Versioning and Keep a Changelog.
 - Bounded stream idle timeout plus V1 installation, encryption-key rotation,
 	response cleanup, admin authorization, provider-retention, and rollback guidance.
 
+### Changed
+
+- Updated dummy-host Rails to 8.1.3.1, JSON to 2.21.2, and Brakeman to 8.0.6
+  to incorporate current security fixes.
+
 ### Upgrade notes
 
 - No host changes are required for the Attempts chart. Existing admin
