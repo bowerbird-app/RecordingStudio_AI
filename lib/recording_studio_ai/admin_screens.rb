@@ -29,7 +29,7 @@ module AdminScreens
       RecordingStudioAI::Attempt.joins(:run).merge(runs_scope(context))
     end
 
-    def attempt_kind_series(relation, field: "recording_studio_ai_attempts.created_at", bucket: :day)
+    def attempt_kind_series(relation, date_range:, field: "recording_studio_ai_attempts.created_at", bucket: :day)
       bucket = bucket.to_sym
       kinds = RecordingStudioAI::Attempt::KINDS.values
       timestamps_by_kind = kinds.index_with { |_kind| [] }
@@ -43,7 +43,7 @@ module AdminScreens
         timestamps_by_kind[key] << created_at
       end
 
-      buckets = timestamps_by_kind.values.flatten.map { |created_at| attempt_kind_bucket_key(created_at, bucket) }.uniq.sort
+      buckets = attempt_kind_bucket_keys(date_range, bucket)
       return [] if buckets.empty?
 
       kinds.filter_map do |kind|
@@ -61,6 +61,28 @@ module AdminScreens
             }
           end
         }
+      end
+    end
+
+    def attempt_kind_bucket_keys(date_range, bucket)
+      return [] unless date_range && date_range.start_date && date_range.end_date
+
+      start_at = attempt_kind_bucket_key(date_range.start_date.beginning_of_day, bucket)
+      end_at = attempt_kind_bucket_key(date_range.end_date.end_of_day, bucket)
+      step = case bucket
+             when :hour then 1.hour
+             when :week then 1.week
+             when :month then 1.month
+             when :year then 1.year
+             else 1.day
+             end
+
+      [].tap do |buckets|
+        current = start_at
+        while current <= end_at
+          buckets << current
+          current += step
+        end
       end
     end
 
@@ -1234,6 +1256,7 @@ module AdminScreens
       series do |context|
         AdminScreens::RecordingStudioAIWidgets.attempt_kind_series(
           context.query_result.relation,
+          date_range: context.filter_value(:date_range),
           bucket: context.filter_value(:group_by) || :day
         )
       end

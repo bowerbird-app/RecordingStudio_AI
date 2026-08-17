@@ -411,6 +411,43 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_select "input[name='group_by']", count: 1
   end
 
+  test "attempts chart includes zero-count days across the selected period" do
+    authenticate_for_admin!
+    run = create_run!(status: "cancelled", operation: "generation")
+    start_date = 3.days.ago.to_date
+    end_date = Date.current
+    first_attempt = run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "cancelled",
+      provider: "openai",
+      model: "attempt-chart-first-day"
+    )
+    last_attempt = run.attempts.create!(
+      sequence: 2,
+      kind: "primary",
+      status: "cancelled",
+      provider: "openai",
+      model: "attempt-chart-last-day"
+    )
+    first_attempt.update_columns(created_at: start_date.noon, updated_at: start_date.noon)
+    last_attempt.update_columns(created_at: end_date.noon, updated_at: end_date.noon)
+
+    get "/admin/screens/attempts/chart", params: {
+      start_date: start_date.iso8601,
+      end_date: end_date.iso8601,
+      group_by: "day",
+      attempt_status: "cancelled"
+    }
+
+    assert_response :success
+    chart_html = CGI.unescapeHTML(response.body)
+    (start_date..end_date).each do |date|
+      expected_count = [ start_date, end_date ].include?(date) ? 1 : 0
+      assert_includes chart_html, %("x":"#{date.strftime('%b %-d')}","y":#{expected_count})
+    end
+  end
+
   test "attempts chart marks increased retries and failures as unfavorable" do
     authenticate_for_admin!
     run = create_run!(status: "completed", operation: "generation")

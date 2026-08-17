@@ -5,8 +5,12 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-17
+
 ### Added
 
+- Stacked Attempts admin chart with selectable time grouping, attempt-kind
+  series, and zero-filled buckets across the complete selected period.
 - Phase 2 public Ruby API contract surface for generation, streaming, batches,
 	and tools registration.
 - Normalized contract objects for responses, usage, cost, citations,
@@ -71,6 +75,11 @@ Versioning and Keep a Changelog.
 - Bounded stream idle timeout plus V1 installation, encryption-key rotation,
 	response cleanup, admin authorization, provider-retention, and rollback guidance.
 
+### Upgrade notes
+
+- No host changes are required for the Attempts chart. Existing admin
+  authorization and visible-root scoping continue to apply.
+
 ## [0.1.0] - 2026-08-10
 
 ### Added
@@ -82,5 +91,6 @@ Versioning and Keep a Changelog.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bowerbird-app/RecordingStudio_AI/releases/tag/v0.1.0
