@@ -135,7 +135,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "value=\"last_4_weeks\""
-    assert_includes response.body, "Tool Key"
+    assert_includes response.body, "Tool key"
     refute_includes response.body, ">Short name<"
   end
 
