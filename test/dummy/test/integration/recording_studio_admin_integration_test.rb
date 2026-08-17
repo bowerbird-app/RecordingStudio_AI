@@ -179,6 +179,106 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "href=\"/admin/screens/registered_custom_tools\""
   end
 
+  test "registered prompts widget and section link to the prompts screen" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_namespace: "demo",
+      prompt_key: "summarize_text",
+      prompt_version: 1,
+      prompt_name_snapshot: "Text Summary"
+    )
+
+    get "/admin"
+
+    assert_response :success
+    assert_includes response.body, "Registered prompts"
+    assert_includes response.body, "Registered Prompts"
+    assert_includes response.body, "href=\"/admin/screens/registered_prompts\""
+    assert_includes response.body, "Text Summary"
+    assert_includes response.body, "prompt=summarize_text"
+  end
+
+  test "registered prompts screen shows chart and table metrics" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_namespace: "demo",
+      prompt_key: "summarize_text",
+      prompt_version: 1,
+      prompt_name_snapshot: "Text Summary",
+      latency_ms: 420
+    )
+    create_run!(
+      status: "failed",
+      operation: "generation",
+      prompt_namespace: "demo",
+      prompt_key: "summarize_text",
+      prompt_version: 1,
+      prompt_name_snapshot: "Text Summary",
+      latency_ms: 800
+    )
+
+    get "/admin/screens/registered_prompts"
+
+    assert_response :success
+    assert_includes response.body, "Registered prompts"
+    assert_includes response.body, "Success rate"
+    assert_includes response.body, "Error rate"
+    assert_includes response.body, "Average duration"
+
+    get "/admin/screens/registered_prompts/chart"
+
+    assert_response :success
+    assert_includes response.body, "Prompt call volume"
+    assert_includes response.body, "Text Summary"
+
+    get "/admin/screens/registered_prompts/table"
+
+    assert_response :success
+    assert_includes response.body, "Text Summary"
+    assert_includes response.body, "data-modal-id=\"registered-prompt-definition-demo-summarize_text-1\""
+    assert_includes response.body, "Creates a concise summary of supplied text"
+    assert_includes response.body, "#000000"
+  end
+
+  test "registered prompts screen includes unused registered prompts" do
+    authenticate_for_admin!
+    unused_prompt_key = "unused_prompt_#{SecureRandom.hex(4)}"
+    unused_prompt_name = "Unused Prompt #{unused_prompt_key}"
+    RecordingStudioAI.prompts.register(
+      owner: "dummy_app",
+      namespace: :demo,
+      key: unused_prompt_key.to_sym,
+      version: 1,
+      name: unused_prompt_name,
+      short_name: "Unused",
+      description: "An unused registered prompt for admin coverage.",
+      inputs: [],
+      messages: [{ role: :user, content: "Unused prompt content" }],
+      defaults: { profile: :low, purpose: "unused_prompt" }
+    )
+
+    get "/admin/screens/registered_prompts/table"
+
+    assert_response :success
+    assert_includes response.body, unused_prompt_name
+
+    unused_prompt_row = AdminScreens::RecordingStudioAIWidgets.prompt_rows(
+      RecordingStudioAdmin::Context.new(
+        params: {},
+        current_actor: @user,
+        controller: self
+      )
+    ).find { |row| row.key == unused_prompt_key }
+    assert_equal 0, unused_prompt_row.calls
+    assert_equal 0.0, unused_prompt_row.success_rate
+    assert_equal 0.0, unused_prompt_row.error_rate
+    assert_equal "No data", unused_prompt_row.average_duration
+  end
+
   test "registered custom tools screen shows definition and execution metrics" do
     authenticate_for_admin!
 
@@ -853,12 +953,15 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     follow_redirect!
   end
 
-  def create_run!(status:, operation:, prompt_key: nil, prompt_name_snapshot: nil, resolved_model: nil, resolved_provider: nil,
+  def create_run!(status:, operation:, prompt_key: nil, prompt_name_snapshot: nil, prompt_namespace: nil,
+                  prompt_version: nil, resolved_model: nil, resolved_provider: nil,
                   total_tokens: nil, input_tokens: nil, output_tokens: nil, latency_ms: nil)
     RecordingStudioAI::Run.create!(
       operation: operation,
       status: status,
+      prompt_namespace: prompt_namespace,
       prompt_key: prompt_key,
+      prompt_version: prompt_version,
       prompt_name_snapshot: prompt_name_snapshot,
       resolved_model: resolved_model,
       resolved_provider: resolved_provider,

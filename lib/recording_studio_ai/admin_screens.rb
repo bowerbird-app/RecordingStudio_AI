@@ -10,6 +10,10 @@ module AdminScreens
       ToolRow = Data.define(:key, :version, :name, :description, :cost_class, :safety, :calls_series, :success_rate,
                             :error_rate, :average_duration)
     end
+    unless const_defined?(:PromptRow)
+      PromptRow = Data.define(:namespace, :key, :version, :name, :short_name, :description, :calls, :calls_series,
+                              :success_rate, :error_rate, :average_duration)
+    end
     unless const_defined?(:LatencyRow)
       LatencyRow = Data.define(:name, :calls, :p50_latency_ms, :p90_latency_ms, :average_latency_ms,
                                :max_latency_ms)
@@ -212,8 +216,71 @@ module AdminScreens
       end
     end
 
-    def date_range_query(context)
-      date_range = registered_custom_tools_date_range_value(context)
+    def prompt_rows(context)
+      runs = runs_scope(context).where.not(prompt_key: nil)
+      date_range_value = registered_prompts_date_range_value(context)
+      date_range = if date_range_value.respond_to?(:start_date) && date_range_value.respond_to?(:end_date)
+                     date_range_value.start_date.beginning_of_day..date_range_value.end_date.end_of_day
+                   else
+                     30.days.ago..Time.current
+                   end
+      range_runs = runs.where(created_at: date_range)
+      range_counts = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).count
+      daily_counts = range_runs.group_by do |run|
+        [run.prompt_namespace, run.prompt_key, run.prompt_version, run.created_at.to_date]
+      end.transform_values(&:count)
+      completed_counts = range_runs.where(status: "completed").group(:prompt_namespace, :prompt_key,
+                                                                     :prompt_version).count
+      error_counts = range_runs.where(status: %w[failed cancelled]).group(:prompt_namespace, :prompt_key,
+                                                                          :prompt_version).count
+      average_latencies = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).average(:latency_ms)
+
+      RecordingStudioAI.prompts.all.map do |definition|
+        key = [definition.namespace, definition.key, definition.version]
+        total = range_counts.fetch(key, 0)
+
+        PromptRow.new(
+          definition.namespace,
+          definition.key,
+          definition.version,
+          definition.name,
+          definition.short_name,
+          definition.description,
+          total,
+          (date_range.begin.to_date..date_range.end.to_date).map do |date|
+            { x: date.strftime("%b %-d"), y: daily_counts.fetch([*key, date], 0) }
+          end,
+          percentage(completed_counts.fetch(key, 0), total),
+          percentage(error_counts.fetch(key, 0), total),
+          duration(average_latencies[key])
+        )
+      end.sort_by { |row| [-row.calls, row.namespace, row.key, row.version] }
+    end
+
+    def top_prompt_call_rows(scope, range: 30.days.ago..Time.current, limit: 5)
+      scope.where(created_at: range)
+           .where.not(prompt_key: nil)
+           .group(:prompt_namespace, :prompt_key)
+           .count
+           .sort_by { |_identity, count| -count }
+           .first(limit)
+           .filter_map do |(namespace, key), calls|
+             definition = RecordingStudioAI.prompts.fetch(namespace, key) if namespace.present?
+             name = definition&.name ||
+                    scope.where(prompt_namespace: namespace, prompt_key: key)
+                         .where.not(prompt_name_snapshot: [nil, ""])
+                         .order(created_at: :desc)
+                         .limit(1)
+                         .pick(:prompt_name_snapshot) ||
+                    key
+             [name, key, calls]
+           end
+    end
+
+    def date_range_query(context, screen: AdminScreens::RecordingStudioAIRegisteredCustomToolsScreen)
+      date_range = context.filter_value(:date_range) || screen.filters.find do |filter|
+        filter.key == :date_range
+      end.normalize(context.params)
       return { date_range_preset: date_range.preset_key } if date_range&.preset_key.present?
       return { date_range_preset: :last_30_days } unless date_range&.start_date && date_range.end_date
 
@@ -227,6 +294,13 @@ module AdminScreens
       return context.filter_value(:date_range) if context.filter_value(:date_range)
 
       screen = AdminScreens::RecordingStudioAIRegisteredCustomToolsScreen
+      screen.filters.find { |filter| filter.key == :date_range }.normalize(context.params)
+    end
+
+    def registered_prompts_date_range_value(context)
+      return context.filter_value(:date_range) if context.filter_value(:date_range)
+
+      screen = AdminScreens::RecordingStudioAIRegisteredPromptsScreen
       screen.filters.find { |filter| filter.key == :date_range }.normalize(context.params)
     end
 
@@ -277,6 +351,46 @@ module AdminScreens
         "Executor" => definition.executor_label,
         "Safety" => "#{definition.read_only ? 'Read only' : 'Writes'}; destructive: #{definition.destructive ? 'yes' : 'no'}; confirmation: #{definition.requires_confirmation ? 'required' : 'not required'}; idempotent: #{definition.idempotent ? 'yes' : 'no'}"
       }
+      definition_modal(
+        helpers: helpers,
+        modal_id: modal_id,
+        title: "#{definition.name} v#{definition.version}",
+        trigger_text: "#{row.name} v#{row.version}",
+        aria_label: "Show definition for #{row.name}",
+        fields: fields
+      )
+    end
+
+    def prompt_definition_modal(row)
+      helpers = ActionController::Base.helpers
+      modal_id = "registered-prompt-definition-#{row.namespace}-#{row.key}-#{row.version}"
+      definition = RecordingStudioAI.prompts.fetch(row.namespace, row.key, version: row.version)
+      fields = {
+        "Namespace" => definition.namespace,
+        "Key" => definition.key,
+        "Short name" => definition.short_name,
+        "Description" => definition.description,
+        "Inputs" => definition.inputs.presence&.join(", ") || "None",
+        "Tools" => if definition.tools.any?
+                     definition.tools.map do |tool|
+                       tool[:version] ? "#{tool.fetch(:key)} v#{tool[:version]}" : tool.fetch(:key)
+                     end.join(", ")
+                   else
+                     "None"
+                   end,
+        "Defaults" => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || "None"
+      }
+      definition_modal(
+        helpers: helpers,
+        modal_id: modal_id,
+        title: "#{definition.name} v#{definition.version}",
+        trigger_text: "#{row.name} v#{row.version}",
+        aria_label: "Show definition for #{row.name}",
+        fields: fields
+      )
+    end
+
+    def definition_modal(helpers:, modal_id:, title:, trigger_text:, aria_label:, fields:)
       body = helpers.content_tag(:dl, class: "grid gap-4 text-sm") do
         helpers.safe_join(fields.map do |label, value|
           helpers.content_tag(:div) do
@@ -301,7 +415,7 @@ module AdminScreens
                                                     helpers.content_tag(:div,
                                                                         class: "flex items-center justify-between gap-4") do
                                                       helpers.safe_join([
-                                                                          helpers.content_tag(:h2, "#{definition.name} v#{definition.version}",
+                                                                          helpers.content_tag(:h2, title,
                                                                                               class: "text-lg font-semibold text-[var(--modal-title-color)]"),
                                                                           helpers.content_tag(:button, "×", type: "button", class: "text-xl", aria: { label: "Close" },
                                                                                                             data: { action: "flat-pack--modal#close" })
@@ -318,8 +432,8 @@ module AdminScreens
                 "flat-pack--modal-close-on-escape-value": true, action: "keydown.esc->flat-pack--modal#close" },
         aria: { hidden: true }
       )
-      trigger = helpers.content_tag(:button, "#{row.name} v#{row.version}", type: "button",
-                                                                            class: "text-(--color-primary-background-color) underline", data: { modal_id: modal_id }, aria: { label: "Show definition for #{row.name}" })
+      trigger = helpers.content_tag(:button, trigger_text, type: "button",
+                                                          class: "text-(--color-primary-background-color) underline", data: { modal_id: modal_id }, aria: { label: aria_label })
       helpers.safe_join([trigger, modal])
     end
 
@@ -574,6 +688,30 @@ module AdminScreens
       end.compact.presence || [{ text: "No custom tool calls in the last 30 days." }]
     end
     link_to { |context| context.admin_screen_path("registered_custom_tools") }
+  end
+
+  RecordingStudioAIRegisteredPromptsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.registered_prompts") do
+    type :list
+    title "Registered prompts"
+    subtitle "Top 5 most-called prompts in the last 30 days."
+    description "Open a prompt to inspect recent AI calls that used it."
+    list_options { { divider: true } }
+    items do |context|
+      rows = AdminScreens::RecordingStudioAIWidgets.top_prompt_call_rows(
+        AdminScreens::RecordingStudioAIWidgets.runs_scope(context),
+        range: 30.days.ago..Time.current,
+        limit: 5
+      )
+      rows.map do |name, prompt_key, calls|
+        {
+          icon: :document_text,
+          text: name,
+          trailing: "#{AdminScreens::RecordingStudioAIWidgets.number(calls)} calls",
+          href: "#{context.admin_screen_path('ai_calls')}?#{{ prompt: prompt_key }.to_query}"
+        }
+      end.presence || [{ text: "No prompt calls in the last 30 days." }]
+    end
+    link_to { |context| context.admin_screen_path("registered_prompts") }
   end
 
   RecordingStudioAIRetryRateByModelWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.retry_rate_by_model") do
@@ -1475,6 +1613,71 @@ module AdminScreens
     end
   end
 
+  class RecordingStudioAIRegisteredPromptsScreen < RecordingStudioAdmin::Screen
+    key "registered_prompts"
+    icon :document_text
+    title "Registered prompts"
+    subtitle "Prompt definitions and call volume across visible roots."
+
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.prompt_rows(context)
+    end
+
+    filter_presentation :modal, inline_count: 1
+    filter :date_range, field: :created_at, default: :last_30_days
+
+    chart do
+      title "Prompt call volume"
+      subtitle "Calls per registered prompt in the selected date range."
+      type :bar
+      series do |context|
+        [{ name: "Calls", data: context.query_result.relation.map(&:calls) }]
+      end
+      options do |context|
+        {
+          height: 300,
+          plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
+          xaxis: { categories: context.query_result.relation.map(&:name), min: 0 },
+          dataLabels: { enabled: false }
+        }
+      end
+    end
+
+    table do
+      title ""
+      hide_columns_button
+      hide_count
+
+      column :name,
+             title: "Prompt",
+             value: lambda { |row, _context|
+               AdminScreens::RecordingStudioAIWidgets.prompt_definition_modal(row)
+             }
+      column :namespace, title: "Namespace"
+      column :key, title: "Key"
+      column :description, title: "Description"
+      column :calls_series,
+             title: "Calls",
+             value: lambda { |row, context|
+               date_range_query = AdminScreens::RecordingStudioAIWidgets.date_range_query(
+                 context,
+                 screen: AdminScreens::RecordingStudioAIRegisteredPromptsScreen
+               )
+               url = "/admin/screens/ai_calls?#{{ **date_range_query, prompt: row.key }.to_query}"
+               ActionController::Base.helpers.link_to(
+                 AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
+                 url,
+                 class: "inline-block",
+                 data: { turbo_frame: "_top" },
+                 aria: { label: "AI calls for #{row.name} in the selected date range" }
+               )
+             }
+      column :success_rate, title: "Success rate", value: ->(row, _context) { "#{row.success_rate}%" }
+      column :error_rate, title: "Error rate", value: ->(row, _context) { "#{row.error_rate}%" }
+      column :average_duration, title: "Average duration"
+    end
+  end
+
   class RecordingStudioAIEstimatedSpendScreen < RecordingStudioAdmin::Screen
     key "estimated_spend"
     icon :currency_dollar
@@ -1695,6 +1898,11 @@ module AdminScreens
          url: ->(context) { context.admin_screen_path("registered_custom_tools") },
          style: :secondary
 
+    link :registered_prompts,
+         text: "Registered Prompts",
+         url: ->(context) { context.admin_screen_path("registered_prompts") },
+         style: :secondary
+
     link :estimated_spend,
          text: "Estimated Spend",
          url: ->(context) { context.admin_screen_path("estimated_spend") },
@@ -1718,6 +1926,7 @@ module AdminScreens
     widget "widgets.recording_studio_ai.ai_calls_windows"
     widget "widgets.recording_studio_ai.tool_calls"
     widget "widgets.recording_studio_ai.registered_custom_tools"
+    widget "widgets.recording_studio_ai.registered_prompts"
     widget "widgets.recording_studio_ai.retry_rate_by_model"
     widget "widgets.recording_studio_ai.errors_failed_calls"
     widget "widgets.recording_studio_ai.estimated_spend"
@@ -1730,6 +1939,7 @@ module AdminScreens
     RecordingStudioAIAICallsWindowsWidget,
     RecordingStudioAIToolCallsWidget,
     RecordingStudioAIRegisteredCustomToolsWidget,
+    RecordingStudioAIRegisteredPromptsWidget,
     RecordingStudioAIRetryRateByModelWidget,
     RecordingStudioAIErrorsFailedCallsWidget,
     RecordingStudioAIEstimatedSpendWidget,
@@ -1747,6 +1957,7 @@ module AdminScreens
     RecordingStudioAdmin.register_screen(RecordingStudioAIAttemptsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIToolCallsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredCustomToolsScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredPromptsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIEstimatedSpendScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAILatencyByModelScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAILatencyByPromptScreen)
