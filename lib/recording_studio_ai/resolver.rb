@@ -52,7 +52,19 @@ module RecordingStudioAI
     def build_candidate(entry)
       return entry if entry.is_a?(RecordingStudioAI::Candidate)
 
-      RecordingStudioAI::Candidate.new(**entry.transform_keys(&:to_sym))
+      attributes = entry.transform_keys(&:to_sym)
+      attributes[:capabilities] ||= registered_capabilities(attributes[:provider], attributes[:model])
+      RecordingStudioAI::Candidate.new(**attributes)
+    end
+
+    # Profiles reference models by their provider API model string. When a
+    # profile entry omits explicit capabilities, derive them from the registered
+    # model definition so capabilities live in one place (the model registry).
+    def registered_capabilities(provider, model)
+      return nil if provider.nil? || model.nil?
+
+      definition = RecordingStudioAI.models.fetch(provider, model)
+      definition&.capabilities
     end
 
     def raise_resolution_error!(candidates, required_capabilities)

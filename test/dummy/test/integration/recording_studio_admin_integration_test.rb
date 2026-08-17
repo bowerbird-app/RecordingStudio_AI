@@ -55,7 +55,24 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Methods"
     assert_includes response.body, "RecordingStudioAI.generate"
     assert_includes response.body, "RecordingStudioAI.refresh_batch_async"
+    assert_includes response.body, "RecordingStudioAI.models.register"
+    assert_includes response.body, "RecordingStudioAI.models.fetch"
     assert_includes response.body, "href=\"/methods\""
+  end
+
+  test "config guide documents providers models and profiles" do
+    authenticate_for_admin!
+
+    get "/config"
+
+    assert_response :success
+    assert_includes response.body, "Add a Provider"
+    assert_includes response.body, "Add a Model"
+    assert_includes response.body, "Create Profiles"
+    assert_includes response.body, "RecordingStudioAI.models.register"
+    assert_includes response.body, "lib/recording_studio_ai/models/"
+    assert_includes response.body, "delivery"
+    assert_includes response.body, "modalities"
   end
 
   test "ai playground shows batch items only in the batch tab" do

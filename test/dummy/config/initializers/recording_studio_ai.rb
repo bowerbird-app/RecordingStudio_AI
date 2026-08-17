@@ -8,22 +8,16 @@ RecordingStudioAI.configure do |config|
   config.default_profile = :medium
   config.profiles = {
     low: [
-      { provider: :openai, model: "gpt-5-mini",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
-      { provider: :gemini, model: "gemini-2.5-flash",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+      { provider: :openai, model: "gpt-5-mini" },
+      { provider: :gemini, model: "gemini-2.5-flash" }
     ],
     medium: [
-      { provider: :openai, model: "gpt-5",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
-      { provider: :gemini, model: "gemini-2.5-pro",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+      { provider: :openai, model: "gpt-5" },
+      { provider: :gemini, model: "gemini-2.5-pro" }
     ],
     high: [
-      { provider: :openai, model: "gpt-5-pro",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
-      { provider: :gemini, model: "gemini-2.5-pro",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+      { provider: :openai, model: "gpt-5-pro" },
+      { provider: :gemini, model: "gemini-2.5-pro" }
     ]
   }
   config.authorization_handler = ->(action:, attribution:, context:) { true }

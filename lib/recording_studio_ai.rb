@@ -10,6 +10,7 @@ require "recording_studio_ai/metadata"
 require "recording_studio_ai/authorization"
 require "recording_studio_ai/tools"
 require "recording_studio_ai/prompts"
+require "recording_studio_ai/models"
 require "recording_studio_ai/attachments"
 require "recording_studio_ai/cost_calculator"
 require "recording_studio_ai/structured_output"
@@ -200,6 +201,20 @@ module RecordingStudioAI
 
     def prompts
       @prompts ||= RecordingStudioAI::Prompts::Registry.new
+    end
+
+    def models
+      return @models if @models
+
+      @models = RecordingStudioAI::Models::Registry.new
+      load_builtin_models!
+      @models
+    end
+
+    def load_builtin_models!
+      Dir.glob(File.expand_path("recording_studio_ai/models/*/*.rb", __dir__)).sort.each do |file|
+        load file
+      end
     end
 
     def prompt(namespace, key, version: nil)

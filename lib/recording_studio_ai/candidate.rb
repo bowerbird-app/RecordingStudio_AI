@@ -4,7 +4,7 @@ module RecordingStudioAI
   class Candidate
     attr_reader :provider, :model, :capabilities
 
-    def initialize(provider:, model:, capabilities:)
+    def initialize(provider:, model:, capabilities: nil)
       @provider = provider.to_sym
       @model = model.to_s
       @capabilities = Array(capabilities).map(&:to_sym).uniq.freeze

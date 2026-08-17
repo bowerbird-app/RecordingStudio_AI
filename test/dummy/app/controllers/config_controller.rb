@@ -35,8 +35,8 @@ class ConfigController < ApplicationController
     {
       key: "profiles",
       required: "Yes",
-      accepted_values: "Hash of profile keys to ordered provider/model candidates",
-      explanation: "Core model routing map used by generate, stream, and batch APIs."
+      accepted_values: "Hash of profile keys to ordered { provider:, model: } candidates",
+      explanation: "Core model routing map used by generate, stream, and batch APIs. Reference models by their provider API model string; capabilities/parameters/tools/modalities come from the model registry (RecordingStudioAI.models)."
     },
     {
       key: "allowed_provider_overrides",
@@ -302,7 +302,9 @@ class ConfigController < ApplicationController
       config.openai_client = nil
       config.gemini_client = nil
 
-      # Profile routing.
+      # Profile routing. Reference models by their provider API model string.
+      # Capabilities, tunable parameters, native tools, and modalities come from
+      # the model registry (RecordingStudioAI.models), not from the profile entry.
       config.default_profile = :medium
       config.allowed_provider_overrides = []
       config.discovery_enabled = false
@@ -434,6 +436,88 @@ class ConfigController < ApplicationController
     RecordingStudioAI.discover_providers!
   RUBY
 
+  MODEL_REGISTRATION_EXAMPLE = <<~RUBY.freeze
+    # Built-in OpenAI and Gemini models ship with the gem under
+    # lib/recording_studio_ai/models/<provider-key>/<model-key>.rb. Each file is a
+    # registration script (no class). Add your own models the same way from a host
+    # initializer or another gem's engine initializer.
+    #
+    # File layout for a host-provided model:
+    #   config/initializers/recording_studio_ai_models.rb   (or any initializer)
+    #
+    # File naming convention for gem-style catalogs:
+    #   lib/recording_studio_ai/models/openai/gpt-5-mini.rb
+    #   lib/recording_studio_ai/models/gemini/gemini-2-5-pro.rb
+    #   - the file/key is a lowercase hyphenated slug (dots become hyphens)
+    #   - the :model value is the exact provider API model string
+
+    RecordingStudioAI.models.register(
+      provider: :openai,                 # required: provider key (must match a registered provider)
+      key: "gpt-5",                      # required: stable slug, matches the filename
+      model: "gpt-5",                    # required: exact provider API model string used in profiles
+      display_name: "GPT-5",             # optional: label for admin/playground UI
+
+      # Delivery/response modes the model supports.
+      delivery: {
+        streaming: true,
+        structured_output: true,         # JSON schema / JSON output
+        batch: true,
+        batch_cancellation: true
+      },
+
+      # Tunable parameters. Declare support plus bounds/defaults so the playground
+      # can render the right controls and requests can be validated.
+      parameters: {
+        temperature:       { supported: true, min: 0.0, max: 2.0, default: 1.0, step: 0.1 },
+        verbosity:         { supported: true, values: %w[low medium high], default: "medium" },
+        max_output_tokens: { supported: true, min: 1, max: 128_000, default: 8_192 },
+        reasoning_effort:  { supported: true, values: %w[minimal low medium high], default: "medium" }
+      },
+
+      # Native/provider tools the model can use. custom_tools = host function calling.
+      tools: %i[web_search file_search code_execution image_generation custom_tools],
+
+      # Input/output modalities.
+      modalities: {
+        input:  %i[text image file],
+        output: %i[text]
+      }
+    )
+
+    # Look models up anywhere (used by the resolver and playground):
+    RecordingStudioAI.models.fetch(:openai, "gpt-5")          # by API model string
+    RecordingStudioAI.models.fetch_by_key(:openai, "gpt-5")   # by slug/key
+    RecordingStudioAI.models.for_provider(:openai)            # all models for a provider
+    RecordingStudioAI.models.all                              # every registered model
+  RUBY
+
+  PROFILE_EXAMPLE = <<~RUBY.freeze
+    # Profiles are ordered preference lists. The resolver tries each candidate in
+    # order and picks the first whose provider is configured and whose registered
+    # model supports the request's required capabilities. Reference models by their
+    # provider API model string; capabilities come from the model registry.
+    RecordingStudioAI.configure do |config|
+      config.default_profile = :medium
+      config.profiles = {
+        low: [
+          { provider: :openai, model: "gpt-5-mini" },
+          { provider: :gemini, model: "gemini-2.5-flash" }
+        ],
+        medium: [
+          { provider: :openai, model: "gpt-5" },
+          { provider: :gemini, model: "gemini-2.5-pro" }
+        ],
+        high: [
+          { provider: :openai, model: "gpt-5-pro" },
+          { provider: :gemini, model: "gemini-2.5-pro" }
+        ]
+      }
+
+      # Optional: allow one tier to fall back to another when no candidate resolves.
+      config.profile_fallbacks = { high: [:medium], medium: [:low] }
+    end
+  RUBY
+
   CUSTOM_TOOLS_EXAMPLE = <<~RUBY.freeze
     # Register a custom tool (host app or another gem initializer)
     RecordingStudioAI.tools.register(
@@ -476,6 +560,8 @@ class ConfigController < ApplicationController
     @config_options = CONFIG_OPTIONS
     @config_example = CONFIG_EXAMPLE
     @provider_extension_example = PROVIDER_EXTENSION_EXAMPLE
+    @model_registration_example = MODEL_REGISTRATION_EXAMPLE
+    @profile_example = PROFILE_EXAMPLE
     @custom_tools_example = CUSTOM_TOOLS_EXAMPLE
   end
 end

@@ -29,17 +29,17 @@
 
   <div class="space-y-3">
     <%= render FlatPack::PageTitle::Component.new(
-      title: "Add a Provider",
-      subtitle: "How to register providers from a host app or from another gem.",
+      title: "1. Add a Provider",
+      subtitle: "Providers are single adapter classes (for example OpenAI and Gemini). Each provider is one class under lib/recording_studio_ai/providers/<provider>.rb.",
       variant: :h3,
       class: "mb-0 pb-0"
     ) %>
 
     <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
-      <li>Create a provider class that implements the Recording Studio AI provider contract.</li>
-      <li>Register it from the host initializer or in another gem's engine initializer.</li>
-      <li>Add the provider to one or more profile candidate lists.</li>
-      <li>Optionally enable discovery if your provider class is in the expected providers path.</li>
+      <li>Create a provider class under <span class="font-mono">lib/recording_studio_ai/providers/&lt;provider&gt;.rb</span> that inherits <span class="font-mono">RecordingStudioAI::Providers::Base</span> and declares <span class="font-mono">provider_key</span>.</li>
+      <li>Implement the contract methods your models need: <span class="font-mono">generate</span>, <span class="font-mono">stream</span>, and the batch methods.</li>
+      <li>Register it from the host initializer or another gem's engine initializer with <span class="font-mono">RecordingStudioAI.register_provider(:key, instance)</span>.</li>
+      <li>Optionally set <span class="font-mono">config.discovery_enabled = true</span> to auto-register provider classes found under the providers path.</li>
     </ol>
   </div>
 
@@ -47,6 +47,50 @@
     title: "Provider registration examples",
     language: "ruby",
     code: @provider_extension_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "2. Add a Model",
+      subtitle: "Models are declarative registration scripts (no class). Built-ins ship with the gem; add your own the same way.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Pick the provider the model belongs to (it must be registered first).</li>
+      <li>Create a registration file. For gem-style catalogs use <span class="font-mono">lib/recording_studio_ai/models/&lt;provider-key&gt;/&lt;model-key&gt;.rb</span> (for example <span class="font-mono">models/openai/gpt-5-mini.rb</span>, <span class="font-mono">models/gemini/gemini-2-5-pro.rb</span>). For a host app, any initializer works.</li>
+      <li>The file/key is a lowercase hyphenated slug (dots become hyphens); the <span class="font-mono">model:</span> value is the exact provider API model string used in profiles.</li>
+      <li>Call <span class="font-mono">RecordingStudioAI.models.register(...)</span> and declare <span class="font-mono">delivery</span>, <span class="font-mono">parameters</span>, <span class="font-mono">tools</span>, and <span class="font-mono">modalities</span> so the resolver and AI playground know what the model supports.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Model registration",
+    language: "ruby",
+    code: @model_registration_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "3. Create Profiles",
+      subtitle: "Profiles are ordered preference lists of provider/model candidates used by generate, stream, and batch.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Set <span class="font-mono">config.profiles</span> in <span class="font-mono">config/initializers/recording_studio_ai.rb</span>.</li>
+      <li>Reference each model by its provider API model string (the <span class="font-mono">model:</span> value from registration). Do not repeat capabilities here — they come from the model registry.</li>
+      <li>Order candidates by preference; the resolver picks the first configured provider whose model supports the request.</li>
+      <li>Set <span class="font-mono">config.default_profile</span> and, optionally, <span class="font-mono">config.profile_fallbacks</span> for tier fallback.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Profile configuration",
+    language: "ruby",
+    code: @profile_example
   ) %>
 
   <div class="space-y-3">
