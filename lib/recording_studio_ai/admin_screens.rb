@@ -273,8 +273,25 @@ module AdminScreens
                          .limit(1)
                          .pick(:prompt_name_snapshot) ||
                     key
-             [name, key, calls]
+             [name, namespace, key, calls]
            end
+    end
+
+    def prompt_chart_label(row)
+      "#{row.name} (#{row.namespace}.#{row.key} v#{row.version})"
+    end
+
+    def prompt_calls_path(context, row)
+      range_query = date_range_query(
+        context,
+        screen: AdminScreens::RecordingStudioAIRegisteredPromptsScreen
+      )
+      query = range_query.merge(
+        prompt: row.key,
+        prompt_namespace: row.namespace,
+        prompt_version: row.version
+      )
+      "/admin/screens/ai_calls?#{query.to_query}"
     end
 
     def date_range_query(context, screen: AdminScreens::RecordingStudioAIRegisteredCustomToolsScreen)
@@ -702,12 +719,15 @@ module AdminScreens
         range: 30.days.ago..Time.current,
         limit: 5
       )
-      rows.map do |name, prompt_key, calls|
+      rows.map do |name, namespace, prompt_key, calls|
         {
           icon: :document_text,
           text: name,
           trailing: "#{AdminScreens::RecordingStudioAIWidgets.number(calls)} calls",
-          href: "#{context.admin_screen_path('ai_calls')}?#{{ prompt: prompt_key }.to_query}"
+          href: "#{context.admin_screen_path('ai_calls')}?#{{
+            prompt: prompt_key,
+            prompt_namespace: namespace
+          }.compact.to_query}"
         }
       end.presence || [{ text: "No prompt calls in the last 30 days." }]
     end
@@ -1198,6 +1218,20 @@ module AdminScreens
            title: "Prompt",
            field: :prompt_key,
            values: -> { RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key) }
+    filter :prompt_namespace,
+           title: "Prompt namespace",
+           field: :prompt_namespace,
+           values: lambda {
+             RecordingStudioAI::Run.where.not(prompt_namespace: nil).distinct.order(:prompt_namespace).pluck(:prompt_namespace)
+           },
+           apply: ->(relation, value, _context) { relation.where(prompt_namespace: value) }
+    filter :prompt_version,
+           title: "Prompt version",
+           field: :prompt_version,
+           values: lambda {
+             RecordingStudioAI::Run.where.not(prompt_version: nil).distinct.order(:prompt_version).pluck(:prompt_version)
+           },
+           apply: ->(relation, value, _context) { relation.where(prompt_version: value) }
     filter :provider,
            values: lambda {
              RecordingStudioAI::Run.distinct.order(:resolved_provider).pluck(:resolved_provider).compact_blank
@@ -1637,7 +1671,12 @@ module AdminScreens
         {
           height: 300,
           plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
-          xaxis: { categories: context.query_result.relation.map(&:name), min: 0 },
+          xaxis: {
+            categories: context.query_result.relation.map do |row|
+              AdminScreens::RecordingStudioAIWidgets.prompt_chart_label(row)
+            end,
+            min: 0
+          },
           dataLabels: { enabled: false }
         }
       end
@@ -1659,14 +1698,9 @@ module AdminScreens
       column :calls_series,
              title: "Calls",
              value: lambda { |row, context|
-               date_range_query = AdminScreens::RecordingStudioAIWidgets.date_range_query(
-                 context,
-                 screen: AdminScreens::RecordingStudioAIRegisteredPromptsScreen
-               )
-               url = "/admin/screens/ai_calls?#{{ **date_range_query, prompt: row.key }.to_query}"
                ActionController::Base.helpers.link_to(
                  AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
-                 url,
+                 AdminScreens::RecordingStudioAIWidgets.prompt_calls_path(context, row),
                  class: "inline-block",
                  data: { turbo_frame: "_top" },
                  aria: { label: "AI calls for #{row.name} in the selected date range" }

@@ -198,6 +198,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "href=\"/admin/screens/registered_prompts\""
     assert_includes response.body, "Text Summary"
     assert_includes response.body, "prompt=summarize_text"
+    assert_includes response.body, "prompt_namespace=demo"
   end
 
   test "registered prompts screen shows chart and table metrics" do
