@@ -1,0 +1,68 @@
+<div id="<%= frame_id %>" class="space-y-6">
+  <% if error_message.present? %>
+    <div class="space-y-2">
+      <h3 class="text-xl font-semibold text-(--color-danger-background-color)">Execution error</h3>
+      <p class="text-sm"><%= error_message %></p>
+    </div>
+  <% end %>
+
+  <% if response_payload.present? %>
+    <div class="space-y-3">
+      <h3 class="text-xl font-semibold">Execution result</h3>
+      <% if request_id.present? %>
+        <p class="text-sm text-(--surface-muted-content-color)">Request ID: <%= request_id %></p>
+      <% end %>
+
+      <% if stream_text.present? %>
+        <div class="space-y-2">
+          <h4 class="text-sm font-semibold">Streamed text</h4>
+          <p class="text-sm whitespace-pre-wrap"><%= stream_text %></p>
+        </div>
+      <% end %>
+
+      <% if stream_events.present? %>
+        <div class="space-y-2">
+          <h4 class="text-sm font-semibold">Stream events</h4>
+          <pre class="overflow-auto rounded-md border border-(--surface-border-color) p-3 text-xs"><%= JSON.pretty_generate(stream_events) %></pre>
+        </div>
+      <% end %>
+
+      <div class="space-y-2">
+        <h4 class="text-sm font-semibold">Response JSON</h4>
+        <pre class="overflow-auto rounded-md border border-(--surface-border-color) p-3 text-xs"><%= JSON.pretty_generate(response_payload) %></pre>
+      </div>
+    </div>
+  <% end %>
+
+  <% if created_runs.present? %>
+    <div class="space-y-3">
+      <h3 class="text-xl font-semibold">Created runs</h3>
+      <%= render FlatPack::List::Component.new(divider: true) do %>
+        <% created_runs.each do |run| %>
+          <%= render FlatPack::List::Item.new(icon: :cpu_chip) do %>
+            <div class="flex flex-col gap-1">
+              <span class="text-sm font-medium">Run <%= run.id %> • <%= run.operation %> • <%= run.status %></span>
+              <span class="text-xs text-(--surface-muted-content-color)">Provider: <%= run.resolved_provider || "n/a" %> • Model: <%= run.resolved_model || "n/a" %></span>
+            </div>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if created_attempts.present? %>
+    <div class="space-y-3">
+      <h3 class="text-xl font-semibold">Created attempts</h3>
+      <%= render FlatPack::List::Component.new(divider: true) do %>
+        <% created_attempts.each do |attempt| %>
+          <%= render FlatPack::List::Item.new(icon: :clock) do %>
+            <div class="flex flex-col gap-1">
+              <span class="text-sm font-medium">Attempt <%= attempt.id %> • seq <%= attempt.sequence %> • <%= attempt.status %></span>
+              <span class="text-xs text-(--surface-muted-content-color)">Provider: <%= attempt.provider || "n/a" %> • Model: <%= attempt.model || "n/a" %></span>
+            </div>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+</div>
