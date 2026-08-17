@@ -29,6 +29,75 @@ module AdminScreens
       RecordingStudioAI::Attempt.joins(:run).merge(runs_scope(context))
     end
 
+    def attempt_kind_series(relation, field: "recording_studio_ai_attempts.created_at", bucket: :day)
+      bucket = bucket.to_sym
+      kinds = RecordingStudioAI::Attempt::KINDS.values
+      timestamps_by_kind = kinds.index_with { |_kind| [] }
+
+      relation.reorder(nil).pluck(:kind, Arel.sql(field)).each do |kind, created_at|
+        next if created_at.blank?
+
+        key = kind.to_s
+        next unless timestamps_by_kind.key?(key)
+
+        timestamps_by_kind[key] << created_at
+      end
+
+      buckets = timestamps_by_kind.values.flatten.map { |created_at| attempt_kind_bucket_key(created_at, bucket) }.uniq.sort
+      return [] if buckets.empty?
+
+      kinds.filter_map do |kind|
+        counts = timestamps_by_kind.fetch(kind).each_with_object(Hash.new(0)) do |created_at, memo|
+          memo[attempt_kind_bucket_key(created_at, bucket)] += 1
+        end
+        next if counts.values.sum.zero?
+
+        {
+          name: kind.to_s.humanize,
+          data: buckets.map do |bucket_key|
+            {
+              x: attempt_kind_bucket_label(bucket_key, bucket),
+              y: counts.fetch(bucket_key, 0)
+            }
+          end
+        }
+      end
+    end
+
+    def attempt_kind_bucket_key(value, bucket)
+      timestamp = value.respond_to?(:in_time_zone) ? value.in_time_zone : Time.zone.parse(value.to_s)
+
+      case bucket
+      when :hour
+        timestamp.beginning_of_hour
+      when :week
+        timestamp.beginning_of_week
+      when :month
+        timestamp.beginning_of_month
+      when :year
+        timestamp.beginning_of_year
+      else
+        timestamp.to_date
+      end
+    end
+
+    def attempt_kind_bucket_label(value, bucket)
+      timestamp = value.respond_to?(:in_time_zone) ? value.in_time_zone : Time.zone.parse(value.to_s)
+
+      case bucket
+      when :hour
+        timestamp.strftime("%-l%P").strip
+      when :week
+        "Week of #{timestamp.strftime('%b %-d')}"
+      when :month
+        timestamp.strftime("%b")
+      when :year
+        timestamp.strftime("%Y")
+      else
+        timestamp.strftime("%b %-d")
+      end
+    end
+
     def p90_latency(scope)
       percentile_latency(scope.pluck(:latency_ms), percentile: 0.9)
     end
@@ -1128,6 +1197,7 @@ module AdminScreens
 
     filter_presentation :modal, inline_count: 3
     filter :date_range, field: :created_at, default: :last_4_weeks
+    filter :group_by, values: %i[hour day week month year], default: :day
     filter :status,
            param: :attempt_status,
            field: :status,
@@ -1144,6 +1214,50 @@ module AdminScreens
            field: :kind,
            values: -> { RecordingStudioAI::Attempt.distinct.order(:kind).pluck(:kind).compact_blank },
            apply: ->(relation, value, _context) { relation.where(kind: value) }
+
+    summary do
+      change_good_when do |context|
+        kind = context.filter_value(:kind).to_s
+        status = context.filter_value(:status).to_s
+        if %w[retry fallback continuation].include?(kind) || %w[failed cancelled].include?(status)
+          :down
+        else
+          :up
+        end
+      end
+    end
+
+    chart do
+      title "Attempts by kind"
+      subtitle "Stacked attempt volume by primary, retry, fallback, and continuation."
+      type :column
+      series do |context|
+        AdminScreens::RecordingStudioAIWidgets.attempt_kind_series(
+          context.query_result.relation,
+          bucket: context.filter_value(:group_by) || :day
+        )
+      end
+      options do
+        {
+          height: 300,
+          chart: { stacked: true },
+          plotOptions: {
+            bar: {
+              horizontal: false,
+              columnWidth: "55%"
+            }
+          },
+          xaxis: {
+            labels: { show: true },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+          },
+          yaxis: { min: 0 },
+          legend: { position: "top" },
+          grid: { xaxis: { lines: { show: false } } }
+        }
+      end
+    end
 
     table do
       column :created_at, title: "Created"

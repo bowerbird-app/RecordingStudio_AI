@@ -379,12 +379,54 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "value=\"last_4_weeks\""
     assert_includes response.body, "attempt_status"
     assert_includes response.body, "provider"
+    assert_includes response.body, "name=\"group_by\""
 
     get "/admin/screens/attempts/table", params: { provider: "openai", kind: "retry" }
 
     assert_response :success
     assert_includes response.body, "attempt-openai-retry"
     refute_includes response.body, "attempt-google-primary"
+  end
+
+  test "attempts chart stacks volume by kind and accepts a grouping filter" do
+    authenticate_for_admin!
+    run = create_run!(status: "completed", operation: "generation")
+    run.attempts.create!(sequence: 1, kind: "primary", status: "failed", provider: "openai", model: "attempt-chart-primary")
+    run.attempts.create!(sequence: 2, kind: "retry", status: "completed", provider: "openai", model: "attempt-chart-retry")
+    run.attempts.create!(sequence: 3, kind: "fallback", status: "completed", provider: "google", model: "attempt-chart-fallback")
+
+    get "/admin/screens/attempts/chart", params: { group_by: "day" }
+
+    assert_response :success
+    assert_includes response.body, "Attempts by kind"
+    assert_includes response.body, "Primary"
+    assert_includes response.body, "Retry"
+    assert_includes response.body, "Fallback"
+    assert_includes response.body, "&quot;stacked&quot;:true"
+
+    get "/admin/screens/attempts", params: { group_by: "month" }
+
+    assert_response :success
+    assert_includes response.body, "group_by=month"
+    assert_select "input[name='group_by']", count: 1
+  end
+
+  test "attempts chart marks increased retries and failures as unfavorable" do
+    authenticate_for_admin!
+    run = create_run!(status: "completed", operation: "generation")
+    run.attempts.create!(sequence: 1, kind: "retry", status: "failed", provider: "openai", model: "attempt-unfavorable")
+
+    get "/admin/screens/attempts/chart", params: { kind: "retry" }
+
+    assert_response :success
+    assert_includes response.body, "+100%"
+    assert_includes response.body, "text-[var(--color-danger-background-color)]"
+
+    get "/admin/screens/attempts/chart", params: { attempt_status: "failed" }
+
+    assert_response :success
+    assert_includes response.body, "+100%"
+    assert_includes response.body, "text-[var(--color-danger-background-color)]"
   end
 
   test "retry rate by model widget links to attempts" do
