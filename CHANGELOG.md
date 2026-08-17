@@ -14,6 +14,9 @@ Versioning and Keep a Changelog.
 - Registered Prompts dashboard widget listing the top 5 most-called prompts
   in the last 30 days.
 - Registered Prompts table columns for average input and output tokens.
+- Registered Prompts definition modal now includes the full prompt messages.
+- Attempts admin screen adds prompt/model/token/error-code filters, a Prompt
+  table column, and hides AI call/sequence/kind columns by default.
 - Engine phase-test schemas now apply prompt-attribution and correlation-id
   migrations so orchestrator persistence matches current run columns.
 - Stacked Attempts admin chart with selectable time grouping, attempt-kind

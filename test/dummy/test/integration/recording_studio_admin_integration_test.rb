@@ -257,6 +257,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, ">60<"
     assert_includes response.body, "data-modal-id=\"registered-prompt-definition-demo-summarize_text-1\""
     assert_includes response.body, "Creates a concise summary of supplied text"
+    assert_includes response.body, "Produce a concise factual summary."
+    assert_includes response.body, "Summarize this text:"
     assert_includes response.body, "#000000"
   end
 
@@ -503,12 +505,96 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "attempt_status"
     assert_includes response.body, "provider"
     assert_includes response.body, "name=\"group_by\""
+    assert_includes response.body, "name=\"prompt\""
+    assert_includes response.body, "name=\"model\""
+    assert_includes response.body, "name=\"min_tokens\""
+    assert_includes response.body, "name=\"max_tokens\""
+    assert_includes response.body, "name=\"error_code\""
 
     get "/admin/screens/attempts/table", params: { provider: "openai", kind: "retry" }
 
     assert_response :success
     assert_includes response.body, "attempt-openai-retry"
     refute_includes response.body, "attempt-google-primary"
+  end
+
+  test "attempts table shows prompt and hides ai call sequence and kind by default" do
+    authenticate_for_admin!
+    run = create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_key: "attempt-prompt",
+      prompt_name_snapshot: "Attempt Prompt"
+    )
+    run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      provider: "openai",
+      model: "attempt-prompt-model",
+      total_tokens: 250,
+      error_code: nil
+    )
+
+    get "/admin/screens/attempts/table"
+
+    assert_response :success
+    assert_includes response.body, "Attempt Prompt"
+    assert_includes response.body, "Prompt"
+    assert_select "th", text: /Created/
+    assert_select "th", text: "Prompt"
+    assert_select "th", text: "Status"
+    assert_select "th", text: "AI call", count: 0
+    assert_select "th", text: "Sequence", count: 0
+    assert_select "th", text: "Kind", count: 0
+  end
+
+  test "attempts table filters by prompt model tokens and error code" do
+    authenticate_for_admin!
+    matching_run = create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_key: "matching-attempt-prompt",
+      prompt_name_snapshot: "Matching Attempt Prompt"
+    )
+    other_run = create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_key: "other-attempt-prompt",
+      prompt_name_snapshot: "Other Attempt Prompt"
+    )
+    matching_run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "failed",
+      provider: "openai",
+      model: "matching-attempt-model",
+      total_tokens: 500,
+      error_code: "rate_limit"
+    )
+    other_run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      provider: "openai",
+      model: "other-attempt-model",
+      total_tokens: 50,
+      error_code: "timeout"
+    )
+
+    get "/admin/screens/attempts/table", params: {
+      prompt: "matching-attempt-prompt",
+      model: "matching-attempt-model",
+      min_tokens: 100,
+      max_tokens: 1000,
+      error_code: "rate_limit"
+    }
+
+    assert_response :success
+    assert_includes response.body, "matching-attempt-model"
+    assert_includes response.body, "Matching Attempt Prompt"
+    refute_includes response.body, "other-attempt-model"
+    refute_includes response.body, "Other Attempt Prompt"
   end
 
   test "attempts chart stacks volume by kind and accepts a grouping filter" do

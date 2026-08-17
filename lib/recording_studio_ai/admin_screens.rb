@@ -412,7 +412,8 @@ module AdminScreens
                    else
                      "None"
                    end,
-        "Defaults" => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || "None"
+        "Defaults" => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || "None",
+        "Prompt" => prompt_messages_markup(helpers, definition.messages)
       }
       definition_modal(
         helpers: helpers,
@@ -422,6 +423,21 @@ module AdminScreens
         aria_label: "Show definition for #{row.name}",
         fields: fields
       )
+    end
+
+    def prompt_messages_markup(helpers, messages)
+      helpers.content_tag(:div, class: "grid gap-3") do
+        helpers.safe_join(messages.map do |message|
+          helpers.content_tag(:div, class: "rounded-md border border-[var(--modal-border-color)] p-3") do
+            helpers.safe_join([
+                                helpers.content_tag(:div, message.fetch(:role).to_s.humanize,
+                                                    class: "mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--surface-muted-content-color)]"),
+                                helpers.content_tag(:pre, message.fetch(:content),
+                                                    class: "whitespace-pre-wrap break-words font-sans text-sm")
+                              ])
+          end
+        end)
+      end
     end
 
     def definition_modal(helpers:, modal_id:, title:, trigger_text:, aria_label:, fields:)
@@ -455,7 +471,7 @@ module AdminScreens
                                                                                                             data: { action: "flat-pack--modal#close" })
                                                                         ])
                                                     end,
-                                                    helpers.content_tag(:div, body, class: "mt-6")
+                                                    helpers.content_tag(:div, body, class: "mt-6 min-h-0 flex-1 overflow-y-auto")
                                                   ])
                               end
                             end
@@ -1401,6 +1417,40 @@ module AdminScreens
            field: :provider,
            values: -> { RecordingStudioAI::Attempt.distinct.order(:provider).pluck(:provider).compact_blank },
            apply: ->(relation, value, _context) { relation.where(provider: value) }
+    filter :model,
+           field: :model,
+           values: -> { RecordingStudioAI::Attempt.distinct.order(:model).pluck(:model).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(model: value) }
+    filter :prompt,
+           field: :prompt_key,
+           values: lambda {
+             RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key)
+           },
+           apply: lambda { |relation, value, _context|
+             relation.where(run_id: RecordingStudioAI::Run.where(prompt_key: value).select(:id))
+           }
+    filter :token_min,
+           param: :min_tokens,
+           max: 1_000_000,
+           apply: lambda { |relation, value, _context|
+             value.to_i.positive? ? relation.where("recording_studio_ai_attempts.total_tokens >= ?", value.to_i) : relation
+           }
+    filter :token_max,
+           param: :max_tokens,
+           max: 1_000_000,
+           apply: lambda { |relation, value, _context|
+             if value.to_i.positive? && value.to_i < 1_000_000
+               relation.where("recording_studio_ai_attempts.total_tokens <= ?", value.to_i)
+             else
+               relation
+             end
+           }
+    filter :error_code,
+           field: :error_code,
+           values: lambda {
+             RecordingStudioAI::Attempt.where.not(error_code: [nil, ""]).distinct.order(:error_code).pluck(:error_code)
+           },
+           apply: ->(relation, value, _context) { relation.where(error_code: value.to_s) }
     filter :run_id,
            field: :run_id,
            apply: ->(relation, value, _context) { relation.where(run_id: value) }
@@ -1455,6 +1505,8 @@ module AdminScreens
     end
 
     table do
+      show_columns_button
+
       column :created_at, title: "Created"
       column :run_id, title: "AI call"
       column :sequence, title: "Sequence"
@@ -1462,6 +1514,12 @@ module AdminScreens
              display: :badge,
              display_options: lambda { |_row, _context, value|
                { text: value.to_s.humanize, style: :default, size: :sm }
+             }
+      column :prompt,
+             title: "Prompt",
+             sortable: false,
+             value: lambda { |attempt, _context|
+               attempt.run&.prompt_name_snapshot.presence || attempt.run&.prompt_key || "No prompt"
              }
       column :status,
              display: :badge,
@@ -1479,6 +1537,8 @@ module AdminScreens
       column :latency_ms, title: "Latency (ms)"
       column :total_tokens, title: "Tokens"
       column :error_code, title: "Error code"
+
+      default_columns :created_at, :prompt, :status, :provider, :model, :latency_ms, :total_tokens, :error_code
 
       default_sort :sequence, direction: :asc
       paginate per_page: 25
