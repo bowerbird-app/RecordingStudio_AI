@@ -1282,6 +1282,12 @@ module AdminScreens
            field: :resolved_model,
            values: -> { RecordingStudioAI::Run.distinct.order(:resolved_model).pluck(:resolved_model).compact_blank },
            apply: ->(relation, value, _context) { relation.where(resolved_model: value) }
+    filter :slowest,
+           values: [ "1" ],
+           control: :checkbox,
+           apply: lambda { |relation, _value, _context|
+             relation.where.not(latency_ms: nil).reorder(latency_ms: :desc)
+           }
 
     summary do
       change_good_when do |context|

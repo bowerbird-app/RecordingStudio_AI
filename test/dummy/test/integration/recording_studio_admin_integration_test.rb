@@ -1054,10 +1054,14 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "slowest=1"
 
-    index_9011 = response.body.index("latency-model-9011")
-    index_8011 = response.body.index("latency-model-8011")
-    index_7011 = response.body.index("latency-model-7011")
-    index_nil = response.body.index("latency-model-nil")
+    # Model names can also appear in filter option lists; only compare order inside the table body.
+    table_body = response.body[/<tbody\b.*?>.*?<\/tbody>/m]
+    assert table_body, "expected ai calls table body in response"
+
+    index_9011 = table_body.index("latency-model-9011")
+    index_8011 = table_body.index("latency-model-8011")
+    index_7011 = table_body.index("latency-model-7011")
+    index_nil = table_body.index("latency-model-nil")
 
     assert index_9011, "expected to find highest-latency model row in response"
     assert index_8011, "expected to find middle-latency model row in response"
