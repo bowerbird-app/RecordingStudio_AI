@@ -13,6 +13,7 @@ Versioning and Keep a Changelog.
   and per-prompt success/error/latency metrics for the selected date range.
 - Registered Prompts dashboard widget listing the top 5 most-called prompts
   in the last 30 days.
+- Registered Prompts table columns for average input and output tokens.
 - Engine phase-test schemas now apply prompt-attribution and correlation-id
   migrations so orchestrator persistence matches current run columns.
 - Stacked Attempts admin chart with selectable time grouping, attempt-kind

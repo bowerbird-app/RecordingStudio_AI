@@ -10,9 +10,16 @@ module AdminScreens
       ToolRow = Data.define(:key, :version, :name, :description, :cost_class, :safety, :calls_series, :success_rate,
                             :error_rate, :average_duration)
     end
+    if const_defined?(:PromptRow) && PromptRow.members != %i[
+      namespace key version name short_name description calls calls_series success_rate error_rate
+      average_duration average_input_tokens average_output_tokens
+    ]
+      remove_const(:PromptRow)
+    end
     unless const_defined?(:PromptRow)
       PromptRow = Data.define(:namespace, :key, :version, :name, :short_name, :description, :calls, :calls_series,
-                              :success_rate, :error_rate, :average_duration)
+                              :success_rate, :error_rate, :average_duration, :average_input_tokens,
+                              :average_output_tokens)
     end
     unless const_defined?(:LatencyRow)
       LatencyRow = Data.define(:name, :calls, :p50_latency_ms, :p90_latency_ms, :average_latency_ms,
@@ -234,6 +241,8 @@ module AdminScreens
       error_counts = range_runs.where(status: %w[failed cancelled]).group(:prompt_namespace, :prompt_key,
                                                                           :prompt_version).count
       average_latencies = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).average(:latency_ms)
+      average_input_tokens = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).average(:input_tokens)
+      average_output_tokens = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).average(:output_tokens)
 
       RecordingStudioAI.prompts.all.map do |definition|
         key = [definition.namespace, definition.key, definition.version]
@@ -252,9 +261,17 @@ module AdminScreens
           end,
           percentage(completed_counts.fetch(key, 0), total),
           percentage(error_counts.fetch(key, 0), total),
-          duration(average_latencies[key])
+          duration(average_latencies[key]),
+          average_tokens(average_input_tokens[key]),
+          average_tokens(average_output_tokens[key])
         )
       end.sort_by { |row| [-row.calls, row.namespace, row.key, row.version] }
+    end
+
+    def average_tokens(value)
+      return "No data" if value.blank?
+
+      number(value.round)
     end
 
     def top_prompt_call_rows(scope, range: 30.days.ago..Time.current, limit: 5)
@@ -1662,19 +1679,19 @@ module AdminScreens
 
     chart do
       title "Prompt call volume"
-      subtitle "Calls per registered prompt in the selected date range."
+      subtitle "All registered prompts by call volume in the selected date range."
       type :bar
       series do |context|
-        [{ name: "Calls", data: context.query_result.relation.map(&:calls) }]
+        rows = context.query_result.relation
+        [{ name: "Calls", data: rows.map(&:calls) }]
       end
       options do |context|
+        rows = context.query_result.relation
         {
-          height: 300,
+          height: [300, (rows.length * 40) + 80].max,
           plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
           xaxis: {
-            categories: context.query_result.relation.map do |row|
-              AdminScreens::RecordingStudioAIWidgets.prompt_chart_label(row)
-            end,
+            categories: rows.map { |row| AdminScreens::RecordingStudioAIWidgets.prompt_chart_label(row) },
             min: 0
           },
           dataLabels: { enabled: false }
@@ -1709,6 +1726,8 @@ module AdminScreens
       column :success_rate, title: "Success rate", value: ->(row, _context) { "#{row.success_rate}%" }
       column :error_rate, title: "Error rate", value: ->(row, _context) { "#{row.error_rate}%" }
       column :average_duration, title: "Average duration"
+      column :average_input_tokens, title: "Avg input"
+      column :average_output_tokens, title: "Avg output"
     end
   end
 

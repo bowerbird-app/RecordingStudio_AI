@@ -210,7 +210,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       prompt_key: "summarize_text",
       prompt_version: 1,
       prompt_name_snapshot: "Text Summary",
-      latency_ms: 420
+      latency_ms: 420,
+      input_tokens: 120,
+      output_tokens: 80
     )
     create_run!(
       status: "failed",
@@ -219,7 +221,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       prompt_key: "summarize_text",
       prompt_version: 1,
       prompt_name_snapshot: "Text Summary",
-      latency_ms: 800
+      latency_ms: 800,
+      input_tokens: 200,
+      output_tokens: 40
     )
 
     get "/admin/screens/registered_prompts"
@@ -229,17 +233,28 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Success rate"
     assert_includes response.body, "Error rate"
     assert_includes response.body, "Average duration"
+    assert_includes response.body, "Avg input"
+    assert_includes response.body, "Avg output"
 
     get "/admin/screens/registered_prompts/chart"
 
     assert_response :success
     assert_includes response.body, "Prompt call volume"
     assert_includes response.body, "Text Summary"
+    assert_includes response.body, "Text Analysis"
+    assert_includes response.body, "Osaka Weather"
+    assert_includes response.body, "demo.analyze_text"
+    assert_includes response.body, "demo.osaka_weather"
+    assert_includes response.body, "demo.summarize_text"
 
     get "/admin/screens/registered_prompts/table"
 
     assert_response :success
     assert_includes response.body, "Text Summary"
+    assert_includes response.body, "Avg input"
+    assert_includes response.body, "Avg output"
+    assert_includes response.body, ">160<"
+    assert_includes response.body, ">60<"
     assert_includes response.body, "data-modal-id=\"registered-prompt-definition-demo-summarize_text-1\""
     assert_includes response.body, "Creates a concise summary of supplied text"
     assert_includes response.body, "#000000"
@@ -262,6 +277,11 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       defaults: { profile: :low, purpose: "unused_prompt" }
     )
 
+    get "/admin/screens/registered_prompts/chart"
+
+    assert_response :success
+    assert_includes response.body, unused_prompt_name
+
     get "/admin/screens/registered_prompts/table"
 
     assert_response :success
@@ -278,6 +298,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_equal 0.0, unused_prompt_row.success_rate
     assert_equal 0.0, unused_prompt_row.error_rate
     assert_equal "No data", unused_prompt_row.average_duration
+    assert_equal "No data", unused_prompt_row.average_input_tokens
+    assert_equal "No data", unused_prompt_row.average_output_tokens
   end
 
   test "registered custom tools screen shows definition and execution metrics" do
