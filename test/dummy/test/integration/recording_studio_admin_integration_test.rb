@@ -290,11 +290,18 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/registered_models/table"
 
     assert_response :success
-    assert_includes response.body, "GPT-5"
     assert_includes response.body, "gpt-5"
     assert_includes response.body, "openai"
     assert_includes response.body, "gemini-2.5-flash"
+    assert_includes response.body, "Temperature"
+    assert_includes response.body, "Verbosity"
+    assert_includes response.body, "Reasoning"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "provider=openai"
+    assert_includes response.body, "model=gpt-5"
     assert_includes response.body, "date_range_preset=last_30_days"
+    refute_includes response.body, "API model"
+    refute_includes response.body, "Calls (30d)"
   end
 
   test "registered prompts screen shows chart and table metrics" do

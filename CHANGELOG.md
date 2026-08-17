@@ -26,6 +26,9 @@ Versioning and Keep a Changelog.
   screens and section links.
 - Registered Providers table includes a 30-day calls mini chart after Configured;
   clicking it opens AI Calls filtered to that provider.
+- Registered Models table drops Key/Name, renames API model to Model, shows
+  Temperature / Verbosity / Reasoning defaults, and uses a 30-day calls mini
+  chart that opens AI Calls filtered to that provider and model.
 
 ### Removed
 

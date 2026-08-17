@@ -28,12 +28,12 @@ module AdminScreens
     provider_row_members = %i[key class_name configured models_count calls calls_series]
     remove_const(:ProviderRow) if const_defined?(:ProviderRow) && ProviderRow.members != provider_row_members
     ProviderRow = Data.define(*provider_row_members) unless const_defined?(:ProviderRow)
-    unless const_defined?(:ModelRow)
-      ModelRow = Data.define(
-        :provider, :key, :display_name, :model, :streaming, :structured_output, :batch,
-        :tools, :input_modalities, :output_modalities, :calls
-      )
-    end
+    model_row_members = %i[
+      provider model temperature verbosity reasoning_effort streaming structured_output batch
+      tools input_modalities output_modalities calls calls_series
+    ]
+    remove_const(:ModelRow) if const_defined?(:ModelRow) && ModelRow.members != model_row_members
+    ModelRow = Data.define(*model_row_members) unless const_defined?(:ModelRow)
 
     def runs_scope(context)
       scope = RecordingStudioAI::Run.all
@@ -373,27 +373,43 @@ module AdminScreens
     end
 
     def model_rows(context)
-      call_counts = runs_scope(context)
-                    .where(created_at: 30.days.ago..Time.current)
-                    .where.not(resolved_model: [nil, ""])
-                    .group(:resolved_provider, :resolved_model)
-                    .count
+      date_range = 30.days.ago.beginning_of_day..Time.current
+      range_runs = runs_scope(context)
+                   .where(created_at: date_range)
+                   .where.not(resolved_model: [nil, ""])
+      call_counts = range_runs.group(:resolved_provider, :resolved_model).count
+      daily_counts = range_runs.group_by do |run|
+        [run.resolved_provider.to_s, run.resolved_model.to_s, run.created_at.to_date]
+      end.transform_values(&:count)
 
       RecordingStudioAI.models.all.map do |definition|
+        provider_key = definition.provider.to_s
+        model_key = definition.model
         ModelRow.new(
-          definition.provider.to_s,
-          definition.key,
-          definition.display_name,
-          definition.model,
+          provider_key,
+          model_key,
+          parameter_default_label(definition, :temperature),
+          parameter_default_label(definition, :verbosity),
+          parameter_default_label(definition, :reasoning_effort),
           definition.delivery.fetch(:streaming, false),
           definition.delivery.fetch(:structured_output, false),
           definition.delivery.fetch(:batch, false),
           definition.tools.map(&:to_s).join(", "),
           definition.modalities.fetch(:input, []).map(&:to_s).join(", "),
           definition.modalities.fetch(:output, []).map(&:to_s).join(", "),
-          call_counts.fetch([definition.provider.to_s, definition.model], 0)
+          call_counts.fetch([provider_key, model_key], 0),
+          (date_range.begin.to_date..date_range.end.to_date).map do |date|
+            { x: date.strftime("%b %-d"), y: daily_counts.fetch([provider_key, model_key, date], 0) }
+          end
         )
-      end.sort_by { |row| [-row.calls, row.provider, row.key] }
+      end.sort_by { |row| [-row.calls, row.provider, row.model] }
+    end
+
+    def parameter_default_label(definition, name)
+      return "—" unless definition.supports_parameter?(name)
+
+      value = definition.parameter(name)&.fetch(:default, nil)
+      value.nil? ? "Supported" : value.to_s
     end
 
     def top_provider_call_rows(context, range: 30.days.ago..Time.current, limit: 5)
@@ -1989,9 +2005,10 @@ module AdminScreens
       hide_count
 
       column :provider, title: "Provider"
-      column :display_name, title: "Name"
-      column :key, title: "Key"
-      column :model, title: "API model"
+      column :model, title: "Model"
+      column :temperature, title: "Temperature"
+      column :verbosity, title: "Verbosity"
+      column :reasoning_effort, title: "Reasoning"
       column :streaming,
              title: "Streaming",
              value: ->(row, _context) { row.streaming ? "Yes" : "No" }
@@ -2004,17 +2021,19 @@ module AdminScreens
       column :tools, title: "Tools"
       column :input_modalities, title: "Input"
       column :output_modalities, title: "Output"
-      column :calls,
-             title: "Calls (30d)",
+      column :calls_series,
+             title: "Calls",
              value: lambda { |row, context|
                ActionController::Base.helpers.link_to(
-                 AdminScreens::RecordingStudioAIWidgets.number(row.calls),
+                 AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
                  "#{context.admin_screen_path('ai_calls')}?#{{
                    provider: row.provider,
                    model: row.model,
                    date_range_preset: :last_30_days
                  }.to_query}",
-                 data: { turbo_frame: "_top" }
+                 class: "inline-block",
+                 data: { turbo_frame: "_top" },
+                 aria: { label: "AI calls for #{row.provider}/#{row.model} in the last 30 days" }
                )
              }
     end
