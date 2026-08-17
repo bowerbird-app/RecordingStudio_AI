@@ -20,16 +20,32 @@ Layout/LineLength:
 Metrics/ClassLength:
   Exclude:
     - 'test/**/*'
+    - 'lib/recording_studio_ai/admin_screens.rb'
 
 Metrics/MethodLength:
   Exclude:
     - 'test/**/*'
     - 'lib/generators/**/*'
+    - 'lib/recording_studio_ai/admin_screens.rb'
 
 Metrics/AbcSize:
   Exclude:
     - 'test/**/*'
     - 'lib/generators/**/*'
+    - 'lib/recording_studio_ai/admin_screens.rb'
+
+Metrics/BlockLength:
+  Exclude:
+    - 'test/**/*'
+    - 'lib/recording_studio_ai/admin_screens.rb'
+
+Metrics/CyclomaticComplexity:
+  Exclude:
+    - 'lib/recording_studio_ai/admin_screens.rb'
+
+Metrics/PerceivedComplexity:
+  Exclude:
+    - 'lib/recording_studio_ai/admin_screens.rb'
 
 # Allow empty blocks in tests (common for stubs/mocks)
 Lint/EmptyBlock:

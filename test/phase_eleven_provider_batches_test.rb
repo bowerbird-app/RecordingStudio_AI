@@ -292,15 +292,15 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     assert_equal "completed", first.status
     assert_equal "answer one", first.items.first.text
     assert_equal 15, first.usage.total_tokens
-    assert_equal 300, first.cost.amount
+    assert_nil first.cost
     assert_equal 15, second.usage.total_tokens
-    assert_equal 300, second.cost.amount
+    assert_nil second.cost
     assert_equal "answer one", second.items.first.text
     assert_equal 2, RecordingStudioAI::Run.where(status: "completed").count
     assert_equal 2, @provider.refreshes.length
   end
 
-  def test_batch_catalog_costs_preserve_estimated_source
+  def test_batch_catalog_costs_are_omitted_after_cost_removal
     response = submit_two_items
     @provider.refresh_result = completed_result(with_cost: false)
     RecordingStudioAI.configuration.cost_catalogs = {
@@ -311,10 +311,9 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
       batch_id: response.batch.id, root_recording: @root_recording, initiator: @initiator
     )
 
-    assert_equal "catalog", refreshed.items.first.cost.source
-    assert refreshed.items.first.cost.estimated?
-    assert_equal "catalog", refreshed.cost.source
-    assert refreshed.cost.estimated?
+    assert refreshed.success?
+    assert_nil refreshed.items.first.cost
+    assert_nil refreshed.cost
   end
 
   def test_batch_mixed_currencies_leave_aggregate_cost_unknown
@@ -636,7 +635,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
       Struct.new(:id).new("file-1")
     end
 
-    def content(file_id)
+    def content(_file_id)
       return StringIO.new("{not-json\n") if malformed
 
       StringIO.new(JSON.generate(
