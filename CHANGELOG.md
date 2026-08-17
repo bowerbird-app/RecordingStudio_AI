@@ -24,6 +24,8 @@ Versioning and Keep a Changelog.
 - Admin dashboard adds Registered Providers and Registered Models widgets (top 5
   by call volume) at the end of the widget grid, plus matching table-only
   screens and section links.
+- Registered Providers table includes a 30-day calls mini chart after Configured;
+  clicking it opens AI Calls filtered to that provider.
 
 ### Removed
 

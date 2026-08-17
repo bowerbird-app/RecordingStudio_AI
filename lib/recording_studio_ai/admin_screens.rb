@@ -25,8 +25,11 @@ module AdminScreens
       LatencyRow = Data.define(:name, :calls, :p50_latency_ms, :p90_latency_ms, :average_latency_ms,
                                :max_latency_ms)
     end
+    if const_defined?(:ProviderRow) && ProviderRow.members != %i[key class_name configured models_count calls calls_series]
+      remove_const(:ProviderRow)
+    end
     unless const_defined?(:ProviderRow)
-      ProviderRow = Data.define(:key, :class_name, :configured, :models_count, :calls)
+      ProviderRow = Data.define(:key, :class_name, :configured, :models_count, :calls, :calls_series)
     end
     unless const_defined?(:ModelRow)
       ModelRow = Data.define(
@@ -348,19 +351,26 @@ module AdminScreens
     end
 
     def provider_rows(context)
-      call_counts = runs_scope(context)
-                    .where(created_at: 30.days.ago..Time.current)
-                    .where.not(resolved_provider: [nil, ""])
-                    .group(:resolved_provider)
-                    .count
+      date_range = 30.days.ago.beginning_of_day..Time.current
+      range_runs = runs_scope(context)
+                   .where(created_at: date_range)
+                   .where.not(resolved_provider: [nil, ""])
+      call_counts = range_runs.group(:resolved_provider).count
+      daily_counts = range_runs.group_by do |run|
+        [run.resolved_provider.to_s, run.created_at.to_date]
+      end.transform_values(&:count)
 
       RecordingStudioAI.configuration.providers.map do |key, provider|
+        provider_key = key.to_s
         ProviderRow.new(
-          key.to_s,
+          provider_key,
           provider.class.name.demodulize,
           provider.respond_to?(:configured?) ? provider.configured? : false,
           RecordingStudioAI.models.for_provider(key).length,
-          call_counts.fetch(key.to_s, 0)
+          call_counts.fetch(provider_key, 0),
+          (date_range.begin.to_date..date_range.end.to_date).map do |date|
+            { x: date.strftime("%b %-d"), y: daily_counts.fetch([provider_key, date], 0) }
+          end
         )
       end.sort_by { |row| [-row.calls, row.key] }
     end
@@ -1944,16 +1954,18 @@ module AdminScreens
              display_options: lambda { |_row, _context, value|
                { text: value, style: value == "Yes" ? :success : :warning, size: :sm }
              }
-      column :models_count, title: "Models"
-      column :calls,
-             title: "Calls (30d)",
+      column :calls_series,
+             title: "Calls",
              value: lambda { |row, context|
                ActionController::Base.helpers.link_to(
-                 AdminScreens::RecordingStudioAIWidgets.number(row.calls),
+                 AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
                  "#{context.admin_screen_path('ai_calls')}?#{{ provider: row.key }.to_query}",
-                 data: { turbo_frame: "_top" }
+                 class: "inline-block",
+                 data: { turbo_frame: "_top" },
+                 aria: { label: "AI calls for #{row.key} in the last 30 days" }
                )
              }
+      column :models_count, title: "Models"
     end
   end
 
