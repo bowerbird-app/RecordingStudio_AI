@@ -27,9 +27,7 @@ module AdminScreens
     end
     provider_row_members = %i[key class_name configured models_count calls calls_series]
     remove_const(:ProviderRow) if const_defined?(:ProviderRow) && ProviderRow.members != provider_row_members
-    unless const_defined?(:ProviderRow)
-      ProviderRow = Data.define(*provider_row_members)
-    end
+    ProviderRow = Data.define(*provider_row_members) unless const_defined?(:ProviderRow)
     unless const_defined?(:ModelRow)
       ModelRow = Data.define(
         :provider, :key, :display_name, :model, :streaming, :structured_output, :batch,
@@ -1202,7 +1200,10 @@ module AdminScreens
           icon: :server,
           text: key,
           trailing: "#{AdminScreens::RecordingStudioAIWidgets.number(calls)} calls",
-          href: "#{context.admin_screen_path('ai_calls')}?#{{ provider: key }.to_query}"
+          href: "#{context.admin_screen_path('ai_calls')}?#{{
+            provider: key,
+            date_range_preset: :last_30_days
+          }.to_query}"
         }
       end.presence || [{ text: "No registered providers." }]
     end
@@ -1224,7 +1225,8 @@ module AdminScreens
           trailing: "#{AdminScreens::RecordingStudioAIWidgets.number(calls)} calls",
           href: "#{context.admin_screen_path('ai_calls')}?#{{
             provider: provider,
-            model: model
+            model: model,
+            date_range_preset: :last_30_days
           }.to_query}"
         }
       end.presence || [{ text: "No registered models." }]
@@ -1958,7 +1960,10 @@ module AdminScreens
              value: lambda { |row, context|
                ActionController::Base.helpers.link_to(
                  AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
-                 "#{context.admin_screen_path('ai_calls')}?#{{ provider: row.key }.to_query}",
+                 "#{context.admin_screen_path('ai_calls')}?#{{
+                   provider: row.key,
+                   date_range_preset: :last_30_days
+                 }.to_query}",
                  class: "inline-block",
                  data: { turbo_frame: "_top" },
                  aria: { label: "AI calls for #{row.key} in the last 30 days" }

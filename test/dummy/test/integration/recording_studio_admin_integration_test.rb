@@ -267,7 +267,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "OpenAI"
     assert_includes response.body, "Gemini"
     assert_includes response.body, "flat-pack--chart"
-    assert_includes response.body, "/admin/screens/ai_calls?provider=openai"
+    assert_includes response.body, "ai_calls?"
+    assert_includes response.body, "provider=openai"
+    assert_includes response.body, "date_range_preset=last_30_days"
   end
 
   test "registered models screen lists every registered model definition" do
