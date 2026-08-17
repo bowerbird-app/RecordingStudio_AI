@@ -4,7 +4,7 @@ class AIPlaygroundController < ApplicationController
   include ActionController::Live
 
   PROVIDERS = {
-    "" => "Auto (profile default)",
+    "auto" => "Auto (profile default)",
     "openai" => "OpenAI",
     "gemini" => "Gemini"
   }.freeze
@@ -140,7 +140,7 @@ class AIPlaygroundController < ApplicationController
       **base_request_for(@form, root_recording: root_recording, request_id: request_id)
         .except(:purpose)
         .merge(
-          provider: provider || (@form.fetch("provider").presence&.to_sym),
+          provider: provider || provider_override(@form),
           model: model,
           items: batch_items_for(
             @form.fetch("batch_items", []),
@@ -153,7 +153,7 @@ class AIPlaygroundController < ApplicationController
 
   def generation_kwargs(form, root_recording:, request_id:)
     provider, model = split_candidate_value(form["model"])
-    provider ||= form.fetch("provider").presence&.to_sym
+    provider ||= provider_override(form)
     kwargs = base_request_for(form, root_recording: root_recording, request_id: request_id).merge(
       messages: [user_message(form.fetch("prompt"))],
       provider: provider,
@@ -268,10 +268,10 @@ class AIPlaygroundController < ApplicationController
   end
 
   def default_form
-    medium_default = candidates_for("medium", "").first
+    medium_default = candidates_for("medium", "auto").first
     {
       "mode" => "generate",
-      "provider" => "",
+      "provider" => "auto",
       "profile" => "medium",
       "model" => medium_default ? candidate_value(medium_default) : "",
       "prompt" => "what's the weather in Osaka",
@@ -326,6 +326,7 @@ class AIPlaygroundController < ApplicationController
   end
 
   def candidates_for(profile, provider)
+    provider = "" if provider.to_s == "auto"
     entries = Array(RecordingStudioAI.configuration.profiles[profile.to_sym]).map { |entry| entry.transform_keys(&:to_sym) }
     entries.select! { |entry| entry[:provider].to_s == provider.to_s } if provider.present?
     entries
@@ -374,6 +375,13 @@ class AIPlaygroundController < ApplicationController
 
   def batch_mode?(form = @form)
     form.fetch("mode", "generate") == "batch"
+  end
+
+  def provider_override(form = @form)
+    value = form.fetch("provider", "auto").to_s
+    return nil if value.blank? || value == "auto"
+
+    value.to_sym
   end
 
   def present_number(value)

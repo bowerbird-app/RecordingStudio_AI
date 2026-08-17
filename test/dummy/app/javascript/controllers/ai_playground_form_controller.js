@@ -49,7 +49,7 @@ export default class extends Controller {
     const profile = this.profileTarget.value
     const provider = this.hasProviderTarget ? this.providerTarget.value : ""
     let candidates = this.candidatesValue[profile] || []
-    if (provider) {
+    if (provider && provider !== "auto") {
       candidates = candidates.filter((candidate) => candidate.provider === provider)
     }
 
