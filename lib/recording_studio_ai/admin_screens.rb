@@ -25,11 +25,10 @@ module AdminScreens
       LatencyRow = Data.define(:name, :calls, :p50_latency_ms, :p90_latency_ms, :average_latency_ms,
                                :max_latency_ms)
     end
-    if const_defined?(:ProviderRow) && ProviderRow.members != %i[key class_name configured models_count calls calls_series]
-      remove_const(:ProviderRow)
-    end
+    provider_row_members = %i[key class_name configured models_count calls calls_series]
+    remove_const(:ProviderRow) if const_defined?(:ProviderRow) && ProviderRow.members != provider_row_members
     unless const_defined?(:ProviderRow)
-      ProviderRow = Data.define(:key, :class_name, :configured, :models_count, :calls, :calls_series)
+      ProviderRow = Data.define(*provider_row_members)
     end
     unless const_defined?(:ModelRow)
       ModelRow = Data.define(
