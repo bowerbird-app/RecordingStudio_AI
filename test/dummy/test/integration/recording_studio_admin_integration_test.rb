@@ -294,6 +294,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "gpt-5"
     assert_includes response.body, "openai"
     assert_includes response.body, "gemini-2.5-flash"
+    assert_includes response.body, "date_range_preset=last_30_days"
   end
 
   test "registered prompts screen shows chart and table metrics" do

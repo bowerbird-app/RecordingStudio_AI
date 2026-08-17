@@ -2011,7 +2011,8 @@ module AdminScreens
                  AdminScreens::RecordingStudioAIWidgets.number(row.calls),
                  "#{context.admin_screen_path('ai_calls')}?#{{
                    provider: row.provider,
-                   model: row.model
+                   model: row.model,
+                   date_range_preset: :last_30_days
                  }.to_query}",
                  data: { turbo_frame: "_top" }
                )
