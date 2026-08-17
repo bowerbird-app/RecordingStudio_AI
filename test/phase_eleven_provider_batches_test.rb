@@ -6,6 +6,7 @@ require "active_record"
 migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb",
                                       __dir__)].first
 require migration_file
+require_relative "../db/migrate/20260814120000_add_prompt_attribution_to_recording_studio_ai_runs"
 require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
 require File.expand_path("../db/migrate/20260811120000_harden_recording_studio_ai_persistence.rb", __dir__)
 require File.expand_path("../db/migrate/20260811130000_enforce_recording_studio_ai_history_integrity.rb", __dir__)
@@ -64,6 +65,7 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     ActiveRecord::Base.connection.create_table(:recording_studio_recordings) { |table| table.timestamps }
     ActiveRecord::Migration.suppress_messages do
       CreateRecordingStudioAIPersistenceTables.migrate(:up)
+      AddPromptAttributionToRecordingStudioAIRuns.migrate(:up)
       RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up)
       HardenRecordingStudioAIPersistence.migrate(:up)
       EnforceRecordingStudioAIHistoryIntegrity.migrate(:up)

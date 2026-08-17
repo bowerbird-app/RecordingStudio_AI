@@ -13,6 +13,8 @@ Versioning and Keep a Changelog.
   and per-prompt success/error/latency metrics for the selected date range.
 - Registered Prompts dashboard widget listing the top 5 most-called prompts
   in the last 30 days.
+- Engine phase-test schemas now apply prompt-attribution and correlation-id
+  migrations so orchestrator persistence matches current run columns.
 - Stacked Attempts admin chart with selectable time grouping, attempt-kind
   series, and zero-filled buckets across the complete selected period.
 - Phase 2 public Ruby API contract surface for generation, streaming, batches,

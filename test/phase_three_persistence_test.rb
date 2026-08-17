@@ -22,6 +22,8 @@ class PhaseThreePersistenceTest < Minitest::Test
 
     ActiveRecord::Migration.suppress_messages do
       CreateRecordingStudioAIPersistenceTables.migrate(:up)
+      AddPromptAttributionToRecordingStudioAIRuns.migrate(:up)
+      RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up)
       HardenRecordingStudioAIPersistence.migrate(:up)
       EnforceRecordingStudioAIHistoryIntegrity.migrate(:up)
     end
