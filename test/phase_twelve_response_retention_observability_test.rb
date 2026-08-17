@@ -3,8 +3,11 @@
 require "test_helper"
 require "active_record"
 
-migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb", __dir__)].first
+migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb",
+                                      __dir__)].first
 require migration_file
+require_relative "../db/migrate/20260814120000_add_prompt_attribution_to_recording_studio_ai_runs"
+require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
 
 require_relative "../app/models/recording_studio_ai/application_record"
 require_relative "../app/models/concerns/recording_studio_ai/terminal_immutability"
@@ -56,7 +59,11 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     )
     ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
     ActiveRecord::Base.connection.create_table(:recording_studio_recordings) { |table| table.timestamps }
-    ActiveRecord::Migration.suppress_messages { CreateRecordingStudioAIPersistenceTables.migrate(:up) }
+    ActiveRecord::Migration.suppress_messages do
+      CreateRecordingStudioAIPersistenceTables.migrate(:up)
+      AddPromptAttributionToRecordingStudioAIRuns.migrate(:up)
+      RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up)
+    end
     @root_recording = Actor.new(create_recording_id)
     @initiator = Actor.new(71)
     @original_configuration = RecordingStudioAI.instance_variable_get(:@configuration)
@@ -268,7 +275,7 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     RecordingStudioAI.configuration.profiles[:medium].first[:capabilities] << :streaming
     events = []
 
-    RecordingStudioAI.stream(
+    RecordingStudioAI.generate(stream: true, 
       prompt: "private prompt", root_recording: @root_recording, initiator: @initiator, provider: :test
     ) { |event| events << event }
 
@@ -276,7 +283,7 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     assert_equal "stream", retained.response_type
     assert_equal "assembled stream", retained.content_text
     refute_includes retained.normalized_response, "private-chunk-one"
-    assert_equal 2, events.count { |event| event.type == "text_delta" }
+    assert_equal(2, events.count { |event| event.type == "text_delta" })
   end
 
   def test_normalized_error_and_batch_item_retention_are_idempotent
@@ -412,12 +419,14 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     serialized = JSON.generate(events)
     refute_includes serialized, "private prompt"
     refute_includes serialized, "assembled response"
-    assert events.all? { |_name, payload| (payload.keys & %i[prompt output chunks attachments tool_args result]).empty? }
+    assert(events.all? do |_name, payload|
+      (payload.keys & %i[prompt output chunks attachments tool_args result]).empty?
+    end)
 
     completed_attempt = RecordingStudioAI::Attempt.where(status: "completed").first
     event_count = events.count { |name, _payload| name == "recording_studio_ai.attempt.completed" }
     completed_attempt.update!(metadata: { safe: true })
-    assert_equal event_count, events.count { |name, _payload| name == "recording_studio_ai.attempt.completed" }
+    assert_equal(event_count, events.count { |name, _payload| name == "recording_studio_ai.attempt.completed" })
 
     unsafe = create_run
     unsafe.attempts.create!(
@@ -445,9 +454,9 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     assert_equal 0.5, report[:values][:provider_error_rate]
     assert_includes report[:breaches].map { |breach| breach[:metric] }, :error_rate
     assert_includes report[:breaches].map { |breach| breach[:metric] }, :provider_error_rate
-    assert_equal %i[runs error_rate input_tokens output_tokens total_tokens spend_microunits average_latency_ms
+    assert_equal %i[runs error_rate input_tokens output_tokens total_tokens average_latency_ms
                     slow_calls retries fallbacks tool_calls maximum_tool_calls_per_run expensive_model_runs destructive_requests
-            confirmation_rejections batch_failures batch_expirations provider_error_rate],
+                    confirmation_rejections batch_failures batch_expirations provider_error_rate],
                  report[:values].keys
   end
 

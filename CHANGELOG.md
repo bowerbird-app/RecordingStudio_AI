@@ -5,12 +5,65 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- `RecordingStudioAI.generate` accepts `stream: true`, optional `model:` override,
+  and flat generation parameters (`temperature`, `verbosity`, `max_output_tokens`,
+  `reasoning_effort`) validated against the model registry.
+- AI Playground uses a single capability-driven generate form (plus a separate
+  batch section) instead of Chat / Streaming / Tool Calls / Batch tabs.
+
+### Changed
+
+- Streaming is configured with `stream: true` on `generate` / `generate!`.
+  Upgrade note: replace `RecordingStudioAI.stream(...)` with
+  `RecordingStudioAI.generate(stream: true, ...)` and
+  `RecordingStudioAI.stream!(...)` with `RecordingStudioAI.generate!(stream: true, ...)`.
+- Batch remains on `submit_batch` / `refresh_batch*` and is not folded into
+  `generate`. Playground batch demos use a secondary section on the same page.
+
+### Removed
+
+- `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
+
 ## [0.2.0] - 2026-08-17
 
 ### Added
 
+- Model registry (`RecordingStudioAI.models`) with declarative model definitions
+  describing delivery modes, tunable parameters (temperature, verbosity,
+  max output tokens, reasoning effort), native tools, and input/output
+  modalities. Built-in OpenAI and Gemini models ship as registration scripts
+  under `lib/recording_studio_ai/models/<provider>/<key>.rb`.
+- Profiles now reference models by their provider API model string and derive
+  capabilities from the model registry; explicit `capabilities:` on a profile
+  entry remains supported for custom/unregistered models.
+- `/config` and `/methods` guides document how to add providers, register
+  models, and create profiles.
+- Registered Prompts admin screen with call-volume chart, definition modal,
+  and per-prompt success/error/latency metrics for the selected date range.
+- Registered Prompts dashboard widget listing the top 5 most-called prompts
+  in the last 30 days.
+- Registered Prompts table columns for average input and output tokens.
+- Registered Prompts definition modal now includes the full prompt messages.
+- Attempts admin screen adds prompt/model/token/error-code filters, a Prompt
+  table column, and hides AI call/sequence/kind columns by default.
+- Engine phase-test schemas now apply prompt-attribution and correlation-id
+  migrations so orchestrator persistence matches current run columns.
 - Stacked Attempts admin chart with selectable time grouping, attempt-kind
   series, and zero-filled buckets across the complete selected period.
+
+### Changed
+
+- Default profiles and the install template no longer hard-code `capabilities:`
+  arrays; capabilities are derived from the model registry. Upgrade note:
+  existing profiles keep working (explicit `capabilities:` is still honored),
+  but for models that are not registered you must either register them via
+  `RecordingStudioAI.models.register(...)` or keep an explicit `capabilities:`
+  entry on the profile candidate.
+
+### Added (continued)
+
 - Phase 2 public Ruby API contract surface for generation, streaming, batches,
 	and tools registration.
 - Normalized contract objects for responses, usage, cost, citations,

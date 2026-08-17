@@ -93,7 +93,7 @@ class PhaseTwoContractsTest < Minitest::Test
   def test_stream_emits_normalized_resolution_error_and_returns_contract_response
     events = []
 
-    response = RecordingStudioAI.stream(
+    response = RecordingStudioAI.generate(stream: true, 
       prompt: "Stream this",
       purpose: "stream_summary",
       root_recording: @root_recording,
@@ -110,7 +110,7 @@ class PhaseTwoContractsTest < Minitest::Test
 
   def test_stream_bang_requires_block
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
-      RecordingStudioAI.stream!(
+      RecordingStudioAI.generate!(stream: true, 
         prompt: "Stream this",
         root_recording: @root_recording,
         initiator: @initiator

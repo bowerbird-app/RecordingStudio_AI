@@ -34,7 +34,7 @@
   <section class="space-y-3">
     <%= render FlatPack::PageTitle::Component.new(
       title: "Generate",
-      subtitle: "Generate a complete response. The non-bang method returns a response object with success and error details.",
+      subtitle: "One entry point for sync and streaming generation. Pass stream: true to receive incremental events. Optional model and flat generation parameters are validated against the model registry.",
       variant: :h3,
       class: "mb-0 pb-0"
     ) %>
@@ -47,6 +47,11 @@
           prompt: "Summarize this page for an editor.",
           purpose: "page_summary",
           profile: :medium,
+          provider: :openai,
+          model: "gpt-5",
+          temperature: 0.4,
+          verbosity: "medium",
+          provider_native_tools: [:web_search],
           metadata: { feature: "page_editor" },
           **attribution
         )
@@ -61,23 +66,15 @@
         response = RecordingStudioAI.generate!(prompt: "Draft a title", **attribution)
       RUBY
     ) %>
-  </section>
-
-  <section class="space-y-3">
-    <%= render FlatPack::PageTitle::Component.new(
-      title: "Stream",
-      subtitle: "Receive provider output incrementally. Provide a block, or use the returned Enumerator when no block is supplied.",
-      variant: :h3,
-      class: "mb-0 pb-0"
-    ) %>
 
     <%= render FlatPack::CodeBlock::Component.new(
       title: "Streaming generation",
       language: "ruby",
       code: <<~'RUBY'
-        RecordingStudioAI.stream(
+        RecordingStudioAI.generate(
           prompt: "Explain this report in three bullets.",
           purpose: "report_explanation",
+          stream: true,
           **attribution
         ) do |event|
           next unless event.type == "content_delta"
@@ -85,7 +82,8 @@
           broadcast_append_to("generation_#{current_user.id}", target: "output", html: event.text)
         end
 
-        events = RecordingStudioAI.stream(prompt: "Draft an outline", **attribution)
+        # Without a block, stream: true returns an Enumerator.
+        events = RecordingStudioAI.generate(prompt: "Draft an outline", stream: true, **attribution)
         events.each { |event| process_event(event) }
       RUBY
     ) %>
@@ -94,7 +92,7 @@
   <section class="space-y-3">
     <%= render FlatPack::PageTitle::Component.new(
       title: "Batch",
-      subtitle: "Submit independent items to a provider batch, then refresh synchronously or enqueue polling with Sidekiq through ActiveJob.",
+      subtitle: "Submit independent items to a provider batch, then refresh synchronously or enqueue polling with Sidekiq through ActiveJob. Batch stays on submit_batch — it is not part of generate.",
       variant: :h3,
       class: "mb-0 pb-0"
     ) %>
@@ -105,6 +103,8 @@
       code: <<~'RUBY'
         batch = RecordingStudioAI.submit_batch(
           purpose: "nightly_page_summaries",
+          profile: :medium,
+          model: "gpt-5-mini",
           items: pages.map do |page|
             {
               reference: page.id.to_s,
@@ -124,6 +124,49 @@
         RecordingStudioAI.refresh_batch_async(batch_id: batch.batch.id, **attribution)
 
         RecordingStudioAI.cancel_batch(batch_id: batch.batch.id, **attribution)
+      RUBY
+    ) %>
+  </section>
+
+  <section class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Models",
+      subtitle: "Register provider models declaratively, then reference them by their provider API model string in profiles. Query the registry to inspect what a model supports.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Register and query models",
+      language: "ruby",
+      code: <<~'RUBY'
+        # Register a model (built-ins live under lib/recording_studio_ai/models/<provider>/<key>.rb).
+        RecordingStudioAI.models.register(
+          provider: :openai,
+          key: "gpt-5",
+          model: "gpt-5",
+          display_name: "GPT-5",
+          delivery: { streaming: true, structured_output: true, batch: true, batch_cancellation: true },
+          parameters: {
+            temperature:       { supported: true, min: 0.0, max: 2.0, default: 1.0, step: 0.1 },
+            verbosity:         { supported: true, values: %w[low medium high], default: "medium" },
+            max_output_tokens: { supported: true, min: 1, max: 128_000, default: 8_192 },
+            reasoning_effort:  { supported: true, values: %w[minimal low medium high], default: "medium" }
+          },
+          tools: %i[web_search file_search code_execution image_generation custom_tools],
+          modalities: { input: %i[text image file], output: %i[text] }
+        )
+
+        # Inspect a model (used by the resolver and the AI playground).
+        model = RecordingStudioAI.models.fetch(:openai, "gpt-5")
+        model.capabilities            # => [:generation, :streaming, :structured_output, ...]
+        model.supports_parameter?(:temperature)   # => true
+        model.parameter(:temperature)             # => { supported: true, min: 0.0, max: 2.0, ... }
+        model.supports_tool?(:web_search)         # => true
+        model.modalities                          # => { input: [:text, :image, :file], output: [:text] }
+
+        RecordingStudioAI.models.for_provider(:openai)  # all OpenAI models
+        RecordingStudioAI.models.all                    # every registered model
       RUBY
     ) %>
   </section>

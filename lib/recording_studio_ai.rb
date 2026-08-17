@@ -10,6 +10,7 @@ require "recording_studio_ai/metadata"
 require "recording_studio_ai/authorization"
 require "recording_studio_ai/tools"
 require "recording_studio_ai/prompts"
+require "recording_studio_ai/models"
 require "recording_studio_ai/attachments"
 require "recording_studio_ai/cost_calculator"
 require "recording_studio_ai/structured_output"
@@ -68,67 +69,62 @@ module RecordingStudioAI
       discovered
     end
 
-    def generate(**kwargs)
-      request = Contracts::RequestValidation.validate_generation_request!(**kwargs)
+    def generate(**, &block)
+      request = Contracts::RequestValidation.validate_generation_request!(**)
       configuration.validate!
-      Authorization.authorize!(
-        :execute,
-        attribution: request[:attribution],
-        context: {
-          operation: "generation",
-          profile: request[:profile],
-          purpose: request[:purpose]
-        }
-      )
-      authorize_provider_native_tools!(request)
-      Orchestrator.new.generate(request)
-    end
 
-    def generate!(**kwargs)
-      response = generate(**kwargs)
-      raise Errors::ExecutionError, response unless response.success?
+      if request[:stream]
+        return stream_enumerator(**) unless block
 
-      response
-    end
-
-    def stream(**kwargs)
-      unless block_given?
-        return Enumerator.new do |events|
-          stream(**kwargs) { |event| events << event }
+        Authorization.authorize!(
+          :execute,
+          attribution: request[:attribution],
+          context: {
+            operation: "stream",
+            profile: request[:profile],
+            purpose: request[:purpose]
+          }
+        )
+        authorize_provider_native_tools!(request, operation: "stream")
+        Orchestrator.new.stream(request, &block)
+      else
+        if block
+          raise Errors::ContractValidationError.new(
+            "generate only accepts a block when stream: true",
+            code: "invalid_request"
+          )
         end
-      end
 
-      request = Contracts::RequestValidation.validate_generation_request!(**kwargs)
-      configuration.validate!
-      Authorization.authorize!(
-        :execute,
-        attribution: request[:attribution],
-        context: {
-          operation: "stream",
-          profile: request[:profile],
-          purpose: request[:purpose]
-        }
-      )
-      authorize_provider_native_tools!(request, operation: "stream")
-      Orchestrator.new.stream(request) { |event| yield event }
+        Authorization.authorize!(
+          :execute,
+          attribution: request[:attribution],
+          context: {
+            operation: "generation",
+            profile: request[:profile],
+            purpose: request[:purpose]
+          }
+        )
+        authorize_provider_native_tools!(request)
+        Orchestrator.new.generate(request)
+      end
     end
 
-    def stream!(**kwargs, &block)
-      unless block
+    def generate!(**kwargs, &block)
+      if kwargs.fetch(:stream, false) && !block
         raise Errors::ContractValidationError.new(
-          "stream! requires a block to receive streaming events",
+          "generate!(stream: true) requires a block to receive streaming events",
           code: "invalid_request"
         )
       end
 
-      response = stream(**kwargs, &block)
+      response = generate(**kwargs, &block)
       raise Errors::ExecutionError, response unless response.success?
 
       response
     end
 
-    def submit_batch(**kwargs)
-      request = Contracts::RequestValidation.validate_batch_submit_request!(**kwargs)
+    def submit_batch(**)
+      request = Contracts::RequestValidation.validate_batch_submit_request!(**)
       configuration.validate!
       Authorization.authorize!(
         :submit_batch,
@@ -148,8 +144,8 @@ module RecordingStudioAI
       BatchOrchestrator.new.submit(request)
     end
 
-    def refresh_batch(**kwargs)
-      request = Contracts::RequestValidation.validate_batch_lookup_request!(**kwargs)
+    def refresh_batch(**)
+      request = Contracts::RequestValidation.validate_batch_lookup_request!(**)
       configuration.validate!
       Authorization.authorize!(
         :view_execution,
@@ -162,8 +158,8 @@ module RecordingStudioAI
       BatchOrchestrator.new.refresh(request)
     end
 
-    def refresh_batch_async(**kwargs)
-      request = Contracts::RequestValidation.validate_batch_lookup_request!(**kwargs)
+    def refresh_batch_async(**)
+      request = Contracts::RequestValidation.validate_batch_lookup_request!(**)
       configuration.validate!
       Authorization.authorize!(
         :view_execution,
@@ -176,8 +172,8 @@ module RecordingStudioAI
       enqueue_batch_synchronization(request)
     end
 
-    def cancel_batch(**kwargs)
-      request = Contracts::RequestValidation.validate_batch_lookup_request!(**kwargs)
+    def cancel_batch(**)
+      request = Contracts::RequestValidation.validate_batch_lookup_request!(**)
       configuration.validate!
       Authorization.authorize!(
         :cancel_batch,
@@ -190,8 +186,8 @@ module RecordingStudioAI
       BatchOrchestrator.new.cancel(request)
     end
 
-    def read_retained_response(**kwargs)
-      ResponseReader.new.read(**kwargs)
+    def read_retained_response(**)
+      ResponseReader.new.read(**)
     end
 
     def tools
@@ -200,6 +196,20 @@ module RecordingStudioAI
 
     def prompts
       @prompts ||= RecordingStudioAI::Prompts::Registry.new
+    end
+
+    def models
+      return @models if @models
+
+      @models = RecordingStudioAI::Models::Registry.new
+      load_builtin_models!
+      @models
+    end
+
+    def load_builtin_models!
+      Dir.glob(File.expand_path("recording_studio_ai/models/*/*.rb", __dir__)).each do |file|
+        load file
+      end
     end
 
     def prompt(namespace, key, version: nil)
@@ -219,6 +229,12 @@ module RecordingStudioAI
     end
 
     private
+
+    def stream_enumerator(**kwargs)
+      Enumerator.new do |events|
+        generate(**kwargs, stream: true) { |event| events << event }
+      end
+    end
 
     def enqueue_batch_synchronization(request)
       attribution = request.fetch(:attribution)

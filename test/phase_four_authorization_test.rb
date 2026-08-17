@@ -102,7 +102,7 @@ class PhaseFourAuthorizationTest < Minitest::Test
     end
 
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
-      RecordingStudioAI.stream(
+      RecordingStudioAI.generate(stream: true, 
         prompt: "Stream this",
         root_recording: @root_recording,
         initiator: @initiator

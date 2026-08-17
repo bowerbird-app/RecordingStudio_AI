@@ -20,16 +20,47 @@ Layout/LineLength:
 Metrics/ClassLength:
   Exclude:
     - 'test/**/*'
+    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/models/definition.rb'
 
 Metrics/MethodLength:
   Exclude:
     - 'test/**/*'
     - 'lib/generators/**/*'
+    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/models/definition.rb'
 
 Metrics/AbcSize:
   Exclude:
     - 'test/**/*'
     - 'lib/generators/**/*'
+    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/models/definition.rb'
+
+Metrics/BlockLength:
+  Exclude:
+    - 'test/**/*'
+    - 'lib/recording_studio_ai/admin_screens.rb'
+
+Metrics/CyclomaticComplexity:
+  Exclude:
+    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/models/definition.rb'
+
+Metrics/PerceivedComplexity:
+  Exclude:
+    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/models/definition.rb'
+
+Metrics/ParameterLists:
+  Exclude:
+    - 'lib/recording_studio_ai/models/definition.rb'
+
+# Model catalog files are keyed by the provider model slug (dots become hyphens),
+# so their filenames are intentionally not snake_case.
+Naming/FileName:
+  Exclude:
+    - 'lib/recording_studio_ai/models/*/*.rb'
 
 # Allow empty blocks in tests (common for stubs/mocks)
 Lint/EmptyBlock:

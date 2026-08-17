@@ -55,22 +55,43 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Methods"
     assert_includes response.body, "RecordingStudioAI.generate"
     assert_includes response.body, "RecordingStudioAI.refresh_batch_async"
+    assert_includes response.body, "RecordingStudioAI.models.register"
+    assert_includes response.body, "RecordingStudioAI.models.fetch"
     assert_includes response.body, "href=\"/methods\""
   end
 
-  test "ai playground shows batch items only in the batch tab" do
+  test "config guide documents providers models and profiles" do
+    authenticate_for_admin!
+
+    get "/config"
+
+    assert_response :success
+    assert_includes response.body, "Add a Provider"
+    assert_includes response.body, "Add a Model"
+    assert_includes response.body, "Create Profiles"
+    assert_includes response.body, "RecordingStudioAI.models.register"
+    assert_includes response.body, "lib/recording_studio_ai/models/"
+    assert_includes response.body, "delivery"
+    assert_includes response.body, "modalities"
+  end
+
+  test "ai playground shows capability-driven generate form and batch section" do
     authenticate_for_admin!
 
     get "/ai_playground"
 
     assert_response :success
+    assert_includes response.body, "Run generate"
+    assert_includes response.body, "ai-playground-form"
+    assert_includes response.body, "Auto (profile default)"
+    assert_includes response.body, "name=\"ai_playground[model]\""
+    assert_includes response.body, "Streaming"
+    assert_includes response.body, "Web search"
+    assert_includes response.body, "Live response"
     assert_equal 1, response.body.scan(/>Batch items</).size
     assert_equal 3, response.body.scan(/name="ai_playground\[batch_items\]\[\]"/).size
-    assert_includes response.body, "Live response"
-    assert_includes response.body, "ai-playground-stream#submit"
-    assert_includes response.body, "data-ai-playground-stream-target=\"submit\""
-    assert_includes response.body, "disabled:opacity-60"
-    assert_includes File.read(Rails.root.join("app/javascript/controllers/ai_playground_stream_controller.js")),
+    refute_includes response.body, "ai-playground-stream#submit"
+    assert_includes File.read(Rails.root.join("app/javascript/controllers/ai_playground_form_controller.js")),
                     "new FormData(event.currentTarget)"
   end
 
@@ -114,7 +135,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "value=\"last_4_weeks\""
-    assert_includes response.body, "Tool Key"
+    assert_includes response.body, "Tool key"
     refute_includes response.body, ">Short name<"
   end
 
@@ -177,6 +198,131 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Custom tools"
     refute_includes response.body, "Current registry"
     assert_includes response.body, "href=\"/admin/screens/registered_custom_tools\""
+  end
+
+  test "registered prompts widget and section link to the prompts screen" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_namespace: "demo",
+      prompt_key: "summarize_text",
+      prompt_version: 1,
+      prompt_name_snapshot: "Text Summary"
+    )
+
+    get "/admin"
+
+    assert_response :success
+    assert_includes response.body, "Registered prompts"
+    assert_includes response.body, "Registered Prompts"
+    assert_includes response.body, "href=\"/admin/screens/registered_prompts\""
+    assert_includes response.body, "Text Summary"
+    assert_includes response.body, "prompt=summarize_text"
+    assert_includes response.body, "prompt_namespace=demo"
+  end
+
+  test "registered prompts screen shows chart and table metrics" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_namespace: "demo",
+      prompt_key: "summarize_text",
+      prompt_version: 1,
+      prompt_name_snapshot: "Text Summary",
+      latency_ms: 420,
+      input_tokens: 120,
+      output_tokens: 80
+    )
+    create_run!(
+      status: "failed",
+      operation: "generation",
+      prompt_namespace: "demo",
+      prompt_key: "summarize_text",
+      prompt_version: 1,
+      prompt_name_snapshot: "Text Summary",
+      latency_ms: 800,
+      input_tokens: 200,
+      output_tokens: 40
+    )
+
+    get "/admin/screens/registered_prompts"
+
+    assert_response :success
+    assert_includes response.body, "Registered prompts"
+    assert_includes response.body, "Success rate"
+    assert_includes response.body, "Error rate"
+    assert_includes response.body, "Average duration"
+    assert_includes response.body, "Avg input"
+    assert_includes response.body, "Avg output"
+
+    get "/admin/screens/registered_prompts/chart"
+
+    assert_response :success
+    assert_includes response.body, "Prompt call volume"
+    assert_includes response.body, "Text Summary"
+    assert_includes response.body, "Text Analysis"
+    assert_includes response.body, "Osaka Weather"
+    assert_includes response.body, "demo.analyze_text"
+    assert_includes response.body, "demo.osaka_weather"
+    assert_includes response.body, "demo.summarize_text"
+
+    get "/admin/screens/registered_prompts/table"
+
+    assert_response :success
+    assert_includes response.body, "Text Summary"
+    assert_includes response.body, "Avg input"
+    assert_includes response.body, "Avg output"
+    assert_includes response.body, ">160<"
+    assert_includes response.body, ">60<"
+    assert_includes response.body, "data-modal-id=\"registered-prompt-definition-demo-summarize_text-1\""
+    assert_includes response.body, "Creates a concise summary of supplied text"
+    assert_includes response.body, "Produce a concise factual summary."
+    assert_includes response.body, "Summarize this text:"
+    assert_includes response.body, "#000000"
+  end
+
+  test "registered prompts screen includes unused registered prompts" do
+    authenticate_for_admin!
+    unused_prompt_key = "unused_prompt_#{SecureRandom.hex(4)}"
+    unused_prompt_name = "Unused Prompt #{unused_prompt_key}"
+    RecordingStudioAI.prompts.register(
+      owner: "dummy_app",
+      namespace: :demo,
+      key: unused_prompt_key.to_sym,
+      version: 1,
+      name: unused_prompt_name,
+      short_name: "Unused",
+      description: "An unused registered prompt for admin coverage.",
+      inputs: [],
+      messages: [{ role: :user, content: "Unused prompt content" }],
+      defaults: { profile: :low, purpose: "unused_prompt" }
+    )
+
+    get "/admin/screens/registered_prompts/chart"
+
+    assert_response :success
+    assert_includes response.body, unused_prompt_name
+
+    get "/admin/screens/registered_prompts/table"
+
+    assert_response :success
+    assert_includes response.body, unused_prompt_name
+
+    unused_prompt_row = AdminScreens::RecordingStudioAIWidgets.prompt_rows(
+      RecordingStudioAdmin::Context.new(
+        params: {},
+        current_actor: @user,
+        controller: self
+      )
+    ).find { |row| row.key == unused_prompt_key }
+    assert_equal 0, unused_prompt_row.calls
+    assert_equal 0.0, unused_prompt_row.success_rate
+    assert_equal 0.0, unused_prompt_row.error_rate
+    assert_equal "No data", unused_prompt_row.average_duration
+    assert_equal "No data", unused_prompt_row.average_input_tokens
+    assert_equal "No data", unused_prompt_row.average_output_tokens
   end
 
   test "registered custom tools screen shows definition and execution metrics" do
@@ -380,12 +526,96 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "attempt_status"
     assert_includes response.body, "provider"
     assert_includes response.body, "name=\"group_by\""
+    assert_includes response.body, "name=\"prompt\""
+    assert_includes response.body, "name=\"model\""
+    assert_includes response.body, "name=\"min_tokens\""
+    assert_includes response.body, "name=\"max_tokens\""
+    assert_includes response.body, "name=\"error_code\""
 
     get "/admin/screens/attempts/table", params: { provider: "openai", kind: "retry" }
 
     assert_response :success
     assert_includes response.body, "attempt-openai-retry"
     refute_includes response.body, "attempt-google-primary"
+  end
+
+  test "attempts table shows prompt and hides ai call sequence and kind by default" do
+    authenticate_for_admin!
+    run = create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_key: "attempt-prompt",
+      prompt_name_snapshot: "Attempt Prompt"
+    )
+    run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      provider: "openai",
+      model: "attempt-prompt-model",
+      total_tokens: 250,
+      error_code: nil
+    )
+
+    get "/admin/screens/attempts/table"
+
+    assert_response :success
+    assert_includes response.body, "Attempt Prompt"
+    assert_includes response.body, "Prompt"
+    assert_select "th", text: /Created/
+    assert_select "th", text: "Prompt"
+    assert_select "th", text: "Status"
+    assert_select "th", text: "AI call", count: 0
+    assert_select "th", text: "Sequence", count: 0
+    assert_select "th", text: "Kind", count: 0
+  end
+
+  test "attempts table filters by prompt model tokens and error code" do
+    authenticate_for_admin!
+    matching_run = create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_key: "matching-attempt-prompt",
+      prompt_name_snapshot: "Matching Attempt Prompt"
+    )
+    other_run = create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_key: "other-attempt-prompt",
+      prompt_name_snapshot: "Other Attempt Prompt"
+    )
+    matching_run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "failed",
+      provider: "openai",
+      model: "matching-attempt-model",
+      total_tokens: 500,
+      error_code: "rate_limit"
+    )
+    other_run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      provider: "openai",
+      model: "other-attempt-model",
+      total_tokens: 50,
+      error_code: "timeout"
+    )
+
+    get "/admin/screens/attempts/table", params: {
+      prompt: "matching-attempt-prompt",
+      model: "matching-attempt-model",
+      min_tokens: 100,
+      max_tokens: 1000,
+      error_code: "rate_limit"
+    }
+
+    assert_response :success
+    assert_includes response.body, "matching-attempt-model"
+    assert_includes response.body, "Matching Attempt Prompt"
+    refute_includes response.body, "other-attempt-model"
+    refute_includes response.body, "Other Attempt Prompt"
   end
 
   test "attempts chart stacks volume by kind and accepts a grouping filter" do
@@ -824,10 +1054,14 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "slowest=1"
 
-    index_9011 = response.body.index("latency-model-9011")
-    index_8011 = response.body.index("latency-model-8011")
-    index_7011 = response.body.index("latency-model-7011")
-    index_nil = response.body.index("latency-model-nil")
+    # Model names can also appear in filter option lists; only compare order inside the table body.
+    table_body = response.body[/<tbody\b.*?>.*?<\/tbody>/m]
+    assert table_body, "expected ai calls table body in response"
+
+    index_9011 = table_body.index("latency-model-9011")
+    index_8011 = table_body.index("latency-model-8011")
+    index_7011 = table_body.index("latency-model-7011")
+    index_nil = table_body.index("latency-model-nil")
 
     assert index_9011, "expected to find highest-latency model row in response"
     assert index_8011, "expected to find middle-latency model row in response"
@@ -853,12 +1087,15 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     follow_redirect!
   end
 
-  def create_run!(status:, operation:, prompt_key: nil, prompt_name_snapshot: nil, resolved_model: nil, resolved_provider: nil,
+  def create_run!(status:, operation:, prompt_key: nil, prompt_name_snapshot: nil, prompt_namespace: nil,
+                  prompt_version: nil, resolved_model: nil, resolved_provider: nil,
                   total_tokens: nil, input_tokens: nil, output_tokens: nil, latency_ms: nil)
     RecordingStudioAI::Run.create!(
       operation: operation,
       status: status,
+      prompt_namespace: prompt_namespace,
       prompt_key: prompt_key,
+      prompt_version: prompt_version,
       prompt_name_snapshot: prompt_name_snapshot,
       resolved_model: resolved_model,
       resolved_provider: resolved_provider,

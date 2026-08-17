@@ -11,25 +11,23 @@ RecordingStudioAI.configure do |config|
   # config.gemini_client = MyGeminiClientFactory.build
 
   config.default_profile = :medium
-  # Route each tier to ordered provider/model candidates. Edit this map for your own cost and quality targets.
+  # Route each tier to ordered provider/model candidates. Reference models by
+  # their provider API model string. Capabilities, tunable parameters, native
+  # tools, and modalities come from the model registry (see the /config guide
+  # and RecordingStudioAI.models.register). Edit this map for your own cost and
+  # quality targets.
   config.profiles = {
     low: [
-      { provider: :openai, model: "gpt-5-mini",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
-      { provider: :gemini, model: "gemini-2.5-flash",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+      { provider: :openai, model: "gpt-5-mini" },
+      { provider: :gemini, model: "gemini-2.5-flash" }
     ],
     medium: [
-      { provider: :openai, model: "gpt-5",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
-      { provider: :gemini, model: "gemini-2.5-pro",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+      { provider: :openai, model: "gpt-5" },
+      { provider: :gemini, model: "gemini-2.5-pro" }
     ],
     high: [
-      { provider: :openai, model: "gpt-5-pro",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] },
-      { provider: :gemini, model: "gemini-2.5-pro",
-        capabilities: %i[generation streaming structured_output image_input file_input provider_native_web_search custom_tools provider_batch provider_batch_cancellation] }
+      { provider: :openai, model: "gpt-5-pro" },
+      { provider: :gemini, model: "gemini-2.5-pro" }
     ]
   }
   # Rates are integer microunits per one million tokens, keyed by provider/model.

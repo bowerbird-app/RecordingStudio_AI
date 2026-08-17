@@ -5,6 +5,8 @@ require "active_record"
 
 migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb", __dir__)].first
 require migration_file
+require_relative "../db/migrate/20260814120000_add_prompt_attribution_to_recording_studio_ai_runs"
+require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
 
 require_relative "../app/models/recording_studio_ai/application_record"
 require_relative "../app/models/concerns/recording_studio_ai/terminal_immutability"
@@ -55,6 +57,8 @@ class PhaseNineCustomToolsTest < Minitest::Test
     bootstrap_external_recording_studio_table
     ActiveRecord::Migration.suppress_messages do
       CreateRecordingStudioAIPersistenceTables.migrate(:up)
+      AddPromptAttributionToRecordingStudioAIRuns.migrate(:up)
+      RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up)
     end
 
     @root_recording = Actor.new(create_recording_id)

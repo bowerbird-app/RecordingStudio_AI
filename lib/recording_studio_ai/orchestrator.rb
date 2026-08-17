@@ -104,6 +104,7 @@ module RecordingStudioAI
         @resolver.candidates(
           profile: profile,
           provider: request[:provider],
+          model: request[:model],
           required_capabilities: capabilities,
           allow_empty: profile != request[:profile]
         ).map { |candidate| PlannedCandidate.new(candidate: candidate, profile: profile.to_sym) }
@@ -516,7 +517,18 @@ module RecordingStudioAI
       "fallback"
     end
 
+    def apply_resolved_generation_parameters!(request, candidate)
+      provided = RecordingStudioAI::Models::Definition::KNOWN_PARAMETERS.index_with { |name| request[name] }.compact
+      return request if provided.empty?
+
+      definition = RecordingStudioAI.models.fetch(candidate.provider, candidate.model)
+      return request unless definition
+
+      request.merge(RecordingStudioAI::Models::ParameterValidation.normalize!(definition, provided))
+    end
+
     def execute_attempt(request, candidate, operation:)
+      request = apply_resolved_generation_parameters!(request, candidate)
       buffer_stream_events = operation == :stream && request[:schema]
       @stream_event_buffer = [] if buffer_stream_events
       timeout, timeout_error = provider_timeout(request)
@@ -938,7 +950,7 @@ module RecordingStudioAI
     rescue StreamConsumerError
       raise
     rescue StandardError => e
-      raise StreamConsumerError.new(e)
+      raise StreamConsumerError, e
     end
 
     def cancel_active_stream_records!
@@ -997,7 +1009,7 @@ module RecordingStudioAI
     end
 
     def identifier(value)
-      value && value.respond_to?(:id) ? value.id : nil
+      value.respond_to?(:id) ? value.id : nil
     end
 
     def elapsed_ms(started_at, completed_at)

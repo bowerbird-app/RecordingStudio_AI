@@ -12,18 +12,21 @@ module RecordingStudioAI
       @configuration = configuration
     end
 
-    def resolve(profile:, required_capabilities:, provider: nil)
+    def resolve(profile:, required_capabilities:, provider: nil, model: nil)
       candidates(
         profile: profile,
         required_capabilities: required_capabilities,
-        provider: provider
+        provider: provider,
+        model: model
       ).first
     end
 
-    def candidates(profile:, required_capabilities:, provider: nil, allow_empty: false)
+    def candidates(profile:, required_capabilities:, provider: nil, model: nil, allow_empty: false)
       provider_key = validate_override!(provider)
+      model_key = model&.to_s
       candidates = Array(@configuration.profiles[profile.to_sym]).map { |entry| build_candidate(entry) }
       candidates.select! { |candidate| candidate.provider == provider_key } if provider_key
+      candidates.select! { |candidate| candidate.model == model_key } if model_key
       candidates.select! do |candidate|
         provider = @configuration.providers[candidate.provider]
         provider && (!provider.respond_to?(:configured?) || provider.configured?)
@@ -32,7 +35,7 @@ module RecordingStudioAI
       eligible = candidates.select { |candidate| candidate.supports?(required_capabilities) }
       return eligible if eligible.any? || allow_empty
 
-      raise_resolution_error!(candidates, required_capabilities)
+      raise_resolution_error!(candidates, required_capabilities, model: model_key)
     end
 
     private
@@ -52,13 +55,27 @@ module RecordingStudioAI
     def build_candidate(entry)
       return entry if entry.is_a?(RecordingStudioAI::Candidate)
 
-      RecordingStudioAI::Candidate.new(**entry.transform_keys(&:to_sym))
+      attributes = entry.transform_keys(&:to_sym)
+      attributes[:capabilities] ||= registered_capabilities(attributes[:provider], attributes[:model])
+      RecordingStudioAI::Candidate.new(**attributes)
     end
 
-    def raise_resolution_error!(candidates, required_capabilities)
+    # Profiles reference models by their provider API model string. When a
+    # profile entry omits explicit capabilities, derive them from the registered
+    # model definition so capabilities live in one place (the model registry).
+    def registered_capabilities(provider, model)
+      return nil if provider.nil? || model.nil?
+
+      definition = RecordingStudioAI.models.fetch(provider, model)
+      definition&.capabilities
+    end
+
+    def raise_resolution_error!(candidates, required_capabilities, model: nil)
       category = candidates.empty? ? "configuration" : "unsupported_capability"
       code = candidates.empty? ? "not_implemented" : "unsupported_capability"
-      message = if candidates.empty?
+      message = if candidates.empty? && model
+                  "No candidates match the requested profile, provider, and model (#{model})."
+                elsif candidates.empty?
                   "No candidates are configured for the requested profile and provider."
                 else
                   "No candidate supports all required capabilities: #{required_capabilities.join(', ')}"
