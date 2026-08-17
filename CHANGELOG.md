@@ -21,6 +21,9 @@ Versioning and Keep a Changelog.
   `RecordingStudioAI.stream!(...)` with `RecordingStudioAI.generate!(stream: true, ...)`.
 - Batch remains on `submit_batch` / `refresh_batch*` and is not folded into
   `generate`. Playground batch demos use a secondary section on the same page.
+- Admin dashboard adds Registered Providers and Registered Models widgets (top 5
+  by call volume) at the end of the widget grid, plus matching table-only
+  screens and section links.
 
 ### Removed
 
