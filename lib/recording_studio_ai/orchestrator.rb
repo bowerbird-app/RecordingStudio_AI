@@ -950,7 +950,7 @@ module RecordingStudioAI
     rescue StreamConsumerError
       raise
     rescue StandardError => e
-      raise StreamConsumerError.new(e)
+      raise StreamConsumerError, e
     end
 
     def cancel_active_stream_records!
@@ -1009,7 +1009,7 @@ module RecordingStudioAI
     end
 
     def identifier(value)
-      value && value.respond_to?(:id) ? value.id : nil
+      value.respond_to?(:id) ? value.id : nil
     end
 
     def elapsed_ms(started_at, completed_at)

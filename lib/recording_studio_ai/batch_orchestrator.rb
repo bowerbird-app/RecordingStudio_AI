@@ -322,7 +322,7 @@ module RecordingStudioAI
     def usage_from(record)
       return nil unless record && Contracts::Usage::TOKEN_FIELDS.any? { |field| !record.public_send(field).nil? }
 
-      Contracts::Usage.new(**Contracts::Usage::TOKEN_FIELDS.to_h { |field| [field, record.public_send(field)] })
+      Contracts::Usage.new(**Contracts::Usage::TOKEN_FIELDS.index_with { |field| record.public_send(field) })
     end
 
     def cost_from(_record)

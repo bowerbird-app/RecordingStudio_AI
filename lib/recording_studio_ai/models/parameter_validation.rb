@@ -11,9 +11,7 @@ module RecordingStudioAI
       def normalize!(definition, parameters)
         provided = parameters.transform_keys(&:to_sym).compact
         unknown = provided.keys - Definition::KNOWN_PARAMETERS
-        if unknown.any?
-          validation_error!("unknown generation parameters: #{unknown.join(', ')}")
-        end
+        validation_error!("unknown generation parameters: #{unknown.join(', ')}") if unknown.any?
 
         Definition::KNOWN_PARAMETERS.to_h do |name|
           value = provided[name]
@@ -30,9 +28,7 @@ module RecordingStudioAI
       def normalize_without_definition!(parameters)
         provided = parameters.transform_keys(&:to_sym).compact
         unknown = provided.keys - Definition::KNOWN_PARAMETERS
-        if unknown.any?
-          validation_error!("unknown generation parameters: #{unknown.join(', ')}")
-        end
+        validation_error!("unknown generation parameters: #{unknown.join(', ')}") if unknown.any?
 
         Definition::KNOWN_PARAMETERS.to_h do |name|
           value = provided[name]
@@ -52,12 +48,8 @@ module RecordingStudioAI
           return coerced.to_s
         end
 
-        if spec.key?(:min) && coerced < spec[:min]
-          validation_error!("parameter #{name} must be >= #{spec[:min]}")
-        end
-        if spec.key?(:max) && coerced > spec[:max]
-          validation_error!("parameter #{name} must be <= #{spec[:max]}")
-        end
+        validation_error!("parameter #{name} must be >= #{spec[:min]}") if spec.key?(:min) && coerced < spec[:min]
+        validation_error!("parameter #{name} must be <= #{spec[:max]}") if spec.key?(:max) && coerced > spec[:max]
 
         coerced
       end
@@ -65,9 +57,7 @@ module RecordingStudioAI
       def coerce_value!(name, value)
         case name
         when :temperature
-          unless value.is_a?(Numeric)
-            validation_error!("parameter temperature must be a Number")
-          end
+          validation_error!("parameter temperature must be a Number") unless value.is_a?(Numeric)
           value.to_f
         when :max_output_tokens
           unless value.is_a?(Integer) || (value.is_a?(String) && value.match?(/\A-?\d+\z/))

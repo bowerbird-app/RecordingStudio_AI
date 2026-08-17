@@ -242,7 +242,7 @@ module RecordingStudioAI
       end
 
       def ensure_boolean!(value, path:)
-        return if value == true || value == false
+        return if [true, false].include?(value)
 
         raise RecordingStudioAI::Errors::ContractValidationError.new(
           "#{path} must be a Boolean",
@@ -266,9 +266,7 @@ module RecordingStudioAI
         return parameters.transform_values { nil } if provided.empty?
 
         definition = nil
-        if provider && model
-          definition = RecordingStudioAI.models.fetch(provider, model)
-        end
+        definition = RecordingStudioAI.models.fetch(provider, model) if provider && model
 
         if definition
           RecordingStudioAI::Models::ParameterValidation.normalize!(definition, provided)
@@ -404,14 +402,10 @@ module RecordingStudioAI
       end
 
       def ensure_custom_tools!(tools)
-        unless tools.is_a?(Array)
-          custom_tool_error!("custom_tools must be an Array")
-        end
+        custom_tool_error!("custom_tools must be an Array") unless tools.is_a?(Array)
 
         tools.map.with_index do |reference, index|
-          unless reference.is_a?(Hash)
-            custom_tool_error!("custom_tools[#{index}] must be a Hash")
-          end
+          custom_tool_error!("custom_tools[#{index}] must be a Hash") unless reference.is_a?(Hash)
 
           normalized = reference.transform_keys(&:to_sym)
           unless normalized.keys.sort == %i[key version]
@@ -432,7 +426,9 @@ module RecordingStudioAI
       def resolve_custom_tools!(references)
         definitions = references.map do |reference|
           definition = RecordingStudioAI.tools.fetch(reference.fetch(:key), version: reference.fetch(:version))
-          custom_tool_error!("unknown custom tool #{reference.fetch(:key)} version #{reference.fetch(:version)}") unless definition
+          unless definition
+            custom_tool_error!("unknown custom tool #{reference.fetch(:key)} version #{reference.fetch(:version)}")
+          end
           definition
         end
 

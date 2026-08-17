@@ -99,10 +99,10 @@ module RecordingStudioAI
           input_file_id: read_value(uploaded, :id), endpoint: :"/v1/responses", completion_window: :"24h"
         )
         normalize_batch_result(response)
-      rescue StandardError => error
-        raise unless ProviderError.expected?(error)
+      rescue StandardError => e
+        raise unless ProviderError.expected?(e)
 
-        BatchResult.new(status: "failed", error: ProviderError.normalize(error, provider: :openai))
+        BatchResult.new(status: "failed", error: ProviderError.normalize(e, provider: :openai))
       end
 
       def refresh_batch(batch:, candidate:)
@@ -116,20 +116,20 @@ module RecordingStudioAI
             message: "Provider returned an invalid batch response.", retryable: false, provider: "openai"
           )
         )
-      rescue StandardError => error
-        raise unless ProviderError.expected?(error)
+      rescue StandardError => e
+        raise unless ProviderError.expected?(e)
 
         BatchResult.new(status: batch.status, provider_batch_id: batch.provider_batch_id,
-                        error: ProviderError.normalize(error, provider: :openai))
+                        error: ProviderError.normalize(e, provider: :openai))
       end
 
       def cancel_batch(batch:, candidate:)
         normalize_batch_result(client.batches.cancel(batch.provider_batch_id), batch: batch)
-      rescue StandardError => error
-        raise unless ProviderError.expected?(error)
+      rescue StandardError => e
+        raise unless ProviderError.expected?(e)
 
         BatchResult.new(status: batch.status, provider_batch_id: batch.provider_batch_id,
-                        error: ProviderError.normalize(error, provider: :openai))
+                        error: ProviderError.normalize(e, provider: :openai))
       end
 
       private
@@ -190,7 +190,7 @@ module RecordingStudioAI
       end
 
       def parse_batch_structured_data(text, batch, reference)
-        item = if batch&.respond_to?(:batch_items)
+        item = if batch.respond_to?(:batch_items)
                  batch.batch_items.find { |candidate| candidate.reference == reference.to_s }
                end
         return nil unless item&.metadata&.fetch("structured_output", false)
@@ -233,11 +233,11 @@ module RecordingStudioAI
       def serializable_request_counts(counts)
         return unless counts
 
-        %i[total completed failed].to_h { |key| [key, read_value(counts, key)] }.compact
+        %i[total completed failed].index_with { |key| read_value(counts, key) }.compact
       end
 
       def timestamp(value)
-        Time.at(value) if value
+        Time.zone.at(value) if value
       end
 
       def normalize_result(response, fallback_error: nil)
@@ -344,9 +344,7 @@ module RecordingStudioAI
         text[:verbosity] = request[:verbosity] if request[:verbosity]
         text.merge!(structured_output_config(request[:schema])) if request[:schema]
         parameters[:text] = text unless text.empty?
-        if request[:reasoning_effort]
-          parameters[:reasoning] = { effort: request[:reasoning_effort] }
-        end
+        parameters[:reasoning] = { effort: request[:reasoning_effort] } if request[:reasoning_effort]
         tools = []
         tools << { type: "web_search" } if request[:provider_native_tools].include?(:web_search)
         tools.concat(custom_tool_definitions(request))
@@ -364,7 +362,6 @@ module RecordingStudioAI
       end
 
       def normalize_initial_input(request)
-
         if request[:prompt]
           return request[:prompt] if request[:attachments].empty?
 

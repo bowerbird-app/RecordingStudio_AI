@@ -32,7 +32,9 @@ module RecordingStudioAI
       end
 
       def method_missing(namespace, ...)
-        return NamespaceProxy.new(@registry, namespace) if (definition = @registry.all.find { |item| item.namespace == namespace.to_s }) && definition
+        return NamespaceProxy.new(@registry, namespace) if (definition = @registry.all.find do |item|
+          item.namespace == namespace.to_s
+        end) && definition
 
         super
       end
@@ -55,12 +57,12 @@ module RecordingStudioAI
         RecordingStudioAI.generate!(**request(inputs, options))
       end
 
-      def stream(inputs:, **options, &block)
-        RecordingStudioAI.generate(**request(inputs, options).merge(stream: true), &block)
+      def stream(inputs:, **options, &)
+        RecordingStudioAI.generate(**request(inputs, options).merge(stream: true), &)
       end
 
-      def stream!(inputs:, **options, &block)
-        RecordingStudioAI.generate!(**request(inputs, options).merge(stream: true), &block)
+      def stream!(inputs:, **options, &)
+        RecordingStudioAI.generate!(**request(inputs, options).merge(stream: true), &)
       end
 
       private

@@ -69,12 +69,12 @@ module RecordingStudioAI
       discovered
     end
 
-    def generate(**kwargs, &block)
-      request = Contracts::RequestValidation.validate_generation_request!(**kwargs)
+    def generate(**, &block)
+      request = Contracts::RequestValidation.validate_generation_request!(**)
       configuration.validate!
 
       if request[:stream]
-        return stream_enumerator(**kwargs) unless block
+        return stream_enumerator(**) unless block
 
         Authorization.authorize!(
           :execute,
@@ -86,7 +86,7 @@ module RecordingStudioAI
           }
         )
         authorize_provider_native_tools!(request, operation: "stream")
-        Orchestrator.new.stream(request) { |event| yield event }
+        Orchestrator.new.stream(request, &block)
       else
         if block
           raise Errors::ContractValidationError.new(
@@ -123,8 +123,8 @@ module RecordingStudioAI
       response
     end
 
-    def submit_batch(**kwargs)
-      request = Contracts::RequestValidation.validate_batch_submit_request!(**kwargs)
+    def submit_batch(**)
+      request = Contracts::RequestValidation.validate_batch_submit_request!(**)
       configuration.validate!
       Authorization.authorize!(
         :submit_batch,
@@ -144,8 +144,8 @@ module RecordingStudioAI
       BatchOrchestrator.new.submit(request)
     end
 
-    def refresh_batch(**kwargs)
-      request = Contracts::RequestValidation.validate_batch_lookup_request!(**kwargs)
+    def refresh_batch(**)
+      request = Contracts::RequestValidation.validate_batch_lookup_request!(**)
       configuration.validate!
       Authorization.authorize!(
         :view_execution,
@@ -158,8 +158,8 @@ module RecordingStudioAI
       BatchOrchestrator.new.refresh(request)
     end
 
-    def refresh_batch_async(**kwargs)
-      request = Contracts::RequestValidation.validate_batch_lookup_request!(**kwargs)
+    def refresh_batch_async(**)
+      request = Contracts::RequestValidation.validate_batch_lookup_request!(**)
       configuration.validate!
       Authorization.authorize!(
         :view_execution,
@@ -172,8 +172,8 @@ module RecordingStudioAI
       enqueue_batch_synchronization(request)
     end
 
-    def cancel_batch(**kwargs)
-      request = Contracts::RequestValidation.validate_batch_lookup_request!(**kwargs)
+    def cancel_batch(**)
+      request = Contracts::RequestValidation.validate_batch_lookup_request!(**)
       configuration.validate!
       Authorization.authorize!(
         :cancel_batch,
@@ -186,8 +186,8 @@ module RecordingStudioAI
       BatchOrchestrator.new.cancel(request)
     end
 
-    def read_retained_response(**kwargs)
-      ResponseReader.new.read(**kwargs)
+    def read_retained_response(**)
+      ResponseReader.new.read(**)
     end
 
     def tools
@@ -207,7 +207,7 @@ module RecordingStudioAI
     end
 
     def load_builtin_models!
-      Dir.glob(File.expand_path("recording_studio_ai/models/*/*.rb", __dir__)).sort.each do |file|
+      Dir.glob(File.expand_path("recording_studio_ai/models/*/*.rb", __dir__)).each do |file|
         load file
       end
     end
@@ -232,7 +232,7 @@ module RecordingStudioAI
 
     def stream_enumerator(**kwargs)
       Enumerator.new do |events|
-        generate(**kwargs.merge(stream: true)) { |event| events << event }
+        generate(**kwargs, stream: true) { |event| events << event }
       end
     end
 

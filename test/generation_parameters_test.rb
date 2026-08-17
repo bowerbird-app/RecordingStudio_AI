@@ -69,12 +69,12 @@ class GenerationParametersTest < Minitest::Test
   def test_resolver_pins_model_override
     configuration = RecordingStudioAI::Configuration.new
     configuration.providers = {
-      openai: Class.new(RecordingStudioAI::Providers::Base) {
+      openai: Class.new(RecordingStudioAI::Providers::Base) do
         def configured? = true
-      }.new,
-      gemini: Class.new(RecordingStudioAI::Providers::Base) {
+      end.new,
+      gemini: Class.new(RecordingStudioAI::Providers::Base) do
         def configured? = true
-      }.new
+      end.new
     }
     configuration.profiles[:medium] = [
       { provider: :openai, model: "gpt-5-mini" },

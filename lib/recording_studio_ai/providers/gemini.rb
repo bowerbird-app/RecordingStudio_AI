@@ -136,29 +136,29 @@ module RecordingStudioAI
           end
         )
         normalize_batch_result(response)
-      rescue StandardError => error
-        raise unless ProviderError.expected?(error)
+      rescue StandardError => e
+        raise unless ProviderError.expected?(e)
 
-        BatchResult.new(status: "failed", error: ProviderError.normalize(error, provider: :gemini))
+        BatchResult.new(status: "failed", error: ProviderError.normalize(e, provider: :gemini))
       end
 
       def refresh_batch(batch:, candidate:)
         normalize_batch_result(client.get_batch(batch.provider_batch_id), batch: batch)
-      rescue StandardError => error
-        raise unless ProviderError.expected?(error)
+      rescue StandardError => e
+        raise unless ProviderError.expected?(e)
 
         BatchResult.new(status: batch.status, provider_batch_id: batch.provider_batch_id,
-                        error: ProviderError.normalize(error, provider: :gemini))
+                        error: ProviderError.normalize(e, provider: :gemini))
       end
 
       def cancel_batch(batch:, candidate:)
         client.cancel_batch(batch.provider_batch_id)
         normalize_batch_result(client.get_batch(batch.provider_batch_id), batch: batch)
-      rescue StandardError => error
-        raise unless ProviderError.expected?(error)
+      rescue StandardError => e
+        raise unless ProviderError.expected?(e)
 
         BatchResult.new(status: batch.status, provider_batch_id: batch.provider_batch_id,
-                        error: ProviderError.normalize(error, provider: :gemini))
+                        error: ProviderError.normalize(e, provider: :gemini))
       end
 
       private
@@ -230,7 +230,7 @@ module RecordingStudioAI
       end
 
       def gemini_batch_structured_data(text, batch, reference)
-        item = if batch&.respond_to?(:batch_items)
+        item = if batch.respond_to?(:batch_items)
                  batch.batch_items.find { |candidate| candidate.reference == reference.to_s }
                end
         return nil unless item&.metadata&.fetch("structured_output", false)

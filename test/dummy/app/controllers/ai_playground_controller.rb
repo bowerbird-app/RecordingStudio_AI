@@ -155,10 +155,10 @@ class AIPlaygroundController < ApplicationController
     provider, model = split_candidate_value(form["model"])
     provider ||= provider_override(form)
     kwargs = base_request_for(form, root_recording: root_recording, request_id: request_id).merge(
-      messages: [user_message(form.fetch("prompt"))],
+      messages: [ user_message(form.fetch("prompt")) ],
       provider: provider,
       model: model,
-      provider_native_tools: web_search_enabled?(form) ? [:web_search] : [],
+      provider_native_tools: web_search_enabled?(form) ? [ :web_search ] : [],
       custom_tools: custom_tools_for(form),
       attachments: attachments_for(form)
     )
@@ -193,7 +193,7 @@ class AIPlaygroundController < ApplicationController
     return [] if definition && !definition.supports_tool?(:custom_tools)
 
     key = selected_tool_key(form)
-    [{ key: key, version: 1 }]
+    [ { key: key, version: 1 } ]
   end
 
   def attachments_for(form)
@@ -250,15 +250,15 @@ class AIPlaygroundController < ApplicationController
 
   def batch_items_for(prompts, shared_prompt: "", web_search_enabled: false)
     prompts = Array(prompts).map(&:to_s).map(&:strip).reject(&:blank?)
-    prompts = [default_form.fetch("prompt")] if prompts.empty?
+    prompts = [ default_form.fetch("prompt") ] if prompts.empty?
 
     prompts.each_with_index.map do |item_prompt, index|
-      content = [shared_prompt.to_s.strip, item_prompt].reject(&:blank?).join("\n\n")
+      content = [ shared_prompt.to_s.strip, item_prompt ].reject(&:blank?).join("\n\n")
       {
         reference: "item-#{index + 1}",
-        messages: [user_message(content)],
+        messages: [ user_message(content) ],
         purpose: "dummy_batch_call",
-        provider_native_tools: web_search_enabled ? [:web_search] : []
+        provider_native_tools: web_search_enabled ? [ :web_search ] : []
       }
     end
   end
@@ -351,12 +351,12 @@ class AIPlaygroundController < ApplicationController
   end
 
   def split_candidate_value(value)
-    return [nil, nil] if value.blank?
+    return [ nil, nil ] if value.blank?
 
     provider, model = value.to_s.split("|", 2)
-    return [nil, nil] if provider.blank? || model.blank?
+    return [ nil, nil ] if provider.blank? || model.blank?
 
-    [provider.to_sym, model]
+    [ provider.to_sym, model ]
   end
 
   def selected_tool_key(form = @form)
