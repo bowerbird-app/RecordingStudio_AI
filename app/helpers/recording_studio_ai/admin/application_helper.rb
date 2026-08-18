@@ -28,6 +28,15 @@ module RecordingStudioAI
       def admin_json(value)
         JSON.pretty_generate(value || {})
       end
+
+      def admin_code_block(code, title:, language: "json")
+        render FlatPack::CodeBlock::Component.new(
+          title: title,
+          language: language,
+          code: code.to_s,
+          separated: false
+        )
+      end
     end
   end
 end

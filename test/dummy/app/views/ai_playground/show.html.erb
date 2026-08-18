@@ -157,10 +157,14 @@
               value: @form.fetch("tool_key"),
               data: { ai_playground_form_target: "toolKey", action: "change->ai-playground-form#refreshToolDescription" }
             ) %>
-            <div class="mt-2 rounded-md border border-(--surface-border-color) bg-(--surface-subtle-background-color) p-3">
-              <p class="text-xs font-semibold uppercase tracking-wide text-(--surface-muted-content-color)">Selected tool</p>
-              <p class="mt-1 text-sm text-(--surface-content-color)" data-ai-playground-form-target="toolDescription"><%= @selected_tool_description %></p>
-            </div>
+            <%= render FlatPack::Card::Component.new(style: :default, class: "mt-2") do |card| %>
+              <% card.header do %>
+                <%= render FlatPack::PageTitle::Component.new(title: "Selected tool", variant: :h4, class: "mb-0 pb-0") %>
+              <% end %>
+              <% card.body do %>
+                <p class="text-sm" data-ai-playground-form-target="toolDescription"><%= @selected_tool_description %></p>
+              <% end %>
+            <% end %>
           </div>
         </div>
 
@@ -182,12 +186,18 @@
         ) %>
       <% end %>
 
-      <div class="hidden space-y-2 rounded-md border border-(--surface-border-color) bg-(--surface-subtle-background-color) p-4" data-ai-playground-form-target="streamPanel" aria-live="polite">
-        <div class="flex items-center justify-between gap-3">
-          <p class="text-sm font-semibold">Live response</p>
-          <span class="text-xs text-(--surface-muted-content-color)" data-ai-playground-form-target="streamStatus">Waiting</span>
-        </div>
-        <pre class="min-h-24 max-h-96 overflow-y-auto whitespace-pre-wrap wrap-break-word text-sm text-(--surface-content-color)" data-ai-playground-form-target="streamOutput"></pre>
+      <div class="hidden" data-ai-playground-form-target="streamPanel" aria-live="polite">
+        <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+          <% card.header do %>
+            <div class="flex items-center justify-between gap-3">
+              <%= render FlatPack::PageTitle::Component.new(title: "Live response", variant: :h4, class: "mb-0 pb-0") %>
+              <span class="text-xs text-(--surface-muted-content-color)" data-ai-playground-form-target="streamStatus">Waiting</span>
+            </div>
+          <% end %>
+          <% card.body do %>
+            <div class="min-h-24 max-h-96 overflow-y-auto whitespace-pre-wrap wrap-break-word text-sm" data-ai-playground-form-target="streamOutput"></div>
+          <% end %>
+        <% end %>
       </div>
 
       <%= render "result", **result_locals("generate") %>
