@@ -31,6 +31,10 @@ Open `/` and sign in with:
 - Email: `admin@admin.com`
 - Password: `Password`
 
+Forwarded preview URLs (Codespaces, Cursor Cloud) can reject sign-in with a CSRF
+origin mismatch. The dummy relaxes that origin check in development when
+`CODESPACES=true` or `CURSOR_AGENT` is set. CSRF tokens stay required.
+
 Useful routes:
 
 - `/` — foundation status page

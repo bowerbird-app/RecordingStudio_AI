@@ -15,6 +15,9 @@ Versioning and Keep a Changelog.
 
 ### Changed
 
+- Dummy sign-in works through Cursor Cloud and Codespaces forwarded previews by
+  relaxing the CSRF origin check in development when `CURSOR_AGENT` or
+  `CODESPACES` is set. CSRF tokens stay required.
 - Streaming is configured with `stream: true` on `generate` / `generate!`.
   Upgrade note: replace `RecordingStudioAI.stream(...)` with
   `RecordingStudioAI.generate(stream: true, ...)` and
