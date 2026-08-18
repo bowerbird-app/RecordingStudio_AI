@@ -100,7 +100,8 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
   def test_widget_memo_dedupes_repeated_chart_row_lookups
     root_id = create_recording_id
     create_run(root_id: root_id, status: "completed", tokens: 10, resolved_model: "gpt-test")
-    context = Struct.new(:root_recording, :object_id).new(Actor.new(id: root_id), 99_001)
+    context = Object.new
+    context.define_singleton_method(:root_recording) { Actor.new(id: root_id) }
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
 
     first = AdminScreens::RecordingStudioAIWidgets.top_model_call_volume_rows(context)
