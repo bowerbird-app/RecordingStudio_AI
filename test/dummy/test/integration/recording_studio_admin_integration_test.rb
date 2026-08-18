@@ -1227,6 +1227,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     start_date = 3.days.ago.to_date
     end_date = Date.current
     get "/admin/screens/latency_by_model/table", params: {
+      date_range_preset: "last_4_weeks",
       start_date: start_date.iso8601,
       end_date: end_date.iso8601
     }
@@ -1234,9 +1235,11 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "latency-chart-model"
     assert_includes response.body, "flat-pack--chart-series-value"
-    assert_includes response.body, "start_date=#{start_date.iso8601}"
-    assert_includes response.body, "end_date=#{end_date.iso8601}"
-    assert_includes response.body, "model=latency-chart-model"
+    calls_href = response.body[%r{href="(/admin/screens/ai_calls\?[^"]*model=latency-chart-model[^"]*)"}m, 1]
+    assert calls_href, "expected an AI Calls link for the model mini chart"
+    assert_includes calls_href, "start_date=#{start_date.iso8601}"
+    assert_includes calls_href, "end_date=#{end_date.iso8601}"
+    refute_includes calls_href, "date_range_preset"
     chart_payload = response.body.match(/model=latency-chart-model[^>]*>.*?data-flat-pack--chart-series-value="([^"]+)"/m).captures.first
     assert_equal 4, chart_payload.scan(/&quot;x&quot;/).size
     assert_equal 1, chart_payload.scan(/&quot;y&quot;:1/).size

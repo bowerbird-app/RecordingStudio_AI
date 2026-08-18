@@ -468,13 +468,23 @@ module AdminScreens
       date_range = context.filter_value(:date_range) || screen.filters.find do |filter|
         filter.key == :date_range
       end.normalize(context.params)
-      return { date_range_preset: date_range.preset_key } if date_range&.preset_key.present?
       return { date_range_preset: :last_4_weeks } unless date_range&.start_date && date_range.end_date
+      return { date_range_preset: date_range.preset_key } if date_range_matches_preset?(date_range)
 
       {
         start_date: date_range.start_date.iso8601,
         end_date: date_range.end_date.iso8601
       }
+    end
+
+    def date_range_matches_preset?(date_range)
+      return false if date_range.preset_key.blank?
+      return false unless defined?(RecordingStudioAdmin::Period)
+
+      preset = RecordingStudioAdmin::Period.from_preset_key(date_range.preset_key)
+      return false unless preset
+
+      preset.start_date == date_range.start_date && preset.end_date == date_range.end_date
     end
 
     def registered_custom_tools_date_range_value(context)

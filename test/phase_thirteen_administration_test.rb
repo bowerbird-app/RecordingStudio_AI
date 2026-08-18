@@ -268,6 +268,20 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
+  def test_date_range_query_keeps_custom_dates_when_a_preset_does_not_match
+    start_date = 3.days.ago.to_date
+    end_date = Date.current
+    range = Struct.new(:start_date, :end_date, :preset_key).new(start_date, end_date, :last_4_weeks)
+    context = Struct.new(:selected_range, :params).new(range, {})
+    def context.filter_value(_key) = selected_range
+
+    query = AdminScreens::RecordingStudioAIWidgets.date_range_query(context, screen: nil)
+
+    assert_equal start_date.iso8601, query[:start_date]
+    assert_equal end_date.iso8601, query[:end_date]
+    refute query.key?(:date_range_preset)
+  end
+
   private
 
   def create_run(root_id:, status:, tokens:, **attributes)
