@@ -92,6 +92,9 @@ Versioning and Keep a Changelog.
 - Dummy Tailwind writes Bundler gem `@source` paths before compile so Flatpack
   and Recording Studio utilities are scanned outside `vendor/bundle` /
   `/usr/local/bundle`.
+- Dummy AI Playground generate form picks a registered prompt from a dropdown
+  and shows that prompt in a disabled textarea. Generate sends the registered
+  prompt (including its tools), so Text Analysis exercises echo/keyword tools.
 - AI Calls, Custom Tool Calls, Attempts, Estimated spend, Registered custom
   tools, Registered prompts, Registered providers, and Registered models table
   headers explain each column in everyday language.

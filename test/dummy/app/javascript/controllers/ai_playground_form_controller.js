@@ -23,7 +23,9 @@ export default class extends Controller {
     "submit",
     "streamPanel",
     "streamStatus",
-    "streamOutput"
+    "streamOutput",
+    "promptKey",
+    "promptPreview"
   ]
 
   static values = {
@@ -31,6 +33,7 @@ export default class extends Controller {
     candidates: Object,
     definitions: Object,
     toolDescriptions: Object,
+    prompts: Object,
     requireBatch: { type: Boolean, default: false }
   }
 
@@ -40,6 +43,7 @@ export default class extends Controller {
 
   refresh() {
     this.refreshModels()
+    this.refreshPromptPreview()
     this.refreshCapabilities()
     this.refreshToolDescription()
   }
@@ -96,7 +100,7 @@ export default class extends Controller {
 
     show("streamingField", definition?.delivery?.streaming === true)
     show("webSearchField", Array.isArray(definition?.tools) && definition.tools.includes("web_search"))
-    show("customToolsField", Array.isArray(definition?.tools) && definition.tools.includes("custom_tools"))
+    show("customToolsField", this.customToolsVisible(definition))
     show(
       "attachmentField",
       Array.isArray(definition?.modalities?.input) &&
@@ -104,6 +108,24 @@ export default class extends Controller {
     )
 
     this.refreshToolPickerVisibility()
+  }
+
+  refreshPromptPreview() {
+    if (!this.hasPromptPreviewTarget || !this.hasPromptKeyTarget) return
+
+    const prompt = this.promptsValue[this.promptKeyTarget.value] || {}
+    const field = this.promptPreviewTarget.matches("textarea")
+      ? this.promptPreviewTarget
+      : this.promptPreviewTarget.querySelector("textarea")
+    if (field) field.value = prompt.preview || ""
+    this.refreshCapabilities()
+  }
+
+  customToolsVisible(definition) {
+    const prompt = this.hasPromptKeyTarget ? this.promptsValue[this.promptKeyTarget.value] : null
+    if (prompt?.tools) return false
+
+    return Array.isArray(definition?.tools) && definition.tools.includes("custom_tools")
   }
 
   refreshToolDescription() {

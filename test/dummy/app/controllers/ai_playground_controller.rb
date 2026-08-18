@@ -28,6 +28,10 @@ class AIPlaygroundController < ApplicationController
     }
   }.freeze
 
+  PLAYGROUND_SAMPLE_INPUTS = {
+    "text" => "Osaka is warm, humid, and packed with street food this week."
+  }.freeze
+
   def show
     setup_page_state
   end
@@ -115,6 +119,12 @@ class AIPlaygroundController < ApplicationController
     @tool_options = TOOL_CATALOG.map do |key, meta|
       { value: key, label: meta.fetch(:label), description: meta.fetch(:description) }
     end
+    @prompt_options = registered_prompt_definitions.map do |definition|
+      { value: prompt_identity(definition), label: prompt_option_label(definition) }
+    end
+    @prompt_previews = registered_prompt_definitions.to_h do |definition|
+      [prompt_identity(definition), { preview: prompt_preview_text(definition), tools: definition.tools.any? }]
+    end
     @profile_candidates = profile_candidates_payload
     @model_definitions = model_definitions_payload
     sync_selected_model_state!
@@ -141,6 +151,7 @@ class AIPlaygroundController < ApplicationController
     end
     @selected_tool_key = selected_tool_key
     @selected_tool_description = TOOL_CATALOG.fetch(@selected_tool_key).fetch(:description)
+    @selected_prompt_preview = prompt_preview_text(selected_prompt_definition)
   end
 
   def execute_generate(root_recording:, request_id:)
@@ -175,14 +186,23 @@ class AIPlaygroundController < ApplicationController
   end
 
   def generation_kwargs(form, root_recording:, request_id:)
+    definition = selected_prompt_definition(form)
+    unless definition
+      raise RecordingStudioAI::Errors::ContractValidationError.new(
+        "Pick a registered prompt before running generate.",
+        code: "invalid_request"
+      )
+    end
+
     provider, model = split_candidate_value(form["model"])
     provider ||= provider_override(form)
     kwargs = base_request_for(form, root_recording: root_recording, request_id: request_id).merge(
-      messages: [ user_message(form.fetch("prompt")) ],
+      messages: definition.render(playground_prompt_inputs(definition)),
+      prompt_definition: definition,
       provider: provider,
       model: model,
       provider_native_tools: web_search_enabled?(form) ? [ :web_search ] : [],
-      custom_tools: custom_tools_for(form),
+      custom_tools: generation_custom_tools(form, definition),
       attachments: attachments_for(form)
     )
     kwargs.merge(generation_parameters_for(form))
@@ -347,6 +367,7 @@ class AIPlaygroundController < ApplicationController
       "profile" => "medium",
       "model" => medium_default ? candidate_value(medium_default) : "",
       "prompt" => "what's the weather in Osaka",
+      "prompt_key" => default_prompt_identity,
       "batch_items" => [
         "Summarize the latest weather conditions in Osaka.",
         "Summarize the latest weather conditions in Tokyo.",
@@ -437,6 +458,57 @@ class AIPlaygroundController < ApplicationController
     key
   end
 
+  def registered_prompt_definitions
+    RecordingStudioAI.prompts.all
+  end
+
+  def prompt_identity(definition)
+    "#{definition.namespace}:#{definition.key}:#{definition.version}"
+  end
+
+  def prompt_option_label(definition)
+    "#{definition.name} · #{definition.namespace}.#{definition.key}"
+  end
+
+  def prompt_preview_text(definition)
+    return "" unless definition
+
+    definition.render(playground_prompt_inputs(definition)).map do |message|
+      "#{message.fetch(:role).to_s.capitalize}\n#{message.fetch(:content)}"
+    end.join("\n\n")
+  end
+
+  def playground_prompt_inputs(definition)
+    definition.inputs.index_with { |name| PLAYGROUND_SAMPLE_INPUTS.fetch(name, "sample #{name}") }
+  end
+
+  def default_prompt_identity
+    preferred = registered_prompt_definitions.find { |definition| definition.key == "analyze_text" }
+    definition = preferred || registered_prompt_definitions.first
+    definition ? prompt_identity(definition) : ""
+  end
+
+  def selected_prompt_definition(form = @form)
+    identity = form.fetch("prompt_key", default_prompt_identity).to_s
+    namespace, key, version = identity.split(":", 3)
+    return registered_prompt_definitions.first if namespace.blank? || key.blank?
+
+    RecordingStudioAI.prompts.fetch(namespace, key, version: version.present? ? version.to_i : nil) ||
+      registered_prompt_definitions.first
+  end
+
+  def generation_custom_tools(form, definition)
+    prompt_tools = definition.tools.filter_map do |tool|
+      registered = RecordingStudioAI.tools.fetch(tool.fetch(:key), version: tool[:version])
+      next unless registered
+
+      { key: registered.key, version: registered.version }
+    end
+    return prompt_tools if prompt_tools.any?
+
+    custom_tools_for(form)
+  end
+
   def web_search_enabled?(form = @form)
     form.fetch("web_search", "0") == "1"
   end
@@ -474,7 +546,7 @@ class AIPlaygroundController < ApplicationController
 
   def form_params
     params.require(:ai_playground).permit(
-      :mode, :provider, :profile, :model, :prompt, :web_search, :streaming, :use_custom_tool, :tool_key,
+      :mode, :provider, :profile, :model, :prompt, :prompt_key, :web_search, :streaming, :use_custom_tool, :tool_key,
       :temperature, :verbosity, :max_output_tokens, :reasoning_effort, :attachment,
       batch_items: []
     )
