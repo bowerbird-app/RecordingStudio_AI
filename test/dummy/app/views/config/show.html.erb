@@ -36,15 +36,17 @@
     ) %>
 
     <%= render FlatPack::Table::Component.new(data: @config_options) do |table| %>
-      <% table.column(title: "Param") do |option| %>
-        <span class="font-mono text-xs"><%= option[:key] %></span>
-      <% end %>
-      <% table.column(title: "Required") { |option| option[:required] } %>
-      <% table.column(title: "Possible values") { |option| option[:accepted_values] } %>
-      <% table.column(title: "Default") do |option| %>
-        <span class="font-mono text-xs"><%= option[:default] %></span>
-      <% end %>
-      <% table.column(title: "Description") { |option| option[:explanation] } %>
+      <% table.column(
+        title: "Param",
+        html: ->(option) { content_tag(:span, option[:key], class: "font-mono text-xs") }
+      ) %>
+      <% table.column(title: "Required", html: ->(option) { option[:required] }) %>
+      <% table.column(title: "Possible values", html: ->(option) { option[:accepted_values] }) %>
+      <% table.column(
+        title: "Default",
+        html: ->(option) { content_tag(:span, option[:default], class: "font-mono text-xs break-all") }
+      ) %>
+      <% table.column(title: "Description", html: ->(option) { option[:explanation] }) %>
     <% end %>
   </div>
 

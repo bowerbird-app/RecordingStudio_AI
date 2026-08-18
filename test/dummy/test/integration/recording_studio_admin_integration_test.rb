@@ -81,6 +81,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, ">Possible values<"
     assert_includes response.body, ">Default<"
     assert_includes response.body, ">Description<"
+
+    parameters_table = Nokogiri::HTML(response.body).css("table").first
+    rows = parameters_table.css("tbody tr")
+    assert_equal ConfigController::CONFIG_OPTIONS.length, rows.length
+    rows.each { |row| assert_equal 5, row.css("td").length, "expected five cells in #{row.text.squish}" }
+    assert_includes parameters_table.text, "image/png"
     refute_includes response.body, "Implement the contract methods your models need"
     refute_includes response.body, "used by generate, stream, and batch"
     refute_includes response.body, "Configuration Reference"
