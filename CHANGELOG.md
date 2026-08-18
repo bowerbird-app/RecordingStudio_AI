@@ -21,6 +21,11 @@ Versioning and Keep a Changelog.
   `RecordingStudioAI.stream!(...)` with `RecordingStudioAI.generate!(stream: true, ...)`.
 - Batch remains on `submit_batch` / `refresh_batch*` and is not folded into
   `generate`. Playground batch demos use a secondary section on the same page.
+- AI Playground generate submissions respond with a Turbo Stream, so the result
+  renders in place under the "Run generate" button (above the batch section)
+  without a full page reload. Batch submissions render their own result frame
+  beneath the batch form.
+- Deduplicated the AI Responses admin table so `Created` appears once.
 - Admin dashboard adds Registered Providers and Registered Models widgets (top 5
   by call volume) at the end of the widget grid, plus matching table-only
   screens and section links.
