@@ -4,15 +4,13 @@ require "test_helper"
 
 class ConfigurationTest < Minitest::Test
   def setup
-    @original_openai_api_key = ENV.fetch("OPENAI_API_KEY", nil)
-    @original_gemini_api_key = ENV.fetch("GEMINI_API_KEY", nil)
     ENV.delete("OPENAI_API_KEY")
     ENV.delete("GEMINI_API_KEY")
   end
 
   def teardown
-    ENV["OPENAI_API_KEY"] = @original_openai_api_key
-    ENV["GEMINI_API_KEY"] = @original_gemini_api_key
+    ENV.delete("OPENAI_API_KEY")
+    ENV.delete("GEMINI_API_KEY")
   end
 
   def test_v1_defaults_are_provider_independent

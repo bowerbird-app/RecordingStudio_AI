@@ -26,6 +26,8 @@ Versioning and Keep a Changelog.
   without a full page reload. Batch submissions render their own result frame
   beneath the batch form.
 - Deduplicated the AI Responses admin table so `Created` appears once.
+- Extracted shared Minitest bootstrap for gem phase tests (`test/support`) covering
+  SQLite persistence, configuration isolation, and recording lookup doubles.
 
 ### Removed
 

@@ -1,24 +1,8 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require "active_record"
 
-migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb",
-                                      __dir__)].first
-require migration_file
-require_relative "../db/migrate/20260814120000_add_prompt_attribution_to_recording_studio_ai_runs"
-require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
-require File.expand_path("../db/migrate/20260811120000_harden_recording_studio_ai_persistence.rb", __dir__)
-require File.expand_path("../db/migrate/20260811130000_enforce_recording_studio_ai_history_integrity.rb", __dir__)
-
-require_relative "../app/models/recording_studio_ai/application_record"
-require_relative "../app/models/concerns/recording_studio_ai/terminal_immutability"
-require_relative "../app/models/recording_studio_ai/run"
-require_relative "../app/models/recording_studio_ai/batch"
-require_relative "../app/models/recording_studio_ai/batch_item"
-require_relative "../app/jobs/recording_studio_ai/batch_synchronization_job"
-
-class PhaseElevenProviderBatchesTest < Minitest::Test
+class PhaseElevenProviderBatchesTest < RecordingStudioAI::Test::PersistenceCase
   Actor = Struct.new(:id)
 
   class BatchProvider < RecordingStudioAI::Providers::Base
@@ -60,28 +44,21 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
     end
   end
 
+  def persistence_schema
+    :hardened
+  end
+
+  def reset_persistence_columns?
+    true
+  end
+
   def setup
-    ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
-    ActiveRecord::Base.connection.create_table(:recording_studio_recordings) { |table| table.timestamps }
-    ActiveRecord::Migration.suppress_messages do
-      CreateRecordingStudioAIPersistenceTables.migrate(:up)
-      AddPromptAttributionToRecordingStudioAIRuns.migrate(:up)
-      RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up)
-      HardenRecordingStudioAIPersistence.migrate(:up)
-      EnforceRecordingStudioAIHistoryIntegrity.migrate(:up)
-    end
-    [RecordingStudioAI::Run, RecordingStudioAI::Batch, RecordingStudioAI::BatchItem].each(&:reset_column_information)
+    super
     @root_recording = Actor.new(create_recording_id)
     @other_root = Actor.new(create_recording_id)
     @initiator = Actor.new(41)
     @provider = BatchProvider.new
-    @original_configuration = RecordingStudioAI.instance_variable_get(:@configuration)
-    RecordingStudioAI.instance_variable_set(:@configuration, configured_configuration)
-  end
-
-  def teardown
-    RecordingStudioAI.instance_variable_set(:@configuration, @original_configuration)
-    ActiveRecord::Base.connection_pool.disconnect! if ActiveRecord::Base.connected?
+    isolate_configuration!(configured_configuration)
   end
 
   def test_submit_normalizes_and_validates_batch_items
@@ -735,11 +712,5 @@ class PhaseElevenProviderBatchesTest < Minitest::Test
         capabilities: %i[generation structured_output image_input file_input provider_native_web_search provider_batch provider_batch_cancellation]
       }]
     end
-  end
-
-  def create_recording_id
-    ActiveRecord::Base.connection.insert(
-      "INSERT INTO recording_studio_recordings (created_at, updated_at) VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
-    )
   end
 end

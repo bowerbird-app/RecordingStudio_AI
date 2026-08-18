@@ -2,19 +2,11 @@
 
 require "test_helper"
 
-class PhaseTwoContractsTest < Minitest::Test
+class PhaseTwoContractsTest < RecordingStudioAI::Test::IsolatedCase
   def setup
     @root_recording = Object.new
     @initiator = Object.new
-    @original_authorization_handler = RecordingStudioAI.configuration.authorization_handler
-    @original_attribution_validator = RecordingStudioAI.configuration.attribution_validator
-    RecordingStudioAI.configuration.authorization_handler = ->(**) { true }
-    RecordingStudioAI.configuration.attribution_validator = ->(**) {}
-  end
-
-  def teardown
-    RecordingStudioAI.configuration.authorization_handler = @original_authorization_handler
-    RecordingStudioAI.configuration.attribution_validator = @original_attribution_validator
+    stub_host_callbacks!
   end
 
   def test_generate_requires_exactly_one_of_prompt_or_messages
