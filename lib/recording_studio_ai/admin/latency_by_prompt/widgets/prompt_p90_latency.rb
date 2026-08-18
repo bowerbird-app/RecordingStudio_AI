@@ -8,11 +8,8 @@ module AdminScreens
     description "Compares prompt response speed using the latency at or below which 90% of calls completed."
     metadata { { period_label: "Last 30 days" } }
     value do |context|
-      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-                                                   .where(created_at: 30.days.ago..Time.current)
-                                                   .where.not(latency_ms: nil)
-      p90_latency = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(runs,
-                                                                                 dimension: :prompt).first&.p90_latency_ms.to_i
+      p90_latency = AdminScreens::RecordingStudioAIWidgets.latency_chart_rows(context, dimension: :prompt)
+                                                          .first&.p90_latency_ms.to_i
       "#{AdminScreens::RecordingStudioAIWidgets.number(p90_latency)} ms"
     end
     change do |context|
@@ -28,21 +25,11 @@ module AdminScreens
     change_good_when :down
     chart_type :bar
     series do |context|
-      rows = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-                                             .where(created_at: 30.days.ago..Time.current)
-                                             .where.not(latency_ms: nil),
-        dimension: :prompt
-      ).first(5)
+      rows = AdminScreens::RecordingStudioAIWidgets.latency_chart_rows(context, dimension: :prompt)
       [{ name: "P90 latency (ms)", data: rows.map(&:p90_latency_ms) }]
     end
     chart_options do |context|
-      rows = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-                                             .where(created_at: 30.days.ago..Time.current)
-                                             .where.not(latency_ms: nil),
-        dimension: :prompt
-      ).first(5)
+      rows = AdminScreens::RecordingStudioAIWidgets.latency_chart_rows(context, dimension: :prompt)
       {
         height: 240,
         plotOptions: { bar: { horizontal: true, barHeight: "55%" } },

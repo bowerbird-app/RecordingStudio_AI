@@ -24,15 +24,11 @@ module AdminScreens
     change_good_when :down
     chart_type :bar
     series do |context|
-      rows = AdminScreens::RecordingStudioAIWidgets.retry_rate_by_model_rows(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-      )
+      rows = AdminScreens::RecordingStudioAIWidgets.retry_rate_chart_rows(context)
       [{ name: "Retry rate", data: rows.map(&:last) }]
     end
     chart_options do |context|
-      rows = AdminScreens::RecordingStudioAIWidgets.retry_rate_by_model_rows(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-      )
+      rows = AdminScreens::RecordingStudioAIWidgets.retry_rate_chart_rows(context)
       {
         height: 240,
         plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
