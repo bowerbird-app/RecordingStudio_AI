@@ -15,6 +15,9 @@ Versioning and Keep a Changelog.
 
 ### Changed
 
+- Dummy `/config` now matches the public API: `generate` (with `stream: true`)
+  and separate batch methods. It no longer lists `stream` as a peer contract
+  method.
 - Streaming is configured with `stream: true` on `generate` / `generate!`.
   Upgrade note: replace `RecordingStudioAI.stream(...)` with
   `RecordingStudioAI.generate(stream: true, ...)` and
