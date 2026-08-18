@@ -20,15 +20,15 @@
     ) %>
   </div>
 
-  <div
-    data-controller="ai-playground-form"
-    data-ai-playground-form-stream-url-value="<%= main_app.stream_ai_playground_path %>"
-    data-ai-playground-form-candidates-value="<%= @profile_candidates.to_json %>"
-    data-ai-playground-form-definitions-value="<%= @model_definitions.to_json %>"
-    data-ai-playground-form-tool-descriptions-value="<%= AIPlaygroundController::TOOL_CATALOG.transform_values { |meta| meta.fetch(:description) }.to_json %>"
-    class="space-y-8"
-  >
-    <section class="space-y-4">
+  <div class="space-y-8">
+    <section
+      data-controller="ai-playground-form"
+      data-ai-playground-form-stream-url-value="<%= main_app.stream_ai_playground_path %>"
+      data-ai-playground-form-candidates-value="<%= @profile_candidates.to_json %>"
+      data-ai-playground-form-definitions-value="<%= @model_definitions.to_json %>"
+      data-ai-playground-form-tool-descriptions-value="<%= AIPlaygroundController::TOOL_CATALOG.transform_values { |meta| meta.fetch(:description) }.to_json %>"
+      class="space-y-4"
+    >
       <%= render FlatPack::PageTitle::Component.new(
         title: "Generate",
         subtitle: "Provider, profile, and optional model override. Capability fields appear from the model registry.",
@@ -193,7 +193,13 @@
       <%= render "result", **result_locals("generate") %>
     </section>
 
-    <section class="space-y-4 border-t border-(--surface-border-color) pt-8">
+    <section
+      data-controller="ai-playground-form"
+      data-ai-playground-form-candidates-value="<%= @profile_candidates.to_json %>"
+      data-ai-playground-form-definitions-value="<%= @model_definitions.to_json %>"
+      data-ai-playground-form-require-batch-value="true"
+      class="space-y-4 border-t border-(--surface-border-color) pt-8"
+    >
       <%= render FlatPack::PageTitle::Component.new(
         title: "Batch",
         subtitle: "Provider batches stay on submit_batch. Items are submitted together with the selected profile/model.",
@@ -210,19 +216,23 @@
           name: "ai_playground[provider]",
           label: "Provider",
           options: @provider_options,
-          value: @form.fetch("provider")
+          value: @form.fetch("provider"),
+          data: { ai_playground_form_target: "provider", action: "change->ai-playground-form#refresh" }
         ) %>
         <%= render FlatPack::Select::Component.new(
           name: "ai_playground[profile]",
           label: "Profile",
           options: @profile_options,
-          value: @form.fetch("profile")
+          value: @form.fetch("profile"),
+          data: { ai_playground_form_target: "profile", action: "change->ai-playground-form#refresh" }
         ) %>
         <%= render FlatPack::Select::Component.new(
           name: "ai_playground[model]",
           label: "Model",
           options: @model_options,
-          value: @form.fetch("model")
+          value: @form.fetch("model"),
+          help_text: "Defaults to the first batch-capable model in the selected profile (after provider filter).",
+          data: { ai_playground_form_target: "model" }
         ) %>
         <%= render FlatPack::TextArea::Component.new(
           name: "ai_playground[prompt]",
