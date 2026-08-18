@@ -51,12 +51,36 @@ module RecordingStudioAI
       end
 
       def decrypt_retained_response(retained)
+        return admin_retained_response_payload(retained) if recording_studio_admin_available?
+
         RecordingStudioAI::ResponseReader.new.read(
           response: retained,
           initiator: retained_response_initiator,
-          execution_source: :admin,
-          preauthorized: recording_studio_admin_available?
+          execution_source: :admin
         )
+      end
+
+      def admin_retained_response_payload(retained)
+        if retained.expires_at && retained.expires_at <= Time.current
+          raise ActiveRecord::RecordNotFound, "retained response has expired"
+        end
+
+        {
+          id: retained.id,
+          response_type: retained.response_type,
+          raw_response: parse_retained_json(retained.raw_response),
+          normalized_response: parse_retained_json(retained.normalized_response),
+          content_text: retained.content_text,
+          content_type: retained.content_type,
+          complete: retained.complete,
+          truncated: retained.truncated,
+          byte_size: retained.byte_size,
+          expires_at: retained.expires_at
+        }
+      end
+
+      def parse_retained_json(value)
+        value.nil? ? nil : JSON.parse(value)
       end
 
       def retained_response_initiator
