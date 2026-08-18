@@ -19,23 +19,19 @@ module AdminScreens
     filter :status,
            param: :run_status,
            field: :status,
-           options: -> { RecordingStudioAI::Run.distinct.order(:status).pluck(:status).compact_blank },
+           options: -> { AdminScreens::RecordingStudioAIWidgets.run_distinct_values(:status) },
            apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
     filter :model,
            field: :resolved_model,
-           values: -> { RecordingStudioAI::Run.distinct.order(:resolved_model).pluck(:resolved_model).compact_blank },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.run_distinct_values(:resolved_model) },
            apply: ->(relation, value, _context) { relation.where(resolved_model: value) }
     filter :provider,
            field: :resolved_provider,
-           values: lambda {
-             RecordingStudioAI::Run.distinct.order(:resolved_provider).pluck(:resolved_provider).compact_blank
-           },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.run_distinct_values(:resolved_provider) },
            apply: ->(relation, value, _context) { relation.where(resolved_provider: value) }
     filter :prompt,
            field: :prompt_key,
-           values: lambda {
-             RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key)
-           },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.run_present_distinct_values(:prompt_key) },
            apply: ->(relation, value, _context) { relation.where(prompt_key: value) }
     filter :token_min,
            param: :min_tokens,

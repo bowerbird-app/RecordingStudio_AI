@@ -7,8 +7,8 @@ module AdminScreens
     title "Recording Studio AI"
     subtitle "Entry point for AI administration views."
 
-    query do |_context|
-      RecordingStudioAI::Run.order(created_at: :desc)
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.runs_scope(context).order(created_at: :desc)
     end
   end
 end

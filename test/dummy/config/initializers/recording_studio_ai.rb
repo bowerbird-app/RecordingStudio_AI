@@ -20,7 +20,9 @@ RecordingStudioAI.configure do |config|
       { provider: :gemini, model: "gemini-2.5-pro" }
     ]
   }
-  config.authorization_handler = ->(action:, attribution:, context:) { true }
+  # Map AI actions onto RecordingStudioAccessible roles for the selected root.
+  # Do not copy `->(**) { true }` into a real host.
+  config.authorization_handler = DummyAccessibleAIAuthorization.method(:call)
   config.attribution_validator = lambda do |root_recording:, context_recording:|
     unless root_recording.is_a?(RecordingStudio::Recording) &&
            root_recording.parent_recording_id.nil? &&
@@ -36,7 +38,7 @@ RecordingStudioAI.configure do |config|
   config.maximum_retained_response_size = 1.megabyte
   config.admin_actor_resolver = ->(controller:) { Current.actor }
   config.admin_visible_roots_resolver = lambda do |actor:, controller:|
-    RecordingStudio::Recording.where(parent_recording_id: nil).pluck(:id)
+    DummyAccessibleAIAuthorization.accessible_root_ids(actor: actor, minimum_role: :view)
   end
   config.admin_layout = "flat_pack_sidebar"
   config.maximum_attempts = 3

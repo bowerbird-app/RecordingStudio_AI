@@ -17,21 +17,19 @@ module AdminScreens
     filter :status,
            param: :attempt_status,
            field: :status,
-           options: -> { RecordingStudioAI::Attempt.distinct.order(:status).pluck(:status).compact_blank },
+           options: -> { AdminScreens::RecordingStudioAIWidgets.attempt_distinct_values(:status) },
            apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
     filter :provider,
            field: :provider,
-           values: -> { RecordingStudioAI::Attempt.distinct.order(:provider).pluck(:provider).compact_blank },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.attempt_distinct_values(:provider) },
            apply: ->(relation, value, _context) { relation.where(provider: value) }
     filter :model,
            field: :model,
-           values: -> { RecordingStudioAI::Attempt.distinct.order(:model).pluck(:model).compact_blank },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.attempt_distinct_values(:model) },
            apply: ->(relation, value, _context) { relation.where(model: value) }
     filter :prompt,
            field: :prompt_key,
-           values: lambda {
-             RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key)
-           },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.run_present_distinct_values(:prompt_key) },
            apply: lambda { |relation, value, _context|
              relation.where(run_id: RecordingStudioAI::Run.where(prompt_key: value).select(:id))
            }
@@ -53,16 +51,14 @@ module AdminScreens
            }
     filter :error_code,
            field: :error_code,
-           values: lambda {
-             RecordingStudioAI::Attempt.where.not(error_code: [nil, ""]).distinct.order(:error_code).pluck(:error_code)
-           },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.attempt_present_distinct_values(:error_code) },
            apply: ->(relation, value, _context) { relation.where(error_code: value.to_s) }
     filter :run_id,
            field: :run_id,
            apply: ->(relation, value, _context) { relation.where(run_id: value) }
     filter :kind,
            field: :kind,
-           values: -> { RecordingStudioAI::Attempt.distinct.order(:kind).pluck(:kind).compact_blank },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.attempt_distinct_values(:kind) },
            apply: ->(relation, value, _context) { relation.where(kind: value) }
 
     summary do

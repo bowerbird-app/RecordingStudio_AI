@@ -35,18 +35,79 @@ module AdminScreens
     remove_const(:ModelRow) if const_defined?(:ModelRow) && ModelRow.members != model_row_members
     ModelRow = Data.define(*model_row_members) unless const_defined?(:ModelRow)
 
-    def runs_scope(context)
-      scope = RecordingStudioAI::Run.all
-      root_id = context.root_recording&.id
-      root_id.present? ? scope.where(root_recording_id: root_id) : scope
+    ADMIN_CONTEXT_KEY = :recording_studio_ai_admin_context unless const_defined?(:ADMIN_CONTEXT_KEY)
+
+    def bind_admin_context!(context)
+      Thread.current[ADMIN_CONTEXT_KEY] = context
+      context
     end
 
-    def tool_scope(context)
+    def clear_admin_context!
+      Thread.current[ADMIN_CONTEXT_KEY] = nil
+    end
+
+    def admin_context
+      Thread.current[ADMIN_CONTEXT_KEY]
+    end
+
+    # Fail closed: missing root yields no rows instead of every tenant's runs.
+    # Binding the context lets filter option lambdas (which receive no args from
+    # Recording Studio Admin) reuse the same root scope for dropdown values.
+    def runs_scope(context = admin_context)
+      bind_admin_context!(context) if context
+      root_id = context&.root_recording&.id
+      return RecordingStudioAI::Run.none if root_id.blank?
+
+      RecordingStudioAI::Run.where(root_recording_id: root_id)
+    end
+
+    def tool_scope(context = admin_context)
       RecordingStudioAI::CustomToolInvocation.joins(:run).merge(runs_scope(context))
     end
 
-    def attempts_scope(context)
+    def attempts_scope(context = admin_context)
       RecordingStudioAI::Attempt.joins(:run).merge(runs_scope(context))
+    end
+
+    def responses_scope(context = admin_context)
+      bind_admin_context!(context) if context
+      root_id = context&.root_recording&.id
+      return RecordingStudioAI::Response.none if root_id.blank?
+
+      run_ids = RecordingStudioAI::Run.where(root_recording_id: root_id).select(:id)
+      attempt_ids = RecordingStudioAI::Attempt.where(run_id: run_ids).select(:id)
+      batch_item_ids = RecordingStudioAI::BatchItem.where(run_id: run_ids).select(:id)
+
+      RecordingStudioAI::Response.includes(attempt: :run, batch_item: :run).where(
+        "recording_studio_ai_responses.attempt_id IN (:attempt_ids) OR " \
+        "recording_studio_ai_responses.batch_item_id IN (:batch_item_ids)",
+        attempt_ids: attempt_ids,
+        batch_item_ids: batch_item_ids
+      )
+    end
+
+    def run_distinct_values(column)
+      runs_scope.distinct.order(column).pluck(column).compact_blank
+    end
+
+    def run_present_distinct_values(column)
+      runs_scope.where.not(column => nil).distinct.order(column).pluck(column).compact_blank
+    end
+
+    def attempt_distinct_values(column)
+      attempts_scope.distinct.order(column).pluck(column).compact_blank
+    end
+
+    def attempt_present_distinct_values(column)
+      attempts_scope.where.not(column => [nil, ""]).distinct.order(column).pluck(column).compact_blank
+    end
+
+    def tool_distinct_values(column)
+      tool_scope.distinct.order(column).pluck(column).compact_blank
+    end
+
+    def response_distinct_values(column)
+      responses_scope.distinct.order(column).pluck(column).compact_blank
     end
 
     def attempt_kind_series(relation, date_range:, field: "recording_studio_ai_attempts.created_at", bucket: :day)

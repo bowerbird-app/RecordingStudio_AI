@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "recording_studio_ai/admin/recording_studio_ai_widgets"
 
 class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
   Actor = Data.define(:id)
@@ -58,6 +59,83 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     assert_empty result[:breaches]
   end
 
+  def test_warning_metrics_fail_closed_without_root_ids
+    create_run(root_id: create_recording_id, status: "failed", tokens: 90)
+
+    result = RecordingStudioAI::WarningMetrics.new(
+      since: 1.hour.ago,
+      thresholds: { runs: 1, error_rate: 0.1 }
+    ).call
+
+    assert_equal 0, result[:values][:runs]
+    assert_nil result[:values][:error_rate]
+    assert_empty result[:breaches]
+  end
+
+  def test_admin_runs_scope_fails_closed_without_a_root
+    visible_root = create_recording_id
+    create_run(root_id: visible_root, status: "completed", tokens: 10)
+    context = Struct.new(:root_recording).new(nil)
+
+    assert_empty AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
+  def test_admin_screens_and_filters_stay_inside_the_current_root
+    visible_root = create_recording_id
+    hidden_root = create_recording_id
+    visible_run = create_run(
+      root_id: visible_root, status: "completed", tokens: 10,
+      prompt_key: "visible-prompt", resolved_provider: "openai", resolved_model: "gpt-visible"
+    )
+    hidden_run = create_run(
+      root_id: hidden_root, status: "failed", tokens: 90,
+      prompt_key: "hidden-prompt", resolved_provider: "gemini", resolved_model: "gemini-hidden"
+    )
+    visible_attempt = visible_run.attempts.create!(
+      sequence: 1, kind: "primary", status: "completed", provider: "openai", model: "gpt-visible"
+    )
+    hidden_attempt = hidden_run.attempts.create!(
+      sequence: 1, kind: "primary", status: "failed", provider: "gemini", model: "gemini-hidden"
+    )
+    visible_run.custom_tool_invocations.create!(
+      tool_key: "visible-tool", tool_version: 1, status: "completed", read_only: true,
+      destructive: false, requires_confirmation: false, idempotent: true
+    )
+    hidden_run.custom_tool_invocations.create!(
+      tool_key: "hidden-tool", tool_version: 1, status: "completed", read_only: true,
+      destructive: false, requires_confirmation: false, idempotent: true
+    )
+    RecordingStudioAI::Response.create!(
+      attempt: visible_attempt, response_type: "generation", provider: "openai", model: "gpt-visible",
+      complete: true, byte_size: 12
+    )
+    RecordingStudioAI::Response.create!(
+      attempt: hidden_attempt, response_type: "error", provider: "gemini", model: "gemini-hidden",
+      complete: false, byte_size: 34
+    )
+
+    context = Struct.new(:root_recording).new(Actor.new(id: visible_root))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+
+    assert_equal [visible_run.id], widgets.runs_scope(context).pluck(:id)
+    assert_equal [visible_attempt.id], widgets.attempts_scope(context).pluck(:id)
+    assert_equal ["visible-tool"], widgets.tool_scope(context).pluck(:tool_key)
+    assert_equal ["openai"], widgets.responses_scope(context).pluck(:provider)
+    assert_equal %w[completed], widgets.run_distinct_values(:status)
+    assert_equal %w[visible-prompt], widgets.run_present_distinct_values(:prompt_key)
+    assert_equal %w[openai], widgets.run_distinct_values(:resolved_provider)
+    assert_equal %w[gpt-visible], widgets.run_distinct_values(:resolved_model)
+    assert_equal %w[visible-tool], widgets.tool_distinct_values(:tool_key)
+    assert_equal %w[openai], widgets.response_distinct_values(:provider)
+    refute_includes widgets.run_present_distinct_values(:prompt_key), "hidden-prompt"
+    refute_includes widgets.tool_distinct_values(:tool_key), "hidden-tool"
+    refute_includes widgets.response_distinct_values(:provider), "gemini"
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
   def test_warning_metrics_leave_mixed_currency_spend_unknown
     root_id = create_recording_id
     create_run(root_id: root_id, status: "completed", tokens: 10)
@@ -107,7 +185,7 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
 
   private
 
-  def create_run(root_id:, status:, tokens:)
+  def create_run(root_id:, status:, tokens:, **attributes)
     RecordingStudioAI::Run.create!(
       operation: "generation",
       status: status,
@@ -116,7 +194,8 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
       initiator_id: @actor.id,
       initiator_kind: "user",
       total_tokens: tokens,
-      created_at: Time.current
+      created_at: Time.current,
+      **attributes
     )
   end
 end

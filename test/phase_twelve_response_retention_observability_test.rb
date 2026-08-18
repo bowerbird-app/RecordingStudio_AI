@@ -421,7 +421,9 @@ class PhaseTwelveResponseRetentionObservabilityTest < RecordingStudioAI::Test::P
       error_rate: 0.5, total_tokens: 1, provider_error_rate: 0.5
     )
 
-    report = RecordingStudioAI::WarningMetrics.new(since: 1.hour.ago, thresholds: thresholds).call
+    report = RecordingStudioAI::WarningMetrics.new(
+      since: 1.hour.ago, thresholds: thresholds, root_ids: [@root_recording.id]
+    ).call
 
     assert_equal 0.5, report[:values][:error_rate]
     assert_equal 0.5, report[:values][:provider_error_rate]
@@ -440,7 +442,9 @@ class PhaseTwelveResponseRetentionObservabilityTest < RecordingStudioAI::Test::P
     slow.update_columns(latency_ms: 20_000, created_at: Time.current)
     RecordingStudioAI.configuration.admin_slow_call_threshold_ms = 10_000
 
-    report = RecordingStudioAI::WarningMetrics.new(since: 1.hour.ago, thresholds: { slow_calls: 1 }).call
+    report = RecordingStudioAI::WarningMetrics.new(
+      since: 1.hour.ago, thresholds: { slow_calls: 1 }, root_ids: [@root_recording.id]
+    ).call
 
     assert_equal 1, report[:values][:slow_calls]
     assert_includes report[:breaches].map { |breach| breach[:metric] }, :slow_calls
@@ -452,14 +456,18 @@ class PhaseTwelveResponseRetentionObservabilityTest < RecordingStudioAI::Test::P
     active_run = create_run(status: "running")
     active_run.attempts.create!(sequence: 1, kind: "primary", status: "running", provider: "openai")
 
-    values = RecordingStudioAI::WarningMetrics.new(since: 1.hour.ago).call.fetch(:values)
+    values = RecordingStudioAI::WarningMetrics.new(
+      since: 1.hour.ago, root_ids: [@root_recording.id]
+    ).call.fetch(:values)
 
     assert_equal 1.0, values.fetch(:error_rate)
     assert_equal 1.0, values.fetch(:provider_error_rate)
   end
 
   def test_warning_metrics_preserve_unknown_values_for_empty_windows
-    report = RecordingStudioAI::WarningMetrics.new(since: 1.minute.from_now).call
+    report = RecordingStudioAI::WarningMetrics.new(
+      since: 1.minute.from_now, root_ids: [@root_recording.id]
+    ).call
 
     assert_nil report[:values][:error_rate]
     assert_nil report[:values][:total_tokens]

@@ -16,7 +16,7 @@ module AdminScreens
     filter :group_by, values: %i[hour day week month year], default: :day
     filter :tool_key,
            field: :tool_key,
-           values: -> { RecordingStudioAI::CustomToolInvocation.distinct.order(:tool_key).pluck(:tool_key).compact_blank }
+           values: -> { AdminScreens::RecordingStudioAIWidgets.tool_distinct_values(:tool_key) }
     filter :run_id,
            field: :run_id,
            apply: ->(relation, value, _context) { relation.where(run_id: value) }
@@ -27,9 +27,7 @@ module AdminScreens
            apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
     filter :prompt,
            field: :prompt_key,
-           values: lambda {
-             RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key)
-           },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.run_present_distinct_values(:prompt_key) },
            apply: lambda { |relation, value, _context|
              relation.where(run_id: RecordingStudioAI::Run.where(prompt_key: value).select(:id))
            }

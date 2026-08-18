@@ -189,8 +189,9 @@ Sanitized `ActiveSupport::Notifications` events use the configured namespace,
 for example `recording_studio_ai.run.completed` and
 `recording_studio_ai.attempt.failed`. Payloads contain identifiers, statuses,
 timings, usage, cost, counts, and normalized error codes only.
-`RecordingStudioAI::WarningMetrics.new(since: 24.hours.ago).call` returns
-canonical metric values and deterministic threshold breaches.
+`RecordingStudioAI::WarningMetrics.new(since: 24.hours.ago, root_ids: root_ids).call`
+returns canonical metric values and deterministic threshold breaches for those
+roots. Omitting `root_ids` fails closed (empty metrics).
 
 ## Administration (Phase 13)
 

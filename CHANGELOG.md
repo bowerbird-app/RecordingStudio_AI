@@ -76,6 +76,40 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.4] - 2026-08-18
+
+### Security
+
+- Admin run/attempt/tool/response scopes fail closed when no admin root is present
+  (no more global `Run.all` / cross-tenant listings).
+- Recording Studio Admin overview and AI Responses screens scope queries to the
+  current admin root.
+- Admin filter dropdown options (prompt keys, models, providers, tools, etc.)
+  are built from the same root-scoped relations instead of global `pluck`s.
+- `WarningMetrics` with `root_ids: nil` no longer scans every tenant; pass an
+  explicit root id list.
+- Gemini generate/stream clients send the API key only via `x-goog-api-key`
+  (never as a `key=` query parameter). Streaming still uses `alt=sse` in the
+  query string.
+- Dummy host now wires Recording Studio AI authorization through
+  RecordingStudioAccessible role mapping instead of `->(**) { true }`.
+- Dummy root switcher lists only Accessible roots and uses the default
+  Accessible access check (no always-allow switch).
+- Dummy AI admin visible roots and Recording Studio Admin access recording
+  resolvers fail closed to Accessible grants (no global-root fallback).
+- Dummy AI playground refuses to run without a selected root the actor can
+  edit (no first-Workspace fallback).
+- Dummy Sidekiq UI is limited to actors with Accessible admin on at least one
+  root, and the sidebar link is hidden otherwise.
+
+### Upgrade notes
+
+- Callers of `RecordingStudioAI::WarningMetrics` must pass `root_ids:` for
+  meaningful results. Omitting it returns empty metrics.
+- Treat the dummy initializers as the reference Accessible host pattern. Do not
+  copy the old always-true authorization / all-workspaces switcher into a real
+  host.
+
 ## [0.2.3] - 2026-08-18
 
 ### Changed

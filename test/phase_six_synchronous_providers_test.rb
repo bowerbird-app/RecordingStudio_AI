@@ -267,6 +267,36 @@ class PhaseSixSynchronousProvidersTest < RecordingStudioAI::Test::PersistenceCas
     assert_equal "Sensitive prompt", body.dig("contents", 0, "parts", 0, "text")
     assert_equal "Sensitive instruction", body.dig("systemInstruction", "parts", 0, "text")
     refute_includes captured_request.path, "Sensitive"
+    assert_equal "secret-key", captured_request["x-goog-api-key"]
+    refute_includes captured_request.path, "secret-key"
+    refute_match(/[?&]key=/, captured_request.path)
+  end
+
+  def test_internal_gemini_stream_sends_api_key_in_header_not_query_string
+    client = RecordingStudioAI::ProviderClients::Gemini.new(api_key: "stream-secret", timeout: 5)
+    captured_request = nil
+    http = Object.new
+    http.define_singleton_method(:request) do |request, &block|
+      captured_request = request
+      response = Net::HTTPOK.new("1.1", "200", "OK")
+      response.define_singleton_method(:read_body) do |&chunk_block|
+        chunk_block&.call("data: {\"responseId\":\"stream-1\",\"candidates\":[]}\r\n\r\n")
+      end
+      block.call(response)
+      response
+    end
+
+    Net::HTTP.stub(:start, ->(*, **, &block) { block.call(http) }) do
+      client.stream_generate_content(
+        model: "gemini-test",
+        contents: [{ role: "user", parts: [{ text: "hi" }] }]
+      ) { |_chunk| }
+    end
+
+    assert_equal "stream-secret", captured_request["x-goog-api-key"]
+    assert_includes captured_request.path, "alt=sse"
+    refute_includes captured_request.path, "stream-secret"
+    refute_match(/[?&]key=/, captured_request.path)
   end
 
   def test_official_openai_transport_errors_are_retryable_and_normalized

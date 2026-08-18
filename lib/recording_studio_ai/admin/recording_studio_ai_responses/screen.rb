@@ -7,25 +7,21 @@ module AdminScreens
     title "AI Responses"
     subtitle "Persisted response records from Recording Studio AI executions."
 
-    query do |_context|
-      RecordingStudioAI::Response.includes(attempt: :run, batch_item: :run).order(created_at: :desc)
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.responses_scope(context).order(created_at: :desc)
     end
 
     filter_presentation :modal, inline_count: 3
     filter :date_range, field: :created_at, default: :last_30_days
     filter :type,
-           values: lambda {
-             RecordingStudioAI::Response.distinct.order(:response_type).pluck(:response_type).compact_blank
-           },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.response_distinct_values(:response_type) },
            apply: ->(relation, value, _context) { relation.where(response_type: value) }
     filter :provider,
-           options: -> { RecordingStudioAI::Response.distinct.order(:provider).pluck(:provider).compact_blank }
+           options: -> { AdminScreens::RecordingStudioAIWidgets.response_distinct_values(:provider) }
     filter :model,
-           options: -> { RecordingStudioAI::Response.distinct.order(:model).pluck(:model).compact_blank }
+           options: -> { AdminScreens::RecordingStudioAIWidgets.response_distinct_values(:model) }
     filter :finish,
-           options: lambda {
-             RecordingStudioAI::Response.distinct.order(:finish_reason).pluck(:finish_reason).compact_blank
-           },
+           options: -> { AdminScreens::RecordingStudioAIWidgets.response_distinct_values(:finish_reason) },
            apply: ->(relation, value, _context) { relation.where(finish_reason: value) }
     filter :complete,
            values: ["1"],
