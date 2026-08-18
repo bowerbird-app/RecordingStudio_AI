@@ -98,6 +98,11 @@ Versioning and Keep a Changelog.
   Generate sends the registered prompt, filled-in inputs, and its tools. The
   custom-tool checkbox and dropdown stay available so you can add a playground
   tool on any supported model.
+- Gemini generate requests that mix web search with custom tools send
+  `toolConfig.includeServerSideToolInvocations`. If Gemini still refuses the
+  mix, the error says to turn one of them off.
+- Generation response JSON serializes `run` as `{ id: }` instead of the Active
+  Record inspect string.
 - AI Calls, Custom Tool Calls, Attempts, Estimated spend, Registered custom
   tools, Registered prompts, Registered providers, and Registered models table
   headers explain each column in everyday language.
@@ -107,6 +112,8 @@ Versioning and Keep a Changelog.
 - Rebuild dummy CSS with `bundle exec rails tailwindcss:build` in `test/dummy`
   after pulling. Hosts should keep a `@source` on the installed Flatpack
   `app/components` path.
+- `response.to_h[:run]` is now `{ id: run.id }` when the run has an id. Update
+  any host that parsed the old inspect string.
 
 ## [0.2.8] - 2026-08-18
 

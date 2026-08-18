@@ -14,11 +14,12 @@ module RecordingStudioAI
       StreamChunk = Data.define(:payload, :text_mode)
 
       class HttpError < StandardError
-        attr_reader :status, :code
+        attr_reader :status, :code, :provider_message
 
-        def initialize(status:, code: nil)
+        def initialize(status:, code: nil, provider_message: nil)
           @status = status
           @code = code
+          @provider_message = provider_message
           super("Gemini request failed")
         end
       end
@@ -161,8 +162,19 @@ module RecordingStudioAI
         generation_config[:responseMimeType] = config[:response_mime_type] if config&.dig(:response_mime_type)
         generation_config[:responseJsonSchema] = config[:response_json_schema] if config&.dig(:response_json_schema)
         body[:generationConfig] = generation_config unless generation_config.empty?
-        body[:tools] = normalize_tools(config[:tools]) if config&.dig(:tools)
+        tools = config&.dig(:tools)
+        if tools && !Array(tools).empty?
+          body[:tools] = normalize_tools(tools)
+          body[:toolConfig] = { includeServerSideToolInvocations: true } if mixed_builtin_and_custom_tools?(tools)
+        end
         body
+      end
+
+      def mixed_builtin_and_custom_tools?(tools)
+        list = Array(tools)
+        builtin = list.any? { |tool| tool.key?(:google_search) || tool.key?(:googleSearch) }
+        custom = list.any? { |tool| tool.key?(:function_declarations) || tool.key?(:functionDeclarations) }
+        builtin && custom
       end
 
       def normalize_tools(tools)
@@ -210,8 +222,12 @@ module RecordingStudioAI
       end
 
       def raise_http_error(response)
-        code = JSON.parse(response.body).dig("error", "status")
-        raise HttpError.new(status: response.code.to_i, code: code)
+        parsed = JSON.parse(response.body)
+        raise HttpError.new(
+          status: response.code.to_i,
+          code: parsed.dig("error", "status"),
+          provider_message: parsed.dig("error", "message")
+        )
       rescue JSON::ParserError
         raise HttpError.new(status: response.code.to_i)
       end
