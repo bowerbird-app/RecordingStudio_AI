@@ -88,8 +88,8 @@ Versioning and Keep a Changelog.
   and `required_access_role` (default `:view`), including the current-root
   match. Lookups stay inside that admin root. The public
   `read_retained_response` API still requires `view_retained_response`.
-  The Admin access helper lives on `RecordingStudioAI::RecordingStudioAdminAuthorization`
-  so a development reload of the autoloaded Admin controllers does not drop it.
+  The Admin access helper is autoloaded from `app/controllers` with the
+  retained-response controller so a development reload still finds it.
 
 ### Upgrade notes
 

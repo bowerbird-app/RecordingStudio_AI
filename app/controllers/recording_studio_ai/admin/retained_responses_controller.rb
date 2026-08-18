@@ -68,12 +68,12 @@ module RecordingStudioAI
       end
 
       def recording_studio_admin_available?
-        RecordingStudioAI::RecordingStudioAdminAuthorization.available?
+        RecordingStudioAdminAuthorization.available?
       end
 
       def authorize_recording_studio_admin!
-        context = RecordingStudioAI::RecordingStudioAdminAuthorization.context_for(controller: self)
-        RecordingStudioAI::RecordingStudioAdminAuthorization.authorize!(context)
+        context = RecordingStudioAdminAuthorization.context_for(controller: self)
+        RecordingStudioAdminAuthorization.authorize!(context)
         @recording_studio_admin_context = context
       rescue RecordingStudioAdmin::AuthorizationFailed
         head :forbidden

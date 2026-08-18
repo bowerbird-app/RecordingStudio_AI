@@ -22,8 +22,7 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
   end
 
   test "signed-in users without Accessible grants are forbidden like Recording Studio Admin" do
-    assert RecordingStudioAI.const_defined?(:RecordingStudioAdminAuthorization)
-    refute RecordingStudioAI::Admin.const_defined?(:RecordingStudioAdminAuthorization, false)
+    assert RecordingStudioAI::Admin.const_defined?(:RecordingStudioAdminAuthorization)
 
     retained = create_retained_response!(root: @root_recording)
     sign_in @user
