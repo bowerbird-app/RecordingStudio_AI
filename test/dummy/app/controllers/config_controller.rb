@@ -70,7 +70,7 @@ class ConfigController < ApplicationController
       required: "Yes",
       accepted_values: "Callable returning literal true or false",
       default: "->(**) { false }",
-      explanation: "Return true to allow a call. Dummy maps actions to Accessible roles; ships closed until you set it."
+      explanation: "Return literal true to allow a call. Dummy maps actions to Accessible roles and ships closed until you set it. Prefer RecordingStudioAI::AccessibleAuthorization once Accessible is installed."
     },
     {
       key: "attribution_validator",
@@ -326,6 +326,13 @@ class ConfigController < ApplicationController
       explanation: "Who is looking at admin. Admin screens stay shut until you set this."
     },
     {
+      key: "admin_authenticate",
+      required: "Recommended for admin",
+      accepted_values: "Callable(controller:) or nil",
+      default: "nil",
+      explanation: "Optional extra authenticate step on engine admin. The engine does not authenticate by itself — also authenticate ApplicationController."
+    },
+    {
       key: "admin_visible_roots_resolver",
       required: "Yes, to open admin",
       accepted_values: "Callable(actor:, controller:) or nil",
@@ -382,6 +389,8 @@ class ConfigController < ApplicationController
       # RecordingStudioAI.discover_providers!
 
       # Authorization. Replace this deny-all handler with your own policy.
+      # Prefer RecordingStudioAI::AccessibleAuthorization once Accessible is installed:
+      #   config.authorization_handler = RecordingStudioAI::AccessibleAuthorization.method(:call)
       config.authorization_handler = ->(**) { false }
 
       # The gem already checks that the workspace root and context match.
@@ -445,6 +454,7 @@ class ConfigController < ApplicationController
 
       # Admin screens stay shut until both resolvers are set.
       config.admin_actor_resolver = ->(controller:) { controller.current_user }
+      config.admin_authenticate = nil
       config.admin_visible_roots_resolver = ->(actor:, controller:) { actor.visible_recording_root_ids }
       config.admin_layout = nil
     end

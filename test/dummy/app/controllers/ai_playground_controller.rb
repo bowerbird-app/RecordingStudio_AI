@@ -52,7 +52,7 @@ class AIPlaygroundController < ApplicationController
     load_created_records!(@request_id)
     render_result
   rescue StandardError => error
-    @error_message = "#{error.class}: #{error.message}"
+    @error_message = playground_error_message(error)
     load_created_records!(@request_id)
     render_result(status: :unprocessable_entity)
   end
@@ -229,7 +229,7 @@ class AIPlaygroundController < ApplicationController
     upload = form["attachment"].presence || params.dig(:ai_playground, :attachment)
     return [] unless upload.respond_to?(:read)
 
-    data = upload.read
+    data = read_capped_upload!(upload)
     content_type = upload.content_type.to_s
     type = content_type.start_with?("image/") ? :image : :file
     [
@@ -240,6 +240,59 @@ class AIPlaygroundController < ApplicationController
         filename: upload.original_filename
       }
     ]
+  end
+
+  # Never trust client size headers alone. Reject claimed oversize first, then
+  # read at most the configured limit (+1) so a lying Content-Length cannot DoS.
+  def read_capped_upload!(upload)
+    limit = attachment_byte_limit
+    claimed = claimed_upload_bytes(upload)
+    raise playground_file_too_big if claimed && claimed > limit
+
+    io = upload_io(upload)
+    io.rewind if io.respond_to?(:rewind)
+    data = io.read(limit + 1).to_s
+    raise playground_file_too_big if data.bytesize > limit
+
+    data
+  end
+
+  def attachment_byte_limit
+    [
+      RecordingStudioAI.configuration.maximum_attachment_bytes,
+      RecordingStudioAI.configuration.maximum_attachment_total_bytes
+    ].min
+  end
+
+  def claimed_upload_bytes(upload)
+    candidates = []
+    candidates << upload.size if upload.respond_to?(:size) && !upload.size.nil?
+    candidates << upload.tempfile.size if upload.respond_to?(:tempfile) && upload.tempfile
+    candidates << request.content_length if request.content_length.present?
+    values = candidates.compact.map(&:to_i)
+    values.max
+  end
+
+  def upload_io(upload)
+    return upload.tempfile if upload.respond_to?(:tempfile) && upload.tempfile
+
+    upload
+  end
+
+  def playground_file_too_big
+    RecordingStudioAI::Errors::ContractValidationError.new(
+      "That file is too big for this playground.",
+      code: "invalid_request"
+    )
+  end
+
+  def playground_error_message(error)
+    return error.message if error.is_a?(RecordingStudioAI::Errors::ContractValidationError)
+
+    Rails.logger.error(
+      "[ai_playground] #{error.class}: #{error.message}\n#{Array(error.backtrace).first(8).join("\n")}"
+    )
+    "That run didn't finish. Try again in a moment."
   end
 
   def base_request_for(form, root_recording:, request_id:)
@@ -431,10 +484,18 @@ class AIPlaygroundController < ApplicationController
   # on the currently selected root before spending provider credits.
   def playground_root_recording!
     root = current_root_recording
-    raise ArgumentError, "Select a workspace you can access before running AI." if root.blank?
+    if root.blank?
+      raise RecordingStudioAI::Errors::ContractValidationError.new(
+        "Select a workspace you can access before running AI.",
+        code: "authorization"
+      )
+    end
 
     unless RecordingStudioAccessible.authorized?(actor: current_user, recording: root, role: :edit)
-      raise ArgumentError, "You need edit access on the selected workspace to run AI."
+      raise RecordingStudioAI::Errors::ContractValidationError.new(
+        "You need edit access on the selected workspace to run AI.",
+        code: "authorization"
+      )
     end
 
     root

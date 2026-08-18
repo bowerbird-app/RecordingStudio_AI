@@ -30,6 +30,8 @@ Versioning and Keep a Changelog.
   `retry_random` / `retry_sleeper` test seams.
 - Dummy `/config` Create Custom Tools now includes registration-field and
   argument-field tables for `RecordingStudioAI.tools.register`.
+- Dummy `/config` keeps `admin_authenticate` and AccessibleAuthorization
+  guidance alongside those custom-tool tables.
 - Dummy sign-in works through Cursor Cloud and Codespaces forwarded previews by
   relaxing the CSRF origin check in development when `CURSOR_AGENT` or
   `CODESPACES` is set. CSRF tokens stay required.
@@ -75,6 +77,48 @@ Versioning and Keep a Changelog.
 ### Removed
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
+
+## [0.2.7] - 2026-08-18
+
+### Changed
+
+- Engine admin definition modals, sparklines, data tables, warnings, and
+  retained JSON now use Flatpack Modal, Chart, Table, Alert, and CodeBlock
+  instead of copied markup.
+- Dummy playground, tables page, and recording tree empty state use Flatpack
+  Card, Table, Alert, CodeBlock, and EmptyState.
+
+### Upgrade notes
+
+- No host configuration changes. Admin and dummy screens keep the same jobs;
+  markup now comes from Flatpack.
+
+## [0.2.6] - 2026-08-18
+
+### Security
+
+- Gemini `get_batch` / `cancel_batch` allowlist `provider_batch_id` to
+  `batches/<id>` so a poisoned stored name cannot call other Gemini paths with
+  the host API key.
+- Dummy AI playground rejects oversized uploads from claimed size *and* a
+  capped read, so a lying Content-Length cannot load the file into memory.
+  Gem magic-byte checks still apply after.
+- Dummy AI playground shows contract/auth messages only. Unexpected exceptions
+  log server-side and show a generic “try again” line (no class names).
+- Engine admin supports optional `admin_authenticate` and documents that the
+  engine does not authenticate by itself.
+- Ships `RecordingStudioAI::AccessibleAuthorization` as the recommended
+  Accessible role mapper (view / edit / admin). Install template and README
+  point hosts at it instead of always-true handlers.
+
+### Upgrade notes
+
+- Prefer `config.authorization_handler = RecordingStudioAI::AccessibleAuthorization.method(:call)`
+  once recording-studio-accessible is installed.
+- Set `config.admin_authenticate` (or authenticate on `ApplicationController`)
+  for engine admin routes.
+- Gemini batches whose stored `provider_batch_id` is not `batches/...` will
+  raise on refresh/cancel; re-submit or repair those rows.
 
 ## [0.2.5] - 2026-08-18
 

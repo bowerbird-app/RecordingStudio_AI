@@ -8,6 +8,9 @@ module RecordingStudioAI
     class Gemini
       API_BASE = "https://generativelanguage.googleapis.com/v1beta"
       API_ROOT = "#{API_BASE}/models"
+      # Provider-returned batch resource names only. Blocks path injection that
+      # would call other Gemini endpoints with the host API key.
+      BATCH_NAME_PATTERN = %r{\Abatches/[A-Za-z0-9._-]+\z}
       StreamChunk = Data.define(:payload, :text_mode)
 
       class HttpError < StandardError
@@ -92,16 +95,23 @@ module RecordingStudioAI
       end
 
       def get_batch(name)
-        uri = URI("#{API_BASE}/#{name}")
+        uri = URI("#{API_BASE}/#{batch_resource_name!(name)}")
         json_request(uri, Net::HTTP::Get)
       end
 
       def cancel_batch(name)
-        uri = URI("#{API_BASE}/#{name}:cancel")
+        uri = URI("#{API_BASE}/#{batch_resource_name!(name)}:cancel")
         json_request(uri, Net::HTTP::Post, {})
       end
 
       private
+
+      def batch_resource_name!(name)
+        value = name.to_s
+        return value if value.match?(BATCH_NAME_PATTERN)
+
+        raise ArgumentError, "Gemini batch name must match batches/<id>"
+      end
 
       def apply_api_key!(request)
         request["x-goog-api-key"] = @api_key

@@ -134,6 +134,17 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "tables guide uses Flatpack tables" do
+    authenticate_for_admin!
+
+    get "/tables"
+
+    assert_response :success
+    assert_includes response.body, "recording_studio_ai_runs"
+    assert_includes response.body, ">Column<"
+    assert_includes response.body, "overflow-x-auto rounded-lg border border-[var(--table-border-color)]"
+  end
+
   test "ai playground shows capability-driven generate form and batch section" do
     authenticate_for_admin!
 

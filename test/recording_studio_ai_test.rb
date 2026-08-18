@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.2.5", RecordingStudioAI::VERSION
+    assert_equal "0.2.7", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -87,5 +87,20 @@ class RecordingStudioAITest < Minitest::Test
     assert File.exist?(File.expand_path("../app/models/recording_studio_ai/batch.rb", __dir__))
     assert File.exist?(File.expand_path("../app/models/recording_studio_ai/batch_item.rb", __dir__))
     assert File.exist?(File.expand_path("../app/models/recording_studio_ai/response.rb", __dir__))
+  end
+
+  def test_engine_admin_uses_flatpack_tables_modals_and_charts
+    views_root = File.expand_path("../app/views/recording_studio_ai/admin", __dir__)
+    Dir[File.join(views_root, "**/*.erb")].each do |path|
+      contents = File.read(path)
+      refute_match(/<table[\s>]/, contents, "#{path} still has a raw table")
+      refute_match(/<pre[\s>]/, contents, "#{path} still has a raw pre")
+    end
+
+    widgets = File.read(File.expand_path("../lib/recording_studio_ai/admin/recording_studio_ai_widgets.rb", __dir__))
+    assert_includes widgets, "FlatPack::Modal::Component"
+    assert_includes widgets, "FlatPack::Chart::Component"
+    assert_includes widgets, "FlatPack::Button::Component"
+    refute_includes widgets, "click->flat-pack--modal#clickBackdrop"
   end
 end

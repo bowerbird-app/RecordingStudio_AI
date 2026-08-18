@@ -4,37 +4,42 @@
   <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
     <% card.body do %>
       <% if @batches.any? %>
-        <div class="overflow-x-auto">
-          <table class="w-full min-w-max text-left text-sm">
-            <thead>
-              <tr class="border-b">
-                <th class="p-3">Time / ID</th>
-                <th class="p-3">Attribution</th>
-                <th class="p-3">Provider / model</th>
-                <th class="p-3">Status</th>
-                <th class="p-3">Progress</th>
-                <th class="p-3">Usage / cost</th>
-                <th class="p-3">Expiry</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% @batches.each do |batch| %>
-                <tr class="border-b align-top">
-                  <td class="p-3">
-                    <%= link_to batch.created_at.to_fs(:short), admin_batch_path(batch), class: "font-semibold" %>
-                    <div class="text-xs opacity-70">Batch <%= batch.id %><% if @sensitive_roots[batch.root_recording_id] %><br>Provider batch <%= batch.provider_batch_id.presence || "none" %><% end %></div>
-                  </td>
-                  <td class="p-3">Root <%= batch.root_recording_id %><div class="text-xs opacity-70"><%= batch.initiator_type %> #<%= batch.initiator_id %></div></td>
-                  <td class="p-3"><%= [batch.provider, batch.model].compact.join(" / ").presence || "Unknown" %><div class="text-xs opacity-70"><%= batch.profile_key.presence || "No profile" %></div></td>
-                  <td class="p-3"><%= render FlatPack::Badge::Component.new(text: batch.status.humanize, style: admin_status_style(batch.status), size: :sm) %></td>
-                  <td class="p-3"><%= batch.completed_item_count + batch.failed_item_count + batch.cancelled_item_count %> / <%= batch.item_count %><div class="text-xs opacity-70"><%= batch.failed_item_count %> failed; <%= batch.cancelled_item_count %> cancelled</div></td>
-                  <td class="p-3"><%= admin_tokens(batch.total_tokens) %></td>
-                  <td class="p-3"><%= batch.expires_at&.to_fs(:short) || "Unknown" %></td>
-                </tr>
-              <% end %>
-            </tbody>
-          </table>
-        </div>
+        <%= render FlatPack::Table::Component.new(data: @batches) do |table| %>
+          <% table.column(title: "Time / ID") do |batch| %>
+            <div>
+              <%= link_to batch.created_at.to_fs(:short), admin_batch_path(batch), class: "font-semibold" %>
+              <div class="text-xs opacity-70">
+                Batch <%= batch.id %>
+                <% if @sensitive_roots[batch.root_recording_id] %>
+                  <br>Provider batch <%= batch.provider_batch_id.presence || "none" %>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+          <% table.column(title: "Attribution") do |batch| %>
+            <div>
+              Root <%= batch.root_recording_id %>
+              <div class="text-xs opacity-70"><%= batch.initiator_type %> #<%= batch.initiator_id %></div>
+            </div>
+          <% end %>
+          <% table.column(title: "Provider / model") do |batch| %>
+            <div>
+              <%= [batch.provider, batch.model].compact.join(" / ").presence || "Unknown" %>
+              <div class="text-xs opacity-70"><%= batch.profile_key.presence || "No profile" %></div>
+            </div>
+          <% end %>
+          <% table.column(title: "Status") do |batch| %>
+            <%= render FlatPack::Badge::Component.new(text: batch.status.humanize, style: admin_status_style(batch.status), size: :sm) %>
+          <% end %>
+          <% table.column(title: "Progress") do |batch| %>
+            <div>
+              <%= batch.completed_item_count + batch.failed_item_count + batch.cancelled_item_count %> / <%= batch.item_count %>
+              <div class="text-xs opacity-70"><%= batch.failed_item_count %> failed; <%= batch.cancelled_item_count %> cancelled</div>
+            </div>
+          <% end %>
+          <% table.column(title: "Usage / cost") { |batch| admin_tokens(batch.total_tokens) } %>
+          <% table.column(title: "Expiry") { |batch| batch.expires_at&.to_fs(:short) || "Unknown" } %>
+        <% end %>
       <% else %>
         <%= render FlatPack::EmptyState::Component.new(title: "No batches found", description: "Submitted provider batches will appear here.") %>
       <% end %>

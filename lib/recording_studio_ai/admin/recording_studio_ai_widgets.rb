@@ -597,98 +597,105 @@ module AdminScreens
     end
 
     def mini_chart(series)
-      options = {
-        chart: { toolbar: { show: false }, sparkline: { enabled: true } },
-        colors: ["#000000"],
-        stroke: { curve: "smooth", width: 2 },
-        tooltip: { theme: "light" },
-        xaxis: { labels: { show: false } },
-        yaxis: { min: 0, labels: { show: false } },
-        grid: { show: false }
-      }
-
-      ActionController::Base.helpers.content_tag(
-        :div,
-        nil,
-        class: "h-16 w-36",
-        data: {
-          controller: "flat-pack--chart",
-          "flat-pack--chart-series-value": [{ name: "Calls", data: series }].to_json,
-          "flat-pack--chart-type-value": "line",
-          "flat-pack--chart-options-value": options.to_json,
-          "flat-pack--chart-height-value": 64
-        }
+      render_flatpack(
+        FlatPack::Chart::Component.new(
+          series: [{ name: "Calls", data: series }],
+          type: :line,
+          height: 64,
+          card: false,
+          class: "h-16 w-36",
+          options: {
+            chart: { toolbar: { show: false }, sparkline: { enabled: true } },
+            colors: ["#000000"],
+            stroke: { curve: "smooth", width: 2 },
+            tooltip: { theme: "light" },
+            xaxis: { labels: { show: false } },
+            yaxis: { min: 0, labels: { show: false } },
+            grid: { show: false }
+          }
+        )
       )
     end
 
     def custom_tool_definition_modal(row)
-      helpers = ActionController::Base.helpers
-      modal_id = "custom-tool-definition-#{row.key}-#{row.version}"
       definition = RecordingStudioAI.tools.fetch(row.key, version: row.version)
-      fields = {
-        "Description" => definition.description,
-        "Use when" => definition.use_when,
-        "Do not use when" => definition.do_not_use_when,
-        "Returns" => definition.returns,
-        "Executor" => definition.executor_label,
-        "Safety" => "#{definition.read_only ? 'Read only' : 'Writes'}; destructive: #{definition.destructive ? 'yes' : 'no'}; confirmation: #{definition.requires_confirmation ? 'required' : 'not required'}; idempotent: #{definition.idempotent ? 'yes' : 'no'}"
-      }
       definition_modal(
-        helpers: helpers,
-        modal_id: modal_id,
+        modal_id: "custom-tool-definition-#{row.key}-#{row.version}",
         title: "#{definition.name} v#{definition.version}",
         trigger_text: "#{row.name} v#{row.version}",
         aria_label: "Show definition for #{row.name}",
-        fields: fields
+        fields: {
+          "Description" => definition.description,
+          "Use when" => definition.use_when,
+          "Do not use when" => definition.do_not_use_when,
+          "Returns" => definition.returns,
+          "Executor" => definition.executor_label,
+          "Safety" => "#{definition.read_only ? 'Read only' : 'Writes'}; destructive: #{definition.destructive ? 'yes' : 'no'}; confirmation: #{definition.requires_confirmation ? 'required' : 'not required'}; idempotent: #{definition.idempotent ? 'yes' : 'no'}"
+        }
       )
     end
 
     def prompt_definition_modal(row)
-      helpers = ActionController::Base.helpers
-      modal_id = "registered-prompt-definition-#{row.namespace}-#{row.key}-#{row.version}"
       definition = RecordingStudioAI.prompts.fetch(row.namespace, row.key, version: row.version)
-      fields = {
-        "Namespace" => definition.namespace,
-        "Key" => definition.key,
-        "Short name" => definition.short_name,
-        "Description" => definition.description,
-        "Inputs" => definition.inputs.presence&.join(", ") || "None",
-        "Tools" => if definition.tools.any?
-                     definition.tools.map do |tool|
-                       tool[:version] ? "#{tool.fetch(:key)} v#{tool[:version]}" : tool.fetch(:key)
-                     end.join(", ")
-                   else
-                     "None"
-                   end,
-        "Defaults" => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || "None",
-        "Prompt" => prompt_messages_markup(helpers, definition.messages)
-      }
       definition_modal(
-        helpers: helpers,
-        modal_id: modal_id,
+        modal_id: "registered-prompt-definition-#{row.namespace}-#{row.key}-#{row.version}",
         title: "#{definition.name} v#{definition.version}",
         trigger_text: "#{row.name} v#{row.version}",
         aria_label: "Show definition for #{row.name}",
-        fields: fields
+        fields: {
+          "Namespace" => definition.namespace,
+          "Key" => definition.key,
+          "Short name" => definition.short_name,
+          "Description" => definition.description,
+          "Inputs" => definition.inputs.presence&.join(", ") || "None",
+          "Tools" => prompt_tool_labels(definition),
+          "Defaults" => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || "None",
+          "Prompt" => prompt_messages_markup(definition.messages)
+        }
       )
     end
 
-    def prompt_messages_markup(helpers, messages)
+    def prompt_tool_labels(definition)
+      return "None" if definition.tools.empty?
+
+      definition.tools.map do |tool|
+        tool[:version] ? "#{tool.fetch(:key)} v#{tool[:version]}" : tool.fetch(:key)
+      end.join(", ")
+    end
+
+    def prompt_messages_markup(messages)
+      helpers = ActionController::Base.helpers
       helpers.content_tag(:div, class: "grid gap-3") do
-        helpers.safe_join(messages.map do |message|
-          helpers.content_tag(:div, class: "rounded-md border border-[var(--modal-border-color)] p-3") do
-            helpers.safe_join([
-                                helpers.content_tag(:div, message.fetch(:role).to_s.humanize,
-                                                    class: "mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--surface-muted-content-color)]"),
-                                helpers.content_tag(:pre, message.fetch(:content),
-                                                    class: "whitespace-pre-wrap break-words font-sans text-sm")
-                              ])
-          end
-        end)
+        helpers.safe_join(messages.map { |message| prompt_message_card(message) })
       end
     end
 
-    def definition_modal(helpers:, modal_id:, title:, trigger_text:, aria_label:, fields:)
+    def prompt_message_card(message)
+      render_flatpack(FlatPack::Card::Component.new) do |card|
+        card.header do
+          render_flatpack(
+            FlatPack::PageTitle::Component.new(
+              title: message.fetch(:role).to_s.humanize,
+              variant: :h4,
+              class: "mb-0 pb-0"
+            )
+          )
+        end
+        card.body do
+          render_flatpack(
+            FlatPack::CodeBlock::Component.new(
+              title: "Message",
+              language: "text",
+              code: message.fetch(:content).to_s,
+              separated: false
+            )
+          )
+        end
+      end
+    end
+
+    def definition_modal(modal_id:, title:, trigger_text:, aria_label:, fields:)
+      helpers = ActionController::Base.helpers
       body = helpers.content_tag(:dl, class: "grid gap-4 text-sm") do
         helpers.safe_join(fields.map do |label, value|
           helpers.content_tag(:div) do
@@ -700,39 +707,42 @@ module AdminScreens
           end
         end)
       end
-      modal = helpers.content_tag(
-        :div,
-        helpers.safe_join([
-                            helpers.content_tag(:div, nil, class: "absolute inset-0",
-                                                           data: { action: "click->flat-pack--modal#clickBackdrop" }),
-                            helpers.content_tag(:div,
-                                                class: "relative flex w-full min-h-screen items-start sm:items-center justify-center p-4 sm:p-6") do
-                              helpers.content_tag(:div,
-                                                  class: "relative flex flex-col min-h-0 max-h-[calc(100vh-2rem)] w-full overflow-hidden max-w-2xl p-4 sm:p-6 bg-[var(--modal-surface-color)] rounded-lg shadow-lg border border-[var(--modal-border-color)] transform transition-all duration-300 scale-95 opacity-0", role: "dialog", aria: { modal: true }, data: { "flat-pack--modal-target": "dialog" }) do
-                                helpers.safe_join([
-                                                    helpers.content_tag(:div,
-                                                                        class: "flex items-center justify-between gap-4") do
-                                                      helpers.safe_join([
-                                                                          helpers.content_tag(:h2, title,
-                                                                                              class: "text-lg font-semibold text-[var(--modal-title-color)]"),
-                                                                          helpers.content_tag(:button, "×", type: "button", class: "text-xl", aria: { label: "Close" },
-                                                                                                            data: { action: "flat-pack--modal#close" })
-                                                                        ])
-                                                    end,
-                                                    helpers.content_tag(:div, body, class: "mt-6 min-h-0 flex-1 overflow-y-auto")
-                                                  ])
-                              end
-                            end
-                          ]),
-        id: modal_id,
-        class: "fixed inset-0 z-50 hidden overflow-y-auto bg-[var(--modal-backdrop-color)] backdrop-blur-[var(--modal-backdrop-blur)] transition-opacity duration-300",
-        data: { controller: "flat-pack--modal", "flat-pack--modal-close-on-backdrop-value": true,
-                "flat-pack--modal-close-on-escape-value": true, action: "keydown.esc->flat-pack--modal#close" },
-        aria: { hidden: true }
+      trigger = render_flatpack(
+        FlatPack::Button::Component.new(
+          text: trigger_text,
+          style: :ghost,
+          size: :sm,
+          type: "button",
+          data: { modal_id: modal_id },
+          aria: { label: aria_label }
+        )
       )
-      trigger = helpers.content_tag(:button, trigger_text, type: "button",
-                                                          class: "text-(--color-primary-background-color) underline", data: { modal_id: modal_id }, aria: { label: aria_label })
+      modal = render_flatpack(
+        FlatPack::Modal::Component.new(id: modal_id, title: title, size: :lg)
+      ) do |component|
+        component.body { body }
+      end
       helpers.safe_join([trigger, modal])
+    end
+
+    def render_flatpack(component, &)
+      html = component_view_context.render(component, &)
+      html.respond_to?(:html_safe) ? html : html.to_s.html_safe
+    end
+
+    def component_view_context
+      context = admin_context
+      return context.view_context if context.respond_to?(:view_context) && context.view_context
+      return context.controller.view_context if context&.controller.respond_to?(:view_context)
+
+      fallback_component_view_context
+    end
+
+    def fallback_component_view_context
+      controller = ActionController::Base.new
+      request = ActionDispatch::Request.empty
+      controller.set_request!(request) if controller.respond_to?(:set_request!)
+      controller.view_context
     end
 
     def percentage(part, whole)
