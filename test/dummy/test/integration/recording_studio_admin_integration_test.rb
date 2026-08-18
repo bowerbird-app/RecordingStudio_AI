@@ -90,9 +90,13 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Live response"
     assert_equal 1, response.body.scan(/>Batch items</).size
     assert_equal 3, response.body.scan(/name="ai_playground\[batch_items\]\[\]"/).size
-    refute_includes response.body, "ai-playground-stream#submit"
+    assert_equal 2, response.body.scan(/data-controller="ai-playground-form"/).size
+    assert_includes response.body, "data-ai-playground-form-require-batch-value"
+    assert_equal 4, response.body.scan(/change-&gt;ai-playground-form#refresh"/).size
     assert_includes File.read(Rails.root.join("app/javascript/controllers/ai_playground_form_controller.js")),
                     "new FormData(event.currentTarget)"
+    assert_includes File.read(Rails.root.join("app/javascript/controllers/ai_playground_form_controller.js")),
+                    "requireBatchValue"
   end
 
   test "ai calls table filters by status" do

@@ -25,6 +25,9 @@ Versioning and Keep a Changelog.
   renders in place under the "Run generate" button (above the batch section)
   without a full page reload. Batch submissions render their own result frame
   beneath the batch form.
+- AI Playground batch provider/profile selects refresh the batch model dropdown
+  the same way Generate does (batch-capable models for the chosen profile, then
+  provider).
 - Deduplicated the AI Responses admin table so `Created` appears once.
 
 ### Removed
