@@ -26,6 +26,18 @@ Versioning and Keep a Changelog.
   without a full page reload. Batch submissions render their own result frame
   beneath the batch form.
 - Deduplicated the AI Responses admin table so `Created` appears once.
+- Admin dashboard adds Registered Providers and Registered Models widgets (top 5
+  by call volume) at the end of the widget grid, plus matching table-only
+  screens and section links.
+- Registered Providers table includes a 30-day calls mini chart after Configured;
+  clicking it opens AI Calls filtered to that provider.
+- Registered Models table drops Key/Name, renames API model to Model, shows
+  Temperature / Verbosity / Reasoning defaults, and uses a 30-day calls mini
+  chart that opens AI Calls filtered to that provider and model.
+- `.rubocop_todo.yml` records existing engine RuboCop debt from
+  `copilot/v1-implement-sync-generation` (file-level excludes). New provider/model
+  admin helpers avoid multi-line block chains, and the new widget registrations
+  wrap to the 120-column limit.
 
 ### Removed
 

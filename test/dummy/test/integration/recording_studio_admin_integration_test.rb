@@ -222,6 +222,88 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "prompt_namespace=demo"
   end
 
+  test "registered providers and models widgets and section links appear on the dashboard" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_provider: "openai",
+      resolved_model: "gpt-5"
+    )
+
+    get "/admin"
+
+    assert_response :success
+    assert_includes response.body, "Registered providers"
+    assert_includes response.body, "Registered models"
+    assert_includes response.body, "Registered Providers"
+    assert_includes response.body, "Registered Models"
+    assert_includes response.body, "href=\"/admin/screens/registered_providers\""
+    assert_includes response.body, "href=\"/admin/screens/registered_models\""
+    assert_includes response.body, "openai"
+    assert_includes response.body, "GPT-5"
+  end
+
+  test "registered providers screen lists every configured provider" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_provider: "openai",
+      resolved_model: "gpt-5"
+    )
+
+    get "/admin/screens/registered_providers"
+
+    assert_response :success
+    assert_includes response.body, "Registered providers"
+    assert_includes response.body, "src=\"/admin/screens/registered_providers/table\""
+
+    get "/admin/screens/registered_providers/table"
+
+    assert_response :success
+    assert_includes response.body, "openai"
+    assert_includes response.body, "gemini"
+    assert_includes response.body, "OpenAI"
+    assert_includes response.body, "Gemini"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "ai_calls?"
+    assert_includes response.body, "provider=openai"
+    assert_includes response.body, "date_range_preset=last_30_days"
+  end
+
+  test "registered models screen lists every registered model definition" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_provider: "openai",
+      resolved_model: "gpt-5"
+    )
+
+    get "/admin/screens/registered_models"
+
+    assert_response :success
+    assert_includes response.body, "Registered models"
+    assert_includes response.body, "src=\"/admin/screens/registered_models/table\""
+
+    get "/admin/screens/registered_models/table"
+
+    assert_response :success
+    assert_includes response.body, "gpt-5"
+    assert_includes response.body, "openai"
+    assert_includes response.body, "gemini-2.5-flash"
+    assert_includes response.body, "Temperature"
+    assert_includes response.body, "Verbosity"
+    assert_includes response.body, "Reasoning"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "provider=openai"
+    assert_includes response.body, "model=gpt-5"
+    assert_includes response.body, "date_range_preset=last_30_days"
+    refute_includes response.body, "API model"
+    refute_includes response.body, "Calls (30d)"
+  end
+
   test "registered prompts screen shows chart and table metrics" do
     authenticate_for_admin!
     create_run!(
