@@ -78,6 +78,20 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.9] - 2026-08-18
+
+### Changed
+
+- Dummy Tailwind writes Bundler gem `@source` paths before compile so Flatpack
+  and Recording Studio utilities are scanned outside `vendor/bundle` /
+  `/usr/local/bundle`.
+
+### Upgrade notes
+
+- Rebuild dummy CSS with `bundle exec rails tailwindcss:build` in `test/dummy`
+  after pulling. Hosts should keep a `@source` on the installed Flatpack
+  `app/components` path.
+
 ## [0.2.8] - 2026-08-18
 
 ### Changed
