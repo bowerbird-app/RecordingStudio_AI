@@ -93,9 +93,11 @@ Versioning and Keep a Changelog.
   and Recording Studio utilities are scanned outside `vendor/bundle` /
   `/usr/local/bundle`.
 - Dummy AI Playground generate form picks a registered prompt from a dropdown
-  and shows that prompt in a disabled textarea. Generate sends the registered
-  prompt (including its tools). The custom-tool checkbox and dropdown stay
-  available so you can add a playground tool on any supported model.
+  and shows that prompt in a disabled textarea. Prompts that declare inputs
+  (such as Text Summary and Text Analysis) show a text field for custom input.
+  Generate sends the registered prompt, filled-in inputs, and its tools. The
+  custom-tool checkbox and dropdown stay available so you can add a playground
+  tool on any supported model.
 - AI Calls, Custom Tool Calls, Attempts, Estimated spend, Registered custom
   tools, Registered prompts, Registered providers, and Registered models table
   headers explain each column in everyday language.

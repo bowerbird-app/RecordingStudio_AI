@@ -163,6 +163,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Osaka Weather"
     assert_includes response.body, "Text Summary"
     assert_includes response.body, "Use the available tools to inspect the supplied text"
+    assert_includes response.body, "{{text}}"
+    assert_includes response.body, "name=\"ai_playground[prompt_inputs][text]\""
     assert_includes response.body, "disabled=\"disabled\""
     assert_includes response.body, "Prompt text"
     assert_includes response.body, "Streaming"

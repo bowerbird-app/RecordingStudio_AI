@@ -18,8 +18,10 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "demo:osaka_weather:1"
     assert_includes response.body, "demo:summarize_text:1"
     assert_includes response.body, "Use the available tools to inspect the supplied text"
-    assert_includes response.body, "Osaka is warm, humid, and packed with street food this week."
+    assert_includes response.body, "{{text}}"
+    refute_includes response.body, "Osaka is warm, humid, and packed with street food this week."
     assert_select "textarea[name='ai_playground[prompt_preview]'][disabled]"
+    assert_select "textarea[name='ai_playground[prompt_inputs][text]']"
     assert_select "textarea[name='ai_playground[prompt]']", count: 1
     assert_includes response.body, "name=\"ai_playground[use_custom_tool]\""
     assert_includes response.body, "name=\"ai_playground[tool_key]\""
@@ -28,14 +30,38 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Dummy Summary Tool"
   end
 
-  test "generate sends the selected registered prompt and its tools" do
-    captured = post_generate!("demo:analyze_text:1")
+  test "generate sends the selected registered prompt, custom text, and its tools" do
+    captured = post_generate!("demo:analyze_text:1", extra: { prompt_inputs: { text: "Cats chase yarn across the kitchen." } })
 
+    assert_response :success
     assert_equal "analyze_text", captured[:prompt_definition].key
     assert_includes captured[:custom_tools], { key: "dummy_echo_tool", version: 1 }
     assert_includes captured[:custom_tools], { key: "dummy_keyword_tool", version: 1 }
     assert captured[:messages].any? { |message| message[:content].include?("Analyze this text") }
-    assert captured[:messages].any? { |message| message[:content].include?("Osaka is warm") }
+    assert captured[:messages].any? { |message| message[:content].include?("Cats chase yarn across the kitchen.") }
+    refute captured[:messages].any? { |message| message[:content].include?("Osaka is warm") }
+  end
+
+  test "generate sends custom text for summarize_text" do
+    captured = post_generate!(
+      "demo:summarize_text:1",
+      extra: { prompt_inputs: { text: "Bring your own paragraph for the summary." } }
+    )
+
+    assert_response :success
+    assert_equal "summarize_text", captured[:prompt_definition].key
+    assert_includes captured[:custom_tools], { key: "dummy_summary_tool", version: 1 }
+    assert captured[:messages].any? { |message| message[:content].include?("Summarize this text") }
+    assert captured[:messages].any? { |message| message[:content].include?("Bring your own paragraph for the summary.") }
+    refute captured[:messages].any? { |message| message[:content].include?("Osaka is warm") }
+  end
+
+  test "generate asks for text when a prompt expects it" do
+    captured = post_generate!("demo:analyze_text:1")
+
+    assert_response :unprocessable_entity
+    assert_nil captured
+    assert_includes response.body, "Add the text this prompt needs."
   end
 
   test "the playground custom tool is sent with the selected prompt" do
@@ -44,6 +70,7 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
       extra: { use_custom_tool: "1", tool_key: "dummy_echo_tool" }
     )
 
+    assert_response :success
     assert_equal "osaka_weather", captured[:prompt_definition].key
     assert_equal [{ key: "dummy_echo_tool", version: 1 }], captured[:custom_tools]
     assert captured[:messages].any? { |message| message[:content].include?("What's the weather in Osaka?") }
@@ -52,9 +79,14 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
   test "the playground custom tool is added on top of the prompt's tools" do
     captured = post_generate!(
       "demo:analyze_text:1",
-      extra: { use_custom_tool: "1", tool_key: "dummy_summary_tool" }
+      extra: {
+        use_custom_tool: "1",
+        tool_key: "dummy_summary_tool",
+        prompt_inputs: { text: "Keep the echo and keyword tools, then add summary." }
+      }
     )
 
+    assert_response :success
     assert_equal "analyze_text", captured[:prompt_definition].key
     assert_includes captured[:custom_tools], { key: "dummy_echo_tool", version: 1 }
     assert_includes captured[:custom_tools], { key: "dummy_keyword_tool", version: 1 }
@@ -92,7 +124,6 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
       }.merge(extra)
     }
 
-    assert_response :success
     captured
   ensure
     RecordingStudioAI.singleton_class.define_method(:generate, original) if original

@@ -25,7 +25,8 @@ export default class extends Controller {
     "streamStatus",
     "streamOutput",
     "promptKey",
-    "promptPreview"
+    "promptPreview",
+    "promptInput"
   ]
 
   static values = {
@@ -111,13 +112,37 @@ export default class extends Controller {
   }
 
   refreshPromptPreview() {
-    if (!this.hasPromptPreviewTarget || !this.hasPromptKeyTarget) return
+    if (!this.hasPromptKeyTarget) return
 
     const prompt = this.promptsValue[this.promptKeyTarget.value] || {}
+    const inputNames = prompt.inputs || []
+
+    this.promptInputTargets.forEach((wrapper) => {
+      const name = wrapper.dataset.promptInputName
+      const visible = inputNames.includes(name)
+      const field = wrapper.querySelector("textarea, input")
+      wrapper.classList.toggle("hidden", !visible)
+      if (!field) return
+
+      field.disabled = !visible
+      field.required = visible
+    })
+
+    if (!this.hasPromptPreviewTarget) return
+
+    let preview = prompt.preview || ""
+    this.promptInputTargets.forEach((wrapper) => {
+      const name = wrapper.dataset.promptInputName
+      if (!inputNames.includes(name)) return
+
+      const field = wrapper.querySelector("textarea, input")
+      if (field?.value) preview = preview.replaceAll(`{{${name}}}`, field.value)
+    })
+
     const field = this.promptPreviewTarget.matches("textarea")
       ? this.promptPreviewTarget
       : this.promptPreviewTarget.querySelector("textarea")
-    if (field) field.value = prompt.preview || ""
+    if (field) field.value = preview
   }
 
   refreshToolDescription() {

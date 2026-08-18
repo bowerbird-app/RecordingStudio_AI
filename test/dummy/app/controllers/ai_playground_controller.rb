@@ -28,10 +28,6 @@ class AIPlaygroundController < ApplicationController
     }
   }.freeze
 
-  PLAYGROUND_SAMPLE_INPUTS = {
-    "text" => "Osaka is warm, humid, and packed with street food this week."
-  }.freeze
-
   def show
     setup_page_state
   end
@@ -122,8 +118,9 @@ class AIPlaygroundController < ApplicationController
     @prompt_options = registered_prompt_definitions.map do |definition|
       { value: prompt_identity(definition), label: prompt_option_label(definition) }
     end
+    @prompt_input_names = registered_prompt_definitions.flat_map(&:inputs).uniq
     @prompt_previews = registered_prompt_definitions.to_h do |definition|
-      [prompt_identity(definition), { preview: prompt_preview_text(definition) }]
+      [prompt_identity(definition), { preview: prompt_preview_text(definition), inputs: definition.inputs }]
     end
     @profile_candidates = profile_candidates_payload
     @model_definitions = model_definitions_payload
@@ -152,6 +149,7 @@ class AIPlaygroundController < ApplicationController
     @selected_tool_key = selected_tool_key
     @selected_tool_description = TOOL_CATALOG.fetch(@selected_tool_key).fetch(:description)
     @selected_prompt_preview = prompt_preview_text(selected_prompt_definition)
+    @selected_prompt_input_names = Array(selected_prompt_definition&.inputs)
   end
 
   def execute_generate(root_recording:, request_id:)
@@ -197,7 +195,7 @@ class AIPlaygroundController < ApplicationController
     provider, model = split_candidate_value(form["model"])
     provider ||= provider_override(form)
     kwargs = base_request_for(form, root_recording: root_recording, request_id: request_id).merge(
-      messages: definition.render(playground_prompt_inputs(definition)),
+      messages: definition.render(playground_prompt_inputs(definition, form)),
       prompt_definition: definition,
       provider: provider,
       model: model,
@@ -368,6 +366,7 @@ class AIPlaygroundController < ApplicationController
       "model" => medium_default ? candidate_value(medium_default) : "",
       "prompt" => "what's the weather in Osaka",
       "prompt_key" => default_prompt_identity,
+      "prompt_inputs" => {},
       "batch_items" => [
         "Summarize the latest weather conditions in Osaka.",
         "Summarize the latest weather conditions in Tokyo.",
@@ -467,19 +466,41 @@ class AIPlaygroundController < ApplicationController
   end
 
   def prompt_option_label(definition)
-    "#{definition.name} · #{definition.namespace}.#{definition.key}"
+    definition.name
   end
 
   def prompt_preview_text(definition)
     return "" unless definition
 
-    definition.render(playground_prompt_inputs(definition)).map do |message|
-      "#{message.fetch(:role).to_s.capitalize}\n#{message.fetch(:content)}"
-    end.join("\n\n")
+    definition.messages.map { |message| "#{message.fetch(:role).to_s.capitalize}\n#{message.fetch(:content)}" }.join("\n\n")
   end
 
-  def playground_prompt_inputs(definition)
-    definition.inputs.index_with { |name| PLAYGROUND_SAMPLE_INPUTS.fetch(name, "sample #{name}") }
+  def playground_prompt_inputs(definition, form = @form)
+    submitted = stringify_prompt_inputs(form["prompt_inputs"])
+    missing = definition.inputs.select { |name| submitted[name].blank? }
+    if missing.any?
+      raise RecordingStudioAI::Errors::ContractValidationError.new(
+        missing.one? ? "Add the #{missing.first.tr('_', ' ')} this prompt needs." : "Add the fields this prompt needs.",
+        code: "invalid_request"
+      )
+    end
+
+    definition.inputs.index_with { |name| submitted.fetch(name) }
+  end
+
+  def stringify_prompt_inputs(value)
+    raw = if value.respond_to?(:to_unsafe_h)
+      value.to_unsafe_h
+    elsif value.respond_to?(:to_h)
+      value.to_h
+    else
+      {}
+    end
+    raw.stringify_keys.transform_values { |entry| entry.to_s }
+  end
+
+  def prompt_input_param_keys
+    registered_prompt_definitions.flat_map(&:inputs).uniq
   end
 
   def default_prompt_identity
@@ -547,7 +568,8 @@ class AIPlaygroundController < ApplicationController
     params.require(:ai_playground).permit(
       :mode, :provider, :profile, :model, :prompt, :prompt_key, :web_search, :streaming, :use_custom_tool, :tool_key,
       :temperature, :verbosity, :max_output_tokens, :reasoning_effort, :attachment,
-      batch_items: []
+      batch_items: [],
+      prompt_inputs: prompt_input_param_keys
     )
   end
 
