@@ -1,20 +1,8 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require "active_record"
 
-migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb",
-                                      __dir__)].first
-require migration_file
-require_relative "../db/migrate/20260814120000_add_prompt_attribution_to_recording_studio_ai_runs"
-require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
-
-require_relative "../app/models/recording_studio_ai/application_record"
-require_relative "../app/models/concerns/recording_studio_ai/terminal_immutability"
-require_relative "../app/models/recording_studio_ai/run"
-require_relative "../app/models/recording_studio_ai/attempt"
-
-class PhaseEightResilienceAccountingTest < Minitest::Test
+class PhaseEightResilienceAccountingTest < RecordingStudioAI::Test::PersistenceCase
   Actor = Struct.new(:id)
 
   class QueueProvider < RecordingStudioAI::Providers::Base
@@ -32,26 +20,10 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
   end
 
   def setup
-    ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
-    bootstrap_external_recording_studio_table
-    ActiveRecord::Migration.suppress_messages do
-      CreateRecordingStudioAIPersistenceTables.migrate(:up)
-      AddPromptAttributionToRecordingStudioAIRuns.migrate(:up)
-      RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up)
-    end
-
+    super
     @root_recording = Actor.new(create_recording_id)
     @initiator = Actor.new(51)
-    @original_configuration = RecordingStudioAI.instance_variable_get(:@configuration)
-    configuration = RecordingStudioAI::Configuration.new
-    configuration.attribution_validator = ->(**) {}
-    configuration.authorization_handler = ->(**) { true }
-    RecordingStudioAI.instance_variable_set(:@configuration, configuration)
-  end
-
-  def teardown
-    RecordingStudioAI.instance_variable_set(:@configuration, @original_configuration)
-    ActiveRecord::Base.connection_pool.disconnect! if ActiveRecord::Base.connected?
+    isolate_allow_all_configuration!
   end
 
   def test_retry_then_provider_fallback_tracks_attempt_kinds_and_aggregates_accounting
@@ -361,17 +333,5 @@ class PhaseEightResilienceAccountingTest < Minitest::Test
   def reset_execution_records
     RecordingStudioAI::Attempt.delete_all
     RecordingStudioAI::Run.delete_all
-  end
-
-  def bootstrap_external_recording_studio_table
-    ActiveRecord::Base.connection.create_table(:recording_studio_recordings) do |table|
-      table.timestamps
-    end
-  end
-
-  def create_recording_id
-    ActiveRecord::Base.connection.insert(
-      "INSERT INTO recording_studio_recordings (created_at, updated_at) VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
-    )
   end
 end

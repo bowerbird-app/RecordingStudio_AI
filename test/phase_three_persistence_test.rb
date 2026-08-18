@@ -1,36 +1,10 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require "active_record"
-require "securerandom"
 
-Dir[File.expand_path("../db/migrate/*.rb", __dir__)].sort.each { |migration_file| require migration_file }
-
-require_relative "../app/models/recording_studio_ai/application_record"
-require_relative "../app/models/concerns/recording_studio_ai/terminal_immutability"
-require_relative "../app/models/recording_studio_ai/run"
-require_relative "../app/models/recording_studio_ai/attempt"
-require_relative "../app/models/recording_studio_ai/custom_tool_invocation"
-require_relative "../app/models/recording_studio_ai/batch"
-require_relative "../app/models/recording_studio_ai/batch_item"
-require_relative "../app/models/recording_studio_ai/response"
-
-class PhaseThreePersistenceTest < Minitest::Test
-  def setup
-    ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
-    bootstrap_external_recording_studio_table
-
-    ActiveRecord::Migration.suppress_messages do
-      CreateRecordingStudioAIPersistenceTables.migrate(:up)
-      AddPromptAttributionToRecordingStudioAIRuns.migrate(:up)
-      RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up)
-      HardenRecordingStudioAIPersistence.migrate(:up)
-      EnforceRecordingStudioAIHistoryIntegrity.migrate(:up)
-    end
-  end
-
-  def teardown
-    ActiveRecord::Base.connection_pool.disconnect! if ActiveRecord::Base.connected?
+class PhaseThreePersistenceTest < RecordingStudioAI::Test::PersistenceCase
+  def persistence_schema
+    :hardened
   end
 
   def test_phase_three_creates_exactly_six_infrastructure_tables
@@ -258,17 +232,5 @@ class PhaseThreePersistenceTest < Minitest::Test
     assert_includes encrypted_attributes, "raw_response"
     assert_includes encrypted_attributes, "normalized_response"
     assert_includes encrypted_attributes, "content_text"
-  end
-
-  private
-
-  def bootstrap_external_recording_studio_table
-    ActiveRecord::Base.connection.create_table(:recording_studio_recordings) do |t|
-      t.timestamps
-    end
-  end
-
-  def create_recording_id
-    ActiveRecord::Base.connection.insert("INSERT INTO recording_studio_recordings (created_at, updated_at) VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
   end
 end

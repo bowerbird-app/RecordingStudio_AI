@@ -25,6 +25,15 @@ module AdminScreens
       LatencyRow = Data.define(:name, :calls, :p50_latency_ms, :p90_latency_ms, :average_latency_ms,
                                :max_latency_ms)
     end
+    provider_row_members = %i[key class_name configured models_count calls calls_series]
+    remove_const(:ProviderRow) if const_defined?(:ProviderRow) && ProviderRow.members != provider_row_members
+    ProviderRow = Data.define(*provider_row_members) unless const_defined?(:ProviderRow)
+    model_row_members = %i[
+      provider model temperature verbosity reasoning_effort streaming structured_output batch
+      tools input_modalities output_modalities calls calls_series
+    ]
+    remove_const(:ModelRow) if const_defined?(:ModelRow) && ModelRow.members != model_row_members
+    ModelRow = Data.define(*model_row_members) unless const_defined?(:ModelRow)
 
     def runs_scope(context)
       scope = RecordingStudioAI::Run.all
@@ -336,6 +345,104 @@ module AdminScreens
 
       screen = AdminScreens::RecordingStudioAIRegisteredPromptsScreen
       screen.filters.find { |filter| filter.key == :date_range }.normalize(context.params)
+    end
+
+    def provider_rows(context)
+      date_range = 30.days.ago.beginning_of_day..Time.current
+      range_runs = runs_scope(context)
+                   .where(created_at: date_range)
+                   .where.not(resolved_provider: [nil, ""])
+      call_counts = range_runs.group(:resolved_provider).count
+      daily_counts = range_runs.group_by do |run|
+        [run.resolved_provider.to_s, run.created_at.to_date]
+      end.transform_values(&:count)
+
+      rows = RecordingStudioAI.configuration.providers.map do |key, provider|
+        provider_key = key.to_s
+        ProviderRow.new(
+          provider_key,
+          provider.class.name.demodulize,
+          provider.respond_to?(:configured?) ? provider.configured? : false,
+          RecordingStudioAI.models.for_provider(key).length,
+          call_counts.fetch(provider_key, 0),
+          (date_range.begin.to_date..date_range.end.to_date).map do |date|
+            { x: date.strftime("%b %-d"), y: daily_counts.fetch([provider_key, date], 0) }
+          end
+        )
+      end
+      rows.sort_by { |row| [-row.calls, row.key] }
+    end
+
+    def model_rows(context)
+      date_range = 30.days.ago.beginning_of_day..Time.current
+      range_runs = runs_scope(context)
+                   .where(created_at: date_range)
+                   .where.not(resolved_model: [nil, ""])
+      call_counts = range_runs.group(:resolved_provider, :resolved_model).count
+      daily_counts = range_runs.group_by do |run|
+        [run.resolved_provider.to_s, run.resolved_model.to_s, run.created_at.to_date]
+      end.transform_values(&:count)
+
+      rows = RecordingStudioAI.models.all.map do |definition|
+        provider_key = definition.provider.to_s
+        model_key = definition.model
+        ModelRow.new(
+          provider_key,
+          model_key,
+          parameter_default_label(definition, :temperature),
+          parameter_default_label(definition, :verbosity),
+          parameter_default_label(definition, :reasoning_effort),
+          definition.delivery.fetch(:streaming, false),
+          definition.delivery.fetch(:structured_output, false),
+          definition.delivery.fetch(:batch, false),
+          definition.tools.map(&:to_s).join(", "),
+          definition.modalities.fetch(:input, []).map(&:to_s).join(", "),
+          definition.modalities.fetch(:output, []).map(&:to_s).join(", "),
+          call_counts.fetch([provider_key, model_key], 0),
+          (date_range.begin.to_date..date_range.end.to_date).map do |date|
+            { x: date.strftime("%b %-d"), y: daily_counts.fetch([provider_key, model_key, date], 0) }
+          end
+        )
+      end
+      rows.sort_by { |row| [-row.calls, row.provider, row.model] }
+    end
+
+    def parameter_default_label(definition, name)
+      return "—" unless definition.supports_parameter?(name)
+
+      value = definition.parameter(name)&.fetch(:default, nil)
+      value.nil? ? "Supported" : value.to_s
+    end
+
+    def top_provider_call_rows(context, range: 30.days.ago..Time.current, limit: 5)
+      counts = runs_scope(context)
+               .where(created_at: range)
+               .where.not(resolved_provider: [nil, ""])
+               .group(:resolved_provider)
+               .count
+
+      rows = RecordingStudioAI.configuration.providers.keys.map do |key|
+        [key.to_s, counts.fetch(key.to_s, 0)]
+      end
+      rows.sort_by { |_key, calls| -calls }.first(limit)
+    end
+
+    def top_model_call_rows(context, range: 30.days.ago..Time.current, limit: 5)
+      counts = runs_scope(context)
+               .where(created_at: range)
+               .where.not(resolved_model: [nil, ""])
+               .group(:resolved_provider, :resolved_model)
+               .count
+
+      rows = RecordingStudioAI.models.all.map do |definition|
+        [
+          definition.provider.to_s,
+          definition.model,
+          definition.display_name,
+          counts.fetch([definition.provider.to_s, definition.model], 0)
+        ]
+      end
+      rows.sort_by { |_provider, _model, _name, calls| -calls }.first(limit)
     end
 
     def number(value)
@@ -1100,6 +1207,57 @@ module AdminScreens
     link_to { |context| context.admin_screen_path("latency_by_prompt") }
   end
 
+  RecordingStudioAIRegisteredProvidersWidget = RecordingStudioAdmin::Widget.new(
+    "widgets.recording_studio_ai.registered_providers"
+  ) do
+    type :list
+    title "Registered providers"
+    subtitle "Top 5 providers by call volume in the last 30 days."
+    description "Open the providers screen to inspect every registered provider."
+    list_options { { divider: true } }
+    items do |context|
+      rows = AdminScreens::RecordingStudioAIWidgets.top_provider_call_rows(context, limit: 5)
+      rows.map do |key, calls|
+        {
+          icon: :server,
+          text: key,
+          trailing: "#{AdminScreens::RecordingStudioAIWidgets.number(calls)} calls",
+          href: "#{context.admin_screen_path('ai_calls')}?#{{
+            provider: key,
+            date_range_preset: :last_30_days
+          }.to_query}"
+        }
+      end.presence || [{ text: "No registered providers." }]
+    end
+    link_to { |context| context.admin_screen_path("registered_providers") }
+  end
+
+  RecordingStudioAIRegisteredModelsWidget = RecordingStudioAdmin::Widget.new(
+    "widgets.recording_studio_ai.registered_models"
+  ) do
+    type :list
+    title "Registered models"
+    subtitle "Top 5 models by call volume in the last 30 days."
+    description "Open the models screen to inspect every registered model definition."
+    list_options { { divider: true } }
+    items do |context|
+      rows = AdminScreens::RecordingStudioAIWidgets.top_model_call_rows(context, limit: 5)
+      rows.map do |provider, model, display_name, calls|
+        {
+          icon: :cube,
+          text: "#{display_name} (#{provider})",
+          trailing: "#{AdminScreens::RecordingStudioAIWidgets.number(calls)} calls",
+          href: "#{context.admin_screen_path('ai_calls')}?#{{
+            provider: provider,
+            model: model,
+            date_range_preset: :last_30_days
+          }.to_query}"
+        }
+      end.presence || [{ text: "No registered models." }]
+    end
+    link_to { |context| context.admin_screen_path("registered_models") }
+  end
+
   class RecordingStudioAIOverviewScreen < RecordingStudioAdmin::Screen
     key "recording_studio_ai_overview"
     icon :cpu_chip
@@ -1795,6 +1953,98 @@ module AdminScreens
     end
   end
 
+  class RecordingStudioAIRegisteredProvidersScreen < RecordingStudioAdmin::Screen
+    key "registered_providers"
+    icon :server
+    title "Registered providers"
+    subtitle "Providers currently registered on RecordingStudioAI.configuration."
+
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.provider_rows(context)
+    end
+
+    table do
+      title ""
+      hide_columns_button
+      hide_count
+
+      column :key, title: "Provider"
+      column :class_name, title: "Implementation"
+      column :configured,
+             title: "Configured",
+             value: ->(row, _context) { row.configured ? "Yes" : "No" },
+             display: :badge,
+             display_options: lambda { |_row, _context, value|
+               { text: value, style: value == "Yes" ? :success : :warning, size: :sm }
+             }
+      column :calls_series,
+             title: "Calls",
+             value: lambda { |row, context|
+               ActionController::Base.helpers.link_to(
+                 AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
+                 "#{context.admin_screen_path('ai_calls')}?#{{
+                   provider: row.key,
+                   date_range_preset: :last_30_days
+                 }.to_query}",
+                 class: "inline-block",
+                 data: { turbo_frame: "_top" },
+                 aria: { label: "AI calls for #{row.key} in the last 30 days" }
+               )
+             }
+      column :models_count, title: "Models"
+    end
+  end
+
+  class RecordingStudioAIRegisteredModelsScreen < RecordingStudioAdmin::Screen
+    key "registered_models"
+    icon :cube
+    title "Registered models"
+    subtitle "Model definitions registered through RecordingStudioAI.models."
+
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.model_rows(context)
+    end
+
+    table do
+      title ""
+      hide_columns_button
+      hide_count
+
+      column :provider, title: "Provider"
+      column :model, title: "Model"
+      column :temperature, title: "Temperature"
+      column :verbosity, title: "Verbosity"
+      column :reasoning_effort, title: "Reasoning"
+      column :streaming,
+             title: "Streaming",
+             value: ->(row, _context) { row.streaming ? "Yes" : "No" }
+      column :structured_output,
+             title: "Structured",
+             value: ->(row, _context) { row.structured_output ? "Yes" : "No" }
+      column :batch,
+             title: "Batch",
+             value: ->(row, _context) { row.batch ? "Yes" : "No" }
+      column :tools, title: "Tools"
+      column :input_modalities, title: "Input"
+      column :output_modalities, title: "Output"
+      column :calls_series,
+             title: "Calls",
+             value: lambda { |row, context|
+               ActionController::Base.helpers.link_to(
+                 AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
+                 "#{context.admin_screen_path('ai_calls')}?#{{
+                   provider: row.provider,
+                   model: row.model,
+                   date_range_preset: :last_30_days
+                 }.to_query}",
+                 class: "inline-block",
+                 data: { turbo_frame: "_top" },
+                 aria: { label: "AI calls for #{row.provider}/#{row.model} in the last 30 days" }
+               )
+             }
+    end
+  end
+
   class RecordingStudioAIEstimatedSpendScreen < RecordingStudioAdmin::Screen
     key "estimated_spend"
     icon :currency_dollar
@@ -2040,6 +2290,16 @@ module AdminScreens
          url: ->(context) { context.admin_screen_path("recording_studio_ai_responses") },
          style: :secondary
 
+    link :registered_providers,
+         text: "Registered Providers",
+         url: ->(context) { context.admin_screen_path("registered_providers") },
+         style: :secondary
+
+    link :registered_models,
+         text: "Registered Models",
+         url: ->(context) { context.admin_screen_path("registered_models") },
+         style: :secondary
+
     widget "widgets.recording_studio_ai.ai_calls_windows"
     widget "widgets.recording_studio_ai.tool_calls"
     widget "widgets.recording_studio_ai.registered_custom_tools"
@@ -2050,6 +2310,8 @@ module AdminScreens
     widget "widgets.recording_studio_ai.calls_by_provider_model"
     widget "widgets.recording_studio_ai.slow_calls"
     widget "widgets.recording_studio_ai.prompt_p90_latency"
+    widget "widgets.recording_studio_ai.registered_providers"
+    widget "widgets.recording_studio_ai.registered_models"
   end
 
   REGISTERABLE_WIDGETS = [
@@ -2062,7 +2324,9 @@ module AdminScreens
     RecordingStudioAIEstimatedSpendWidget,
     RecordingStudioAICallsByProviderModelWidget,
     RecordingStudioAISlowCallsWidget,
-    RecordingStudioAIPromptP90LatencyWidget
+    RecordingStudioAIPromptP90LatencyWidget,
+    RecordingStudioAIRegisteredProvidersWidget,
+    RecordingStudioAIRegisteredModelsWidget
   ].freeze
 
   def self.register!
@@ -2075,6 +2339,8 @@ module AdminScreens
     RecordingStudioAdmin.register_screen(RecordingStudioAIToolCallsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredCustomToolsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredPromptsScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredProvidersScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredModelsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIEstimatedSpendScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAILatencyByModelScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAILatencyByPromptScreen)

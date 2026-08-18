@@ -1,20 +1,8 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require "active_record"
 
-migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb",
-                                      __dir__)].first
-require migration_file
-require_relative "../db/migrate/20260814120000_add_prompt_attribution_to_recording_studio_ai_runs"
-require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
-
-require_relative "../app/models/recording_studio_ai/application_record"
-require_relative "../app/models/concerns/recording_studio_ai/terminal_immutability"
-require_relative "../app/models/recording_studio_ai/run"
-require_relative "../app/models/recording_studio_ai/attempt"
-
-class PhaseSevenAdvancedCapabilitiesTest < Minitest::Test
+class PhaseSevenAdvancedCapabilitiesTest < RecordingStudioAI::Test::PersistenceCase
   Actor = Struct.new(:id)
   OpenAIClient = Struct.new(:responses)
   GeminiClient = Struct.new(:models)
@@ -48,25 +36,10 @@ class PhaseSevenAdvancedCapabilitiesTest < Minitest::Test
   end
 
   def setup
-    ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
-    bootstrap_external_recording_studio_table
-    ActiveRecord::Migration.suppress_messages do
-      CreateRecordingStudioAIPersistenceTables.migrate(:up)
-      AddPromptAttributionToRecordingStudioAIRuns.migrate(:up)
-      RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up)
-    end
-
+    super
     @root_recording = Actor.new(create_recording_id)
     @initiator = Actor.new(41)
-    @original_configuration = RecordingStudioAI.instance_variable_get(:@configuration)
-    RecordingStudioAI.instance_variable_set(:@configuration, RecordingStudioAI::Configuration.new)
-    RecordingStudioAI.configuration.attribution_validator = ->(**) {}
-    RecordingStudioAI.configuration.authorization_handler = ->(**) { true }
-  end
-
-  def teardown
-    RecordingStudioAI.instance_variable_set(:@configuration, @original_configuration)
-    ActiveRecord::Base.connection_pool.disconnect! if ActiveRecord::Base.connected?
+    isolate_allow_all_configuration!
   end
 
   def test_openai_translates_schema_image_and_web_search_and_persists_only_safe_metadata
@@ -374,17 +347,5 @@ class PhaseSevenAdvancedCapabilitiesTest < Minitest::Test
     configuration = RecordingStudioAI.configuration
     configuration.public_send("#{provider}_client=", client)
     configuration.allowed_provider_overrides = [provider]
-  end
-
-  def bootstrap_external_recording_studio_table
-    ActiveRecord::Base.connection.create_table(:recording_studio_recordings) do |table|
-      table.timestamps
-    end
-  end
-
-  def create_recording_id
-    ActiveRecord::Base.connection.insert(
-      "INSERT INTO recording_studio_recordings (created_at, updated_at) VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
-    )
   end
 end
