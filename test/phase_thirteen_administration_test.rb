@@ -203,7 +203,10 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
   def test_latency_prompt_rows_include_a_calls_series_for_the_selected_range
     root_id = create_recording_id
     context = Struct.new(:root_recording).new(Actor.new(id: root_id))
-    create_run(root_id: root_id, status: "completed", tokens: 10).update!(
+    create_run(
+      root_id: root_id,
+      status: "completed",
+      tokens: 10,
       prompt_key: "latency-series",
       prompt_name_snapshot: "Latency series",
       latency_ms: 120
@@ -219,7 +222,8 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
 
     assert row
     assert_equal 4, row.calls_series.length
-    assert_equal row.calls, (row.calls_series.sum { |point| point[:y] })
+    series_total = row.calls_series.sum { |point| point[:y] }
+    assert_equal row.calls, series_total
   ensure
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
