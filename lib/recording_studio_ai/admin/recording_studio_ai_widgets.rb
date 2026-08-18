@@ -725,8 +725,8 @@ module AdminScreens
       helpers.safe_join([trigger, modal])
     end
 
-    def render_flatpack(component, &block)
-      html = component_view_context.render(component, &block)
+    def render_flatpack(component, &)
+      html = component_view_context.render(component, &)
       html.respond_to?(:html_safe) ? html : html.to_s.html_safe
     end
 
