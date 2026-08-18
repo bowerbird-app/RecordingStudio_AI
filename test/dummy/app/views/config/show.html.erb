@@ -37,7 +37,7 @@
 
     <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
       <li>Create a provider class under <span class="font-mono">lib/recording_studio_ai/providers/&lt;provider&gt;.rb</span> that inherits <span class="font-mono">RecordingStudioAI::Providers::Base</span> and declares <span class="font-mono">provider_key</span>.</li>
-      <li>Implement the contract methods your models need: <span class="font-mono">generate</span>, <span class="font-mono">stream</span>, and the batch methods.</li>
+      <li>Implement <span class="font-mono">#generate</span>. Add <span class="font-mono">#stream</span> only when models stream, and <span class="font-mono">#submit_batch</span> / <span class="font-mono">#refresh_batch</span> / <span class="font-mono">#cancel_batch</span> only when they batch. Apps call <span class="font-mono">RecordingStudioAI.generate</span> (pass <span class="font-mono">stream: true</span> to stream) and the batch methods — not <span class="font-mono">RecordingStudioAI.stream</span>.</li>
       <li>Register it from the host initializer or another gem's engine initializer with <span class="font-mono">RecordingStudioAI.register_provider(:key, instance)</span>.</li>
       <li>Optionally set <span class="font-mono">config.discovery_enabled = true</span> to auto-register provider classes found under the providers path.</li>
     </ol>
@@ -74,7 +74,7 @@
   <div class="space-y-3">
     <%= render FlatPack::PageTitle::Component.new(
       title: "3. Create Profiles",
-      subtitle: "Profiles are ordered preference lists of provider/model candidates used by generate, stream, and batch.",
+      subtitle: "Profiles are ordered preference lists of provider/model candidates used by generate (including stream: true) and batch.",
       variant: :h3,
       class: "mb-0 pb-0"
     ) %>
@@ -96,7 +96,7 @@
   <div class="space-y-3">
     <%= render FlatPack::PageTitle::Component.new(
       title: "Create Custom Tools",
-      subtitle: "Register a tool and call it from generate/stream requests.",
+      subtitle: "Register a tool and pass it to generate. Streaming uses the same call with stream: true.",
       variant: :h3,
       class: "mb-0 pb-0"
     ) %>

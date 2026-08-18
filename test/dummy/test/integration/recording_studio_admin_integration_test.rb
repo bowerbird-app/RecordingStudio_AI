@@ -70,9 +70,13 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Add a Model"
     assert_includes response.body, "Create Profiles"
     assert_includes response.body, "RecordingStudioAI.models.register"
+    assert_includes response.body, "RecordingStudioAI.generate"
+    assert_includes response.body, "stream: true"
     assert_includes response.body, "lib/recording_studio_ai/models/"
     assert_includes response.body, "delivery"
     assert_includes response.body, "modalities"
+    refute_includes response.body, "Implement the contract methods your models need"
+    refute_includes response.body, "used by generate, stream, and batch"
   end
 
   test "ai playground shows capability-driven generate form and batch section" do

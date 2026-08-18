@@ -36,7 +36,7 @@ class ConfigController < ApplicationController
       key: "profiles",
       required: "Yes",
       accepted_values: "Hash of profile keys to ordered { provider:, model: } candidates",
-      explanation: "Core model routing map used by generate, stream, and batch APIs. Reference models by their provider API model string; capabilities/parameters/tools/modalities come from the model registry (RecordingStudioAI.models)."
+      explanation: "Core model routing map used by generate (pass stream: true to stream) and batch. Reference models by their provider API model string; capabilities/parameters/tools/modalities come from the model registry (RecordingStudioAI.models)."
     },
     {
       key: "allowed_provider_overrides",
@@ -544,7 +544,7 @@ class ConfigController < ApplicationController
       end
     )
 
-    # Use the tool in a generation call
+    # Use the tool in a generation call. Streaming is the same method with stream: true.
     RecordingStudioAI.generate(
       root_recording: root_recording,
       initiator: current_user,
