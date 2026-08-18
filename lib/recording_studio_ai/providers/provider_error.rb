@@ -71,7 +71,7 @@ module RecordingStudioAI
         cannot\sbe\scombined|
         multiple\stools\sare\ssupported|
         include_server_side_tool_invocations
-      /ix.freeze
+      /ix
 
       def message_for(category, error = nil)
         if category == "invalid_request" && mixed_builtin_and_custom_tools?(error)

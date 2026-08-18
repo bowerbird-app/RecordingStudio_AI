@@ -162,12 +162,15 @@ module RecordingStudioAI
         generation_config[:responseMimeType] = config[:response_mime_type] if config&.dig(:response_mime_type)
         generation_config[:responseJsonSchema] = config[:response_json_schema] if config&.dig(:response_json_schema)
         body[:generationConfig] = generation_config unless generation_config.empty?
-        tools = config&.dig(:tools)
-        if tools && !Array(tools).empty?
-          body[:tools] = normalize_tools(tools)
-          body[:toolConfig] = { includeServerSideToolInvocations: true } if mixed_builtin_and_custom_tools?(tools)
-        end
+        apply_tools!(body, config&.dig(:tools))
         body
+      end
+
+      def apply_tools!(body, tools)
+        return if tools.nil? || Array(tools).empty?
+
+        body[:tools] = normalize_tools(tools)
+        body[:toolConfig] = { includeServerSideToolInvocations: true } if mixed_builtin_and_custom_tools?(tools)
       end
 
       def mixed_builtin_and_custom_tools?(tools)
