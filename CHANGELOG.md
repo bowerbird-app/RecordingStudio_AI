@@ -34,9 +34,6 @@ Versioning and Keep a Changelog.
 - Registered Models table drops Key/Name, renames API model to Model, shows
   Temperature / Verbosity / Reasoning defaults, and uses a 30-day calls mini
   chart that opens AI Calls filtered to that provider and model.
-- CI RuboCop now inherits `.rubocop_todo.yml` so existing style/metrics debt is
-  excluded while new files still use the strict cops. Admin screens remain
-  excluded from module-length metrics.
 
 ### Removed
 
