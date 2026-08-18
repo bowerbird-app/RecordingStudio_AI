@@ -9,22 +9,12 @@ module RecordingStudioAI
     class OpenAI < Base
       provider_key :openai
 
-      include ValueReader
-
       RETRYABLE_STREAM_ERROR_CODES = %w[
         rate_limit_exceeded
         server_error
         timeout
         connection_error
       ].freeze
-
-      def initialize(configuration:)
-        @configuration = configuration
-      end
-
-      def configured?
-        !@configuration.openai_client.nil? || present?(@configuration.openai_api_key)
-      end
 
       def generate(request:, candidate:)
         response = client.responses.create(**request_parameters(request, candidate))
@@ -48,8 +38,7 @@ module RecordingStudioAI
       rescue StandardError => e
         raise unless ProviderError.expected?(e)
 
-        error = ProviderError.normalize(e, provider: :openai)
-        Result.new(error: error, retention_snapshot: error_retention_snapshot(error))
+        failed_result(e)
       end
 
       def stream(request:, candidate:)
@@ -83,8 +72,7 @@ module RecordingStudioAI
       rescue StandardError => e
         raise unless ProviderError.expected?(e)
 
-        error = ProviderError.normalize(e, provider: :openai)
-        Result.new(error: error, retention_snapshot: error_retention_snapshot(error))
+        failed_result(e)
       end
 
       def submit_batch(request:, candidate:)
@@ -102,7 +90,7 @@ module RecordingStudioAI
       rescue StandardError => e
         raise unless ProviderError.expected?(e)
 
-        BatchResult.new(status: "failed", error: ProviderError.normalize(e, provider: :openai))
+        failed_batch_result(e)
       end
 
       def refresh_batch(batch:, candidate:)
@@ -113,14 +101,13 @@ module RecordingStudioAI
           status: "failed", provider_batch_id: batch.provider_batch_id,
           error: Contracts::NormalizedError.new(
             category: "invalid_response", code: "invalid_batch_output",
-            message: "Provider returned an invalid batch response.", retryable: false, provider: "openai"
+            message: "Provider returned an invalid batch response.", retryable: false, provider: self.class.provider_key.to_s
           )
         )
       rescue StandardError => e
         raise unless ProviderError.expected?(e)
 
-        BatchResult.new(status: batch.status, provider_batch_id: batch.provider_batch_id,
-                        error: ProviderError.normalize(e, provider: :openai))
+        failed_batch_result(e, status: batch.status, provider_batch_id: batch.provider_batch_id)
       end
 
       def cancel_batch(batch:, candidate:)
@@ -128,8 +115,7 @@ module RecordingStudioAI
       rescue StandardError => e
         raise unless ProviderError.expected?(e)
 
-        BatchResult.new(status: batch.status, provider_batch_id: batch.provider_batch_id,
-                        error: ProviderError.normalize(e, provider: :openai))
+        failed_batch_result(e, status: batch.status, provider_batch_id: batch.provider_batch_id)
       end
 
       private
@@ -218,14 +204,14 @@ module RecordingStudioAI
         expired = read_value(response, :status).to_s == "expired"
         Contracts::NormalizedError.new(
           category: expired ? "batch_expired" : "provider_error", code: expired ? "batch_expired" : "batch_failed",
-          message: expired ? "Provider batch expired." : "Provider batch failed.", retryable: false, provider: "openai"
+          message: expired ? "Provider batch expired." : "Provider batch failed.", retryable: false, provider: self.class.provider_key.to_s
         )
       end
 
       def normalized_batch_item_error(error, status_code)
         Contracts::NormalizedError.new(
           category: "provider_error", code: read_value(error, :code) || "batch_item_failed",
-          message: "Provider batch item failed.", retryable: false, provider: "openai",
+          message: "Provider batch item failed.", retryable: false, provider: self.class.provider_key.to_s,
           provider_code: status_code&.to_s
         )
       end
@@ -271,10 +257,6 @@ module RecordingStudioAI
         }.compact
       end
 
-      def error_retention_snapshot(error)
-        { status: "failed", error: error.to_h }
-      end
-
       def response_output_text(response)
         Array(read_value(response, :output)).flat_map do |item|
           Array(read_value(item, :content)).filter_map do |content|
@@ -294,7 +276,7 @@ module RecordingStudioAI
           code: incomplete ? "incomplete" : (provider_code || "failed"),
           message: incomplete ? "Provider returned an incomplete response." : "Provider request failed.",
           retryable: retryable,
-          provider: "openai",
+          provider: self.class.provider_key.to_s,
           provider_code: provider_code
         )
       end
@@ -318,17 +300,17 @@ module RecordingStudioAI
           code: "missing_stream_completion",
           message: "Provider stream ended without a completed response.",
           retryable: false,
-          provider: "openai"
+          provider: self.class.provider_key.to_s
         )
       end
 
       def client
-        @configuration.openai_client || build_client
+        configuration_client || build_client
       end
 
       def build_client
         require "openai"
-        ::OpenAI::Client.new(api_key: @configuration.openai_api_key)
+        ::OpenAI::Client.new(api_key: configuration_api_key)
       end
 
       def request_parameters(request, candidate)
@@ -438,7 +420,7 @@ module RecordingStudioAI
           code: "invalid_tool_arguments",
           message: "Provider returned invalid custom-tool arguments.",
           retryable: false,
-          provider: "openai"
+          provider: self.class.provider_key.to_s
         )
       end
 
@@ -494,7 +476,7 @@ module RecordingStudioAI
           code: status,
           message: status == "cancelled" ? "Provider request was cancelled." : "Provider request failed.",
           retryable: false,
-          provider: "openai",
+          provider: self.class.provider_key.to_s,
           provider_code: read_value(provider_error, :code)&.to_s
         )
       end
@@ -527,10 +509,6 @@ module RecordingStudioAI
         Array(read_value(response, :output)).any? do |item|
           read_value(item, :type).to_s.include?("web_search")
         end
-      end
-
-      def present?(value)
-        !value.nil? && !value.to_s.empty?
       end
     end
   end

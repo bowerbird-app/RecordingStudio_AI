@@ -7,16 +7,6 @@ module RecordingStudioAI
     class Gemini < Base
       provider_key :gemini
 
-      include ValueReader
-
-      def initialize(configuration:)
-        @configuration = configuration
-      end
-
-      def configured?
-        !@configuration.gemini_client.nil? || present?(@configuration.gemini_api_key)
-      end
-
       def generate(request:, candidate:)
         response = client.models.generate_content(
           model: candidate.model,
@@ -44,8 +34,7 @@ module RecordingStudioAI
       rescue StandardError => e
         raise unless ProviderError.expected?(e)
 
-        error = ProviderError.normalize(e, provider: :gemini)
-        Result.new(error: error, retention_snapshot: error_retention_snapshot(error))
+        failed_result(e)
       end
 
       def stream(request:, candidate:)
@@ -124,8 +113,7 @@ module RecordingStudioAI
       rescue StandardError => e
         raise unless ProviderError.expected?(e)
 
-        error = ProviderError.normalize(e, provider: :gemini)
-        Result.new(error: error, retention_snapshot: error_retention_snapshot(error))
+        failed_result(e)
       end
 
       def submit_batch(request:, candidate:)
@@ -139,7 +127,7 @@ module RecordingStudioAI
       rescue StandardError => e
         raise unless ProviderError.expected?(e)
 
-        BatchResult.new(status: "failed", error: ProviderError.normalize(e, provider: :gemini))
+        failed_batch_result(e)
       end
 
       def refresh_batch(batch:, candidate:)
@@ -147,8 +135,7 @@ module RecordingStudioAI
       rescue StandardError => e
         raise unless ProviderError.expected?(e)
 
-        BatchResult.new(status: batch.status, provider_batch_id: batch.provider_batch_id,
-                        error: ProviderError.normalize(e, provider: :gemini))
+        failed_batch_result(e, status: batch.status, provider_batch_id: batch.provider_batch_id)
       end
 
       def cancel_batch(batch:, candidate:)
@@ -157,8 +144,7 @@ module RecordingStudioAI
       rescue StandardError => e
         raise unless ProviderError.expected?(e)
 
-        BatchResult.new(status: batch.status, provider_batch_id: batch.provider_batch_id,
-                        error: ProviderError.normalize(e, provider: :gemini))
+        failed_batch_result(e, status: batch.status, provider_batch_id: batch.provider_batch_id)
       end
 
       private
@@ -225,10 +211,6 @@ module RecordingStudioAI
         }.compact
       end
 
-      def error_retention_snapshot(error)
-        { status: "failed", error: error.to_h }
-      end
-
       def gemini_batch_structured_data(text, batch, reference)
         item = if batch.respond_to?(:batch_items)
                  batch.batch_items.find { |candidate| candidate.reference == reference.to_s }
@@ -260,20 +242,20 @@ module RecordingStudioAI
           category: expired ? "batch_expired" : "provider_error",
           code: expired ? "batch_expired" : "batch_failed",
           message: expired ? "Provider batch expired." : "Provider batch failed.",
-          retryable: false, provider: "gemini"
+          retryable: false, provider: self.class.provider_key.to_s
         )
       end
 
       def gemini_batch_item_error(error)
         Contracts::NormalizedError.new(
           category: "provider_error", code: read_value(error, :status, :code) || "batch_item_failed",
-          message: "Provider batch item failed.", retryable: false, provider: "gemini"
+          message: "Provider batch item failed.", retryable: false, provider: self.class.provider_key.to_s
         )
       end
 
       def client
-        @configuration.gemini_client || RecordingStudioAI::ProviderClients::Gemini.new(
-          api_key: @configuration.gemini_api_key,
+        configuration_client || RecordingStudioAI::ProviderClients::Gemini.new(
+          api_key: configuration_api_key,
           timeout: @configuration.request_timeout
         )
       end
@@ -480,7 +462,7 @@ module RecordingStudioAI
           code: "missing_candidate",
           message: "Provider returned no generation candidate.",
           retryable: false,
-          provider: "gemini"
+          provider: self.class.provider_key.to_s
         )
       end
 
@@ -490,12 +472,8 @@ module RecordingStudioAI
           code: "blocked",
           message: "Provider blocked the response under its content policy.",
           retryable: false,
-          provider: "gemini"
+          provider: self.class.provider_key.to_s
         )
-      end
-
-      def present?(value)
-        !value.nil? && !value.to_s.empty?
       end
     end
   end

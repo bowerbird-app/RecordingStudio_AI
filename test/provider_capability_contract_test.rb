@@ -154,8 +154,8 @@ class ProviderCapabilityContractTest < Minitest::Test
 
   private
 
-  def assert_provider_capability_contract(provider)
-    adapter, client = build_provider(provider)
+  def assert_provider_capability_contract(provider, adapter: nil, client: nil)
+    adapter, client = build_provider(provider) if adapter.nil? || client.nil?
     candidate = RecordingStudioAI::Candidate.new(
       provider: provider, model: "contract-model", capabilities: CONTRACT_CAPABILITIES
     )

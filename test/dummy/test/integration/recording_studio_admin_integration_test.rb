@@ -67,6 +67,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "Add a Provider"
+    assert_includes response.body, "provider_key"
+    assert_includes response.body, "config.&lt;provider_key&gt;_api_key"
+    assert_includes response.body, "RecordingStudioAI.register_provider"
     assert_includes response.body, "Add a Model"
     assert_includes response.body, "Create Profiles"
     assert_includes response.body, "RecordingStudioAI.models.register"

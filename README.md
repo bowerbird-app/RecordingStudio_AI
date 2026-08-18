@@ -242,6 +242,23 @@ candidate; flat generation parameters (`temperature`, `verbosity`,
 registry. `RecordingStudioAI.stream` / `stream!` were removed — use
 `generate(stream: true)`.
 
+## Adding a provider
+
+This gem already treats OpenAI and Gemini as two adapters behind one contract.
+Adding another vendor should not change `generate`, streaming, or batch.
+
+1. Subclass `RecordingStudioAI::Providers::Base` and declare `provider_key`.
+2. Add credentials the same way as today: `config.<provider_key>_api_key` and
+   optional `config.<provider_key>_client`.
+3. Register with `RecordingStudioAI.register_provider`, or set
+   `config.discovery_enabled = true` if the class lives under
+   `lib/recording_studio_ai/providers/`.
+4. Register models with `RecordingStudioAI.models.register` under
+   `lib/recording_studio_ai/models/<provider-key>/`.
+5. Optionally add a profile candidate `{ provider: :key, model: "..." }`.
+
+The dummy `/config` page has copy-paste examples for registration and models.
+
 ## Provider batches (Phase 11)
 
 `submit_batch` accepts a non-empty list of uniquely referenced generation
