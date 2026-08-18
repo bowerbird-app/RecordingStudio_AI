@@ -3,6 +3,7 @@
 module RecordingStudioAI
   module Admin
     class ApplicationController < ::ApplicationController
+      before_action :run_admin_authenticate
       before_action :establish_admin_access
 
       rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
@@ -13,6 +14,15 @@ module RecordingStudioAI
       layout RecordingStudioAI.configuration.admin_layout if RecordingStudioAI.configuration.admin_layout.present?
 
       private
+
+      # Optional host hook. The engine does not authenticate by itself — either
+      # authenticate in ::ApplicationController or set config.admin_authenticate.
+      def run_admin_authenticate
+        handler = RecordingStudioAI.configuration.admin_authenticate
+        return if handler.nil?
+
+        handler.call(controller: self)
+      end
 
       def establish_admin_access
         @admin_access = RecordingStudioAI::Admin::Access.new(controller: self)

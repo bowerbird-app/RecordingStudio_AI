@@ -70,7 +70,7 @@ class ConfigController < ApplicationController
       required: "No",
       accepted_values: "Callable returning literal true or false",
       default: "->(**) { false }",
-      explanation: "Return true to allow a call. Dummy maps actions to Accessible roles; ships closed in the install template."
+      explanation: "Return literal true to allow. Prefer RecordingStudioAI::AccessibleAuthorization once Accessible is installed."
     },
     {
       key: "attribution_validator",
@@ -325,6 +325,13 @@ class ConfigController < ApplicationController
       explanation: "Who is looking at admin. Admin stays closed until you set this."
     },
     {
+      key: "admin_authenticate",
+      required: "Recommended for admin",
+      accepted_values: "Callable(controller:) or nil",
+      default: "nil",
+      explanation: "Optional extra authenticate step on engine admin. The engine does not authenticate by itself — also authenticate ApplicationController."
+    },
+    {
       key: "admin_visible_roots_resolver",
       required: "For admin",
       accepted_values: "Callable(actor:, controller:) or nil",
@@ -444,6 +451,7 @@ class ConfigController < ApplicationController
       config.admin_slow_call_threshold_ms = 10_000
       config.admin_expensive_models = []
       config.admin_actor_resolver = nil
+      config.admin_authenticate = nil
       config.admin_visible_roots_resolver = nil
       config.admin_layout = nil
     end

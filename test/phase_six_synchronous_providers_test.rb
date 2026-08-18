@@ -299,6 +299,31 @@ class PhaseSixSynchronousProvidersTest < RecordingStudioAI::Test::PersistenceCas
     refute_match(/[?&]key=/, captured_request.path)
   end
 
+  def test_internal_gemini_batch_urls_allowlist_batches_resource_names
+    client = RecordingStudioAI::ProviderClients::Gemini.new(api_key: "secret-key", timeout: 5)
+    captured_paths = []
+    http = Object.new
+    http.define_singleton_method(:request) do |request|
+      captured_paths << request.path
+      response = Net::HTTPOK.new("1.1", "200", "OK")
+      response.instance_variable_set(:@read, true)
+      response.instance_variable_set(:@body, "{}")
+      response
+    end
+
+    Net::HTTP.stub(:start, ->(*, **, &block) { block.call(http) }) do
+      client.get_batch("batches/job-1")
+      client.cancel_batch("batches/job-1")
+    end
+
+    assert_equal ["/v1beta/batches/job-1", "/v1beta/batches/job-1:cancel"], captured_paths
+
+    error = assert_raises(ArgumentError) { client.get_batch("../models/gemini-pro") }
+    assert_match(/batches/, error.message)
+    assert_raises(ArgumentError) { client.cancel_batch("batches/../tunedModels/x") }
+    assert_raises(ArgumentError) { client.get_batch("models/gemini-pro") }
+  end
+
   def test_official_openai_transport_errors_are_retryable_and_normalized
     require "openai"
     url = URI("https://api.openai.com/v1/responses")

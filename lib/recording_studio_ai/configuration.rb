@@ -15,6 +15,7 @@ module RecordingStudioAI
       :batch_synchronization_job,
       :batch_synchronization_interval,
       :admin_actor_resolver,
+      :admin_authenticate,
       :admin_expensive_models,
       :admin_layout,
       :admin_slow_call_threshold_ms,
@@ -67,6 +68,7 @@ module RecordingStudioAI
       @batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"
       @batch_synchronization_interval = 1.minute
       @admin_actor_resolver = nil
+      @admin_authenticate = nil
       @admin_expensive_models = []
       @admin_layout = nil
       @admin_slow_call_threshold_ms = 10_000
