@@ -451,6 +451,10 @@ class ConfigController < ApplicationController
   RUBY
 
   PROVIDER_EXTENSION_EXAMPLE = <<~RUBY.freeze
+    # Credentials follow the provider_key, the same way OpenAI and Gemini do:
+    #   config.my_provider_api_key = ENV.fetch("MY_PROVIDER_API_KEY", nil)
+    #   config.my_provider_client = MyClient.new   # optional injected transport
+
     # Option A: Register directly from the host app (for example in an initializer)
     RecordingStudioAI.register_provider(
       :my_provider,

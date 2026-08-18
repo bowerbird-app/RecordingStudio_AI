@@ -9,6 +9,8 @@ RecordingStudioAI.configure do |config|
   # Provider client objects may be injected for custom transport or testing.
   # config.openai_client = MyOpenAIClientFactory.build
   # config.gemini_client = MyGeminiClientFactory.build
+  # Additional providers use the same names: config.<provider_key>_api_key and
+  # config.<provider_key>_client, then RecordingStudioAI.register_provider.
 
   config.default_profile = :medium
   # Route each tier to ordered provider/model candidates. Reference models by
