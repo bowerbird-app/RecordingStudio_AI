@@ -25,6 +25,7 @@ Versioning and Keep a Changelog.
   renders in place under the "Run generate" button (above the batch section)
   without a full page reload. Batch submissions render their own result frame
   beneath the batch form.
+- Deduplicated the AI Responses admin table so `Created` appears once.
 
 ### Removed
 
