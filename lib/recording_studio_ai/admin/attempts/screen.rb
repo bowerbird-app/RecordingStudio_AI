@@ -1,0 +1,153 @@
+# frozen_string_literal: true
+
+module AdminScreens
+  class RecordingStudioAIAttemptsScreen < RecordingStudioAdmin::Screen
+    key "attempts"
+    icon :arrow_path
+    title "Attempts"
+    subtitle "Provider attempts for AI calls, ordered by their execution sequence."
+
+    query do |context|
+      AdminScreens::RecordingStudioAIWidgets.attempts_scope(context).includes(:run).order(:sequence)
+    end
+
+    filter_presentation :modal, inline_count: 3
+    filter :date_range, field: :created_at, default: :last_4_weeks
+    filter :group_by, values: %i[hour day week month year], default: :day
+    filter :status,
+           param: :attempt_status,
+           field: :status,
+           options: -> { RecordingStudioAI::Attempt.distinct.order(:status).pluck(:status).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
+    filter :provider,
+           field: :provider,
+           values: -> { RecordingStudioAI::Attempt.distinct.order(:provider).pluck(:provider).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(provider: value) }
+    filter :model,
+           field: :model,
+           values: -> { RecordingStudioAI::Attempt.distinct.order(:model).pluck(:model).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(model: value) }
+    filter :prompt,
+           field: :prompt_key,
+           values: lambda {
+             RecordingStudioAI::Run.where.not(prompt_key: nil).distinct.order(:prompt_key).pluck(:prompt_key)
+           },
+           apply: lambda { |relation, value, _context|
+             relation.where(run_id: RecordingStudioAI::Run.where(prompt_key: value).select(:id))
+           }
+    filter :token_min,
+           param: :min_tokens,
+           max: 1_000_000,
+           apply: lambda { |relation, value, _context|
+             value.to_i.positive? ? relation.where("recording_studio_ai_attempts.total_tokens >= ?", value.to_i) : relation
+           }
+    filter :token_max,
+           param: :max_tokens,
+           max: 1_000_000,
+           apply: lambda { |relation, value, _context|
+             if value.to_i.positive? && value.to_i < 1_000_000
+               relation.where("recording_studio_ai_attempts.total_tokens <= ?", value.to_i)
+             else
+               relation
+             end
+           }
+    filter :error_code,
+           field: :error_code,
+           values: lambda {
+             RecordingStudioAI::Attempt.where.not(error_code: [nil, ""]).distinct.order(:error_code).pluck(:error_code)
+           },
+           apply: ->(relation, value, _context) { relation.where(error_code: value.to_s) }
+    filter :run_id,
+           field: :run_id,
+           apply: ->(relation, value, _context) { relation.where(run_id: value) }
+    filter :kind,
+           field: :kind,
+           values: -> { RecordingStudioAI::Attempt.distinct.order(:kind).pluck(:kind).compact_blank },
+           apply: ->(relation, value, _context) { relation.where(kind: value) }
+
+    summary do
+      change_good_when do |context|
+        kind = context.filter_value(:kind).to_s
+        status = context.filter_value(:status).to_s
+        if %w[retry fallback continuation].include?(kind) || %w[failed cancelled].include?(status)
+          :down
+        else
+          :up
+        end
+      end
+    end
+
+    chart do
+      title "Attempts by kind"
+      subtitle "Stacked attempt volume by primary, retry, fallback, and continuation."
+      type :column
+      series do |context|
+        AdminScreens::RecordingStudioAIWidgets.attempt_kind_series(
+          context.query_result.relation,
+          date_range: context.filter_value(:date_range),
+          bucket: context.filter_value(:group_by) || :day
+        )
+      end
+      options do
+        {
+          height: 300,
+          chart: { stacked: true },
+          plotOptions: {
+            bar: {
+              horizontal: false,
+              columnWidth: "55%"
+            }
+          },
+          xaxis: {
+            labels: { show: true },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+          },
+          yaxis: { min: 0 },
+          legend: { position: "top" },
+          grid: { xaxis: { lines: { show: false } } }
+        }
+      end
+    end
+
+    table do
+      show_columns_button
+
+      column :created_at, title: "Created"
+      column :run_id, title: "AI call"
+      column :sequence, title: "Sequence"
+      column :kind,
+             display: :badge,
+             display_options: lambda { |_row, _context, value|
+               { text: value.to_s.humanize, style: :default, size: :sm }
+             }
+      column :prompt,
+             title: "Prompt",
+             sortable: false,
+             value: lambda { |attempt, _context|
+               attempt.run&.prompt_name_snapshot.presence || attempt.run&.prompt_key || "No prompt"
+             }
+      column :status,
+             display: :badge,
+             display_options: lambda { |_row, _context, value|
+               style = case value.to_s
+                       when "completed" then :success
+                       when "failed" then :danger
+                       when "cancelled" then :warning
+                       else :default
+                       end
+               { text: value.to_s.humanize, style: style, size: :sm }
+             }
+      column :provider
+      column :model
+      column :latency_ms, title: "Latency (ms)"
+      column :total_tokens, title: "Tokens"
+      column :error_code, title: "Error code"
+
+      default_columns :created_at, :prompt, :status, :provider, :model, :latency_ms, :total_tokens, :error_code
+
+      default_sort :sequence, direction: :asc
+      paginate per_page: 25
+    end
+  end
+end

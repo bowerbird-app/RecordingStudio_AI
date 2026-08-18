@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-class PhaseFourAuthorizationTest < Minitest::Test
+class PhaseFourAuthorizationTest < RecordingStudioAI::Test::IsolatedCase
   Identifiable = Struct.new(:id)
 
   def setup
@@ -11,13 +11,8 @@ class PhaseFourAuthorizationTest < Minitest::Test
     @initiator = Identifiable.new("user-1")
     @executor = Identifiable.new("exec-1")
     @impersonator = Identifiable.new("imp-1")
-    @original_configuration = RecordingStudioAI.instance_variable_get(:@configuration)
-    RecordingStudioAI.instance_variable_set(:@configuration, RecordingStudioAI::Configuration.new)
+    isolate_configuration!
     RecordingStudioAI.configuration.attribution_validator = ->(**) {}
-  end
-
-  def teardown
-    RecordingStudioAI.instance_variable_set(:@configuration, @original_configuration)
   end
 
   def test_action_map_matches_recording_studio_accessible_contract

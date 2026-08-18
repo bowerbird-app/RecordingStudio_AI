@@ -18,6 +18,9 @@ Versioning and Keep a Changelog.
 - Dummy `/config` now matches the public API: `generate` (with `stream: true`)
   and separate batch methods. It no longer lists `stream` as a peer contract
   method.
+- Dummy sign-in works through Cursor Cloud and Codespaces forwarded previews by
+  relaxing the CSRF origin check in development when `CURSOR_AGENT` or
+  `CODESPACES` is set. CSRF tokens stay required.
 - Streaming is configured with `stream: true` on `generate` / `generate!`.
   Upgrade note: replace `RecordingStudioAI.stream(...)` with
   `RecordingStudioAI.generate(stream: true, ...)` and
@@ -31,10 +34,13 @@ Versioning and Keep a Changelog.
 - AI Playground batch provider/profile selects refresh the batch model dropdown
   the same way Generate does (batch-capable models for the chosen profile, then
   provider).
-- `.rubocop_todo.yml` records existing engine RuboCop debt from
-  `copilot/v1-implement-sync-generation` so CI lint can pass without rewriting
-  Orchestrator and other large files.
 - Deduplicated the AI Responses admin table so `Created` appears once.
+- AI Playground keeps SSE streaming on a dedicated Live controller so Devise
+  authentication on the show/generate page redirects to sign-in instead of
+  raising `UncaughtThrowError` (`throw :warden`). Unauthenticated stream
+  requests return 401.
+- Extracted shared Minitest bootstrap for gem phase tests (`test/support`) covering
+  SQLite persistence, configuration isolation, and recording lookup doubles.
 - Admin dashboard adds Registered Providers and Registered Models widgets (top 5
   by call volume) at the end of the widget grid, plus matching table-only
   screens and section links.
@@ -44,9 +50,15 @@ Versioning and Keep a Changelog.
   Temperature / Verbosity / Reasoning defaults, and uses a 30-day calls mini
   chart that opens AI Calls filtered to that provider and model.
 - `.rubocop_todo.yml` records existing engine RuboCop debt from
-  `copilot/v1-implement-sync-generation` (file-level excludes). New provider/model
+  `copilot/v1-implement-sync-generation` (file-level excludes) so CI lint can
+  pass without rewriting Orchestrator and other large files. New provider/model
   admin helpers avoid multi-line block chains, and the new widget registrations
   wrap to the 120-column limit.
+- Split the Recording Studio AI admin catalog into RSA-style files under
+  `lib/recording_studio_ai/admin` (shared queries, one widget/screen per file,
+  section, manifest). Registration still uses `RecordingStudioAdmin.register_*`
+  only. Upgrade note: require `recording_studio_ai/admin_screens` as before;
+  `AdminScreens.register!` / `AdminScreens.load!` are unchanged.
 
 ### Removed
 

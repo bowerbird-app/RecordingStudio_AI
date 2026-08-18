@@ -10,7 +10,7 @@
             class: "mb-0 pb-0"
           ) %>
 
-          <%= form_for(resource, as: resource_name, url: session_path(resource_name)) do |f| %>
+          <%= form_for(resource, as: resource_name, url: session_path(resource_name), data: { turbo: false }) do |f| %>
             <div class="space-y-4">
             <%= render FlatPack::EmailInput::Component.new(
               name: "user[email]",
