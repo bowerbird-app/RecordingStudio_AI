@@ -3,7 +3,9 @@ require "sidekiq/web"
 Rails.application.routes.draw do
   devise_for :users
 
-  authenticate :user do
+  # Operators only: Accessible admin on at least one root. Do not open Sidekiq
+  # to every signed-in Devise user in a real host.
+  authenticate :user, ->(user) { DummyAccessibleAIAuthorization.admin_operator?(actor: user) } do
     mount Sidekiq::Web => "/sidekiq"
   end
 

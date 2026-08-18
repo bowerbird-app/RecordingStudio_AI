@@ -7,19 +7,21 @@ RecordingStudioAdmin.configure do |config|
   config.authentication_method = :authenticate_user!
   config.current_actor_method = :current_user
 
+  # Fail closed: never fall back to an ungranted or global root.
   config.access_recording_resolver = lambda do |context|
-    current_root = context.controller.current_root_recording
     actor = context.current_actor
+    return nil if actor.blank?
 
-    if actor
-      accessible_root_ids = RecordingStudioAccessible.root_recording_ids_for(actor: actor, minimum_role: :view)
-      return current_root if current_root.present? && accessible_root_ids.include?(current_root.id)
+    accessible_root_ids = DummyAccessibleAIAuthorization.accessible_root_ids(
+      actor: actor,
+      minimum_role: RecordingStudioAdmin.configuration.required_access_role || :view
+    )
+    return nil if accessible_root_ids.empty?
 
-      accessible_root = RecordingStudio::Recording.where(id: accessible_root_ids).order(:created_at).first
-      return accessible_root if accessible_root.present?
-    end
+    current_root = context.controller.current_root_recording
+    return current_root if current_root.present? && accessible_root_ids.include?(current_root.id)
 
-    current_root || RecordingStudio::Recording.where(parent_recording_id: nil).order(:created_at).first
+    RecordingStudio::Recording.where(id: accessible_root_ids).order(:created_at).first
   end
 
   config.admin_sections_resolver = lambda do |recording:, context:, **|

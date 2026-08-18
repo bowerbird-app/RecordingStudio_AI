@@ -29,4 +29,33 @@ class AIPlaygroundAuthenticationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Run generate"
   end
+
+  test "generate rejects signed-in users without an accessible selected root" do
+    user = User.create!(email: "playground-denied-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    Workspace.create!(name: "Denied playground workspace")
+    sign_in user
+
+    post "/ai_playground", params: {
+      ai_playground: { mode: "generate", prompt: "hello", profile: "medium", provider: "auto" }
+    }
+
+    assert_response :unprocessable_entity
+    assert_match(/Select a workspace|edit access/i, response.body)
+  end
+
+  test "generate requires edit access on the selected root" do
+    user = User.create!(email: "playground-view-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    workspace = Workspace.create!(name: "View-only playground workspace")
+    root = RecordingStudio.root_recording_for(workspace)
+    grant_accessible!(recording: root, actor: user, role: :view)
+    sign_in user
+    switch_to_root!(root)
+
+    post "/ai_playground", params: {
+      ai_playground: { mode: "generate", prompt: "hello", profile: "medium", provider: "auto" }
+    }
+
+    assert_response :unprocessable_entity
+    assert_match(/edit access/i, response.body)
+  end
 end

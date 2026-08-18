@@ -68,6 +68,27 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.4] - 2026-08-18
+
+### Security
+
+- Dummy host now wires Recording Studio AI authorization through
+  RecordingStudioAccessible role mapping instead of `->(**) { true }`.
+- Dummy root switcher lists only Accessible roots and uses the default
+  Accessible access check (no always-allow switch).
+- Dummy AI admin visible roots and Recording Studio Admin access recording
+  resolvers fail closed to Accessible grants (no global-root fallback).
+- Dummy AI playground refuses to run without a selected root the actor can
+  edit (no first-Workspace fallback).
+- Dummy Sidekiq UI is limited to actors with Accessible admin on at least one
+  root, and the sidebar link is hidden otherwise.
+
+### Upgrade notes
+
+- Treat the dummy initializers as the reference Accessible host pattern. Do not
+  copy the old always-true authorization / all-workspaces switcher into a real
+  host.
+
 ## [0.2.3] - 2026-08-18
 
 ### Security

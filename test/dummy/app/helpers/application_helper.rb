@@ -1,4 +1,8 @@
 module ApplicationHelper
+	def recording_studio_sidekiq_accessible?
+		DummyAccessibleAIAuthorization.admin_operator?(actor: Current.actor)
+	end
+
 	def recording_tree_root_recording
 		return current_root_recording if respond_to?(:current_root_recording) && current_root_recording.present?
 
