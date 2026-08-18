@@ -4,17 +4,17 @@ class ConfigController < ApplicationController
   CONFIG_OPTIONS = [
     {
       key: "openai_api_key",
-      required: "When using OpenAI",
+      required: "Yes, to call OpenAI",
       accepted_values: "String or nil",
       default: 'ENV["OPENAI_API_KEY"]',
-      explanation: "OpenAI API key."
+      explanation: "OpenAI API key. Set this or inject a client, or OpenAI calls fail."
     },
     {
       key: "gemini_api_key",
-      required: "When using Gemini",
+      required: "Yes, to call Gemini",
       accepted_values: "String or nil",
       default: 'ENV["GEMINI_API_KEY"]',
-      explanation: "Gemini API key."
+      explanation: "Gemini API key. Set this or inject a client, or Gemini calls fail."
     },
     {
       key: "openai_client",
@@ -41,7 +41,7 @@ class ConfigController < ApplicationController
       key: "profiles",
       required: "No",
       accepted_values: "Hash of profile keys to ordered { provider:, model: } lists",
-      default: "low / medium / high built-in maps",
+      default: "low: gpt-5-mini, gemini-2.5-flash / medium: gpt-5, gemini-2.5-pro / high: gpt-5-pro, gemini-2.5-pro",
       explanation: "Preferred provider and model order for generate (including stream: true) and batch."
     },
     {
@@ -67,10 +67,10 @@ class ConfigController < ApplicationController
     },
     {
       key: "authorization_handler",
-      required: "No",
+      required: "Yes",
       accepted_values: "Callable returning true or false",
       default: "->(**) { false }",
-      explanation: "Return true to allow a call. Ships closed."
+      explanation: "Return true to allow a call. Ships closed, so every call is denied until you set it."
     },
     {
       key: "attribution_validator",
@@ -126,14 +126,14 @@ class ConfigController < ApplicationController
       required: "No",
       accepted_values: "Integer >= 0",
       default: "1",
-      explanation: "How many times a call may drop to another profile tier."
+      explanation: "How many times a call may drop to another profile tier. Only bites once profile_fallbacks has a map."
     },
     {
       key: "profile_fallbacks",
       required: "No",
       accepted_values: "Hash of profile_key => [profile_key]",
       default: "{}",
-      explanation: "Which profile to try next. Empty means no tier fallback."
+      explanation: "Which profile to try next. Empty means tier fallback never happens, whatever the limit above says."
     },
     {
       key: "request_timeout",
@@ -179,17 +179,17 @@ class ConfigController < ApplicationController
     },
     {
       key: "retry_random",
-      required: "No",
+      required: "Tests only",
       accepted_values: "Callable that returns a float",
       default: "-> { rand }",
-      explanation: "Random source for retry jitter. Override in tests."
+      explanation: "Random source for retry jitter. Swap it to make retries predictable in tests."
     },
     {
       key: "retry_sleeper",
-      required: "No",
+      required: "Tests only",
       accepted_values: "Callable(seconds)",
       default: "->(seconds) { sleep(seconds) }",
-      explanation: "Wait helper for retry backoff. Override in tests."
+      explanation: "Wait helper for retry backoff. Swap it so tests do not actually sleep."
     },
     {
       key: "maximum_attachment_count",
@@ -216,7 +216,8 @@ class ConfigController < ApplicationController
       key: "allowed_attachment_content_types",
       required: "No",
       accepted_values: "Array of MIME type strings",
-      default: "png, jpeg, gif, webp, pdf, json, plain, csv, markdown",
+      default: "image/png, image/jpeg, image/gif, image/webp, application/pdf, application/json, " \
+               "text/plain, text/csv, text/markdown",
       explanation: "File types the addon will accept."
     },
     {
@@ -242,10 +243,10 @@ class ConfigController < ApplicationController
     },
     {
       key: "custom_tool_confirmation_handler",
-      required: "No",
+      required: "Yes, for tools needing approval",
       accepted_values: ":approved, :rejected, :pending, :expired, or a boolean",
       default: "->(**) { false }",
-      explanation: "Approve or reject tools that need a human yes. Ships closed."
+      explanation: "Approve or reject tools that need a human yes. Ships closed, so those tools never run."
     },
     {
       key: "retain_responses",
@@ -300,8 +301,8 @@ class ConfigController < ApplicationController
       key: "admin_warning_thresholds",
       required: "No",
       accepted_values: "Hash of warning keys to numbers",
-      default: "built-in warning thresholds",
-      explanation: "When admin warning widgets light up."
+      default: "runs 1_000, error_rate 0.1, total_tokens 1_000_000, average_latency_ms 10_000, and more",
+      explanation: "When admin warning widgets light up. Merge your own numbers over the defaults."
     },
     {
       key: "admin_slow_call_threshold_ms",
@@ -319,17 +320,17 @@ class ConfigController < ApplicationController
     },
     {
       key: "admin_actor_resolver",
-      required: "For admin",
+      required: "Yes, to open admin",
       accepted_values: "Callable(controller:) or nil",
       default: "nil",
-      explanation: "Who is looking at admin. Admin stays closed until you set this."
+      explanation: "Who is looking at admin. Admin screens stay shut until you set this."
     },
     {
       key: "admin_visible_roots_resolver",
-      required: "For admin",
+      required: "Yes, to open admin",
       accepted_values: "Callable(actor:, controller:) or nil",
       default: "nil",
-      explanation: "Which workspaces that person may see. Admin stays closed until you set this."
+      explanation: "Which workspaces that person may see. Admin screens stay shut until you set this."
     },
     {
       key: "admin_layout",
@@ -370,26 +371,22 @@ class ConfigController < ApplicationController
           { provider: :gemini, model: "gemini-2.5-pro" }
         ]
       }
+      # Tier fallback only happens when this map is filled, for example { high: [:medium] }.
       config.profile_fallbacks = {}
-      config.providers = {
-        openai: RecordingStudioAI::Providers::OpenAI.new(configuration: config),
-        gemini: RecordingStudioAI::Providers::Gemini.new(configuration: config)
-      }
+
+      # OpenAI and Gemini are registered already. Set this only for custom adapters or tests.
+      # config.providers = { my_provider: MyProvider.new(configuration: config) }
 
       # Optional convenience APIs (outside this block):
       # RecordingStudioAI.register_provider(:my_provider, RecordingStudioAI::Providers::MyProvider.new(configuration: RecordingStudioAI.configuration))
       # RecordingStudioAI.discover_providers!
 
-      # Authorization and attribution boundaries.
+      # Authorization. Replace this deny-all handler with your own policy.
       config.authorization_handler = ->(**) { false }
-      config.attribution_validator = ->(root_recording:, context_recording:) do
-        # Keep host tenancy checks strict. Replace with host policy if needed.
-        recording_class = RecordingStudio::Recording
-        raise ArgumentError, "root must be a root recording" unless root_recording.is_a?(recording_class) && root_recording.parent_recording_id.nil?
-        if context_recording && context_recording.root_recording_id != root_recording.id
-          raise ArgumentError, "context must belong to root"
-        end
-      end
+
+      # The gem already checks that the workspace root and context match.
+      # Set this only for a stricter host rule.
+      # config.attribution_validator = ->(root_recording:, context_recording:) { ... }
 
       # Cost + batch behavior.
       config.cost_catalogs = {}
@@ -404,8 +401,10 @@ class ConfigController < ApplicationController
       config.retry_backoff_base = 0.25
       config.retry_backoff_max = 5.0
       config.retry_jitter = 0.2
-      config.retry_random = -> { rand }
-      config.retry_sleeper = ->(seconds) { sleep(seconds) }
+
+      # Test seams. Leave these alone in an app.
+      # config.retry_random = -> { 0.5 }
+      # config.retry_sleeper = ->(seconds) { }
 
       # Timeout budgets (seconds).
       config.request_timeout = 120
@@ -439,12 +438,14 @@ class ConfigController < ApplicationController
       config.instrumentation_enabled = true
       config.notification_namespace = "recording_studio_ai"
 
-      # Admin behavior.
-      config.admin_warning_thresholds = RecordingStudioAI::Configuration.new.admin_warning_thresholds
+      # Admin behavior. Thresholds keep their defaults unless you override a key.
+      # config.admin_warning_thresholds = config.admin_warning_thresholds.merge(error_rate: 0.05)
       config.admin_slow_call_threshold_ms = 10_000
       config.admin_expensive_models = []
-      config.admin_actor_resolver = nil
-      config.admin_visible_roots_resolver = nil
+
+      # Admin screens stay shut until both resolvers are set.
+      config.admin_actor_resolver = ->(controller:) { controller.current_user }
+      config.admin_visible_roots_resolver = ->(actor:, controller:) { actor.visible_recording_root_ids }
       config.admin_layout = nil
     end
   RUBY
@@ -609,6 +610,173 @@ class ConfigController < ApplicationController
     )
   RUBY
 
+  CUSTOM_TOOL_OPTIONS = [
+    {
+      key: "key",
+      required: "Yes",
+      accepted_values: "snake_case string (a-z, 0-9, _)",
+      default: "—",
+      explanation: "Stable id for the tool. Used when you pass custom_tools: [{ key:, version: }]."
+    },
+    {
+      key: "version",
+      required: "Yes",
+      accepted_values: "Positive Integer",
+      default: "—",
+      explanation: "Version of this definition. Register a new version instead of editing an old one."
+    },
+    {
+      key: "name",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "Short label for people and admin screens."
+    },
+    {
+      key: "description",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "What the tool does. Sent to the model with the use_when / do_not_use_when lines."
+    },
+    {
+      key: "use_when",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "When the model should call this tool."
+    },
+    {
+      key: "do_not_use_when",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "When the model should leave this tool alone."
+    },
+    {
+      key: "parameters",
+      required: "Yes",
+      accepted_values: "Array of argument hashes",
+      default: "—",
+      explanation: "Argument schema for the tool. See the argument fields table below."
+    },
+    {
+      key: "returns",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "Plain-language description of what the executor returns."
+    },
+    {
+      key: "cost",
+      required: "Yes",
+      accepted_values: "negligible, low, medium, high",
+      default: "—",
+      explanation: "Rough cost band for the tool."
+    },
+    {
+      key: "latency",
+      required: "Yes",
+      accepted_values: "instant, fast, slow",
+      default: "—",
+      explanation: "Rough speed band for the tool."
+    },
+    {
+      key: "read_only",
+      required: "Yes",
+      accepted_values: "true or false",
+      default: "—",
+      explanation: "true if the tool only reads. Cannot be true when destructive is true."
+    },
+    {
+      key: "destructive",
+      required: "Yes",
+      accepted_values: "true or false",
+      default: "—",
+      explanation: "true if the tool can change or delete something."
+    },
+    {
+      key: "requires_confirmation",
+      required: "Yes",
+      accepted_values: "true or false",
+      default: "—",
+      explanation: "true if custom_tool_confirmation_handler must approve before it runs."
+    },
+    {
+      key: "idempotent",
+      required: "Yes",
+      accepted_values: "true or false",
+      default: "—",
+      explanation: "true if calling it twice with the same args is safe."
+    },
+    {
+      key: "executor_label",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "Who owns the executor, for people reading admin screens."
+    },
+    {
+      key: "executor",
+      required: "Yes",
+      accepted_values: "Callable(arguments, context)",
+      default: "—",
+      explanation: "Runs the tool. Must return serializable data. context includes the root, initiator, run, and cancellation state."
+    },
+    {
+      key: "examples",
+      required: "No",
+      accepted_values: "Serializable Hash/Array or nil",
+      default: "nil",
+      explanation: "Optional worked examples for the model or docs."
+    }
+  ].freeze
+
+  CUSTOM_TOOL_PARAMETER_OPTIONS = [
+    {
+      key: "name",
+      required: "Yes",
+      accepted_values: "snake_case string (a-z, 0-9, _)",
+      default: "—",
+      explanation: "Argument name. Must be unique inside the tool."
+    },
+    {
+      key: "type",
+      required: "Yes",
+      accepted_values: "string, integer, number, boolean, object, array",
+      default: "—",
+      explanation: "JSON-schema style type for the argument."
+    },
+    {
+      key: "required",
+      required: "Yes",
+      accepted_values: "true or false",
+      default: "—",
+      explanation: "Whether the model must supply this argument."
+    },
+    {
+      key: "description",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "What the argument means."
+    },
+    {
+      key: "allowed_values",
+      required: "No",
+      accepted_values: "Non-empty Array of values matching type",
+      default: "—",
+      explanation: "Optional enum. Values must match the argument type."
+    },
+    {
+      key: "default",
+      required: "No",
+      accepted_values: "Serializable value matching type",
+      default: "—",
+      explanation: "Filled in when the argument is omitted. Still validated against type and allowed_values."
+    }
+  ].freeze
+
   def show
     @config_options = CONFIG_OPTIONS
     @config_example = CONFIG_EXAMPLE
@@ -616,5 +784,7 @@ class ConfigController < ApplicationController
     @model_registration_example = MODEL_REGISTRATION_EXAMPLE
     @profile_example = PROFILE_EXAMPLE
     @custom_tools_example = CUSTOM_TOOLS_EXAMPLE
+    @custom_tool_options = CUSTOM_TOOL_OPTIONS
+    @custom_tool_parameter_options = CUSTOM_TOOL_PARAMETER_OPTIONS
   end
 end

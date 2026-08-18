@@ -22,6 +22,14 @@ Versioning and Keep a Changelog.
   lists every setting with required, possible values, default, and a short
   description. The initializer example now sets `batch_synchronization_job`
   and matches the `retain_responses` default.
+- Dummy `/config` renders the configuration table through Flatpack column
+  `html:` lambdas, so rows have real cells instead of collapsing into one
+  column. Required now says where a setting is actually needed, defaults show
+  real values such as attachment MIME types, and the initializer example stops
+  suggesting host apps copy `providers`, `attribution_validator`, and the
+  `retry_random` / `retry_sleeper` test seams.
+- Dummy `/config` Create Custom Tools now includes registration-field and
+  argument-field tables for `RecordingStudioAI.tools.register`.
 - Dummy sign-in works through Cursor Cloud and Codespaces forwarded previews by
   relaxing the CSRF origin check in development when `CURSOR_AGENT` or
   `CODESPACES` is set. CSRF tokens stay required.
@@ -68,7 +76,7 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
-## [0.2.3] - 2026-08-18
+## [0.2.4] - 2026-08-18
 
 ### Security
 
@@ -88,6 +96,17 @@ Versioning and Keep a Changelog.
 
 - Callers of `RecordingStudioAI::WarningMetrics` must pass `root_ids:` for
   meaningful results. Omitting it returns empty metrics.
+
+## [0.2.3] - 2026-08-18
+
+### Changed
+
+- Extracted `RecordingStudioAI::Orchestrator` into `Orchestration::*`
+  collaborators (planner, persistence, attempt runner, plan executor, stream
+  session, custom tools, response builder). Public `generate` /
+  `generate(stream: true)` behavior is unchanged. Upgrade note: hosts keep
+  calling `RecordingStudioAI.generate`; `Orchestrator::CancellationState` and
+  `Orchestrator::CustomToolContext` remain available as aliases.
 
 ## [0.2.2] - 2026-08-18
 
