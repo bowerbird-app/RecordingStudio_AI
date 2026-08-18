@@ -26,7 +26,7 @@ require "recording_studio_ai/response_cleanup"
 require "recording_studio_ai/history_cleanup"
 require "recording_studio_ai/warning_metrics"
 require "recording_studio_ai/admin/access"
-require "recording_studio_ai/admin/recording_studio_admin_authorization"
+require "recording_studio_ai/recording_studio_admin_authorization"
 require "recording_studio_ai/orchestrator"
 require "recording_studio_ai/batch_orchestrator"
 

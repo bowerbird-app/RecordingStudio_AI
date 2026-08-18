@@ -4,6 +4,7 @@ require "test_helper"
 
 class AdminRecordingStudioAdminAuthorizationTest < Minitest::Test
   def test_gate_is_unavailable_without_recording_studio_admin
-    refute RecordingStudioAI::Admin::RecordingStudioAdminAuthorization.available?
+    assert RecordingStudioAI.const_defined?(:RecordingStudioAdminAuthorization)
+    refute RecordingStudioAI::RecordingStudioAdminAuthorization.available?
   end
 end

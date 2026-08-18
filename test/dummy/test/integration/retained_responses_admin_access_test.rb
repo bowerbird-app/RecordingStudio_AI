@@ -22,6 +22,9 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
   end
 
   test "signed-in users without Accessible grants are forbidden like Recording Studio Admin" do
+    assert RecordingStudioAI.const_defined?(:RecordingStudioAdminAuthorization)
+    refute RecordingStudioAI::Admin.const_defined?(:RecordingStudioAdminAuthorization, false)
+
     retained = create_retained_response!(root: @root_recording)
     sign_in @user
 
@@ -46,6 +49,19 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
     get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
     assert_response :success
     assert_includes response.body, "viewable retained body"
+  end
+
+  test "retained response page still authorizes after a code reload" do
+    grant_accessible!(recording: @root_recording, actor: @user, role: :view)
+    retained = create_retained_response!(root: @root_recording, content_text: "after reload")
+    sign_in @user
+    switch_to_root!(@root_recording)
+
+    Rails.application.reloader.reload!
+
+    get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
+    assert_response :success
+    assert_includes response.body, "after reload"
   end
 
   test "view grant cannot open a retained response from another root" do
