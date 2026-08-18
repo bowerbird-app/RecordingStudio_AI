@@ -13,7 +13,7 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Recording Studio AI"
   end
 
-  test "home page renders the root switch dropdown trigger" do
+  test "home page renders only workspaces the actor can access" do
     user = User.find_or_create_by!(email: "root-switch-test@example.com") do |record|
       record.password = "Password123!"
       record.password_confirmation = "Password123!"
@@ -21,13 +21,17 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
 
     sign_in user
 
-    workspace = Workspace.create!(name: "Dropdown Workspace")
-    RecordingStudio.root_recording_for(workspace)
+    granted = Workspace.create!(name: "Dropdown Workspace")
+    hidden = Workspace.create!(name: "Hidden Workspace")
+    granted_root = RecordingStudio.root_recording_for(granted)
+    RecordingStudio.root_recording_for(hidden)
+    grant_accessible!(recording: granted_root, actor: user, role: :view)
 
     get root_path
 
     assert_response :success
-    assert_includes response.body, workspace.name
+    assert_includes response.body, granted.name
+    refute_includes response.body, hidden.name
   end
 
   test "root switch page renders with the host sidebar" do
@@ -39,13 +43,15 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     sign_in user
 
     workspace = Workspace.create!(name: "Switch Page Workspace")
-    RecordingStudio.root_recording_for(workspace)
+    root = RecordingStudio.root_recording_for(workspace)
+    grant_accessible!(recording: root, actor: user, role: :view)
 
     get "/recording_studio_root_switchable/v1/root_switch?scope=all_workspaces"
 
     assert_response :success
     assert_includes response.body, "AI Admin"
     assert_includes response.body, "Recording tree"
+    assert_includes response.body, workspace.name
   end
 
   test "switching returns to the current page when it is a valid internal route" do
@@ -60,14 +66,9 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     target_workspace = Workspace.create!(name: "Target Workspace")
     target_root_recording = RecordingStudio.root_recording_for(target_workspace)
     RecordingStudio.root_recording_for(source_workspace)
+    grant_accessible!(recording: target_root_recording, actor: user, role: :view)
 
-    patch "/recording_studio_root_switchable/v1/root_switch", params: {
-      scope: "all_workspaces",
-      root_switch: {
-        root_recording_id: target_root_recording.id,
-        return_to: "/"
-      }
-    }
+    switch_to_root!(target_root_recording, return_to: "/")
 
     assert_redirected_to "/"
   end
@@ -84,15 +85,23 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     target_workspace = Workspace.create!(name: "Fallback Target Workspace")
     target_root_recording = RecordingStudio.root_recording_for(target_workspace)
     RecordingStudio.root_recording_for(source_workspace)
+    grant_accessible!(recording: target_root_recording, actor: user, role: :view)
 
-    patch "/recording_studio_root_switchable/v1/root_switch", params: {
-      scope: "all_workspaces",
-      root_switch: {
-        root_recording_id: target_root_recording.id,
-        return_to: "/not-a-real-route"
-      }
-    }
+    switch_to_root!(target_root_recording, return_to: "/not-a-real-route")
 
     assert_redirected_to "/"
+  end
+
+  test "switching to an ungranted workspace is rejected" do
+    user = User.create!(email: "root-switch-denied-#{SecureRandom.hex(4)}@example.com", password: "Password123!")
+    sign_in user
+
+    private_workspace = Workspace.create!(name: "Private Switch Workspace")
+    private_root = RecordingStudio.root_recording_for(private_workspace)
+
+    switch_to_root!(private_root, return_to: "/")
+
+    assert_response :unprocessable_entity
+    assert_match(/not available/i, response.body)
   end
 end

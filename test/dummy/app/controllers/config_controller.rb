@@ -68,9 +68,9 @@ class ConfigController < ApplicationController
     {
       key: "authorization_handler",
       required: "No",
-      accepted_values: "Callable returning true or false",
+      accepted_values: "Callable returning literal true or false",
       default: "->(**) { false }",
-      explanation: "Return true to allow a call. Ships closed."
+      explanation: "Return true to allow a call. Dummy maps actions to Accessible roles; ships closed in the install template."
     },
     {
       key: "attribution_validator",
@@ -329,7 +329,7 @@ class ConfigController < ApplicationController
       required: "For admin",
       accepted_values: "Callable(actor:, controller:) or nil",
       default: "nil",
-      explanation: "Which workspaces that person may see. Admin stays closed until you set this."
+      explanation: "Which workspaces that person may see. Dummy uses Accessible root ids; admin stays closed until you set this."
     },
     {
       key: "admin_layout",

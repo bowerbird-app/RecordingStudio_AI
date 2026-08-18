@@ -10,9 +10,7 @@ module AIPlayground
     def stream
       form = default_form.merge(form_params.to_h)
       request_id = SecureRandom.uuid
-      root_recording = current_root_recording || RecordingStudio.root_recording_for(Workspace.order(:created_at).first)
-      raise "No root recording is available for AI execution." if root_recording.nil?
-
+      root_recording = playground_root_recording!
       response.headers["Content-Type"] = "text/event-stream"
       response.headers["Cache-Control"] = "no-cache"
       response.headers["X-Accel-Buffering"] = "no"
