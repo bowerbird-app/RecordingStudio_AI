@@ -7,6 +7,21 @@ class RecordingStudioAITest < Minitest::Test
     assert_equal "0.2.1", RecordingStudioAI::VERSION
   end
 
+  def test_admin_catalog_uses_public_rsa_registration
+    admin_root = File.expand_path("../lib/recording_studio_ai/admin", __dir__)
+    entry = File.read(File.expand_path("../lib/recording_studio_ai/admin_screens.rb", __dir__))
+    manifest = File.read(File.join(admin_root, "manifest.rb"))
+
+    assert_includes entry, 'require_relative "admin/manifest"'
+    assert_includes manifest, "def self.register!"
+    assert_includes manifest, "def self.load!"
+    assert_includes manifest, "RecordingStudioAdmin.register_widget"
+    assert_includes manifest, "RecordingStudioAdmin.register_screen"
+    assert_includes manifest, "RecordingStudioAdmin.register_section"
+    refute_includes File.read(File.join(admin_root, "section.rb")), "class_eval"
+    refute_includes manifest, "prepend"
+  end
+
   def test_runtime_dependencies_are_declared
     specification = Gem::Specification.load(File.expand_path("../recording_studio_ai.gemspec", __dir__))
     dependencies = specification.runtime_dependencies.to_h { |dependency| [dependency.name, dependency.requirement] }
