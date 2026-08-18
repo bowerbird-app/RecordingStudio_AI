@@ -21,45 +21,47 @@ Style/StringLiterals:
 
 Layout/LineLength:
   Max: 120
+  Exclude:
+    - 'lib/recording_studio_ai/admin/**/*'
 
 # Relax metrics for test files, generators, and the admin screen catalog.
 Metrics/ClassLength:
   Exclude:
     - 'test/**/*'
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
 
 Metrics/ModuleLength:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
 
 Metrics/MethodLength:
   Exclude:
     - 'test/**/*'
     - 'lib/generators/**/*'
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
 
 Metrics/AbcSize:
   Exclude:
     - 'test/**/*'
     - 'lib/generators/**/*'
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
 
 Metrics/BlockLength:
   Exclude:
     - 'test/**/*'
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
 
 Metrics/CyclomaticComplexity:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
 
 Metrics/PerceivedComplexity:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
 
 Metrics/ParameterLists:

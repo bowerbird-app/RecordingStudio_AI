@@ -1,0 +1,735 @@
+# frozen_string_literal: true
+
+module AdminScreens
+  module RecordingStudioAIWidgets
+    extend self
+
+    EXPENSIVE_MODEL_MATCHER = /(gpt-5|o1|claude-opus|gemini-2\.5-pro)/i unless const_defined?(:EXPENSIVE_MODEL_MATCHER)
+    WarningRow = Data.define(:text) unless const_defined?(:WarningRow)
+    unless const_defined?(:ToolRow)
+      ToolRow = Data.define(:key, :version, :name, :description, :cost_class, :safety, :calls_series, :success_rate,
+                            :error_rate, :average_duration)
+    end
+    if const_defined?(:PromptRow) && PromptRow.members != %i[
+      namespace key version name short_name description calls calls_series success_rate error_rate
+      average_duration average_input_tokens average_output_tokens
+    ]
+      remove_const(:PromptRow)
+    end
+    unless const_defined?(:PromptRow)
+      PromptRow = Data.define(:namespace, :key, :version, :name, :short_name, :description, :calls, :calls_series,
+                              :success_rate, :error_rate, :average_duration, :average_input_tokens,
+                              :average_output_tokens)
+    end
+    unless const_defined?(:LatencyRow)
+      LatencyRow = Data.define(:name, :calls, :p50_latency_ms, :p90_latency_ms, :average_latency_ms,
+                               :max_latency_ms)
+    end
+    provider_row_members = %i[key class_name configured models_count calls calls_series]
+    remove_const(:ProviderRow) if const_defined?(:ProviderRow) && ProviderRow.members != provider_row_members
+    ProviderRow = Data.define(*provider_row_members) unless const_defined?(:ProviderRow)
+    model_row_members = %i[
+      provider model temperature verbosity reasoning_effort streaming structured_output batch
+      tools input_modalities output_modalities calls calls_series
+    ]
+    remove_const(:ModelRow) if const_defined?(:ModelRow) && ModelRow.members != model_row_members
+    ModelRow = Data.define(*model_row_members) unless const_defined?(:ModelRow)
+
+    def runs_scope(context)
+      scope = RecordingStudioAI::Run.all
+      root_id = context.root_recording&.id
+      root_id.present? ? scope.where(root_recording_id: root_id) : scope
+    end
+
+    def tool_scope(context)
+      RecordingStudioAI::CustomToolInvocation.joins(:run).merge(runs_scope(context))
+    end
+
+    def attempts_scope(context)
+      RecordingStudioAI::Attempt.joins(:run).merge(runs_scope(context))
+    end
+
+    def attempt_kind_series(relation, date_range:, field: "recording_studio_ai_attempts.created_at", bucket: :day)
+      bucket = bucket.to_sym
+      buckets = attempt_kind_bucket_keys(date_range, bucket)
+      counts = attempt_kind_counts(relation, field, bucket)
+
+      RecordingStudioAI::Attempt::KINDS.values.filter_map do |kind|
+        next unless counts.keys.any? { |count_kind, _bucket| count_kind == kind }
+
+        { name: kind.humanize, data: attempt_kind_data(kind, buckets, counts, bucket) }
+      end
+    end
+
+    def attempt_kind_counts(relation, field, bucket)
+      relation.reorder(nil).pluck(:kind, Arel.sql(field)).each_with_object(Hash.new(0)) do |row, counts|
+        kind, created_at = row
+        next if created_at.blank?
+
+        counts[[kind.to_s, attempt_kind_bucket_key(created_at, bucket)]] += 1
+      end
+    end
+
+    def attempt_kind_data(kind, buckets, counts, bucket)
+      buckets.map do |bucket_key|
+        { x: attempt_kind_bucket_label(bucket_key, bucket), y: counts.fetch([kind, bucket_key], 0) }
+      end
+    end
+
+    def attempt_kind_bucket_keys(date_range, bucket)
+      return [] unless date_range && date_range.start_date && date_range.end_date
+
+      start_at = attempt_kind_bucket_key(date_range.start_date.beginning_of_day, bucket)
+      end_at = attempt_kind_bucket_key(date_range.end_date.end_of_day, bucket)
+      Enumerator.produce(start_at) { |value| value + attempt_kind_bucket_step(bucket) }
+                .take_while { |value| value <= end_at }
+    end
+
+    def attempt_kind_bucket_step(bucket)
+      { hour: 1.hour, day: 1.day, week: 1.week, month: 1.month, year: 1.year }.fetch(bucket, 1.day)
+    end
+
+    def attempt_kind_bucket_key(value, bucket)
+      timestamp = value.respond_to?(:in_time_zone) ? value.in_time_zone : Time.zone.parse(value.to_s)
+
+      case bucket
+      when :hour
+        timestamp.beginning_of_hour
+      when :week
+        timestamp.beginning_of_week
+      when :month
+        timestamp.beginning_of_month
+      when :year
+        timestamp.beginning_of_year
+      else
+        timestamp.to_date
+      end
+    end
+
+    def attempt_kind_bucket_label(value, bucket)
+      timestamp = value.respond_to?(:in_time_zone) ? value.in_time_zone : Time.zone.parse(value.to_s)
+
+      case bucket
+      when :hour
+        timestamp.strftime("%-l%P").strip
+      when :week
+        "Week of #{timestamp.strftime('%b %-d')}"
+      when :month
+        timestamp.strftime("%b")
+      when :year
+        timestamp.strftime("%Y")
+      else
+        timestamp.strftime("%b %-d")
+      end
+    end
+
+    def p90_latency(scope)
+      percentile_latency(scope.pluck(:latency_ms), percentile: 0.9)
+    end
+
+    def daily_p90_latency_series(scope, range: 30.days.ago..Time.current)
+      scope.where(created_at: range).pluck(:created_at, :latency_ms).group_by do |created_at, _latency_ms|
+        created_at.to_date
+      end.sort_by(&:first).map do |date, rows|
+        { x: date.strftime("%b %-d"), y: percentile_latency(rows.map(&:last), percentile: 0.9) }
+      end
+    end
+
+    def percentile_latency(latencies, percentile:)
+      values = latencies.compact.map(&:to_i).sort
+      return 0 if values.empty?
+
+      values[(values.length * percentile).ceil - 1]
+    end
+
+    def latency_rows(context, dimension:)
+      date_range = latency_date_range(context, dimension: dimension)
+      runs = runs_scope(context).where(created_at: date_range).where.not(latency_ms: nil)
+      latency_rows_for_runs(runs, dimension: dimension)
+    end
+
+    def latency_rows_for_runs(runs, dimension:)
+      grouped_latencies = runs.pluck(:resolved_model, :prompt_name_snapshot, :prompt_key, :prompt_version,
+                                     :latency_ms).group_by do |model, prompt_name, prompt_key, prompt_version, _latency_ms|
+        if dimension == :model
+          model.presence || "Unknown model"
+        elsif prompt_name.present?
+          "#{prompt_name}#{" v#{prompt_version}" if prompt_version.present?}"
+        else
+          prompt_key.presence || "No prompt"
+        end
+      end
+
+      grouped_latencies.map do |name, rows|
+        latencies = rows.map(&:last)
+        LatencyRow.new(
+          name,
+          latencies.length,
+          percentile_latency(latencies, percentile: 0.5),
+          percentile_latency(latencies, percentile: 0.9),
+          (latencies.sum.to_f / latencies.length).round,
+          latencies.max
+        )
+      end.sort_by { |row| [-row.p90_latency_ms, row.name] }
+    end
+
+    def latency_date_range(context, dimension:)
+      screen = dimension == :model ? AdminScreens::RecordingStudioAILatencyByModelScreen : AdminScreens::RecordingStudioAILatencyByPromptScreen
+      date_range = context.filter_value(:date_range) || screen.filters.find do |filter|
+        filter.key == :date_range
+      end.normalize(context.params)
+      date_range.start_date.beginning_of_day..date_range.end_date.end_of_day
+    end
+
+    def retry_rate_by_model_rows(scope, range: 30.days.ago..Time.current, limit: 3)
+      runs = scope.where(created_at: range).where.not(resolved_model: nil)
+      run_counts = runs.group(:resolved_model).count
+      retried_run_counts = runs.where("retry_count > 0").group(:resolved_model).count
+
+      run_counts.map do |model, count|
+        [model, percentage(retried_run_counts.fetch(model, 0), count)]
+      end.sort_by { |_model, rate| -rate }.first(limit)
+    end
+
+    def custom_tool_rows(context)
+      invocations = tool_scope(context)
+      date_range_value = registered_custom_tools_date_range_value(context)
+      date_range = if date_range_value.respond_to?(:start_date) && date_range_value.respond_to?(:end_date)
+                     date_range_value.start_date.beginning_of_day..date_range_value.end_date.end_of_day
+                   else
+                     30.days.ago..Time.current
+                   end
+      range_invocations = invocations.where(created_at: date_range)
+      range_counts = range_invocations.group(:tool_key, :tool_version).count
+      daily_counts = range_invocations.group_by do |invocation|
+        [invocation.tool_key, invocation.tool_version, invocation.created_at.to_date]
+      end.transform_values(&:count)
+      completed_counts = range_invocations.where(status: "completed").group(:tool_key, :tool_version).count
+      error_counts = range_invocations.where(status: %w[failed denied rejected cancelled]).group(:tool_key,
+                                                                                                 :tool_version).count
+      average_latencies = range_invocations.group(:tool_key, :tool_version).average(:latency_ms)
+
+      RecordingStudioAI.tools.all.map do |definition|
+        key = [definition.key, definition.version]
+        total = range_counts.fetch(key, 0)
+        safety = definition.read_only ? "Read-only" : "Writes"
+        safety = "#{safety}, destructive" if definition.destructive
+
+        ToolRow.new(
+          definition.key,
+          definition.version,
+          definition.name,
+          definition.description,
+          definition.cost,
+          safety,
+          (date_range.begin.to_date..date_range.end.to_date).map do |date|
+            { x: date.strftime("%b %-d"), y: daily_counts.fetch([*key, date], 0) }
+          end,
+          percentage(completed_counts.fetch(key, 0), total),
+          percentage(error_counts.fetch(key, 0), total),
+          duration(average_latencies[key])
+        )
+      end
+    end
+
+    def prompt_rows(context)
+      runs = runs_scope(context).where.not(prompt_key: nil)
+      date_range_value = registered_prompts_date_range_value(context)
+      date_range = if date_range_value.respond_to?(:start_date) && date_range_value.respond_to?(:end_date)
+                     date_range_value.start_date.beginning_of_day..date_range_value.end_date.end_of_day
+                   else
+                     30.days.ago..Time.current
+                   end
+      range_runs = runs.where(created_at: date_range)
+      range_counts = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).count
+      daily_counts = range_runs.group_by do |run|
+        [run.prompt_namespace, run.prompt_key, run.prompt_version, run.created_at.to_date]
+      end.transform_values(&:count)
+      completed_counts = range_runs.where(status: "completed").group(:prompt_namespace, :prompt_key,
+                                                                     :prompt_version).count
+      error_counts = range_runs.where(status: %w[failed cancelled]).group(:prompt_namespace, :prompt_key,
+                                                                          :prompt_version).count
+      average_latencies = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).average(:latency_ms)
+      average_input_tokens = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).average(:input_tokens)
+      average_output_tokens = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).average(:output_tokens)
+
+      RecordingStudioAI.prompts.all.map do |definition|
+        key = [definition.namespace, definition.key, definition.version]
+        total = range_counts.fetch(key, 0)
+
+        PromptRow.new(
+          definition.namespace,
+          definition.key,
+          definition.version,
+          definition.name,
+          definition.short_name,
+          definition.description,
+          total,
+          (date_range.begin.to_date..date_range.end.to_date).map do |date|
+            { x: date.strftime("%b %-d"), y: daily_counts.fetch([*key, date], 0) }
+          end,
+          percentage(completed_counts.fetch(key, 0), total),
+          percentage(error_counts.fetch(key, 0), total),
+          duration(average_latencies[key]),
+          average_tokens(average_input_tokens[key]),
+          average_tokens(average_output_tokens[key])
+        )
+      end.sort_by { |row| [-row.calls, row.namespace, row.key, row.version] }
+    end
+
+    def average_tokens(value)
+      return "No data" if value.blank?
+
+      number(value.round)
+    end
+
+    def top_prompt_call_rows(scope, range: 30.days.ago..Time.current, limit: 5)
+      scope.where(created_at: range)
+           .where.not(prompt_key: nil)
+           .group(:prompt_namespace, :prompt_key)
+           .count
+           .sort_by { |_identity, count| -count }
+           .first(limit)
+           .filter_map do |(namespace, key), calls|
+             definition = RecordingStudioAI.prompts.fetch(namespace, key) if namespace.present?
+             name = definition&.name ||
+                    scope.where(prompt_namespace: namespace, prompt_key: key)
+                         .where.not(prompt_name_snapshot: [nil, ""])
+                         .order(created_at: :desc)
+                         .limit(1)
+                         .pick(:prompt_name_snapshot) ||
+                    key
+             [name, namespace, key, calls]
+           end
+    end
+
+    def prompt_chart_label(row)
+      "#{row.name} (#{row.namespace}.#{row.key} v#{row.version})"
+    end
+
+    def prompt_calls_path(context, row)
+      range_query = date_range_query(
+        context,
+        screen: AdminScreens::RecordingStudioAIRegisteredPromptsScreen
+      )
+      query = range_query.merge(
+        prompt: row.key,
+        prompt_namespace: row.namespace,
+        prompt_version: row.version
+      )
+      "/admin/screens/ai_calls?#{query.to_query}"
+    end
+
+    def date_range_query(context, screen: AdminScreens::RecordingStudioAIRegisteredCustomToolsScreen)
+      date_range = context.filter_value(:date_range) || screen.filters.find do |filter|
+        filter.key == :date_range
+      end.normalize(context.params)
+      return { date_range_preset: date_range.preset_key } if date_range&.preset_key.present?
+      return { date_range_preset: :last_30_days } unless date_range&.start_date && date_range.end_date
+
+      {
+        start_date: date_range.start_date.iso8601,
+        end_date: date_range.end_date.iso8601
+      }
+    end
+
+    def registered_custom_tools_date_range_value(context)
+      return context.filter_value(:date_range) if context.filter_value(:date_range)
+
+      screen = AdminScreens::RecordingStudioAIRegisteredCustomToolsScreen
+      screen.filters.find { |filter| filter.key == :date_range }.normalize(context.params)
+    end
+
+    def registered_prompts_date_range_value(context)
+      return context.filter_value(:date_range) if context.filter_value(:date_range)
+
+      screen = AdminScreens::RecordingStudioAIRegisteredPromptsScreen
+      screen.filters.find { |filter| filter.key == :date_range }.normalize(context.params)
+    end
+
+    def provider_rows(context)
+      date_range = 30.days.ago.beginning_of_day..Time.current
+      range_runs = runs_scope(context)
+                   .where(created_at: date_range)
+                   .where.not(resolved_provider: [nil, ""])
+      call_counts = range_runs.group(:resolved_provider).count
+      daily_counts = range_runs.group_by do |run|
+        [run.resolved_provider.to_s, run.created_at.to_date]
+      end.transform_values(&:count)
+
+      rows = RecordingStudioAI.configuration.providers.map do |key, provider|
+        provider_key = key.to_s
+        ProviderRow.new(
+          provider_key,
+          provider.class.name.demodulize,
+          provider.respond_to?(:configured?) ? provider.configured? : false,
+          RecordingStudioAI.models.for_provider(key).length,
+          call_counts.fetch(provider_key, 0),
+          (date_range.begin.to_date..date_range.end.to_date).map do |date|
+            { x: date.strftime("%b %-d"), y: daily_counts.fetch([provider_key, date], 0) }
+          end
+        )
+      end
+      rows.sort_by { |row| [-row.calls, row.key] }
+    end
+
+    def model_rows(context)
+      date_range = 30.days.ago.beginning_of_day..Time.current
+      range_runs = runs_scope(context)
+                   .where(created_at: date_range)
+                   .where.not(resolved_model: [nil, ""])
+      call_counts = range_runs.group(:resolved_provider, :resolved_model).count
+      daily_counts = range_runs.group_by do |run|
+        [run.resolved_provider.to_s, run.resolved_model.to_s, run.created_at.to_date]
+      end.transform_values(&:count)
+
+      rows = RecordingStudioAI.models.all.map do |definition|
+        provider_key = definition.provider.to_s
+        model_key = definition.model
+        ModelRow.new(
+          provider_key,
+          model_key,
+          parameter_default_label(definition, :temperature),
+          parameter_default_label(definition, :verbosity),
+          parameter_default_label(definition, :reasoning_effort),
+          definition.delivery.fetch(:streaming, false),
+          definition.delivery.fetch(:structured_output, false),
+          definition.delivery.fetch(:batch, false),
+          definition.tools.map(&:to_s).join(", "),
+          definition.modalities.fetch(:input, []).map(&:to_s).join(", "),
+          definition.modalities.fetch(:output, []).map(&:to_s).join(", "),
+          call_counts.fetch([provider_key, model_key], 0),
+          (date_range.begin.to_date..date_range.end.to_date).map do |date|
+            { x: date.strftime("%b %-d"), y: daily_counts.fetch([provider_key, model_key, date], 0) }
+          end
+        )
+      end
+      rows.sort_by { |row| [-row.calls, row.provider, row.model] }
+    end
+
+    def parameter_default_label(definition, name)
+      return "—" unless definition.supports_parameter?(name)
+
+      value = definition.parameter(name)&.fetch(:default, nil)
+      value.nil? ? "Supported" : value.to_s
+    end
+
+    def top_provider_call_rows(context, range: 30.days.ago..Time.current, limit: 5)
+      counts = runs_scope(context)
+               .where(created_at: range)
+               .where.not(resolved_provider: [nil, ""])
+               .group(:resolved_provider)
+               .count
+
+      rows = RecordingStudioAI.configuration.providers.keys.map do |key|
+        [key.to_s, counts.fetch(key.to_s, 0)]
+      end
+      rows.sort_by { |_key, calls| -calls }.first(limit)
+    end
+
+    def top_model_call_rows(context, range: 30.days.ago..Time.current, limit: 5)
+      counts = runs_scope(context)
+               .where(created_at: range)
+               .where.not(resolved_model: [nil, ""])
+               .group(:resolved_provider, :resolved_model)
+               .count
+
+      rows = RecordingStudioAI.models.all.map do |definition|
+        [
+          definition.provider.to_s,
+          definition.model,
+          definition.display_name,
+          counts.fetch([definition.provider.to_s, definition.model], 0)
+        ]
+      end
+      rows.sort_by { |_provider, _model, _name, calls| -calls }.first(limit)
+    end
+
+    def number(value)
+      ActionController::Base.helpers.number_with_delimiter(value.to_i)
+    end
+
+    def duration(milliseconds)
+      return "No data" if milliseconds.blank?
+
+      milliseconds.to_f >= 1_000 ? format("%.1fs", milliseconds.to_f / 1_000) : "#{milliseconds.to_i}ms"
+    end
+
+    def mini_chart(series)
+      options = {
+        chart: { toolbar: { show: false }, sparkline: { enabled: true } },
+        colors: ["#000000"],
+        stroke: { curve: "smooth", width: 2 },
+        tooltip: { theme: "light" },
+        xaxis: { labels: { show: false } },
+        yaxis: { min: 0, labels: { show: false } },
+        grid: { show: false }
+      }
+
+      ActionController::Base.helpers.content_tag(
+        :div,
+        nil,
+        class: "h-16 w-36",
+        data: {
+          controller: "flat-pack--chart",
+          "flat-pack--chart-series-value": [{ name: "Calls", data: series }].to_json,
+          "flat-pack--chart-type-value": "line",
+          "flat-pack--chart-options-value": options.to_json,
+          "flat-pack--chart-height-value": 64
+        }
+      )
+    end
+
+    def custom_tool_definition_modal(row)
+      helpers = ActionController::Base.helpers
+      modal_id = "custom-tool-definition-#{row.key}-#{row.version}"
+      definition = RecordingStudioAI.tools.fetch(row.key, version: row.version)
+      fields = {
+        "Description" => definition.description,
+        "Use when" => definition.use_when,
+        "Do not use when" => definition.do_not_use_when,
+        "Returns" => definition.returns,
+        "Executor" => definition.executor_label,
+        "Safety" => "#{definition.read_only ? 'Read only' : 'Writes'}; destructive: #{definition.destructive ? 'yes' : 'no'}; confirmation: #{definition.requires_confirmation ? 'required' : 'not required'}; idempotent: #{definition.idempotent ? 'yes' : 'no'}"
+      }
+      definition_modal(
+        helpers: helpers,
+        modal_id: modal_id,
+        title: "#{definition.name} v#{definition.version}",
+        trigger_text: "#{row.name} v#{row.version}",
+        aria_label: "Show definition for #{row.name}",
+        fields: fields
+      )
+    end
+
+    def prompt_definition_modal(row)
+      helpers = ActionController::Base.helpers
+      modal_id = "registered-prompt-definition-#{row.namespace}-#{row.key}-#{row.version}"
+      definition = RecordingStudioAI.prompts.fetch(row.namespace, row.key, version: row.version)
+      fields = {
+        "Namespace" => definition.namespace,
+        "Key" => definition.key,
+        "Short name" => definition.short_name,
+        "Description" => definition.description,
+        "Inputs" => definition.inputs.presence&.join(", ") || "None",
+        "Tools" => if definition.tools.any?
+                     definition.tools.map do |tool|
+                       tool[:version] ? "#{tool.fetch(:key)} v#{tool[:version]}" : tool.fetch(:key)
+                     end.join(", ")
+                   else
+                     "None"
+                   end,
+        "Defaults" => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || "None",
+        "Prompt" => prompt_messages_markup(helpers, definition.messages)
+      }
+      definition_modal(
+        helpers: helpers,
+        modal_id: modal_id,
+        title: "#{definition.name} v#{definition.version}",
+        trigger_text: "#{row.name} v#{row.version}",
+        aria_label: "Show definition for #{row.name}",
+        fields: fields
+      )
+    end
+
+    def prompt_messages_markup(helpers, messages)
+      helpers.content_tag(:div, class: "grid gap-3") do
+        helpers.safe_join(messages.map do |message|
+          helpers.content_tag(:div, class: "rounded-md border border-[var(--modal-border-color)] p-3") do
+            helpers.safe_join([
+                                helpers.content_tag(:div, message.fetch(:role).to_s.humanize,
+                                                    class: "mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--surface-muted-content-color)]"),
+                                helpers.content_tag(:pre, message.fetch(:content),
+                                                    class: "whitespace-pre-wrap break-words font-sans text-sm")
+                              ])
+          end
+        end)
+      end
+    end
+
+    def definition_modal(helpers:, modal_id:, title:, trigger_text:, aria_label:, fields:)
+      body = helpers.content_tag(:dl, class: "grid gap-4 text-sm") do
+        helpers.safe_join(fields.map do |label, value|
+          helpers.content_tag(:div) do
+            helpers.safe_join([
+                                helpers.content_tag(:dt, label,
+                                                    class: "text-sm text-[var(--surface-muted-content-color)]"),
+                                helpers.content_tag(:dd, value)
+                              ])
+          end
+        end)
+      end
+      modal = helpers.content_tag(
+        :div,
+        helpers.safe_join([
+                            helpers.content_tag(:div, nil, class: "absolute inset-0",
+                                                           data: { action: "click->flat-pack--modal#clickBackdrop" }),
+                            helpers.content_tag(:div,
+                                                class: "relative flex w-full min-h-screen items-start sm:items-center justify-center p-4 sm:p-6") do
+                              helpers.content_tag(:div,
+                                                  class: "relative flex flex-col min-h-0 max-h-[calc(100vh-2rem)] w-full overflow-hidden max-w-2xl p-4 sm:p-6 bg-[var(--modal-surface-color)] rounded-lg shadow-lg border border-[var(--modal-border-color)] transform transition-all duration-300 scale-95 opacity-0", role: "dialog", aria: { modal: true }, data: { "flat-pack--modal-target": "dialog" }) do
+                                helpers.safe_join([
+                                                    helpers.content_tag(:div,
+                                                                        class: "flex items-center justify-between gap-4") do
+                                                      helpers.safe_join([
+                                                                          helpers.content_tag(:h2, title,
+                                                                                              class: "text-lg font-semibold text-[var(--modal-title-color)]"),
+                                                                          helpers.content_tag(:button, "×", type: "button", class: "text-xl", aria: { label: "Close" },
+                                                                                                            data: { action: "flat-pack--modal#close" })
+                                                                        ])
+                                                    end,
+                                                    helpers.content_tag(:div, body, class: "mt-6 min-h-0 flex-1 overflow-y-auto")
+                                                  ])
+                              end
+                            end
+                          ]),
+        id: modal_id,
+        class: "fixed inset-0 z-50 hidden overflow-y-auto bg-[var(--modal-backdrop-color)] backdrop-blur-[var(--modal-backdrop-blur)] transition-opacity duration-300",
+        data: { controller: "flat-pack--modal", "flat-pack--modal-close-on-backdrop-value": true,
+                "flat-pack--modal-close-on-escape-value": true, action: "keydown.esc->flat-pack--modal#close" },
+        aria: { hidden: true }
+      )
+      trigger = helpers.content_tag(:button, trigger_text, type: "button",
+                                                          class: "text-(--color-primary-background-color) underline", data: { modal_id: modal_id }, aria: { label: aria_label })
+      helpers.safe_join([trigger, modal])
+    end
+
+    def percentage(part, whole)
+      return 0.0 if whole.to_i <= 0
+
+      ((part.to_f / whole.to_f) * 100).round(1)
+    end
+
+    def percentage_change_label(current:, previous:)
+      change =
+        if previous.to_i <= 0
+          current.to_i.positive? ? 100.0 : 0.0
+        else
+          (((current.to_f - previous.to_f) / previous.to_f) * 100).round(1)
+        end
+
+      formatted = (change % 1).zero? ? change.to_i.to_s : format("%.1f", change)
+      sign = change.positive? ? "+" : ""
+      "#{sign}#{formatted}%"
+    end
+
+    def this_week_range(reference_time: Time.current)
+      reference_time.beginning_of_week..reference_time
+    end
+
+    def previous_week_range(reference_time: Time.current)
+      current_week_start = reference_time.beginning_of_week
+      (current_week_start - 1.week)..(current_week_start - 1.second)
+    end
+
+    def trailing_weeks_range(weeks_back:, reference_time: Time.current)
+      current_week_start = reference_time.beginning_of_week
+      start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
+      start_week..reference_time
+    end
+
+    def weekly_calls_series(scope, weeks_back: 12, series_name: "AI calls")
+      current_week_start = Time.current.beginning_of_week
+      start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
+      calls_by_week = scope.where(created_at: start_week..Time.current)
+                           .group_by { |run| run.created_at.beginning_of_week.to_date }
+
+      week_starts = []
+      cursor = start_week
+      while cursor <= current_week_start
+        week_starts << cursor
+        cursor += 1.week
+      end
+
+      [{
+        name: series_name,
+        data: week_starts.map do |week_start|
+          {
+            x: week_start.strftime("%b %-d"),
+            y: calls_by_week.fetch(week_start.to_date, []).count
+          }
+        end
+      }]
+    end
+
+    def weekly_token_series(scope, weeks_back: 12, series_name: "Token usage")
+      current_week_start = Time.current.beginning_of_week
+      start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
+      tokens_by_week = scope.where(created_at: start_week..Time.current)
+                            .group_by { |run| run.created_at.beginning_of_week.to_date }
+
+      week_starts = []
+      cursor = start_week
+      while cursor <= current_week_start
+        week_starts << cursor
+        cursor += 1.week
+      end
+
+      [{
+        name: series_name,
+        data: week_starts.map do |week_start|
+          week_runs = tokens_by_week.fetch(week_start.to_date, [])
+          {
+            x: week_start.strftime("%b %-d"),
+            y: week_runs.sum { |run| run.total_tokens.to_i }
+          }
+        end
+      }]
+    end
+
+    def top_model_token_rows(scope, range:, limit: 5)
+      scope.where(created_at: range)
+           .where.not(total_tokens: nil)
+           .group(:resolved_model)
+           .sum(:total_tokens)
+           .sort_by { |_model, total_tokens| -total_tokens.to_i }
+           .first(limit)
+    end
+
+    def token_change_label(scope, current_range:, previous_range:)
+      current = scope.where(created_at: current_range).where.not(total_tokens: nil).sum(:total_tokens)
+      previous = scope.where(created_at: previous_range).where.not(total_tokens: nil).sum(:total_tokens)
+      percentage_change_label(current: current, previous: previous)
+    end
+
+    def warning_items(scope)
+      now = Time.current
+      last_day = scope.where(created_at: 24.hours.ago..now)
+      previous_week = scope.where(created_at: 8.days.ago.beginning_of_day..1.day.ago.end_of_day)
+
+      warnings = []
+
+      usage_today = scope.where(created_at: now.beginning_of_day..now).count
+      baseline_daily = previous_week.group_by { |run| run.created_at.to_date }.values.map(&:count)
+      baseline_average = baseline_daily.empty? ? 0 : (baseline_daily.sum.to_f / baseline_daily.size)
+      if usage_today >= [20, (baseline_average * 1.8).ceil].max
+        warnings << {
+          text: "Unusually high usage today: #{number(usage_today)} calls",
+          icon: "arrow-trending-up"
+        }
+      end
+
+      failed_last_day = last_day.where(status: "failed").count
+      failed_previous_week = previous_week.where(status: "failed").count
+      previous_failure_rate = percentage(failed_previous_week, previous_week.count)
+      current_failure_rate = percentage(failed_last_day, last_day.count)
+      if failed_last_day >= 3 && current_failure_rate >= [12.0, previous_failure_rate * 1.7].max
+        warnings << {
+          text: "Error spike: #{current_failure_rate}% failures in the last 24h",
+          icon: "shield-exclamation"
+        }
+      end
+
+      expensive_last_day = last_day.where("resolved_model ~* ?", EXPENSIVE_MODEL_MATCHER.source).count
+      expensive_share = percentage(expensive_last_day, last_day.count)
+      if expensive_last_day >= 3 || expensive_share >= 35.0
+        warnings << {
+          text: "Expensive model usage elevated: #{expensive_share}% in the last 24h",
+          icon: "currency-dollar"
+        }
+      end
+
+      warnings
+    end
+  end
+end

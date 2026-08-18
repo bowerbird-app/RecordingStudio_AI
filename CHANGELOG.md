@@ -44,6 +44,11 @@ Versioning and Keep a Changelog.
   pass without rewriting Orchestrator and other large files. New provider/model
   admin helpers avoid multi-line block chains, and the new widget registrations
   wrap to the 120-column limit.
+- Split the Recording Studio AI admin catalog into RSA-style files under
+  `lib/recording_studio_ai/admin` (shared queries, one widget/screen per file,
+  section, manifest). Registration still uses `RecordingStudioAdmin.register_*`
+  only. Upgrade note: require `recording_studio_ai/admin_screens` as before;
+  `AdminScreens.register!` / `AdminScreens.load!` are unchanged.
 
 ### Removed
 

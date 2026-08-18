@@ -69,7 +69,7 @@ Layout/FirstHashElementIndentation:
 # SupportedLastArgumentHashStyles: always_inspect, always_ignore, ignore_implicit, ignore_explicit
 Layout/HashAlignment:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'test/phase_four_authorization_test.rb'
     - 'test/phase_ten_streaming_test.rb'
     - 'test/phase_twelve_response_retention_observability_test.rb'
@@ -87,7 +87,7 @@ Layout/LineLength:
     - 'app/controllers/recording_studio_ai/admin/runs_controller.rb'
     - 'db/migrate/20260810120000_create_recording_studio_ai_persistence_tables.rb'
     - 'db/migrate/20260811120000_harden_recording_studio_ai_persistence.rb'
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/batch_orchestrator.rb'
     - 'lib/recording_studio_ai/configuration.rb'
     - 'lib/recording_studio_ai/contracts/request_validation.rb'
@@ -150,7 +150,7 @@ Layout/ParameterAlignment:
 # SupportedStylesForEmptyBrackets: space, no_space
 Layout/SpaceInsideArrayLiteralBrackets:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
 
 # Offense count: 21
 # This cop supports safe autocorrection (--autocorrect).
@@ -272,7 +272,7 @@ Metrics/AbcSize:
   Exclude:
     - 'test/**/*'
     - 'lib/generators/**/*'
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
     - 'app/controllers/recording_studio_ai/admin/custom_tools_controller.rb'
     - 'app/controllers/recording_studio_ai/admin/overview_controller.rb'
@@ -320,7 +320,7 @@ Metrics/AbcSize:
 Metrics/BlockLength:
   Exclude:
     - 'test/**/*'
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'db/migrate/20260810120000_create_recording_studio_ai_persistence_tables.rb'
     - 'db/migrate/20260811130000_enforce_recording_studio_ai_history_integrity.rb'
     - 'lib/generators/recording_studio_ai/install/templates/recording_studio_ai_initializer.rb'
@@ -334,7 +334,7 @@ Metrics/BlockLength:
 Metrics/ClassLength:
   Exclude:
     - 'test/**/*'
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
     - 'db/migrate/20260810120000_create_recording_studio_ai_persistence_tables.rb'
     - 'db/migrate/20260811130000_enforce_recording_studio_ai_history_integrity.rb'
@@ -351,7 +351,7 @@ Metrics/ClassLength:
 # Configuration parameters: AllowedMethods, AllowedPatterns, Max.
 Metrics/CyclomaticComplexity:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
     - 'app/controllers/recording_studio_ai/admin/runs_controller.rb'
     - 'db/migrate/20260811130000_enforce_recording_studio_ai_history_integrity.rb'
@@ -388,7 +388,7 @@ Metrics/MethodLength:
   Exclude:
     - 'test/**/*'
     - 'lib/generators/**/*'
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
     - 'app/controllers/recording_studio_ai/admin/custom_tools_controller.rb'
     - 'app/controllers/recording_studio_ai/admin/overview_controller.rb'
@@ -446,7 +446,7 @@ Metrics/MethodLength:
 # Configuration parameters: CountComments, Max, CountAsOne.
 Metrics/ModuleLength:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai.rb'
     - 'lib/recording_studio_ai/attachments.rb'
     - 'lib/recording_studio_ai/contracts/request_validation.rb'
@@ -458,7 +458,7 @@ Metrics/ParameterLists:
   Exclude:
     - 'lib/recording_studio_ai/models/definition.rb'
     - 'app/jobs/recording_studio_ai/batch_synchronization_job.rb'
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/contracts/attempt_summary.rb'
     - 'lib/recording_studio_ai/contracts/attribution.rb'
     - 'lib/recording_studio_ai/contracts/batch_item_result.rb'
@@ -479,7 +479,7 @@ Metrics/ParameterLists:
 # Configuration parameters: AllowedMethods, AllowedPatterns, Max.
 Metrics/PerceivedComplexity:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
     - 'app/controllers/recording_studio_ai/admin/runs_controller.rb'
     - 'lib/recording_studio_ai/attachments.rb'
@@ -557,7 +557,7 @@ Style/ExplicitBlockArgument:
 # SupportedStyles: left_coerce, right_coerce, single_coerce, fdiv
 Style/FloatDivision:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
 
 # Offense count: 9
 # This cop supports safe autocorrection (--autocorrect).
@@ -582,12 +582,12 @@ Style/KeywordParametersOrder:
 # SupportedStyles: module_function, extend_self, forbidden
 Style/ModuleFunction:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
 
 # Offense count: 5
 Style/MultilineBlockChain:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/instrumentation.rb'
 
 # Offense count: 1
@@ -623,7 +623,7 @@ Style/RedundantFreeze:
 # AllowedMethods: present?, blank?, presence, try, try!
 Style/SafeNavigation:
   Exclude:
-    - 'lib/recording_studio_ai/admin_screens.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/metadata.rb'
     - 'lib/recording_studio_ai/providers/provider_error.rb'
     - 'lib/recording_studio_ai/retention.rb'
