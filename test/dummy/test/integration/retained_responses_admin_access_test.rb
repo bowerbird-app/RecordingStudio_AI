@@ -38,6 +38,9 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
 
     get "/admin/screens/recording_studio_ai_responses"
     assert_response :success
+
+    get "/admin/screens/recording_studio_ai_responses/table"
+    assert_response :success
     assert_includes response.body, "Response ##{retained.id}"
 
     get "/recording_studio_ai/admin/retained_responses/#{retained.id}"

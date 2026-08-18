@@ -6,29 +6,9 @@ module RecordingStudioAI
       @configuration = configuration
     end
 
-    def read(response:, initiator:, initiator_kind: nil, executor: nil, execution_source: nil,
-             preauthorized: false)
-      if response.expires_at && response.expires_at <= Time.current
-        raise ActiveRecord::RecordNotFound, "retained response has expired"
-      end
-
-      run = response.attempt&.run || response.batch_item&.run
-      raise ActiveRecord::RecordNotFound, "retained response owner is missing" unless run
-
-      unless preauthorized
-        attribution = Contracts::Attribution.new(
-          root_recording: RecordingStudio::Recording.find(run.root_recording_id),
-          initiator: initiator,
-          initiator_kind: initiator_kind,
-          executor: executor,
-          execution_source: execution_source
-        )
-        Authorization.authorize!(
-          :view_retained_response,
-          attribution: attribution,
-          context: { response_id: response.id, run_id: run.id }
-        )
-      end
+    def read(response:, initiator:, **options)
+      run = retained_run!(response)
+      authorize_read!(response, run, initiator, options) unless options[:preauthorized]
 
       {
         id: response.id,
@@ -45,6 +25,32 @@ module RecordingStudioAI
     end
 
     private
+
+    def retained_run!(response)
+      if response.expires_at && response.expires_at <= Time.current
+        raise ActiveRecord::RecordNotFound, "retained response has expired"
+      end
+
+      run = response.attempt&.run || response.batch_item&.run
+      raise ActiveRecord::RecordNotFound, "retained response owner is missing" unless run
+
+      run
+    end
+
+    def authorize_read!(response, run, initiator, options)
+      attribution = Contracts::Attribution.new(
+        root_recording: RecordingStudio::Recording.find(run.root_recording_id),
+        initiator: initiator,
+        initiator_kind: options[:initiator_kind],
+        executor: options[:executor],
+        execution_source: options[:execution_source]
+      )
+      Authorization.authorize!(
+        :view_retained_response,
+        attribution: attribution,
+        context: { response_id: response.id, run_id: run.id }
+      )
+    end
 
     def parse_json(value) = value.nil? ? nil : JSON.parse(value)
   end

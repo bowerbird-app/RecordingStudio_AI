@@ -31,9 +31,7 @@ module RecordingStudioAI
       end
 
       def actor_for(controller)
-        if defined?(Current) && Current.respond_to?(:actor) && !Current.actor.nil?
-          return Current.actor
-        end
+        return Current.actor if defined?(Current) && Current.respond_to?(:actor) && !Current.actor.nil?
 
         method_name = ::RecordingStudioAdmin.configuration.current_actor_method
         controller.send(method_name) if method_name && controller.respond_to?(method_name, true)
