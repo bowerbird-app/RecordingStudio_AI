@@ -759,12 +759,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Attempt Prompt"
     assert_includes response.body, "Prompt"
     assert_select "th", text: /Created/
-    assert_select "th", text: "Prompt"
-    assert_select "th", text: "Status"
-    assert_select "th", text: "AI call", count: 0
-    assert_select "th", text: "Sequence", count: 0
-    assert_select "th", text: "Kind", count: 0
-    assert_select "th", text: "Error code", count: 0
+    assert_select "th", text: /\APrompt/
+    assert_select "th", text: /\AStatus/
+    assert_select "th", text: /\AAI call/, count: 0
+    assert_select "th", text: /\ASequence/, count: 0
+    assert_select "th", text: /\AKind/, count: 0
+    assert_select "th", text: /\AError code/, count: 0
     assert_select "input[name='columns[]'][value='error_code']", count: 0
   end
 
@@ -783,7 +783,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/attempts/table", params: { attempt_status: "failed" }
 
     assert_response :success
-    assert_select "th", text: "Error code"
+    assert_select "th", text: /\AError code/
     assert_select "input[name='columns[]'][value='error_code']"
     assert_includes response.body, "rate_limit"
   end
