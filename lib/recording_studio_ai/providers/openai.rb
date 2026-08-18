@@ -101,7 +101,8 @@ module RecordingStudioAI
           status: "failed", provider_batch_id: batch.provider_batch_id,
           error: Contracts::NormalizedError.new(
             category: "invalid_response", code: "invalid_batch_output",
-            message: "Provider returned an invalid batch response.", retryable: false, provider: self.class.provider_key.to_s
+            message: "Provider returned an invalid batch response.",
+            retryable: false, provider: self.class.provider_key.to_s
           )
         )
       rescue StandardError => e
@@ -203,8 +204,10 @@ module RecordingStudioAI
 
         expired = read_value(response, :status).to_s == "expired"
         Contracts::NormalizedError.new(
-          category: expired ? "batch_expired" : "provider_error", code: expired ? "batch_expired" : "batch_failed",
-          message: expired ? "Provider batch expired." : "Provider batch failed.", retryable: false, provider: self.class.provider_key.to_s
+          category: expired ? "batch_expired" : "provider_error",
+          code: expired ? "batch_expired" : "batch_failed",
+          message: expired ? "Provider batch expired." : "Provider batch failed.",
+          retryable: false, provider: self.class.provider_key.to_s
         )
       end
 

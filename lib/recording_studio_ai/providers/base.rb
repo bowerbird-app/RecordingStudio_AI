@@ -65,7 +65,8 @@ module RecordingStudioAI
       end
 
       def configuration_setting(suffix)
-        return unless @configuration&.respond_to?(setting_name(suffix))
+        return unless @configuration
+        return unless @configuration.respond_to?(setting_name(suffix))
 
         @configuration.public_send(setting_name(suffix))
       end
