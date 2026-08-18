@@ -28,6 +28,9 @@ Versioning and Keep a Changelog.
 - AI Playground batch provider/profile selects refresh the batch model dropdown
   the same way Generate does (batch-capable models for the chosen profile, then
   provider).
+- `.rubocop_todo.yml` records existing engine RuboCop debt from
+  `copilot/v1-implement-sync-generation` so CI lint can pass without rewriting
+  Orchestrator and other large files.
 - Deduplicated the AI Responses admin table so `Created` appears once.
 
 ### Removed
