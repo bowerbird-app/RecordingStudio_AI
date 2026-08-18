@@ -24,12 +24,14 @@ Layout/LineLength:
   Exclude:
     - 'lib/recording_studio_ai/admin/**/*'
 
-# Relax metrics for test files, generators, and the admin screen catalog.
+# Relax metrics for test files, generators, the admin screen catalog, and
+# orchestration collaborators (attribute maps and rescue chains).
 Metrics/ClassLength:
   Exclude:
     - 'test/**/*'
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/orchestration/**/*'
 
 Metrics/ModuleLength:
   Exclude:
@@ -41,6 +43,7 @@ Metrics/MethodLength:
     - 'lib/generators/**/*'
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/orchestration/**/*'
 
 Metrics/AbcSize:
   Exclude:
@@ -48,6 +51,7 @@ Metrics/AbcSize:
     - 'lib/generators/**/*'
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/orchestration/**/*'
 
 Metrics/BlockLength:
   Exclude:
@@ -58,11 +62,13 @@ Metrics/CyclomaticComplexity:
   Exclude:
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/orchestration/**/*'
 
 Metrics/PerceivedComplexity:
   Exclude:
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/orchestration/**/*'
 
 Metrics/ParameterLists:
   Exclude:

@@ -22,6 +22,16 @@ Versioning and Keep a Changelog.
   lists every setting with required, possible values, default, and a short
   description. The initializer example now sets `batch_synchronization_job`
   and matches the `retain_responses` default.
+- Dummy `/config` renders the configuration table through Flatpack column
+  `html:` lambdas, so rows have real cells instead of collapsing into one
+  column. Required now says where a setting is actually needed, defaults show
+  real values such as attachment MIME types, and the initializer example stops
+  suggesting host apps copy `providers`, `attribution_validator`, and the
+  `retry_random` / `retry_sleeper` test seams.
+- Dummy `/config` Create Custom Tools now includes registration-field and
+  argument-field tables for `RecordingStudioAI.tools.register`.
+- Dummy `/config` keeps `admin_authenticate` and AccessibleAuthorization
+  guidance alongside those custom-tool tables.
 - Dummy sign-in works through Cursor Cloud and Codespaces forwarded previews by
   relaxing the CSRF origin check in development when `CURSOR_AGENT` or
   `CODESPACES` is set. CSRF tokens stay required.
@@ -136,6 +146,17 @@ Versioning and Keep a Changelog.
 
 ### Security
 
+- Admin run/attempt/tool/response scopes fail closed when no admin root is present
+  (no more global `Run.all` / cross-tenant listings).
+- Recording Studio Admin overview and AI Responses screens scope queries to the
+  current admin root.
+- Admin filter dropdown options (prompt keys, models, providers, tools, etc.)
+  are built from the same root-scoped relations instead of global `pluck`s.
+- `WarningMetrics` with `root_ids: nil` no longer scans every tenant; pass an
+  explicit root id list.
+- Gemini generate/stream clients send the API key only via `x-goog-api-key`
+  (never as a `key=` query parameter). Streaming still uses `alt=sse` in the
+  query string.
 - Dummy host now wires Recording Studio AI authorization through
   RecordingStudioAccessible role mapping instead of `->(**) { true }`.
 - Dummy root switcher lists only Accessible roots and uses the default
@@ -149,30 +170,22 @@ Versioning and Keep a Changelog.
 
 ### Upgrade notes
 
+- Callers of `RecordingStudioAI::WarningMetrics` must pass `root_ids:` for
+  meaningful results. Omitting it returns empty metrics.
 - Treat the dummy initializers as the reference Accessible host pattern. Do not
   copy the old always-true authorization / all-workspaces switcher into a real
   host.
 
 ## [0.2.3] - 2026-08-18
 
-### Security
+### Changed
 
-- Admin run/attempt/tool/response scopes fail closed when no admin root is present
-  (no more global `Run.all` / cross-tenant listings).
-- Recording Studio Admin overview and AI Responses screens scope queries to the
-  current admin root.
-- Admin filter dropdown options (prompt keys, models, providers, tools, etc.)
-  are built from the same root-scoped relations instead of global `pluck`s.
-- `WarningMetrics` with `root_ids: nil` no longer scans every tenant; pass an
-  explicit root id list.
-- Gemini generate/stream clients send the API key only via `x-goog-api-key`
-  (never as a `key=` query parameter). Streaming still uses `alt=sse` in the
-  query string.
-
-### Upgrade notes
-
-- Callers of `RecordingStudioAI::WarningMetrics` must pass `root_ids:` for
-  meaningful results. Omitting it returns empty metrics.
+- Extracted `RecordingStudioAI::Orchestrator` into `Orchestration::*`
+  collaborators (planner, persistence, attempt runner, plan executor, stream
+  session, custom tools, response builder). Public `generate` /
+  `generate(stream: true)` behavior is unchanged. Upgrade note: hosts keep
+  calling `RecordingStudioAI.generate`; `Orchestrator::CancellationState` and
+  `Orchestrator::CustomToolContext` remain available as aliases.
 
 ## [0.2.2] - 2026-08-18
 
