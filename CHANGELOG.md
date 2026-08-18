@@ -76,6 +76,18 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.5] - 2026-08-18
+
+### Changed
+
+- Custom Tool Calls, Registered custom tools, Registered prompts, Latency by
+  model, and Latency by prompt now default their date range to Last 4 weeks.
+- Attempts hides the Error code column unless status is filtered to failed.
+  The column also stays out of the Columns picker until then.
+- Latency by model and Latency by prompt table headers explain each column in a
+  tooltip. Latency by prompt Calls is now a date-range mini chart that opens
+  matching AI Calls.
+
 ## [0.2.4] - 2026-08-18
 
 ### Security

@@ -145,5 +145,7 @@ module AdminScreens
       default_sort :sequence, direction: :asc
       paginate per_page: 25
     end
+
+    table.extend(AdminScreens::RecordingStudioAIWidgets::AttemptErrorCodeColumn)
   end
 end

@@ -12,7 +12,7 @@ module AdminScreens
     end
 
     filter_presentation :modal, inline_count: 1
-    filter :date_range, field: :created_at, default: :last_30_days
+    filter :date_range, field: :created_at, default: :last_4_weeks
 
     chart do
       title "Prompt P90 latency"
@@ -31,13 +31,28 @@ module AdminScreens
 
     table do
       hide_columns_button
-      column :name, title: "Prompt"
-      column :calls, title: "Calls"
+      column :name, title: "Prompt", header_tooltip: "The prompt these calls used."
+      column :calls_series,
+             title: "Calls",
+             sortable: false,
+             header_tooltip: "Daily call volume in this date range. Open it to see the matching AI calls.",
+             value: lambda { |row, context|
+               ActionController::Base.helpers.link_to(
+                 AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
+                 AdminScreens::RecordingStudioAIWidgets.latency_prompt_calls_path(context, row),
+                 class: "inline-block",
+                 data: { turbo_frame: "_top" },
+                 aria: { label: "AI calls for #{row.name} in the selected date range" }
+               )
+             }
       column :p50_latency_ms, title: "Median (ms)",
-                              header_tooltip: "Median latency: half of calls completed within this time."
-      column :p90_latency_ms, title: "P90 (ms)", header_tooltip: "90% of calls completed within this time."
-      column :average_latency_ms, title: "Average (ms)"
-      column :max_latency_ms, title: "Max (ms)"
+                              header_tooltip: "Half of calls finished faster than this."
+      column :p90_latency_ms, title: "P90 (ms)",
+                              header_tooltip: "Nine out of ten calls finished within this time."
+      column :average_latency_ms, title: "Average (ms)",
+                                  header_tooltip: "The blended wait if you mix every call together."
+      column :max_latency_ms, title: "Max (ms)",
+                              header_tooltip: "The slowest call in this date range."
     end
   end
 end

@@ -12,7 +12,7 @@ module AdminScreens
     end
 
     filter_presentation :modal, inline_count: 1
-    filter :date_range, field: :created_at, default: :last_30_days
+    filter :date_range, field: :created_at, default: :last_4_weeks
 
     chart do
       title "Model P90 latency"
@@ -31,13 +31,16 @@ module AdminScreens
 
     table do
       hide_columns_button
-      column :name, title: "Model"
-      column :calls, title: "Calls"
+      column :name, title: "Model", header_tooltip: "The model that served these calls."
+      column :calls, title: "Calls", header_tooltip: "How many timed calls sit in this date range."
       column :p50_latency_ms, title: "Median (ms)",
-                              header_tooltip: "Median latency: half of calls completed within this time."
-      column :p90_latency_ms, title: "P90 (ms)", header_tooltip: "90% of calls completed within this time."
-      column :average_latency_ms, title: "Average (ms)"
-      column :max_latency_ms, title: "Max (ms)"
+                              header_tooltip: "Half of calls finished faster than this."
+      column :p90_latency_ms, title: "P90 (ms)",
+                              header_tooltip: "Nine out of ten calls finished within this time."
+      column :average_latency_ms, title: "Average (ms)",
+                                  header_tooltip: "The blended wait if you mix every call together."
+      column :max_latency_ms, title: "Max (ms)",
+                              header_tooltip: "The slowest call in this date range."
     end
   end
 end
