@@ -25,11 +25,29 @@ Versioning and Keep a Changelog.
   renders in place under the "Run generate" button (above the batch section)
   without a full page reload. Batch submissions render their own result frame
   beneath the batch form.
+- AI Playground batch provider/profile selects refresh the batch model dropdown
+  the same way Generate does (batch-capable models for the chosen profile, then
+  provider).
 - Deduplicated the AI Responses admin table so `Created` appears once.
 - AI Playground keeps SSE streaming on a dedicated Live controller so Devise
   authentication on the show/generate page redirects to sign-in instead of
   raising `UncaughtThrowError` (`throw :warden`). Unauthenticated stream
   requests return 401.
+- Extracted shared Minitest bootstrap for gem phase tests (`test/support`) covering
+  SQLite persistence, configuration isolation, and recording lookup doubles.
+- Admin dashboard adds Registered Providers and Registered Models widgets (top 5
+  by call volume) at the end of the widget grid, plus matching table-only
+  screens and section links.
+- Registered Providers table includes a 30-day calls mini chart after Configured;
+  clicking it opens AI Calls filtered to that provider.
+- Registered Models table drops Key/Name, renames API model to Model, shows
+  Temperature / Verbosity / Reasoning defaults, and uses a 30-day calls mini
+  chart that opens AI Calls filtered to that provider and model.
+- `.rubocop_todo.yml` records existing engine RuboCop debt from
+  `copilot/v1-implement-sync-generation` (file-level excludes) so CI lint can
+  pass without rewriting Orchestrator and other large files. New provider/model
+  admin helpers avoid multi-line block chains, and the new widget registrations
+  wrap to the 120-column limit.
 
 ### Removed
 

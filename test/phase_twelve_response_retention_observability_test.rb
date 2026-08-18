@@ -1,25 +1,8 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require "active_record"
 
-migration_file = Dir[File.expand_path("../db/migrate/*_create_recording_studio_ai_persistence_tables.rb",
-                                      __dir__)].first
-require migration_file
-require_relative "../db/migrate/20260814120000_add_prompt_attribution_to_recording_studio_ai_runs"
-require_relative "../db/migrate/20260812150000_remove_correlation_ids_from_recording_studio_ai"
-
-require_relative "../app/models/recording_studio_ai/application_record"
-require_relative "../app/models/concerns/recording_studio_ai/terminal_immutability"
-require_relative "../app/models/recording_studio_ai/run"
-require_relative "../app/models/recording_studio_ai/attempt"
-require_relative "../app/models/recording_studio_ai/custom_tool_invocation"
-require_relative "../app/models/recording_studio_ai/batch"
-require_relative "../app/models/recording_studio_ai/batch_item"
-require_relative "../app/models/recording_studio_ai/response"
-require_relative "../app/jobs/recording_studio_ai/response_cleanup_job"
-
-class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
+class PhaseTwelveResponseRetentionObservabilityTest < RecordingStudioAI::Test::PersistenceCase
   Actor = Struct.new(:id)
 
   class Provider < RecordingStudioAI::Providers::Base
@@ -51,30 +34,20 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
     end
   end
 
-  def setup
+  def before_connect
     ActiveRecord::Encryption.configure(
       primary_key: "phase-twelve-primary-key",
       deterministic_key: "phase-twelve-deterministic-key",
       key_derivation_salt: "phase-twelve-key-derivation-salt"
     )
-    ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: ":memory:")
-    ActiveRecord::Base.connection.create_table(:recording_studio_recordings) { |table| table.timestamps }
-    ActiveRecord::Migration.suppress_messages do
-      CreateRecordingStudioAIPersistenceTables.migrate(:up)
-      AddPromptAttributionToRecordingStudioAIRuns.migrate(:up)
-      RemoveCorrelationIdsFromRecordingStudioAI.migrate(:up)
-    end
-    @root_recording = Actor.new(create_recording_id)
-    @initiator = Actor.new(71)
-    @original_configuration = RecordingStudioAI.instance_variable_get(:@configuration)
-    RecordingStudioAI.instance_variable_set(:@configuration, configured_configuration)
-    install_recording_lookup_double
   end
 
-  def teardown
-    RecordingStudioAI.instance_variable_set(:@configuration, @original_configuration)
-    ActiveRecord::Base.connection_pool.disconnect! if ActiveRecord::Base.connected?
-    RecordingStudio.send(:remove_const, :Recording) if @remove_recording_lookup_double
+  def setup
+    super
+    @root_recording = Actor.new(create_recording_id)
+    @initiator = Actor.new(71)
+    isolate_configuration!(configured_configuration)
+    install_recording_lookup_double
   end
 
   def test_enabled_retention_stores_assembled_generation_response_with_expiry
@@ -532,16 +505,6 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
 
   private
 
-  def install_recording_lookup_double
-    return if RecordingStudio.const_defined?(:Recording, false)
-
-    actor_class = Actor
-    RecordingStudio.const_set(:Recording, Class.new do
-      define_singleton_method(:find) { |id| actor_class.new(id) }
-    end)
-    @remove_recording_lookup_double = true
-  end
-
   def configured_configuration
     RecordingStudioAI::Configuration.new.tap do |configuration|
       configuration.attribution_validator = ->(**) {}
@@ -578,11 +541,5 @@ class PhaseTwelveResponseRetentionObservabilityTest < Minitest::Test
       metadata: {}
     )
     batch.batch_items.create!(run: run, position: 0, reference: "item-1", status: "completed", metadata: {})
-  end
-
-  def create_recording_id
-    ActiveRecord::Base.connection.insert(
-      "INSERT INTO recording_studio_recordings (created_at, updated_at) VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
-    )
   end
 end
