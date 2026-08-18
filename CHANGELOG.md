@@ -28,10 +28,9 @@ Versioning and Keep a Changelog.
 - AI Playground batch provider/profile selects refresh the batch model dropdown
   the same way Generate does (batch-capable models for the chosen profile, then
   provider).
-- `.rubocop_todo.yml` records existing engine RuboCop debt from
-  `copilot/v1-implement-sync-generation` so CI lint can pass without rewriting
-  Orchestrator and other large files.
 - Deduplicated the AI Responses admin table so `Created` appears once.
+- Extracted shared Minitest bootstrap for gem phase tests (`test/support`) covering
+  SQLite persistence, configuration isolation, and recording lookup doubles.
 - Admin dashboard adds Registered Providers and Registered Models widgets (top 5
   by call volume) at the end of the widget grid, plus matching table-only
   screens and section links.
@@ -41,7 +40,8 @@ Versioning and Keep a Changelog.
   Temperature / Verbosity / Reasoning defaults, and uses a 30-day calls mini
   chart that opens AI Calls filtered to that provider and model.
 - `.rubocop_todo.yml` records existing engine RuboCop debt from
-  `copilot/v1-implement-sync-generation` (file-level excludes). New provider/model
+  `copilot/v1-implement-sync-generation` (file-level excludes) so CI lint can
+  pass without rewriting Orchestrator and other large files. New provider/model
   admin helpers avoid multi-line block chains, and the new widget registrations
   wrap to the 120-column limit.
 
