@@ -541,6 +541,78 @@ class PhaseNineCustomToolsTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "string", body.dig("tools", 0, "functionDeclarations", 0, "parameters", "properties", "topic_key", "type")
     assert_equal "Rails", body.dig("contents", 0, "parts", 0, "functionCall", "args", "topic_key")
     assert_equal "done", body.dig("contents", 1, "parts", 0, "functionResponse", "response", "result_key")
+    refute body.key?("toolConfig")
+  end
+
+  def test_internal_gemini_transport_opts_in_when_web_search_and_custom_tools_are_combined
+    client = RecordingStudioAI::ProviderClients::Gemini.new(api_key: "secret-key", timeout: 5)
+    captured_request = nil
+    http = Object.new
+    http.define_singleton_method(:request) do |request|
+      captured_request = request
+      response = Net::HTTPOK.new("1.1", "200", "OK")
+      response.instance_variable_set(:@read, true)
+      response.instance_variable_set(:@body, '{"responseId":"gem-mixed-tools"}')
+      response
+    end
+
+    Net::HTTP.stub(:start, ->(*, **, &block) { block.call(http) }) do
+      client.generate_content(
+        model: "gemini-test",
+        contents: [{ role: "user", parts: [{ text: "Look this up" }] }],
+        config: {
+          tools: [
+            { google_search: {} },
+            { function_declarations: [{
+              name: "dummy_summary_tool",
+              description: "Summarize.",
+              parameters: { "type" => "object", "properties" => { "input" => { "type" => "string" } } }
+            }] }
+          ]
+        }
+      )
+    end
+
+    body = JSON.parse(captured_request.body)
+    assert_equal({}, body.dig("tools", 0, "googleSearch"))
+    assert_equal "dummy_summary_tool", body.dig("tools", 1, "functionDeclarations", 0, "name")
+    assert_equal true, body.dig("toolConfig", "includeServerSideToolInvocations")
+  end
+
+  def test_gemini_http_error_keeps_provider_status_without_leaking_payload_into_the_message
+    client = RecordingStudioAI::ProviderClients::Gemini.new(api_key: "secret-key", timeout: 5)
+    http = Object.new
+    http.define_singleton_method(:request) do |_request|
+      response = Net::HTTPBadRequest.new("1.1", "400", "Bad Request")
+      response.instance_variable_set(:@read, true)
+      response.instance_variable_set(:@body, {
+        error: {
+          status: "INVALID_ARGUMENT",
+          message: "Built-in tools ({google_search}) and Custom tools (Function Calling) cannot be combined in the same request."
+        }
+      }.to_json)
+      response
+    end
+
+    error = assert_raises(RecordingStudioAI::ProviderClients::Gemini::HttpError) do
+      Net::HTTP.stub(:start, ->(*, **, &block) { block.call(http) }) do
+        client.generate_content(
+          model: "gemini-test",
+          contents: [{ role: "user", parts: [{ text: "Look this up" }] }]
+        )
+      end
+    end
+
+    assert_equal 400, error.status
+    assert_equal "INVALID_ARGUMENT", error.code
+    assert_match(/cannot be combined/i, error.provider_message)
+    refute_includes error.message, "google_search"
+
+    normalized = RecordingStudioAI::Providers::ProviderError.normalize(error, provider: :gemini)
+    assert_equal "invalid_request", normalized.category
+    assert_match(/web search and custom tools/i, normalized.message)
+    refute_includes normalized.message, "google_search"
+    refute_includes normalized.message, "Function Calling"
   end
 
   def test_duplicate_tool_version_registration_is_rejected

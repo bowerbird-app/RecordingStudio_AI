@@ -117,8 +117,9 @@ module AdminScreens
         end
       }
 
-      column :created_at, title: "Created"
+      column :created_at, title: "Created", header_tooltip: "When this call started."
       column :status,
+             header_tooltip: "How the call ended.",
              display: :badge,
              display_options: lambda { |_row, _context, value|
                style = case value.to_s
@@ -129,13 +130,14 @@ module AdminScreens
                        end
                { text: value.to_s.humanize, style: style, size: :sm }
              }
-      column :profile_key, title: "Profile"
-      column :prompt_name_snapshot, title: "Prompt"
-      column :requested_provider, title: "Requested"
-      column :resolved_provider, title: "Resolved"
-      column :resolved_model, title: "Model"
+      column :profile_key, title: "Profile", header_tooltip: "Which speed and quality mix was asked for."
+      column :prompt_name_snapshot, title: "Prompt", header_tooltip: "The prompt this call used."
+      column :requested_provider, title: "Requested", header_tooltip: "The provider someone asked for."
+      column :resolved_provider, title: "Resolved", header_tooltip: "The provider that actually ran it."
+      column :resolved_model, title: "Model", header_tooltip: "The model that served this call."
       column :attempt_count,
              title: "Attempts",
+             header_tooltip: "How many tries this call took. Open it to see them.",
              value: lambda { |run, context|
                count = run.attempt_count.to_i
                next count if count.zero?
@@ -149,6 +151,7 @@ module AdminScreens
              }
       column :custom_tool_invocation_count,
              title: "Tool calls",
+             header_tooltip: "How many tools this call used. Open it to see them.",
              value: lambda { |run, context|
                count = run.custom_tool_invocation_count.to_i
                next count if count.zero?
@@ -160,8 +163,8 @@ module AdminScreens
                  data: { turbo_frame: "_top" }
                )
              }
-      column :total_tokens, title: "Tokens"
-      column :latency_ms, title: "Latency (ms)"
+      column :total_tokens, title: "Tokens", header_tooltip: "Rough size of what went in and came back."
+      column :latency_ms, title: "Latency (ms)", header_tooltip: "How long this call took."
 
       default_sort :latency_ms, direction: :desc
       paginate per_page: 25

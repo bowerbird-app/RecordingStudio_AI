@@ -78,7 +78,7 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
-## [0.2.9] - 2026-08-18
+## [0.2.10] - 2026-08-18
 
 ### Changed
 
@@ -97,6 +97,43 @@ Versioning and Keep a Changelog.
   previously required Accessible `:admin` for that drill-down should raise
   Recording Studio Admin `required_access_role` or tighten grants on the access
   recording.
+
+## [0.2.9] - 2026-08-18
+
+### Added
+
+- Registered providers screen includes a Starter file modal with a copy-paste
+  `my_provider.rb` adapter and initializer env wiring
+  (`config.my_provider_api_key = ENV.fetch(...)`). Dummy `/config` shows the
+  same starter next to the existing registration examples.
+
+### Changed
+
+- Dummy Tailwind writes Bundler gem `@source` paths before compile so Flatpack
+  and Recording Studio utilities are scanned outside `vendor/bundle` /
+  `/usr/local/bundle`.
+- Dummy AI Playground generate form picks a registered prompt from a dropdown
+  and shows that prompt in a disabled textarea. Prompts that declare inputs
+  (such as Text Summary and Text Analysis) show a text field for custom input.
+  Generate sends the registered prompt, filled-in inputs, and its tools. The
+  custom-tool checkbox and dropdown stay available so you can add a playground
+  tool on any supported model.
+- Gemini generate requests that mix web search with custom tools send
+  `toolConfig.includeServerSideToolInvocations`. If Gemini still refuses the
+  mix, the error says to turn one of them off.
+- Generation response JSON serializes `run` as `{ id: }` instead of the Active
+  Record inspect string.
+- AI Calls, Custom Tool Calls, Attempts, Estimated spend, Registered custom
+  tools, Registered prompts, Registered providers, and Registered models table
+  headers explain each column in everyday language.
+
+### Upgrade notes
+
+- Rebuild dummy CSS with `bundle exec rails tailwindcss:build` in `test/dummy`
+  after pulling. Hosts should keep a `@source` on the installed Flatpack
+  `app/components` path.
+- `response.to_h[:run]` is now `{ id: run.id }` when the run has an id. Update
+  any host that parsed the old inspect string.
 
 ## [0.2.8] - 2026-08-18
 

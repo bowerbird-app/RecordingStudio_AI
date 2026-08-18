@@ -285,6 +285,13 @@ class PhaseTwoContractsTest < RecordingStudioAI::Test::IsolatedCase
     assert_equal 17, response.to_h.dig(:usage, :total_tokens)
     assert_equal "estimate", response.to_h.dig(:cost, :source)
     assert_equal "primary", response.to_h.dig(:attempts, 0, :kind)
+    run = Struct.new(:id).new("run-123")
+    with_run = RecordingStudioAI::Contracts::Response.new(
+      operation: "generation",
+      profile: :medium,
+      run: run
+    )
+    assert_equal({ id: "run-123" }, with_run.to_h[:run])
   end
 
   def test_cost_rejects_fractional_or_negative_microunits

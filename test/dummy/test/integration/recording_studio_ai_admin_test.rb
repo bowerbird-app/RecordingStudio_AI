@@ -41,6 +41,8 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "Recording Studio AI"
+    assert_includes response.body, "flat_pack/variables"
+    assert_includes response.body, "tailwind-"
   end
 
   test "legacy AI engine admin path is not routable" do

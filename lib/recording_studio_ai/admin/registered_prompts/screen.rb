@@ -43,14 +43,16 @@ module AdminScreens
 
       column :name,
              title: "Prompt",
+             header_tooltip: "Open the prompt's definition.",
              value: lambda { |row, _context|
                AdminScreens::RecordingStudioAIWidgets.prompt_definition_modal(row)
              }
-      column :namespace, title: "Namespace"
-      column :key, title: "Key"
-      column :description, title: "Description"
+      column :namespace, title: "Namespace", header_tooltip: "Group this prompt belongs to."
+      column :key, title: "Key", header_tooltip: "Stable name used in code."
+      column :description, title: "Description", header_tooltip: "What this prompt is for."
       column :calls_series,
              title: "Calls",
+             header_tooltip: "Daily call volume in this date range. Open it to see the matching AI calls.",
              value: lambda { |row, context|
                ActionController::Base.helpers.link_to(
                  AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
@@ -60,11 +62,15 @@ module AdminScreens
                  aria: { label: "AI calls for #{row.name} in the selected date range" }
                )
              }
-      column :success_rate, title: "Success rate", value: ->(row, _context) { "#{row.success_rate}%" }
-      column :error_rate, title: "Error rate", value: ->(row, _context) { "#{row.error_rate}%" }
-      column :average_duration, title: "Average duration"
-      column :average_input_tokens, title: "Avg input"
-      column :average_output_tokens, title: "Avg output"
+      column :success_rate, title: "Success rate",
+                            header_tooltip: "Share of runs that worked.",
+                            value: ->(row, _context) { "#{row.success_rate}%" }
+      column :error_rate, title: "Error rate",
+                          header_tooltip: "Share of runs that failed.",
+                          value: ->(row, _context) { "#{row.error_rate}%" }
+      column :average_duration, title: "Average duration", header_tooltip: "Typical wait for this prompt."
+      column :average_input_tokens, title: "Avg input", header_tooltip: "Typical size of what we send."
+      column :average_output_tokens, title: "Avg output", header_tooltip: "Typical size of what comes back."
     end
   end
 end

@@ -27,6 +27,7 @@
       data-ai-playground-form-candidates-value="<%= @profile_candidates.to_json %>"
       data-ai-playground-form-definitions-value="<%= @model_definitions.to_json %>"
       data-ai-playground-form-tool-descriptions-value="<%= AIPlaygroundController::TOOL_CATALOG.transform_values { |meta| meta.fetch(:description) }.to_json %>"
+      data-ai-playground-form-prompts-value="<%= @prompt_previews.to_json %>"
       class="space-y-4"
     >
       <%= render FlatPack::PageTitle::Component.new(
@@ -68,13 +69,42 @@
           data: { ai_playground_form_target: "model", action: "change->ai-playground-form#refreshCapabilities" }
         ) %>
 
-        <%= render FlatPack::TextArea::Component.new(
-          name: "ai_playground[prompt]",
+        <%= render FlatPack::Select::Component.new(
+          name: "ai_playground[prompt_key]",
           label: "Prompt",
-          value: @form.fetch("prompt"),
-          rows: 5,
-          required: true
+          options: @prompt_options,
+          value: @form.fetch("prompt_key"),
+          required: true,
+          data: { ai_playground_form_target: "promptKey", action: "change->ai-playground-form#refreshPromptPreview" }
         ) %>
+        <% @prompt_input_names.each do |name| %>
+          <% visible = @selected_prompt_input_names.include?(name) %>
+          <div
+            class="<%= 'hidden' unless visible %>"
+            data-ai-playground-form-target="promptInput"
+            data-prompt-input-name="<%= name %>"
+            data-action="input->ai-playground-form#refreshPromptPreview"
+          >
+            <%= render FlatPack::TextArea::Component.new(
+              name: "ai_playground[prompt_inputs][#{name}]",
+              label: name.humanize,
+              value: @form.dig("prompt_inputs", name).to_s,
+              rows: 4,
+              placeholder: "Paste the text this prompt should use.",
+              required: visible,
+              disabled: !visible
+            ) %>
+          </div>
+        <% end %>
+        <div data-ai-playground-form-target="promptPreview">
+          <%= render FlatPack::TextArea::Component.new(
+            name: "ai_playground[prompt_preview]",
+            label: "Prompt text",
+            value: @selected_prompt_preview,
+            rows: 8,
+            disabled: true
+          ) %>
+        </div>
 
         <div class="hidden space-y-4" data-ai-playground-form-target="parametersPanel">
           <div class="hidden" data-ai-playground-form-target="temperatureField">

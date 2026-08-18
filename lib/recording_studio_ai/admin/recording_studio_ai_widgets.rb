@@ -728,6 +728,44 @@ module AdminScreens
       )
     end
 
+    def provider_starter_modal(row)
+      modal_id = "registered-provider-starter-#{row.key}"
+      body = render_flatpack(
+        FlatPack::CodeBlock::Component.new(
+          title: "Starter files",
+          snippets: [
+            {
+              label: "my_provider.rb",
+              language: "ruby",
+              code: RecordingStudioAI::Providers::StarterExample::CLASS_CODE
+            },
+            {
+              label: "Initializer",
+              language: "ruby",
+              code: RecordingStudioAI::Providers::StarterExample::INITIALIZER_CODE
+            }
+          ],
+          separated: false
+        )
+      )
+      trigger = render_flatpack(
+        FlatPack::Button::Component.new(
+          text: "Show file",
+          style: :ghost,
+          size: :sm,
+          type: "button",
+          data: { modal_id: modal_id },
+          aria: { label: "Show a starter provider file" }
+        )
+      )
+      modal = render_flatpack(
+        FlatPack::Modal::Component.new(id: modal_id, title: "Add a provider", size: :xl)
+      ) do |component|
+        component.body { body }
+      end
+      ActionController::Base.helpers.safe_join([trigger, modal])
+    end
+
     def prompt_definition_modal(row)
       definition = RecordingStudioAI.prompts.fetch(row.namespace, row.key, version: row.version)
       definition_modal(

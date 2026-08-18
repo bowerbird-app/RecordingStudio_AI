@@ -47,7 +47,7 @@ module RecordingStudioAI
           profile: profile,
           provider: provider,
           model: model,
-          run: run,
+          run: run_payload(run),
           usage: usage&.to_h,
           cost: cost&.to_h,
           attempts: attempts.map(&:to_h),
@@ -100,6 +100,13 @@ module RecordingStudioAI
           "error must be a RecordingStudioAI::Contracts::NormalizedError",
           code: "invalid_request"
         )
+      end
+
+      def run_payload(run)
+        return if run.nil?
+        return { id: run.id } if run.respond_to?(:id)
+
+        run
       end
     end
   end
