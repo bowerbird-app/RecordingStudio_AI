@@ -185,7 +185,7 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
 
   private
 
-  def create_run(root_id:, status:, tokens:, prompt_key: nil, resolved_provider: nil, resolved_model: nil)
+  def create_run(root_id:, status:, tokens:, **attributes)
     RecordingStudioAI::Run.create!(
       operation: "generation",
       status: status,
@@ -194,10 +194,8 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
       initiator_id: @actor.id,
       initiator_kind: "user",
       total_tokens: tokens,
-      prompt_key: prompt_key,
-      resolved_provider: resolved_provider,
-      resolved_model: resolved_model,
-      created_at: Time.current
+      created_at: Time.current,
+      **attributes
     )
   end
 end
