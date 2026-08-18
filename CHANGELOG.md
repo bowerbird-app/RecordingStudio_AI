@@ -77,6 +77,8 @@ Versioning and Keep a Changelog.
   instead of copied markup.
 - Dummy playground, tables page, and recording tree empty state use Flatpack
   Card, Table, Alert, CodeBlock, and EmptyState.
+- Dummy Tailwind build writes Bundler gem `@source` paths before compile so
+  Flatpack utilities are scanned outside `vendor/bundle` / `/usr/local/bundle`.
 
 ### Upgrade notes
 
