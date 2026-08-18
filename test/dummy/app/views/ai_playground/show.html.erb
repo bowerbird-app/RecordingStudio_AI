@@ -83,6 +83,7 @@
             class="<%= 'hidden' unless visible %>"
             data-ai-playground-form-target="promptInput"
             data-prompt-input-name="<%= name %>"
+            data-action="input->ai-playground-form#refreshPromptPreview"
           >
             <%= render FlatPack::TextArea::Component.new(
               name: "ai_playground[prompt_inputs][#{name}]",
@@ -91,8 +92,7 @@
               rows: 4,
               placeholder: "Paste the text this prompt should use.",
               required: visible,
-              disabled: !visible,
-              data: { action: "input->ai-playground-form#refreshPromptPreview" }
+              disabled: !visible
             ) %>
           </div>
         <% end %>

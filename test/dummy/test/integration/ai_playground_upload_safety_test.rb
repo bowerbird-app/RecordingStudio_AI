@@ -28,7 +28,7 @@ class AIPlaygroundUploadSafetyTest < ActionDispatch::IntegrationTest
       post "/ai_playground", params: {
         ai_playground: {
           mode: "generate",
-          prompt: "hello",
+          prompt_key: "demo:osaka_weather:1",
           profile: "medium",
           provider: "auto",
           attachment: Rack::Test::UploadedFile.new(file.path, "text/plain")
@@ -66,7 +66,12 @@ class AIPlaygroundUploadSafetyTest < ActionDispatch::IntegrationTest
     end
 
     post "/ai_playground", params: {
-      ai_playground: { mode: "generate", prompt: "hello", profile: "medium", provider: "auto" }
+      ai_playground: {
+        mode: "generate",
+        prompt_key: "demo:osaka_weather:1",
+        profile: "medium",
+        provider: "auto"
+      }
     }
 
     assert_response :unprocessable_entity
