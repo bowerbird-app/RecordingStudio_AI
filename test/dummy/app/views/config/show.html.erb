@@ -29,6 +29,27 @@
 
   <div class="space-y-3">
     <%= render FlatPack::PageTitle::Component.new(
+      title: "Configuration parameters",
+      subtitle: "Every setting you can put in the initializer, with defaults.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::Table::Component.new(data: @config_options) do |table| %>
+      <% table.column(title: "Param") do |option| %>
+        <span class="font-mono text-xs"><%= option[:key] %></span>
+      <% end %>
+      <% table.column(title: "Required") { |option| option[:required] } %>
+      <% table.column(title: "Possible values") { |option| option[:accepted_values] } %>
+      <% table.column(title: "Default") do |option| %>
+        <span class="font-mono text-xs"><%= option[:default] %></span>
+      <% end %>
+      <% table.column(title: "Description") { |option| option[:explanation] } %>
+    <% end %>
+  </div>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
       title: "1. Add a Provider",
       subtitle: "Providers are single adapter classes (for example OpenAI and Gemini). Each provider is one class under lib/recording_studio_ai/providers/<provider>.rb.",
       variant: :h3,
@@ -114,36 +135,4 @@
     language: "ruby",
     code: @custom_tools_example
   ) %>
-
-  <div class="space-y-3">
-    <%= render FlatPack::PageTitle::Component.new(
-      title: "Configuration Reference",
-      subtitle: "Meaning, accepted values, and requirement level for each option.",
-      variant: :h3,
-      class: "mb-0 pb-0"
-    ) %>
-
-    <div class="overflow-x-auto">
-      <table class="min-w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-(--surface-border-color)">
-            <th class="px-2 py-2 font-semibold">Key</th>
-            <th class="px-2 py-2 font-semibold">Required</th>
-            <th class="px-2 py-2 font-semibold">Accepted values</th>
-            <th class="px-2 py-2 font-semibold">Explanation</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @config_options.each do |option| %>
-            <tr class="border-b border-(--surface-border-color)">
-              <td class="px-2 py-2 align-top font-mono text-xs"><%= option[:key] %></td>
-              <td class="px-2 py-2 align-top"><%= option[:required] %></td>
-              <td class="px-2 py-2 align-top"><%= option[:accepted_values] %></td>
-              <td class="px-2 py-2 align-top"><%= option[:explanation] %></td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
-    </div>
-  </div>
 </div>
