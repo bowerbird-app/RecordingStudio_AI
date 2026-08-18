@@ -25,7 +25,7 @@ module AIPlayground
       end
       write_stream_event(type: "complete")
     rescue StandardError => error
-      write_stream_event(type: "error", message: "#{error.class}: #{error.message}")
+      write_stream_event(type: "error", message: playground_error_message(error))
     ensure
       response.stream.close
     end

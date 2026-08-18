@@ -75,8 +75,11 @@ Versioning and Keep a Changelog.
 - Gemini `get_batch` / `cancel_batch` allowlist `provider_batch_id` to
   `batches/<id>` so a poisoned stored name cannot call other Gemini paths with
   the host API key.
-- Dummy AI playground rejects oversized uploads from tempfile/Content-Length
-  size before `read` (gem magic-byte checks still apply after).
+- Dummy AI playground rejects oversized uploads from claimed size *and* a
+  capped read, so a lying Content-Length cannot load the file into memory.
+  Gem magic-byte checks still apply after.
+- Dummy AI playground shows contract/auth messages only. Unexpected exceptions
+  log server-side and show a generic “try again” line (no class names).
 - Engine admin supports optional `admin_authenticate` and documents that the
   engine does not authenticate by itself.
 - Ships `RecordingStudioAI::AccessibleAuthorization` as the recommended
