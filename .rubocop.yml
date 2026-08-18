@@ -1,3 +1,9 @@
+inherit_from: .rubocop_todo.yml
+
+inherit_mode:
+  merge:
+    - Exclude
+
 AllCops:
   TargetRubyVersion: 3.3
   NewCops: enable
@@ -16,12 +22,16 @@ Style/StringLiterals:
 Layout/LineLength:
   Max: 120
 
-# Relax metrics for test files and generators
+# Relax metrics for test files, generators, and the admin screen catalog.
 Metrics/ClassLength:
   Exclude:
     - 'test/**/*'
     - 'lib/recording_studio_ai/admin_screens.rb'
     - 'lib/recording_studio_ai/models/definition.rb'
+
+Metrics/ModuleLength:
+  Exclude:
+    - 'lib/recording_studio_ai/admin_screens.rb'
 
 Metrics/MethodLength:
   Exclude:
