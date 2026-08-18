@@ -55,4 +55,12 @@ class ProviderRegistrationTest < RecordingStudioAI::Test::IsolatedCase
     assert_equal "configuration", error.code
     assert_includes error.message, "Providers::Base"
   end
+
+  def test_starter_example_shows_env_backed_credentials
+    assert_includes RecordingStudioAI::Providers::StarterExample::CLASS_CODE, "provider_key :my_provider"
+    assert_includes RecordingStudioAI::Providers::StarterExample::CLASS_CODE, "configuration_api_key"
+    assert_includes RecordingStudioAI::Providers::StarterExample::INITIALIZER_CODE, 'ENV.fetch("MY_PROVIDER_API_KEY"'
+    assert_includes RecordingStudioAI::Providers::StarterExample::INITIALIZER_CODE, "attr_accessor :my_provider_api_key"
+    assert_includes RecordingStudioAI::Providers::StarterExample::INITIALIZER_CODE, "register_provider"
+  end
 end

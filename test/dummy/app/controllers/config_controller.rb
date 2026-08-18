@@ -790,6 +790,8 @@ class ConfigController < ApplicationController
   def show
     @config_options = CONFIG_OPTIONS
     @config_example = CONFIG_EXAMPLE
+    @provider_class_example = RecordingStudioAI::Providers::StarterExample::CLASS_CODE
+    @provider_initializer_example = RecordingStudioAI::Providers::StarterExample::INITIALIZER_CODE
     @provider_extension_example = PROVIDER_EXTENSION_EXAMPLE
     @model_registration_example = MODEL_REGISTRATION_EXAMPLE
     @profile_example = PROFILE_EXAMPLE

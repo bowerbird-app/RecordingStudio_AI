@@ -80,13 +80,15 @@ module AdminScreens
     end
 
     table do
-      column :id, title: "Run"
-      column :created_at, title: "Created"
+      column :id, title: "Run", header_tooltip: "This call's id."
+      column :created_at, title: "Created", header_tooltip: "When this call started."
       column :prompt_name_snapshot,
              title: "Prompt",
              sortable: false,
+             header_tooltip: "The prompt this call used.",
              value: ->(run, _context) { run.prompt_name_snapshot.presence || run.prompt_key || "No prompt" }
       column :status,
+             header_tooltip: "How the call ended.",
              display: :badge,
              display_options: lambda { |_row, _context, value|
                style = case value.to_s
@@ -97,11 +99,11 @@ module AdminScreens
                        end
                { text: value.to_s.humanize, style: style, size: :sm }
              }
-      column :resolved_provider, title: "Provider"
-      column :resolved_model, title: "Model"
-      column :total_tokens, title: "Total tokens"
-      column :input_tokens, title: "Input"
-      column :output_tokens, title: "Output"
+      column :resolved_provider, title: "Provider", header_tooltip: "Who we asked."
+      column :resolved_model, title: "Model", header_tooltip: "The model that served this call."
+      column :total_tokens, title: "Total tokens", header_tooltip: "Rough size of the whole call."
+      column :input_tokens, title: "Input", header_tooltip: "Size of what we sent."
+      column :output_tokens, title: "Output", header_tooltip: "Size of what came back."
 
       default_columns :created_at, :prompt_name_snapshot, :status, :resolved_provider, :resolved_model, :total_tokens,
                       :input_tokens, :output_tokens

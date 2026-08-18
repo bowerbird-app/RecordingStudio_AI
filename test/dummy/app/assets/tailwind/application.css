@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Bundler gem roots written by rake tailwindcss:enhance_sources */
+@import "./gem_sources.css";
+
 /* Include dummy app views for Tailwind CSS */
 @source "../../views/**/*.erb";
 

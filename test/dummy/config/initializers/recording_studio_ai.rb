@@ -158,6 +158,7 @@ DUMMY_TOOLS.each do |tool_definition|
   RecordingStudioAI.tools.register(**tool_definition)
 end
 
+# Dummy-host prompt catalog. `namespace` groups related prompts; this host uses "demo".
 DUMMY_PROMPTS = [
   {
     owner: "dummy_app",

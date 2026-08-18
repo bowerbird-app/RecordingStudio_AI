@@ -23,7 +23,7 @@ module RecordingStudioAI
         RecordingStudioAI::Contracts::NormalizedError.new(
           category: category,
           code: code_for(category, status),
-          message: message_for(category),
+          message: message_for(category, error),
           retryable: retryable,
           provider: provider.to_s,
           provider_code: provider_code(error, status)
@@ -65,7 +65,19 @@ module RecordingStudioAI
         (value || status)&.to_s
       end
 
-      def message_for(category)
+      MIXED_BUILTIN_AND_CUSTOM_TOOLS = /
+        built-in\stools|
+        function\scalling|
+        cannot\sbe\scombined|
+        multiple\stools\sare\ssupported|
+        include_server_side_tool_invocations
+      /ix
+
+      def message_for(category, error = nil)
+        if category == "invalid_request" && mixed_builtin_and_custom_tools?(error)
+          return "Gemini can't use web search and custom tools in the same run. Turn one off and try again."
+        end
+
         {
           "authentication" => "Provider authentication failed.",
           "authorization" => "Provider authorization failed.",
@@ -76,6 +88,11 @@ module RecordingStudioAI
           "provider_unavailable" => "Provider is unavailable.",
           "provider_error" => "Provider request failed."
         }.fetch(category)
+      end
+
+      def mixed_builtin_and_custom_tools?(error)
+        message = error.respond_to?(:provider_message) ? error.provider_message.to_s : ""
+        MIXED_BUILTIN_AND_CUSTOM_TOOLS.match?(message)
       end
     end
   end

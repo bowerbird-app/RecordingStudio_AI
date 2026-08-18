@@ -2,6 +2,7 @@
 
 require "recording_studio_ai/providers/value_reader"
 require "recording_studio_ai/providers/base"
+require "recording_studio_ai/providers/starter_example"
 require "recording_studio_ai/providers/tool_call"
 require "recording_studio_ai/providers/result"
 require "recording_studio_ai/providers/batch_item_result"

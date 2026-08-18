@@ -92,21 +92,21 @@ module AdminScreens
         end
       }
 
-      column :id, title: "Invocation", header_tooltip: "Unique identifier for this tool invocation."
-      column :created_at, title: "Created", header_tooltip: "When the tool invocation was recorded."
-      column :run_id, title: "Run", header_tooltip: "AI call that requested this tool invocation."
-      column :tool_key, title: "Tool", header_tooltip: "Registered key of the tool that was called."
+      column :id, title: "Invocation", header_tooltip: "This tool run's id."
+      column :created_at, title: "Created", header_tooltip: "When this tool ran."
+      column :run_id, title: "Run", header_tooltip: "The AI call that asked for this tool."
+      column :tool_key, title: "Tool", header_tooltip: "Which tool ran."
       column :prompt,
              title: "Prompt",
              sortable: false,
-             header_tooltip: "Prompt used by the AI call that requested this tool invocation.",
+             header_tooltip: "The prompt that asked for this tool.",
              value: lambda { |invocation, _context|
                invocation.run&.prompt_name_snapshot.presence || invocation.run&.prompt_key || "No prompt"
              }
       column :tool_version, title: "Version",
-                            header_tooltip: "Registered version of the tool used for this invocation."
+                            header_tooltip: "Which version of the tool ran."
       column :status,
-             header_tooltip: "Current execution outcome of the tool invocation.",
+             header_tooltip: "How this tool run ended.",
              display: :badge,
              display_options: lambda { |_row, _context, value|
                style = case value.to_s
@@ -117,14 +117,14 @@ module AdminScreens
                        end
                { text: value.to_s.humanize, style: style, size: :sm }
              }
-      column :confirmation_status, title: "Confirmation", header_tooltip: "Whether required confirmation was obtained."
+      column :confirmation_status, title: "Confirmation", header_tooltip: "Whether someone said yes first."
       column :requires_confirmation, title: "Needs confirm",
-                                     header_tooltip: "Whether the tool requires confirmation before it can run."
-      column :read_only, title: "Read-only", header_tooltip: "Whether the tool can only read data."
-      column :destructive, title: "Destructive", header_tooltip: "Whether the tool can make destructive changes."
-      column :latency_ms, title: "Latency (ms)", header_tooltip: "Elapsed execution time in milliseconds."
+                                     header_tooltip: "This tool waits for a yes before it runs."
+      column :read_only, title: "Read-only", header_tooltip: "This tool only looks. It does not change anything."
+      column :destructive, title: "Destructive", header_tooltip: "This tool can change or delete something."
+      column :latency_ms, title: "Latency (ms)", header_tooltip: "How long this tool took."
       column :error_code, title: "Error code",
-                          header_tooltip: "Provider or tool error code when the invocation did not succeed."
+                          header_tooltip: "Why it failed, when it failed."
 
       default_columns :created_at, :tool_key, :prompt, :status, :latency_ms
 

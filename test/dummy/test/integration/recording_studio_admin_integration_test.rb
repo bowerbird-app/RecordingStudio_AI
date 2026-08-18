@@ -70,6 +70,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "provider_key"
     assert_includes response.body, "config.&lt;provider_key&gt;_api_key"
     assert_includes response.body, "RecordingStudioAI.register_provider"
+    assert_includes response.body, "class MyProvider"
+    assert_includes response.body, "MY_PROVIDER_API_KEY"
+    assert_includes response.body, "configuration_api_key"
     assert_includes response.body, "Add a Model"
     assert_includes response.body, "Create Profiles"
     assert_includes response.body, "Configuration parameters"
@@ -155,9 +158,20 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "ai-playground-form"
     assert_includes response.body, "Auto (profile default)"
     assert_includes response.body, "name=\"ai_playground[model]\""
+    assert_includes response.body, "name=\"ai_playground[prompt_key]\""
+    assert_includes response.body, "Text Analysis"
+    assert_includes response.body, "Osaka Weather"
+    assert_includes response.body, "Text Summary"
+    assert_includes response.body, "Use the available tools to inspect the supplied text"
+    assert_includes response.body, "{{text}}"
+    assert_includes response.body, "name=\"ai_playground[prompt_inputs][text]\""
+    assert_includes response.body, "disabled=\"disabled\""
+    assert_includes response.body, "Prompt text"
     assert_includes response.body, "Streaming"
     assert_includes response.body, "Web search"
     assert_includes response.body, "Live response"
+    assert_includes response.body, "Use custom tool"
+    assert_includes response.body, "name=\"ai_playground[tool_key]\""
     assert_equal 1, response.body.scan(/>Batch items</).size
     assert_equal 3, response.body.scan(/name="ai_playground\[batch_items\]\[\]"/).size
     assert_equal 2, response.body.scan(/data-controller="ai-playground-form"/).size
@@ -344,6 +358,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "ai_calls?"
     assert_includes response.body, "provider=openai"
     assert_includes response.body, "date_range_preset=last_30_days"
+    assert_includes response.body, "Show file"
+    assert_includes response.body, "class MyProvider"
+    assert_includes response.body, "MY_PROVIDER_API_KEY"
+    assert_includes response.body, "ENV.fetch"
+    assert_includes response.body, "configuration_api_key"
+    assert_includes response.body, "attr_accessor :my_provider_api_key"
   end
 
   test "registered models screen lists every registered model definition" do
@@ -570,8 +590,47 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes AdminScreens::RecordingStudioAIToolCallsScreen.table.columns.map(&:key), :destructive
     assert_includes AdminScreens::RecordingStudioAIToolCallsScreen.table.columns.map(&:key), :error_code
     assert AdminScreens::RecordingStudioAIToolCallsScreen.table.show_columns_button?
-    assert_equal "Unique identifier for this tool invocation.",
+    assert_equal "This tool run's id.",
                  AdminScreens::RecordingStudioAIToolCallsScreen.table.columns.find { |column| column.key == :id }.header_tooltip
+  end
+
+  test "admin tables explain headers in everyday language" do
+    screens = [
+      AdminScreens::RecordingStudioAICallsScreen,
+      AdminScreens::RecordingStudioAIToolCallsScreen,
+      AdminScreens::RecordingStudioAIRegisteredCustomToolsScreen,
+      AdminScreens::RecordingStudioAIRegisteredPromptsScreen,
+      AdminScreens::RecordingStudioAIAttemptsScreen,
+      AdminScreens::RecordingStudioAIEstimatedSpendScreen,
+      AdminScreens::RecordingStudioAIRegisteredProvidersScreen,
+      AdminScreens::RecordingStudioAIRegisteredModelsScreen
+    ]
+
+    screens.each do |screen|
+      screen.table.columns.each do |column|
+        tooltip = column.header_tooltip.to_s
+        assert tooltip.present?, "#{screen.name} column #{column.key} needs a header tooltip"
+        refute_match(/invocation|milliseconds|identifier/i, tooltip)
+      end
+    end
+
+    authenticate_for_admin!
+
+    {
+      "ai_calls" => "How the call ended.",
+      "tool_calls" => "Which tool ran.",
+      "registered_custom_tools" => "What this tool is for.",
+      "registered_prompts" => "Typical size of what we send.",
+      "attempts" => "How this try ended.",
+      "estimated_spend" => "Size of what we sent.",
+      "registered_providers" => "Whether keys are set so it can run.",
+      "registered_models" => "How wild the answers can get."
+    }.each do |key, phrase|
+      get "/admin/screens/#{key}/table"
+
+      assert_response :success, "expected #{key} table to render"
+      assert_includes response.body, phrase
+    end
   end
 
   test "ai call tool-call count links to that run's tool calls" do
@@ -720,12 +779,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Attempt Prompt"
     assert_includes response.body, "Prompt"
     assert_select "th", text: /Created/
-    assert_select "th", text: "Prompt"
-    assert_select "th", text: "Status"
-    assert_select "th", text: "AI call", count: 0
-    assert_select "th", text: "Sequence", count: 0
-    assert_select "th", text: "Kind", count: 0
-    assert_select "th", text: "Error code", count: 0
+    assert_select "th", text: /\APrompt/
+    assert_select "th", text: /\AStatus/
+    assert_select "th", text: /\AAI call/, count: 0
+    assert_select "th", text: /\ASequence/, count: 0
+    assert_select "th", text: /\AKind/, count: 0
+    assert_select "th", text: /\AError code/, count: 0
     assert_select "input[name='columns[]'][value='error_code']", count: 0
   end
 
@@ -744,7 +803,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/attempts/table", params: { attempt_status: "failed" }
 
     assert_response :success
-    assert_select "th", text: "Error code"
+    assert_select "th", text: /\AError code/
     assert_select "input[name='columns[]'][value='error_code']"
     assert_includes response.body, "rate_limit"
   end

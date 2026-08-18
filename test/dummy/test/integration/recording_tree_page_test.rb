@@ -51,5 +51,8 @@ class RecordingTreePageTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Recording tree"
     assert_includes response.body, "/recording_tree"
+    assert_includes response.body, "flat_pack/variables"
+    assert_includes response.body, "tailwind-"
+    assert_includes response.body, "flat-pack--sidebar-layout"
   end
 end
