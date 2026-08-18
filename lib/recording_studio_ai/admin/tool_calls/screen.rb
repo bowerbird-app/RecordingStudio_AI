@@ -12,7 +12,7 @@ module AdminScreens
     end
 
     filter_presentation :modal, inline_count: 3
-    filter :date_range, field: :created_at, default: :last_30_days
+    filter :date_range, field: :created_at, default: :last_4_weeks
     filter :group_by, values: %i[hour day week month year], default: :day
     filter :tool_key,
            field: :tool_key,

@@ -21,9 +21,28 @@ module AdminScreens
                               :success_rate, :error_rate, :average_duration, :average_input_tokens,
                               :average_output_tokens)
     end
-    unless const_defined?(:LatencyRow)
-      LatencyRow = Data.define(:name, :calls, :p50_latency_ms, :p90_latency_ms, :average_latency_ms,
-                               :max_latency_ms)
+    latency_row_members = %i[
+      name calls calls_series p50_latency_ms p90_latency_ms average_latency_ms max_latency_ms
+      prompt_namespace prompt_key prompt_version resolved_model
+    ]
+    remove_const(:LatencyRow) if const_defined?(:LatencyRow) && LatencyRow.members != latency_row_members
+    LatencyRow = Data.define(*latency_row_members) unless const_defined?(:LatencyRow)
+
+    module AttemptErrorCodeColumn
+      ERROR_CODE_KEY = :error_code
+
+      def columns
+        defined_columns = super
+        return defined_columns if RecordingStudioAIWidgets.attempt_error_code_column_visible?
+
+        defined_columns.reject { |column| column.key == ERROR_CODE_KEY }
+      end
+
+      def default_column_keys
+        return super if RecordingStudioAIWidgets.attempt_error_code_column_visible?
+
+        Array(@default_column_keys) - [ERROR_CODE_KEY]
+      end
     end
     provider_row_members = %i[key class_name configured models_count calls calls_series]
     remove_const(:ProviderRow) if const_defined?(:ProviderRow) && ProviderRow.members != provider_row_members
@@ -247,7 +266,7 @@ module AdminScreens
     def latency_rows(context, dimension:)
       date_range = latency_date_range(context, dimension: dimension)
       runs = runs_scope(context).where(created_at: date_range).where.not(latency_ms: nil)
-      latency_rows_for_runs(runs, dimension: dimension)
+      latency_rows_for_runs(runs, dimension: dimension, date_range: date_range)
     end
 
     def latency_chart_rows(context, dimension:, range: 30.days.ago..Time.current, limit: 5)
@@ -259,29 +278,93 @@ module AdminScreens
       end
     end
 
-    def latency_rows_for_runs(runs, dimension:)
-      grouped_latencies = runs.pluck(:resolved_model, :prompt_name_snapshot, :prompt_key, :prompt_version,
-                                     :latency_ms).group_by do |model, prompt_name, prompt_key, prompt_version, _latency_ms|
-        if dimension == :model
-          model.presence || "Unknown model"
-        elsif prompt_name.present?
-          "#{prompt_name}#{" v#{prompt_version}" if prompt_version.present?}"
-        else
-          prompt_key.presence || "No prompt"
-        end
+    def latency_rows_for_runs(runs, dimension:, date_range: nil)
+      grouped_latencies = runs.pluck(:resolved_model, :prompt_namespace, :prompt_name_snapshot, :prompt_key,
+                                     :prompt_version, :latency_ms, :created_at).group_by do |row|
+        latency_row_group_key(row, dimension: dimension)
       end
 
-      grouped_latencies.map do |name, rows|
-        latencies = rows.map(&:last)
+      grouped_latencies.map do |identity, rows|
+        latencies = rows.map { |row| row[5] }
         LatencyRow.new(
-          name,
+          identity.fetch(:name),
           latencies.length,
+          latency_calls_series(rows, date_range: date_range),
           percentile_latency(latencies, percentile: 0.5),
           percentile_latency(latencies, percentile: 0.9),
           (latencies.sum.to_f / latencies.length).round,
-          latencies.max
+          latencies.max,
+          identity[:prompt_namespace],
+          identity[:prompt_key],
+          identity[:prompt_version],
+          identity[:resolved_model]
         )
       end.sort_by { |row| [-row.p90_latency_ms, row.name] }
+    end
+
+    def latency_row_group_key(row, dimension:)
+      model, prompt_namespace, prompt_name, prompt_key, prompt_version, = row
+      if dimension == :model
+        { name: model.presence || "Unknown model", resolved_model: model.presence }
+      else
+        name = if prompt_name.present?
+                 "#{prompt_name}#{" v#{prompt_version}" if prompt_version.present?}"
+               else
+                 prompt_key.presence || "No prompt"
+               end
+        {
+          name: name,
+          prompt_namespace: prompt_namespace,
+          prompt_key: prompt_key,
+          prompt_version: prompt_version
+        }
+      end
+    end
+
+    def latency_calls_series(rows, date_range:)
+      return [] unless date_range&.begin && date_range.end
+
+      daily_counts = rows.each_with_object(Hash.new(0)) do |row, counts|
+        created_at = row.last
+        next if created_at.blank?
+
+        counts[created_at.to_date] += 1
+      end
+
+      (date_range.begin.to_date..date_range.end.to_date).map do |date|
+        { x: date.strftime("%b %-d"), y: daily_counts.fetch(date, 0) }
+      end
+    end
+
+    def latency_prompt_calls_path(context, row)
+      latency_calls_path(
+        context,
+        screen: AdminScreens::RecordingStudioAILatencyByPromptScreen,
+        prompt: row.prompt_key,
+        prompt_namespace: row.prompt_namespace,
+        prompt_version: row.prompt_version
+      )
+    end
+
+    def latency_model_calls_path(context, row)
+      latency_calls_path(
+        context,
+        screen: AdminScreens::RecordingStudioAILatencyByModelScreen,
+        model: row.resolved_model
+      )
+    end
+
+    def latency_calls_path(context, screen:, **filters)
+      range_query = date_range_query(context, screen: screen)
+      "/admin/screens/ai_calls?#{range_query.merge(filters.compact).to_query}"
+    end
+
+    def attempt_error_code_column_visible?(context = admin_context)
+      values = Array(context&.filter_value(:status)).map(&:to_s)
+      return true if values.include?("failed")
+
+      params = context&.params || {}
+      Array(params[:attempt_status] || params["attempt_status"]).map(&:to_s).include?("failed")
     end
 
     def latency_date_range(context, dimension:)
@@ -460,13 +543,23 @@ module AdminScreens
       date_range = context.filter_value(:date_range) || screen.filters.find do |filter|
         filter.key == :date_range
       end.normalize(context.params)
-      return { date_range_preset: date_range.preset_key } if date_range&.preset_key.present?
-      return { date_range_preset: :last_30_days } unless date_range&.start_date && date_range.end_date
+      return { date_range_preset: :last_4_weeks } unless date_range&.start_date && date_range.end_date
+      return { date_range_preset: date_range.preset_key } if date_range_matches_preset?(date_range)
 
       {
         start_date: date_range.start_date.iso8601,
         end_date: date_range.end_date.iso8601
       }
+    end
+
+    def date_range_matches_preset?(date_range)
+      return false if date_range.preset_key.blank?
+      return false unless defined?(RecordingStudioAdmin::Period)
+
+      preset = RecordingStudioAdmin::Period.from_preset_key(date_range.preset_key)
+      return false unless preset
+
+      preset.start_date == date_range.start_date && preset.end_date == date_range.end_date
     end
 
     def registered_custom_tools_date_range_value(context)

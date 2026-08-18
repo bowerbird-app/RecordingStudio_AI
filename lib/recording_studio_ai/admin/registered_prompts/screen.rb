@@ -12,7 +12,7 @@ module AdminScreens
     end
 
     filter_presentation :modal, inline_count: 1
-    filter :date_range, field: :created_at, default: :last_30_days
+    filter :date_range, field: :created_at, default: :last_4_weeks
 
     chart do
       title "Prompt call volume"

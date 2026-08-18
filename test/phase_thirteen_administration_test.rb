@@ -254,6 +254,105 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     end)
   end
 
+  def test_attempt_error_code_column_is_visible_only_for_failed_status
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    failed_context = Object.new
+    def failed_context.filter_value(key) = key.to_sym == :status ? "failed" : nil
+    def failed_context.params = {}
+
+    completed_context = Object.new
+    def completed_context.filter_value(key) = key.to_sym == :status ? "completed" : nil
+    def completed_context.params = {}
+
+    assert widgets.attempt_error_code_column_visible?(failed_context)
+    refute widgets.attempt_error_code_column_visible?(completed_context)
+    refute widgets.attempt_error_code_column_visible?(nil)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
+  def test_latency_prompt_rows_include_a_calls_series_for_the_selected_range
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    create_run(
+      root_id: root_id,
+      status: "completed",
+      tokens: 10,
+      prompt_key: "latency-series",
+      prompt_name_snapshot: "Latency series",
+      latency_ms: 120
+    )
+    date_range = 3.days.ago.beginning_of_day..Time.current
+
+    rows = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
+      AdminScreens::RecordingStudioAIWidgets.runs_scope(context).where.not(latency_ms: nil),
+      dimension: :prompt,
+      date_range: date_range
+    )
+    row = rows.find { |entry| entry.prompt_key == "latency-series" }
+
+    assert row
+    assert_equal 4, row.calls_series.length
+    series_total = row.calls_series.sum { |point| point[:y] }
+    assert_equal row.calls, series_total
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
+  def test_latency_model_rows_include_a_calls_series_for_the_selected_range
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    create_run(
+      root_id: root_id,
+      status: "completed",
+      tokens: 10,
+      resolved_model: "latency-series-model",
+      latency_ms: 80,
+      created_at: 2.days.ago
+    )
+    create_run(
+      root_id: root_id,
+      status: "completed",
+      tokens: 10,
+      resolved_model: "latency-series-model",
+      latency_ms: 90,
+      created_at: 10.days.ago
+    )
+    date_range = 3.days.ago.beginning_of_day..Time.current
+
+    runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+                                                 .where(created_at: date_range)
+                                                 .where.not(latency_ms: nil)
+    rows = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
+      runs,
+      dimension: :model,
+      date_range: date_range
+    )
+    row = rows.find { |entry| entry.resolved_model == "latency-series-model" }
+
+    assert row
+    assert_equal 1, row.calls
+    assert_equal 4, row.calls_series.length
+    series_total = row.calls_series.sum { |point| point[:y] }
+    assert_equal 1, series_total
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
+  def test_date_range_query_keeps_custom_dates_when_a_preset_does_not_match
+    start_date = 3.days.ago.to_date
+    end_date = Date.current
+    range = Struct.new(:start_date, :end_date, :preset_key).new(start_date, end_date, :last_4_weeks)
+    context = Struct.new(:selected_range, :params).new(range, {})
+    def context.filter_value(_key) = selected_range
+
+    query = AdminScreens::RecordingStudioAIWidgets.date_range_query(context, screen: nil)
+
+    assert_equal start_date.iso8601, query[:start_date]
+    assert_equal end_date.iso8601, query[:end_date]
+    refute query.key?(:date_range_preset)
+  end
+
   private
 
   def create_run(root_id:, status:, tokens:, **attributes)

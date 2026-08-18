@@ -407,6 +407,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "Registered prompts"
+    assert_includes response.body, "value=\"last_4_weeks\""
     assert_includes response.body, "Success rate"
     assert_includes response.body, "Error rate"
     assert_includes response.body, "Average duration"
@@ -541,22 +542,22 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "registered custom tools default reliability metrics to the last thirty days" do
+  test "registered custom tools default reliability metrics to the last four weeks" do
     authenticate_for_admin!
 
     get "/admin/screens/registered_custom_tools"
 
     assert_response :success
-    assert_includes response.body, "value=\"last_30_days\""
+    assert_includes response.body, "value=\"last_4_weeks\""
   end
 
-  test "tool calls defaults its date range to the last thirty days" do
+  test "tool calls defaults its date range to the last four weeks" do
     authenticate_for_admin!
 
     get "/admin/screens/tool_calls"
 
     assert_response :success
-    assert_includes response.body, "value=\"last_30_days\""
+    assert_includes response.body, "value=\"last_4_weeks\""
     filters = AdminScreens::RecordingStudioAIToolCallsScreen.filters
     assert_equal %i[date_range group_by tool_key], filters.first(3).map(&:key)
     assert_equal %i[run_id status prompt], filters.drop(3).map(&:key)
@@ -724,6 +725,28 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_select "th", text: "AI call", count: 0
     assert_select "th", text: "Sequence", count: 0
     assert_select "th", text: "Kind", count: 0
+    assert_select "th", text: "Error code", count: 0
+    assert_select "input[name='columns[]'][value='error_code']", count: 0
+  end
+
+  test "attempts shows error code only when status is filtered to failed" do
+    authenticate_for_admin!
+    run = create_run!(status: "failed", operation: "generation", prompt_name_snapshot: "Failed Attempt Prompt")
+    run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "failed",
+      provider: "openai",
+      model: "failed-attempt-model",
+      error_code: "rate_limit"
+    )
+
+    get "/admin/screens/attempts/table", params: { attempt_status: "failed" }
+
+    assert_response :success
+    assert_select "th", text: "Error code"
+    assert_select "input[name='columns[]'][value='error_code']"
+    assert_includes response.body, "rate_limit"
   end
 
   test "attempts table filters by prompt model tokens and error code" do
@@ -1134,6 +1157,21 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, ">900<"
     assert_includes response.body, "Median (ms)"
     assert_includes response.body, "Average (ms)"
+    assert_includes response.body, "The model that served these calls."
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "ai_calls?"
+    assert_includes response.body, "model=p90-model"
+    assert_includes response.body, "date_range_preset=last_4_weeks"
+    assert_includes response.body, "Daily call volume in this date range."
+    assert_includes response.body, "Half of calls finished faster than this."
+    assert_includes response.body, "Nine out of ten calls finished within this time."
+    assert_includes response.body, "The blended wait if you mix every call together."
+    assert_includes response.body, "The slowest call in this date range."
+
+    get "/admin/screens/latency_by_model"
+
+    assert_response :success
+    assert_includes response.body, "value=\"last_4_weeks\""
 
     get "/admin/screens/latency_by_model/chart"
 
@@ -1161,12 +1199,91 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "P90 Prompt"
     assert_includes response.body, ">900<"
     assert_includes response.body, "Median (ms)"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "ai_calls?"
+    assert_includes response.body, "prompt=p90-prompt"
+    assert_includes response.body, "date_range_preset=last_4_weeks"
+    assert_includes response.body, "The prompt these calls used."
+    assert_includes response.body, "Daily call volume in this date range."
+
+    get "/admin/screens/latency_by_prompt"
+
+    assert_response :success
+    assert_includes response.body, "value=\"last_4_weeks\""
 
     get "/admin/screens/latency_by_prompt/chart"
 
     assert_response :success
     assert_includes response.body, "Prompt P90 latency"
     assert_includes response.body, "P90 latency (ms)"
+  end
+
+  test "latency by model mini chart follows the selected date range into ai calls" do
+    authenticate_for_admin!
+    matching_run = create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_model: "latency-chart-model",
+      latency_ms: 400
+    )
+    matching_run.update!(created_at: 2.days.ago)
+    outside_run = create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_model: "latency-chart-model",
+      latency_ms: 500
+    )
+    outside_run.update!(created_at: 10.days.ago)
+
+    start_date = 3.days.ago.to_date
+    end_date = Date.current
+    get "/admin/screens/latency_by_model/table", params: {
+      date_range_preset: "last_4_weeks",
+      start_date: start_date.iso8601,
+      end_date: end_date.iso8601
+    }
+
+    assert_response :success
+    assert_includes response.body, "latency-chart-model"
+    assert_includes response.body, "flat-pack--chart-series-value"
+    calls_href = response.body[%r{href="(/admin/screens/ai_calls\?[^"]*model=latency-chart-model[^"]*)"}m, 1]
+    assert calls_href, "expected an AI Calls link for the model mini chart"
+    assert_includes calls_href, "start_date=#{start_date.iso8601}"
+    assert_includes calls_href, "end_date=#{end_date.iso8601}"
+    refute_includes calls_href, "date_range_preset"
+    chart_payload = response.body.match(/model=latency-chart-model[^>]*>.*?data-flat-pack--chart-series-value="([^"]+)"/m).captures.first
+    assert_equal 4, chart_payload.scan(/&quot;x&quot;/).size
+    assert_equal 1, chart_payload.scan(/&quot;y&quot;:1/).size
+  end
+
+  test "latency by prompt mini chart follows the selected date range into ai calls" do
+    authenticate_for_admin!
+    matching_run = create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_key: "latency-chart-prompt",
+      prompt_namespace: "demo",
+      prompt_version: 1,
+      prompt_name_snapshot: "Latency Chart Prompt",
+      latency_ms: 400
+    )
+    matching_run.update!(created_at: 2.days.ago)
+
+    start_date = 3.days.ago.to_date
+    end_date = Date.current
+    get "/admin/screens/latency_by_prompt/table", params: {
+      start_date: start_date.iso8601,
+      end_date: end_date.iso8601
+    }
+
+    assert_response :success
+    assert_includes response.body, "Latency Chart Prompt"
+    assert_includes response.body, "flat-pack--chart-series-value"
+    assert_includes response.body, "start_date=#{start_date.iso8601}"
+    assert_includes response.body, "end_date=#{end_date.iso8601}"
+    assert_includes response.body, "prompt=latency-chart-prompt"
+    chart_payload = response.body.match(/prompt=latency-chart-prompt[^>]*>.*?data-flat-pack--chart-series-value="([^"]+)"/m).captures.first
+    assert_equal 4, chart_payload.scan(/&quot;x&quot;/).size
   end
 
   test "warnings screen is not registered" do
