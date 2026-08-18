@@ -33,6 +33,6 @@ Rails.application.routes.draw do
   get "methods", to: "methods#show", as: :gem_methods
   get "ai_playground", to: "ai_playground#show"
   post "ai_playground", to: "ai_playground#create"
-  post "ai_playground/stream", to: "ai_playground#stream", as: :stream_ai_playground
+  post "ai_playground/stream", to: "ai_playground/streams#stream", as: :stream_ai_playground
   root "home#index"
 end

@@ -29,6 +29,10 @@ Versioning and Keep a Changelog.
   the same way Generate does (batch-capable models for the chosen profile, then
   provider).
 - Deduplicated the AI Responses admin table so `Created` appears once.
+- AI Playground keeps SSE streaming on a dedicated Live controller so Devise
+  authentication on the show/generate page redirects to sign-in instead of
+  raising `UncaughtThrowError` (`throw :warden`). Unauthenticated stream
+  requests return 401.
 - Extracted shared Minitest bootstrap for gem phase tests (`test/support`) covering
   SQLite persistence, configuration isolation, and recording lookup doubles.
 - Admin dashboard adds Registered Providers and Registered Models widgets (top 5
