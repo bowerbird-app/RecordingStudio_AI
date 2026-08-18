@@ -68,6 +68,27 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.3] - 2026-08-18
+
+### Security
+
+- Admin run/attempt/tool/response scopes fail closed when no admin root is present
+  (no more global `Run.all` / cross-tenant listings).
+- Recording Studio Admin overview and AI Responses screens scope queries to the
+  current admin root.
+- Admin filter dropdown options (prompt keys, models, providers, tools, etc.)
+  are built from the same root-scoped relations instead of global `pluck`s.
+- `WarningMetrics` with `root_ids: nil` no longer scans every tenant; pass an
+  explicit root id list.
+- Gemini generate/stream clients send the API key only via `x-goog-api-key`
+  (never as a `key=` query parameter). Streaming still uses `alt=sse` in the
+  query string.
+
+### Upgrade notes
+
+- Callers of `RecordingStudioAI::WarningMetrics` must pass `root_ids:` for
+  meaningful results. Omitting it returns empty metrics.
+
 ## [0.2.2] - 2026-08-18
 
 ### Changed

@@ -31,8 +31,8 @@ module RecordingStudioAI
 
       def generate_content(model:, contents:, config: nil)
         uri = URI("#{API_ROOT}/#{URI.encode_uri_component(model)}:generateContent")
-        uri.query = URI.encode_www_form(key: @api_key)
         request = Net::HTTP::Post.new(uri)
+        apply_api_key!(request)
         request["Content-Type"] = "application/json"
         request.body = JSON.generate(request_body(contents, config))
 
@@ -52,8 +52,9 @@ module RecordingStudioAI
         return enum_for(__method__, model: model, contents: contents, config: config) unless block_given?
 
         uri = URI("#{API_ROOT}/#{URI.encode_uri_component(model)}:streamGenerateContent")
-        uri.query = URI.encode_www_form(key: @api_key, alt: "sse")
+        uri.query = URI.encode_www_form(alt: "sse")
         request = Net::HTTP::Post.new(uri)
+        apply_api_key!(request)
         request["Content-Type"] = "application/json"
         request["Accept"] = "text/event-stream"
         request.body = JSON.generate(request_body(contents, config))
@@ -102,9 +103,13 @@ module RecordingStudioAI
 
       private
 
+      def apply_api_key!(request)
+        request["x-goog-api-key"] = @api_key
+      end
+
       def json_request(uri, request_class, body = nil)
         request = request_class.new(uri)
-        request["x-goog-api-key"] = @api_key
+        apply_api_key!(request)
         request["Content-Type"] = "application/json"
         request.body = JSON.generate(body) if body
         response = Net::HTTP.start(

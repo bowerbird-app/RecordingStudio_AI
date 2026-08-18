@@ -51,19 +51,28 @@ module RecordingStudioAI
     end
 
     def scoped_runs
-      @root_ids ? Run.where(root_recording_id: @root_ids) : Run.all
+      # Fail closed: nil root_ids must not mean "every tenant".
+      return Run.none if @root_ids.nil?
+
+      Run.where(root_recording_id: @root_ids)
     end
 
     def scoped_attempts
-      @root_ids ? Attempt.joins(:run).merge(scoped_runs) : Attempt.all
+      return Attempt.none if @root_ids.nil?
+
+      Attempt.joins(:run).merge(scoped_runs)
     end
 
     def scoped_tools
-      @root_ids ? CustomToolInvocation.joins(:run).merge(scoped_runs) : CustomToolInvocation.all
+      return CustomToolInvocation.none if @root_ids.nil?
+
+      CustomToolInvocation.joins(:run).merge(scoped_runs)
     end
 
     def scoped_batches
-      @root_ids ? Batch.where(root_recording_id: @root_ids) : Batch.all
+      return Batch.none if @root_ids.nil?
+
+      Batch.where(root_recording_id: @root_ids)
     end
 
     def ratio(numerator, denominator) = denominator.zero? ? nil : numerator.to_f / denominator
