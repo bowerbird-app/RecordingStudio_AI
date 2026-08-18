@@ -32,7 +32,19 @@ module AdminScreens
     table do
       hide_columns_button
       column :name, title: "Model", header_tooltip: "The model that served these calls."
-      column :calls, title: "Calls", header_tooltip: "How many timed calls sit in this date range."
+      column :calls_series,
+             title: "Calls",
+             sortable: false,
+             header_tooltip: "Daily call volume in this date range. Open it to see the matching AI calls.",
+             value: lambda { |row, context|
+               ActionController::Base.helpers.link_to(
+                 AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
+                 AdminScreens::RecordingStudioAIWidgets.latency_model_calls_path(context, row),
+                 class: "inline-block",
+                 data: { turbo_frame: "_top" },
+                 aria: { label: "AI calls for #{row.name} in the selected date range" }
+               )
+             }
       column :p50_latency_ms, title: "Median (ms)",
                               header_tooltip: "Half of calls finished faster than this."
       column :p90_latency_ms, title: "P90 (ms)",

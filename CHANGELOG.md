@@ -85,8 +85,8 @@ Versioning and Keep a Changelog.
 - Attempts hides the Error code column unless status is filtered to failed.
   The column also stays out of the Columns picker until then.
 - Latency by model and Latency by prompt table headers explain each column in a
-  tooltip. Latency by prompt Calls is now a date-range mini chart that opens
-  matching AI Calls.
+  tooltip. Calls on both screens is a date-range mini chart that opens matching
+  AI Calls.
 
 ## [0.2.4] - 2026-08-18
 

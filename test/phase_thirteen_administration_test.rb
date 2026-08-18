@@ -228,6 +228,45 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
+  def test_latency_model_rows_include_a_calls_series_for_the_selected_range
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    create_run(
+      root_id: root_id,
+      status: "completed",
+      tokens: 10,
+      resolved_model: "latency-series-model",
+      latency_ms: 80,
+      created_at: 2.days.ago
+    )
+    create_run(
+      root_id: root_id,
+      status: "completed",
+      tokens: 10,
+      resolved_model: "latency-series-model",
+      latency_ms: 90,
+      created_at: 10.days.ago
+    )
+    date_range = 3.days.ago.beginning_of_day..Time.current
+
+    runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+                                                 .where(created_at: date_range)
+                                                 .where.not(latency_ms: nil)
+    rows = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
+      runs,
+      dimension: :model,
+      date_range: date_range
+    )
+    row = rows.find { |entry| entry.resolved_model == "latency-series-model" }
+
+    assert row
+    assert_equal 1, row.calls
+    assert_equal 4, row.calls_series.length
+    assert_equal 1, row.calls_series.sum { |point| point[:y] }
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
   private
 
   def create_run(root_id:, status:, tokens:, **attributes)

@@ -1147,7 +1147,11 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Median (ms)"
     assert_includes response.body, "Average (ms)"
     assert_includes response.body, "The model that served these calls."
-    assert_includes response.body, "How many timed calls sit in this date range."
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "ai_calls?"
+    assert_includes response.body, "model=p90-model"
+    assert_includes response.body, "date_range_preset=last_4_weeks"
+    assert_includes response.body, "Daily call volume in this date range."
     assert_includes response.body, "Half of calls finished faster than this."
     assert_includes response.body, "Nine out of ten calls finished within this time."
     assert_includes response.body, "The blended wait if you mix every call together."
@@ -1201,6 +1205,41 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Prompt P90 latency"
     assert_includes response.body, "P90 latency (ms)"
+  end
+
+  test "latency by model mini chart follows the selected date range into ai calls" do
+    authenticate_for_admin!
+    matching_run = create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_model: "latency-chart-model",
+      latency_ms: 400
+    )
+    matching_run.update!(created_at: 2.days.ago)
+    outside_run = create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_model: "latency-chart-model",
+      latency_ms: 500
+    )
+    outside_run.update!(created_at: 10.days.ago)
+
+    start_date = 3.days.ago.to_date
+    end_date = Date.current
+    get "/admin/screens/latency_by_model/table", params: {
+      start_date: start_date.iso8601,
+      end_date: end_date.iso8601
+    }
+
+    assert_response :success
+    assert_includes response.body, "latency-chart-model"
+    assert_includes response.body, "flat-pack--chart-series-value"
+    assert_includes response.body, "start_date=#{start_date.iso8601}"
+    assert_includes response.body, "end_date=#{end_date.iso8601}"
+    assert_includes response.body, "model=latency-chart-model"
+    chart_payload = response.body.match(/model=latency-chart-model[^>]*>.*?data-flat-pack--chart-series-value="([^"]+)"/m).captures.first
+    assert_equal 4, chart_payload.scan(/&quot;x&quot;/).size
+    assert_equal 1, chart_payload.scan(/&quot;y&quot;:1/).size
   end
 
   test "latency by prompt mini chart follows the selected date range into ai calls" do

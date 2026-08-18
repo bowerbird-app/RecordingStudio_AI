@@ -23,7 +23,7 @@ module AdminScreens
     end
     latency_row_members = %i[
       name calls calls_series p50_latency_ms p90_latency_ms average_latency_ms max_latency_ms
-      prompt_namespace prompt_key prompt_version
+      prompt_namespace prompt_key prompt_version resolved_model
     ]
     remove_const(:LatencyRow) if const_defined?(:LatencyRow) && LatencyRow.members != latency_row_members
     LatencyRow = Data.define(*latency_row_members) unless const_defined?(:LatencyRow)
@@ -246,7 +246,8 @@ module AdminScreens
           latencies.max,
           identity[:prompt_namespace],
           identity[:prompt_key],
-          identity[:prompt_version]
+          identity[:prompt_version],
+          identity[:resolved_model]
         )
       end.sort_by { |row| [-row.p90_latency_ms, row.name] }
     end
@@ -254,7 +255,7 @@ module AdminScreens
     def latency_row_group_key(row, dimension:)
       model, prompt_namespace, prompt_name, prompt_key, prompt_version, = row
       if dimension == :model
-        { name: model.presence || "Unknown model" }
+        { name: model.presence || "Unknown model", resolved_model: model.presence }
       else
         name = if prompt_name.present?
                  "#{prompt_name}#{" v#{prompt_version}" if prompt_version.present?}"
@@ -286,18 +287,26 @@ module AdminScreens
     end
 
     def latency_prompt_calls_path(context, row)
-      range_query = date_range_query(
+      latency_calls_path(
         context,
-        screen: AdminScreens::RecordingStudioAILatencyByPromptScreen
+        screen: AdminScreens::RecordingStudioAILatencyByPromptScreen,
+        prompt: row.prompt_key,
+        prompt_namespace: row.prompt_namespace,
+        prompt_version: row.prompt_version
       )
-      query = range_query.merge(
-        {
-          prompt: row.prompt_key,
-          prompt_namespace: row.prompt_namespace,
-          prompt_version: row.prompt_version
-        }.compact
+    end
+
+    def latency_model_calls_path(context, row)
+      latency_calls_path(
+        context,
+        screen: AdminScreens::RecordingStudioAILatencyByModelScreen,
+        model: row.resolved_model
       )
-      "/admin/screens/ai_calls?#{query.to_query}"
+    end
+
+    def latency_calls_path(context, screen:, **filters)
+      range_query = date_range_query(context, screen: screen)
+      "/admin/screens/ai_calls?#{range_query.merge(filters.compact).to_query}"
     end
 
     def attempt_error_code_column_visible?(context = admin_context)
