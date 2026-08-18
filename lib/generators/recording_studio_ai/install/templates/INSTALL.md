@@ -71,7 +71,9 @@ Admin access also fails closed. Configure `admin_actor_resolver`,
 `admin_visible_roots_resolver`, and, when needed, `admin_layout`. The engine does
 not authenticate admin routes by itself — authenticate in
 `ApplicationController` and/or set `admin_authenticate`. Grant basic,
-sensitive, and retained-response actions independently.
+sensitive, and retained-response actions independently. The retained-response
+viewer copies Recording Studio Admin's Accessible check when that gem is
+installed (`Authorization.authorize!` on the access recording).
 
 Review the generated attachment count, size, and content-type limits before
 accepting request-scoped files. Attachment bytes and filenames are not persisted.

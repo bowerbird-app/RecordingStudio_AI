@@ -78,6 +78,26 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.10] - 2026-08-18
+
+### Changed
+
+- The retained-response admin viewer copies Recording Studio Admin access when
+  that gem is installed: authenticate, then
+  `RecordingStudioAdmin::Authorization.authorize!` against the access recording
+  and `required_access_role` (default `:view`), including the current-root
+  match. Lookups stay inside that admin root. The public
+  `read_retained_response` API still requires `view_retained_response`.
+  The Admin access helper is autoloaded from `app/controllers` with the
+  retained-response controller so a development reload still finds it.
+
+### Upgrade notes
+
+- Operators who can open AI Responses can open the retained body. Hosts that
+  previously required Accessible `:admin` for that drill-down should raise
+  Recording Studio Admin `required_access_role` or tighten grants on the access
+  recording.
+
 ## [0.2.9] - 2026-08-18
 
 ### Added
