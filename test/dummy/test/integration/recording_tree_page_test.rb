@@ -12,26 +12,21 @@ class RecordingTreePageTest < ActionDispatch::IntegrationTest
     assert_redirected_to new_user_session_path
   end
 
-  test "recording tree page renders selected root hierarchy" do
+  test "recording tree page renders selected root hierarchy for granted actors" do
     user = User.create!(email: "recording-tree-#{SecureRandom.hex(4)}@example.com", password: "Password123!")
     sign_in user
 
     workspace = Workspace.create!(name: "Tree Workspace")
     root_recording = RecordingStudio.root_recording_for(workspace)
+    grant_accessible!(recording: root_recording, actor: user, role: :view)
 
-    patch "/recording_studio_root_switchable/v1/root_switch", params: {
-      scope: "all_workspaces",
-      root_switch: {
-        root_recording_id: root_recording.id,
-        return_to: "/recording_tree"
-      }
-    }
+    switch_to_root!(root_recording, return_to: "/recording_tree")
     follow_redirect!
 
     assert_response :success
     assert_includes response.body, "Recording tree"
     assert_includes response.body, workspace.name
-    assert_includes response.body, "no access"
+    assert_includes response.body, "view access"
   end
 
   test "sidebar includes a link to recording tree page" do

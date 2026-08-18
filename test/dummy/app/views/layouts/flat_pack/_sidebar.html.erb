@@ -40,15 +40,17 @@
         icon: :cog_6_tooth
       ) %>
       <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Sidekiq",
-        href: main_app.sidekiq_web_path,
-        icon: :queue_list
-      ) %>
-      <%= render FlatPack::Sidebar::Item::Component.new(
         label: "Tables",
         href: main_app.gem_tables_path,
         icon: :server_stack
       ) %>
+      <% if recording_studio_sidekiq_accessible? %>
+        <%= render FlatPack::Sidebar::Item::Component.new(
+          label: "Sidekiq",
+          href: main_app.sidekiq_web_path,
+          icon: :queue_list
+        ) %>
+      <% end %>
       <%= render FlatPack::Sidebar::Item::Component.new(
         label: "Methods",
         href: main_app.gem_methods_path,

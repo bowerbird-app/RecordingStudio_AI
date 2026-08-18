@@ -38,11 +38,9 @@ class AIPlaygroundController < ApplicationController
     @form = default_form.merge(form_params.to_h)
     @request_id = SecureRandom.uuid
     sync_selected_model_state!
-
-    root_recording = current_root_recording || RecordingStudio.root_recording_for(Workspace.order(:created_at).first)
-    raise "No root recording is available for AI execution." if root_recording.nil?
-
     @result_mode = batch_mode? ? "batch" : "generate"
+
+    root_recording = playground_root_recording!
 
     if batch_mode?
       @response = execute_batch(root_recording: root_recording, request_id: @request_id)
@@ -427,5 +425,18 @@ class AIPlaygroundController < ApplicationController
       :temperature, :verbosity, :max_output_tokens, :reasoning_effort, :attachment,
       batch_items: []
     )
+  end
+
+  # Never fall back to an arbitrary Workspace. Require an Accessible edit grant
+  # on the currently selected root before spending provider credits.
+  def playground_root_recording!
+    root = current_root_recording
+    raise ArgumentError, "Select a workspace you can access before running AI." if root.blank?
+
+    unless RecordingStudioAccessible.authorized?(actor: current_user, recording: root, role: :edit)
+      raise ArgumentError, "You need edit access on the selected workspace to run AI."
+    end
+
+    root
   end
 end
