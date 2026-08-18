@@ -570,8 +570,47 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes AdminScreens::RecordingStudioAIToolCallsScreen.table.columns.map(&:key), :destructive
     assert_includes AdminScreens::RecordingStudioAIToolCallsScreen.table.columns.map(&:key), :error_code
     assert AdminScreens::RecordingStudioAIToolCallsScreen.table.show_columns_button?
-    assert_equal "Unique identifier for this tool invocation.",
+    assert_equal "This tool run's id.",
                  AdminScreens::RecordingStudioAIToolCallsScreen.table.columns.find { |column| column.key == :id }.header_tooltip
+  end
+
+  test "admin tables explain headers in everyday language" do
+    screens = [
+      AdminScreens::RecordingStudioAICallsScreen,
+      AdminScreens::RecordingStudioAIToolCallsScreen,
+      AdminScreens::RecordingStudioAIRegisteredCustomToolsScreen,
+      AdminScreens::RecordingStudioAIRegisteredPromptsScreen,
+      AdminScreens::RecordingStudioAIAttemptsScreen,
+      AdminScreens::RecordingStudioAIEstimatedSpendScreen,
+      AdminScreens::RecordingStudioAIRegisteredProvidersScreen,
+      AdminScreens::RecordingStudioAIRegisteredModelsScreen
+    ]
+
+    screens.each do |screen|
+      screen.table.columns.each do |column|
+        tooltip = column.header_tooltip.to_s
+        assert tooltip.present?, "#{screen.name} column #{column.key} needs a header tooltip"
+        refute_match(/invocation|milliseconds|identifier/i, tooltip)
+      end
+    end
+
+    authenticate_for_admin!
+
+    {
+      "ai_calls" => "How the call ended.",
+      "tool_calls" => "Which tool ran.",
+      "registered_custom_tools" => "What this tool is for.",
+      "registered_prompts" => "Typical size of what we send.",
+      "attempts" => "How this try ended.",
+      "estimated_spend" => "Size of what we sent.",
+      "registered_providers" => "Whether keys are set so it can run.",
+      "registered_models" => "How wild the answers can get."
+    }.each do |key, phrase|
+      get "/admin/screens/#{key}/table"
+
+      assert_response :success, "expected #{key} table to render"
+      assert_includes response.body, phrase
+    end
   end
 
   test "ai call tool-call count links to that run's tool calls" do

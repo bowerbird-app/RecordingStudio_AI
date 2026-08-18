@@ -16,10 +16,11 @@ module AdminScreens
       hide_columns_button
       hide_count
 
-      column :key, title: "Provider"
-      column :class_name, title: "Implementation"
+      column :key, title: "Provider", header_tooltip: "The provider's name."
+      column :class_name, title: "Implementation", header_tooltip: "The code that talks to it."
       column :configured,
              title: "Configured",
+             header_tooltip: "Whether keys are set so it can run.",
              value: ->(row, _context) { row.configured ? "Yes" : "No" },
              display: :badge,
              display_options: lambda { |_row, _context, value|
@@ -27,6 +28,7 @@ module AdminScreens
              }
       column :calls_series,
              title: "Calls",
+             header_tooltip: "Daily call volume in the last 30 days. Open it to see the matching AI calls.",
              value: lambda { |row, context|
                ActionController::Base.helpers.link_to(
                  AdminScreens::RecordingStudioAIWidgets.mini_chart(row.calls_series),
@@ -39,7 +41,7 @@ module AdminScreens
                  aria: { label: "AI calls for #{row.key} in the last 30 days" }
                )
              }
-      column :models_count, title: "Models"
+      column :models_count, title: "Models", header_tooltip: "How many models this provider has."
     end
   end
 end

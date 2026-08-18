@@ -109,10 +109,11 @@ module AdminScreens
     table do
       show_columns_button
 
-      column :created_at, title: "Created"
-      column :run_id, title: "AI call"
-      column :sequence, title: "Sequence"
+      column :created_at, title: "Created", header_tooltip: "When this try happened."
+      column :run_id, title: "AI call", header_tooltip: "The call this try belongs to."
+      column :sequence, title: "Sequence", header_tooltip: "Order of tries on that call."
       column :kind,
+             header_tooltip: "First try, a retry, or a switch to another provider.",
              display: :badge,
              display_options: lambda { |_row, _context, value|
                { text: value.to_s.humanize, style: :default, size: :sm }
@@ -120,10 +121,12 @@ module AdminScreens
       column :prompt,
              title: "Prompt",
              sortable: false,
+             header_tooltip: "The prompt this try used.",
              value: lambda { |attempt, _context|
                attempt.run&.prompt_name_snapshot.presence || attempt.run&.prompt_key || "No prompt"
              }
       column :status,
+             header_tooltip: "How this try ended.",
              display: :badge,
              display_options: lambda { |_row, _context, value|
                style = case value.to_s
@@ -134,11 +137,11 @@ module AdminScreens
                        end
                { text: value.to_s.humanize, style: style, size: :sm }
              }
-      column :provider
-      column :model
-      column :latency_ms, title: "Latency (ms)"
-      column :total_tokens, title: "Tokens"
-      column :error_code, title: "Error code"
+      column :provider, header_tooltip: "Who we asked."
+      column :model, header_tooltip: "The model that served this try."
+      column :latency_ms, title: "Latency (ms)", header_tooltip: "How long this try took."
+      column :total_tokens, title: "Tokens", header_tooltip: "Rough size of what went in and came back."
+      column :error_code, title: "Error code", header_tooltip: "Why it failed, when it failed."
 
       default_columns :created_at, :prompt, :status, :provider, :model, :latency_ms, :total_tokens, :error_code
 

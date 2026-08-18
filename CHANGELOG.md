@@ -85,6 +85,9 @@ Versioning and Keep a Changelog.
 - Dummy Tailwind writes Bundler gem `@source` paths before compile so Flatpack
   and Recording Studio utilities are scanned outside `vendor/bundle` /
   `/usr/local/bundle`.
+- AI Calls, Custom Tool Calls, Attempts, Estimated spend, Registered custom
+  tools, Registered prompts, Registered providers, and Registered models table
+  headers explain each column in everyday language.
 
 ### Upgrade notes
 
