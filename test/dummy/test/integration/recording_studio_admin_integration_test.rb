@@ -101,6 +101,37 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       assert_includes response.body, name, "expected /config to document #{name}"
       assert_includes response.body, "config.#{name}", "expected initializer example to set #{name}"
     end
+
+    assert_includes response.body, "Create Custom Tools"
+    assert_includes response.body, "Tool registration fields"
+    assert_includes response.body, "Argument fields inside parameters"
+    assert_includes response.body, "RecordingStudioAI.tools.register"
+
+    tables = Nokogiri::HTML(response.body).css("table")
+    assert_operator tables.length, :>=, 3
+
+    custom_tool_table = tables[1]
+    custom_tool_rows = custom_tool_table.css("tbody tr")
+    assert_equal ConfigController::CUSTOM_TOOL_OPTIONS.length, custom_tool_rows.length
+    custom_tool_rows.each { |row| assert_equal 5, row.css("td").length, "expected five cells in #{row.text.squish}" }
+    documented_tool_keys = ConfigController::CUSTOM_TOOL_OPTIONS.map { |option| option[:key] }
+    assert_equal %w[
+      key version name description use_when do_not_use_when parameters returns cost latency
+      read_only destructive requires_confirmation idempotent executor_label executor examples
+    ], documented_tool_keys
+    documented_tool_keys.each do |name|
+      assert_includes custom_tool_table.text, name, "expected tool registration table to document #{name}"
+    end
+
+    parameter_table = tables[2]
+    parameter_rows = parameter_table.css("tbody tr")
+    assert_equal ConfigController::CUSTOM_TOOL_PARAMETER_OPTIONS.length, parameter_rows.length
+    parameter_rows.each { |row| assert_equal 5, row.css("td").length, "expected five cells in #{row.text.squish}" }
+    documented_parameter_keys = ConfigController::CUSTOM_TOOL_PARAMETER_OPTIONS.map { |option| option[:key] }
+    assert_equal %w[name type required description allowed_values default], documented_parameter_keys
+    documented_parameter_keys.each do |name|
+      assert_includes parameter_table.text, name, "expected tool argument table to document #{name}"
+    end
   end
 
   test "ai playground shows capability-driven generate form and batch section" do

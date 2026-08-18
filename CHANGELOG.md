@@ -28,6 +28,8 @@ Versioning and Keep a Changelog.
   real values such as attachment MIME types, and the initializer example stops
   suggesting host apps copy `providers`, `attribution_validator`, and the
   `retry_random` / `retry_sleeper` test seams.
+- Dummy `/config` Create Custom Tools now includes registration-field and
+  argument-field tables for `RecordingStudioAI.tools.register`.
 - Dummy sign-in works through Cursor Cloud and Codespaces forwarded previews by
   relaxing the CSRF origin check in development when `CURSOR_AGENT` or
   `CODESPACES` is set. CSRF tokens stay required.

@@ -610,6 +610,173 @@ class ConfigController < ApplicationController
     )
   RUBY
 
+  CUSTOM_TOOL_OPTIONS = [
+    {
+      key: "key",
+      required: "Yes",
+      accepted_values: "snake_case string (a-z, 0-9, _)",
+      default: "—",
+      explanation: "Stable id for the tool. Used when you pass custom_tools: [{ key:, version: }]."
+    },
+    {
+      key: "version",
+      required: "Yes",
+      accepted_values: "Positive Integer",
+      default: "—",
+      explanation: "Version of this definition. Register a new version instead of editing an old one."
+    },
+    {
+      key: "name",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "Short label for people and admin screens."
+    },
+    {
+      key: "description",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "What the tool does. Sent to the model with the use_when / do_not_use_when lines."
+    },
+    {
+      key: "use_when",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "When the model should call this tool."
+    },
+    {
+      key: "do_not_use_when",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "When the model should leave this tool alone."
+    },
+    {
+      key: "parameters",
+      required: "Yes",
+      accepted_values: "Array of argument hashes",
+      default: "—",
+      explanation: "Argument schema for the tool. See the argument fields table below."
+    },
+    {
+      key: "returns",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "Plain-language description of what the executor returns."
+    },
+    {
+      key: "cost",
+      required: "Yes",
+      accepted_values: "negligible, low, medium, high",
+      default: "—",
+      explanation: "Rough cost band for the tool."
+    },
+    {
+      key: "latency",
+      required: "Yes",
+      accepted_values: "instant, fast, slow",
+      default: "—",
+      explanation: "Rough speed band for the tool."
+    },
+    {
+      key: "read_only",
+      required: "Yes",
+      accepted_values: "true or false",
+      default: "—",
+      explanation: "true if the tool only reads. Cannot be true when destructive is true."
+    },
+    {
+      key: "destructive",
+      required: "Yes",
+      accepted_values: "true or false",
+      default: "—",
+      explanation: "true if the tool can change or delete something."
+    },
+    {
+      key: "requires_confirmation",
+      required: "Yes",
+      accepted_values: "true or false",
+      default: "—",
+      explanation: "true if custom_tool_confirmation_handler must approve before it runs."
+    },
+    {
+      key: "idempotent",
+      required: "Yes",
+      accepted_values: "true or false",
+      default: "—",
+      explanation: "true if calling it twice with the same args is safe."
+    },
+    {
+      key: "executor_label",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "Who owns the executor, for people reading admin screens."
+    },
+    {
+      key: "executor",
+      required: "Yes",
+      accepted_values: "Callable(arguments, context)",
+      default: "—",
+      explanation: "Runs the tool. Must return serializable data. context includes the root, initiator, run, and cancellation state."
+    },
+    {
+      key: "examples",
+      required: "No",
+      accepted_values: "Serializable Hash/Array or nil",
+      default: "nil",
+      explanation: "Optional worked examples for the model or docs."
+    }
+  ].freeze
+
+  CUSTOM_TOOL_PARAMETER_OPTIONS = [
+    {
+      key: "name",
+      required: "Yes",
+      accepted_values: "snake_case string (a-z, 0-9, _)",
+      default: "—",
+      explanation: "Argument name. Must be unique inside the tool."
+    },
+    {
+      key: "type",
+      required: "Yes",
+      accepted_values: "string, integer, number, boolean, object, array",
+      default: "—",
+      explanation: "JSON-schema style type for the argument."
+    },
+    {
+      key: "required",
+      required: "Yes",
+      accepted_values: "true or false",
+      default: "—",
+      explanation: "Whether the model must supply this argument."
+    },
+    {
+      key: "description",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "What the argument means."
+    },
+    {
+      key: "allowed_values",
+      required: "No",
+      accepted_values: "Non-empty Array of values matching type",
+      default: "—",
+      explanation: "Optional enum. Values must match the argument type."
+    },
+    {
+      key: "default",
+      required: "No",
+      accepted_values: "Serializable value matching type",
+      default: "—",
+      explanation: "Filled in when the argument is omitted. Still validated against type and allowed_values."
+    }
+  ].freeze
+
   def show
     @config_options = CONFIG_OPTIONS
     @config_example = CONFIG_EXAMPLE
@@ -617,5 +784,7 @@ class ConfigController < ApplicationController
     @model_registration_example = MODEL_REGISTRATION_EXAMPLE
     @profile_example = PROFILE_EXAMPLE
     @custom_tools_example = CUSTOM_TOOLS_EXAMPLE
+    @custom_tool_options = CUSTOM_TOOL_OPTIONS
+    @custom_tool_parameter_options = CUSTOM_TOOL_PARAMETER_OPTIONS
   end
 end
