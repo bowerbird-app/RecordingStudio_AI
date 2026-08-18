@@ -357,7 +357,7 @@ module AdminScreens
         [run.resolved_provider.to_s, run.created_at.to_date]
       end.transform_values(&:count)
 
-      RecordingStudioAI.configuration.providers.map do |key, provider|
+      rows = RecordingStudioAI.configuration.providers.map do |key, provider|
         provider_key = key.to_s
         ProviderRow.new(
           provider_key,
@@ -369,7 +369,8 @@ module AdminScreens
             { x: date.strftime("%b %-d"), y: daily_counts.fetch([provider_key, date], 0) }
           end
         )
-      end.sort_by { |row| [-row.calls, row.key] }
+      end
+      rows.sort_by { |row| [-row.calls, row.key] }
     end
 
     def model_rows(context)
@@ -382,7 +383,7 @@ module AdminScreens
         [run.resolved_provider.to_s, run.resolved_model.to_s, run.created_at.to_date]
       end.transform_values(&:count)
 
-      RecordingStudioAI.models.all.map do |definition|
+      rows = RecordingStudioAI.models.all.map do |definition|
         provider_key = definition.provider.to_s
         model_key = definition.model
         ModelRow.new(
@@ -402,7 +403,8 @@ module AdminScreens
             { x: date.strftime("%b %-d"), y: daily_counts.fetch([provider_key, model_key, date], 0) }
           end
         )
-      end.sort_by { |row| [-row.calls, row.provider, row.model] }
+      end
+      rows.sort_by { |row| [-row.calls, row.provider, row.model] }
     end
 
     def parameter_default_label(definition, name)
@@ -419,9 +421,10 @@ module AdminScreens
                .group(:resolved_provider)
                .count
 
-      RecordingStudioAI.configuration.providers.keys.map do |key|
+      rows = RecordingStudioAI.configuration.providers.keys.map do |key|
         [key.to_s, counts.fetch(key.to_s, 0)]
-      end.sort_by { |_key, calls| -calls }.first(limit)
+      end
+      rows.sort_by { |_key, calls| -calls }.first(limit)
     end
 
     def top_model_call_rows(context, range: 30.days.ago..Time.current, limit: 5)
@@ -431,14 +434,15 @@ module AdminScreens
                .group(:resolved_provider, :resolved_model)
                .count
 
-      RecordingStudioAI.models.all.map do |definition|
+      rows = RecordingStudioAI.models.all.map do |definition|
         [
           definition.provider.to_s,
           definition.model,
           definition.display_name,
           counts.fetch([definition.provider.to_s, definition.model], 0)
         ]
-      end.sort_by { |_provider, _model, _name, calls| -calls }.first(limit)
+      end
+      rows.sort_by { |_provider, _model, _name, calls| -calls }.first(limit)
     end
 
     def number(value)
@@ -1203,7 +1207,9 @@ module AdminScreens
     link_to { |context| context.admin_screen_path("latency_by_prompt") }
   end
 
-  RecordingStudioAIRegisteredProvidersWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.registered_providers") do
+  RecordingStudioAIRegisteredProvidersWidget = RecordingStudioAdmin::Widget.new(
+    "widgets.recording_studio_ai.registered_providers"
+  ) do
     type :list
     title "Registered providers"
     subtitle "Top 5 providers by call volume in the last 30 days."
@@ -1226,7 +1232,9 @@ module AdminScreens
     link_to { |context| context.admin_screen_path("registered_providers") }
   end
 
-  RecordingStudioAIRegisteredModelsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.registered_models") do
+  RecordingStudioAIRegisteredModelsWidget = RecordingStudioAdmin::Widget.new(
+    "widgets.recording_studio_ai.registered_models"
+  ) do
     type :list
     title "Registered models"
     subtitle "Top 5 models by call volume in the last 30 days."
