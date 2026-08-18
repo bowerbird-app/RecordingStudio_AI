@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.2.0", RecordingStudioAI::VERSION
+    assert_equal "0.2.1", RecordingStudioAI::VERSION
   end
 
   def test_runtime_dependencies_are_declared
