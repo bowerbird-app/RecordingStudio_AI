@@ -25,6 +25,12 @@ Versioning and Keep a Changelog.
   renders in place under the "Run generate" button (above the batch section)
   without a full page reload. Batch submissions render their own result frame
   beneath the batch form.
+- AI Playground batch provider/profile selects refresh the batch model dropdown
+  the same way Generate does (batch-capable models for the chosen profile, then
+  provider).
+- `.rubocop_todo.yml` records existing engine RuboCop debt from
+  `copilot/v1-implement-sync-generation` so CI lint can pass without rewriting
+  Orchestrator and other large files.
 - Deduplicated the AI Responses admin table so `Created` appears once.
 - Admin dashboard adds Registered Providers and Registered Models widgets (top 5
   by call volume) at the end of the widget grid, plus matching table-only
