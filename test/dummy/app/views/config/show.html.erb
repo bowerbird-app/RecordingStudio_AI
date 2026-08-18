@@ -68,6 +68,14 @@
   </div>
 
   <%= render FlatPack::CodeBlock::Component.new(
+    title: "my_provider.rb",
+    snippets: [
+      { label: "my_provider.rb", language: "ruby", code: @provider_class_example },
+      { label: "Initializer", language: "ruby", code: @provider_initializer_example }
+    ]
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
     title: "Provider registration examples",
     language: "ruby",
     code: @provider_extension_example

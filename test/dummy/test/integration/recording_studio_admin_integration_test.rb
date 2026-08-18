@@ -70,6 +70,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "provider_key"
     assert_includes response.body, "config.&lt;provider_key&gt;_api_key"
     assert_includes response.body, "RecordingStudioAI.register_provider"
+    assert_includes response.body, "class MyProvider"
+    assert_includes response.body, "MY_PROVIDER_API_KEY"
+    assert_includes response.body, "configuration_api_key"
     assert_includes response.body, "Add a Model"
     assert_includes response.body, "Create Profiles"
     assert_includes response.body, "Configuration parameters"
@@ -344,6 +347,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "ai_calls?"
     assert_includes response.body, "provider=openai"
     assert_includes response.body, "date_range_preset=last_30_days"
+    assert_includes response.body, "Show file"
+    assert_includes response.body, "class MyProvider"
+    assert_includes response.body, "MY_PROVIDER_API_KEY"
+    assert_includes response.body, "ENV.fetch"
+    assert_includes response.body, "configuration_api_key"
+    assert_includes response.body, "attr_accessor :my_provider_api_key"
   end
 
   test "registered models screen lists every registered model definition" do

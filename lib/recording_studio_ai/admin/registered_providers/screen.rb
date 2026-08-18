@@ -5,7 +5,7 @@ module AdminScreens
     key "registered_providers"
     icon :server
     title "Registered providers"
-    subtitle "Providers currently registered on RecordingStudioAI.configuration."
+    subtitle "Who's wired up. Open Starter file if you need another."
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.provider_rows(context)
@@ -18,6 +18,13 @@ module AdminScreens
 
       column :key, title: "Provider", header_tooltip: "The provider's name."
       column :class_name, title: "Implementation", header_tooltip: "The code that talks to it."
+      column :starter,
+             title: "Starter file",
+             sortable: false,
+             header_tooltip: "A copy-paste adapter, including how the env key is wired.",
+             value: lambda { |row, _context|
+               AdminScreens::RecordingStudioAIWidgets.provider_starter_modal(row)
+             }
       column :configured,
              title: "Configured",
              header_tooltip: "Whether keys are set so it can run.",

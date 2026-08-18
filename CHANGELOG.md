@@ -80,6 +80,13 @@ Versioning and Keep a Changelog.
 
 ## [0.2.9] - 2026-08-18
 
+### Added
+
+- Registered providers screen includes a Starter file modal with a copy-paste
+  `my_provider.rb` adapter and initializer env wiring
+  (`config.my_provider_api_key = ENV.fetch(...)`). Dummy `/config` shows the
+  same starter next to the existing registration examples.
+
 ### Changed
 
 - Dummy Tailwind writes Bundler gem `@source` paths before compile so Flatpack
