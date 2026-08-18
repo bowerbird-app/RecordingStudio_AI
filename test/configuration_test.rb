@@ -54,6 +54,11 @@ class ConfigurationTest < Minitest::Test
     end
     refute_respond_to configuration, :provider
     refute_respond_to configuration, :default_provider
+    assert_equal %i[gemini openai], configuration.providers.keys.sort
+    assert_instance_of RecordingStudioAI::Providers::OpenAI, configuration.providers[:openai]
+    assert_instance_of RecordingStudioAI::Providers::Gemini, configuration.providers[:gemini]
+    assert_equal :openai, configuration.providers[:openai].class.provider_key
+    assert_equal :gemini, configuration.providers[:gemini].class.provider_key
   end
 
   def test_provider_credentials_default_from_environment

@@ -68,6 +68,18 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.2] - 2026-08-18
+
+### Changed
+
+- Shared OpenAI and Gemini boot setup on `Providers::Base` (configuration,
+  `configured?`, failed results) and install shipped providers from each class
+  `provider_key`. Upgrade note: hosts keep `register_provider`,
+  `models.register`, `openai_*`, and `gemini_*`. No host change is required.
+  A later vendor adds `config.<provider_key>_api_key` /
+  `config.<provider_key>_client`, a `Providers::*` class, and model
+  registrations — not a new public API.
+
 ## [0.2.0] - 2026-08-17
 
 ### Added

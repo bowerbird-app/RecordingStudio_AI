@@ -62,7 +62,7 @@ module RecordingStudioAI
         provider_key = provider_class.provider_key
         next if configuration.providers.key?(provider_key)
 
-        configuration.providers[provider_key] = provider_class.new(configuration: configuration)
+        register_provider(provider_key, provider_class.new(configuration: configuration))
         discovered << provider_key
       end
 

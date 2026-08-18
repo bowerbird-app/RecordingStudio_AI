@@ -59,10 +59,8 @@ module RecordingStudioAI
     def initialize
       @default_profile = :medium
       @authorization_handler = ->(**) { false }
-      @providers = {
-        openai: RecordingStudioAI::Providers::OpenAI.new(configuration: self),
-        gemini: RecordingStudioAI::Providers::Gemini.new(configuration: self)
-      }
+      @providers = {}
+      install_shipped_providers
       @allowed_provider_overrides = []
       @discovery_enabled = false
       @attribution_validator = method(:validate_recording_attribution!)
@@ -187,6 +185,26 @@ module RecordingStudioAI
     end
 
     private
+
+    def install_shipped_providers
+      [
+        RecordingStudioAI::Providers::OpenAI,
+        RecordingStudioAI::Providers::Gemini
+      ].each do |provider_class|
+        store_provider(provider_class.provider_key, provider_class.new(configuration: self))
+      end
+    end
+
+    def store_provider(key, provider)
+      unless provider.is_a?(RecordingStudioAI::Providers::Base)
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          "provider must inherit from RecordingStudioAI::Providers::Base",
+          code: "configuration"
+        )
+      end
+
+      @providers[key.to_sym] = provider
+    end
 
     def validate_integer!(name, minimum:)
       value = public_send(name)
