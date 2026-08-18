@@ -3,10 +3,22 @@
 
   <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
     <% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Retention metadata", variant: :h3, class: "mb-0 pb-0") %><% end %>
-    <% card.body do %><dl class="grid gap-4 text-sm md:grid-cols-3"><div><dt class="opacity-70">Type</dt><dd><%= @response[:response_type].humanize %></dd></div><div><dt class="opacity-70">Complete / truncated</dt><dd><%= @response[:complete] ? "Complete" : "Incomplete" %> / <%= @response[:truncated] ? "Truncated" : "Not truncated" %></dd></div><div><dt class="opacity-70">Size / expiry</dt><dd><%= number_to_human_size(@response[:byte_size]) %> / <%= @response[:expires_at]&.to_fs(:long) || "No expiry" %></dd></div><div><dt class="opacity-70">Content type</dt><dd><%= @response[:content_type].presence || "Unknown" %></dd></div><div><dt class="opacity-70">Run</dt><dd><%= link_to @run.id, admin_run_path(@run) %></dd></div></dl><% end %>
+    <% card.body do %>
+      <dl class="grid gap-4 text-sm md:grid-cols-3">
+        <div><dt class="opacity-70">Type</dt><dd><%= @response[:response_type].humanize %></dd></div>
+        <div><dt class="opacity-70">Complete / truncated</dt><dd><%= @response[:complete] ? "Complete" : "Incomplete" %> / <%= @response[:truncated] ? "Truncated" : "Not truncated" %></dd></div>
+        <div><dt class="opacity-70">Size / expiry</dt><dd><%= number_to_human_size(@response[:byte_size]) %> / <%= @response[:expires_at]&.to_fs(:long) || "No expiry" %></dd></div>
+        <div><dt class="opacity-70">Content type</dt><dd><%= @response[:content_type].presence || "Unknown" %></dd></div>
+        <div><dt class="opacity-70">Run</dt><dd><%= link_to @run.id, admin_run_path(@run) %></dd></div>
+      </dl>
+    <% end %>
   <% end %>
 
-  <% if @response[:content_text].present? %><%= render FlatPack::Card::Component.new(style: :default) do |card| %><% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Extracted output", variant: :h3, class: "mb-0 pb-0") %><% end %><% card.body do %><pre class="overflow-auto whitespace-pre-wrap text-sm"><%= @response[:content_text] %></pre><% end %><% end %><% end %>
+  <% if @response[:content_text].present? %>
+    <%= admin_code_block(@response[:content_text], title: "Extracted output", language: "text") %>
+  <% end %>
 
-  <% { "Normalized response" => @response[:normalized_response], "Sanitized provider response" => @response[:raw_response] }.each do |title, value| %><%= render FlatPack::Card::Component.new(style: :default) do |card| %><% card.header do %><%= render FlatPack::PageTitle::Component.new(title: title, variant: :h3, class: "mb-0 pb-0") %><% end %><% card.body do %><pre class="overflow-auto whitespace-pre-wrap text-sm"><%= value.nil? ? "Not retained" : admin_json(value) %></pre><% end %><% end %><% end %>
+  <% { "Normalized response" => @response[:normalized_response], "Sanitized provider response" => @response[:raw_response] }.each do |title, value| %>
+    <%= admin_code_block(value.nil? ? "Not retained" : admin_json(value), title: title, language: value.nil? ? "text" : "json") %>
+  <% end %>
 </div>

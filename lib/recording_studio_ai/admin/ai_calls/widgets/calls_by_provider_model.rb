@@ -20,12 +20,7 @@ module AdminScreens
     change_good_when :up
     chart_type :bar
     series do |context|
-      rows = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-                                                   .where(created_at: 30.days.ago..Time.current)
-                                                   .group(:resolved_model)
-                                                   .count
-                                                   .sort_by { |_model, count| -count.to_i }
-                                                   .first(5)
+      rows = AdminScreens::RecordingStudioAIWidgets.top_model_call_volume_rows(context)
 
       [{
         name: "Call volume",
@@ -33,12 +28,7 @@ module AdminScreens
       }]
     end
     chart_options do |context|
-      rows = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-                                                   .where(created_at: 30.days.ago..Time.current)
-                                                   .group(:resolved_model)
-                                                   .count
-                                                   .sort_by { |_model, count| -count.to_i }
-                                                   .first(5)
+      rows = AdminScreens::RecordingStudioAIWidgets.top_model_call_volume_rows(context)
 
       {
         height: 240,

@@ -6,8 +6,15 @@ Next steps:
 2. Configure at least one OpenAI or Gemini credential.
 3. Confirm Recording Studio is configured in the host application.
 4. Review the generated engine mount path in `config/routes.rb`.
-5. Configure the authorization handler. It denies every action by default and
-	should delegate to the host's RecordingStudioAccessible policy.
+5. Configure the authorization handler. It denies every action by default.
+	Install recording-studio-accessible, then prefer:
+
+```ruby
+config.authorization_handler = RecordingStudioAI::AccessibleAuthorization.method(:call)
+```
+
+	That mapper separates view / execute / confirm / sensitive / retained onto
+	Accessible `:view` / `:edit` / `:admin`. Never use `->(**) { true }`.
 6. Install and apply addon migrations:
 
 ```bash
@@ -61,7 +68,9 @@ only terminal history older than the cutoff, deleting responses and dependent
 records before runs and batches to preserve foreign-key integrity.
 
 Admin access also fails closed. Configure `admin_actor_resolver`,
-`admin_visible_roots_resolver`, and, when needed, `admin_layout`. Grant basic,
+`admin_visible_roots_resolver`, and, when needed, `admin_layout`. The engine does
+not authenticate admin routes by itself — authenticate in
+`ApplicationController` and/or set `admin_authenticate`. Grant basic,
 sensitive, and retained-response actions independently.
 
 Review the generated attachment count, size, and content-type limits before

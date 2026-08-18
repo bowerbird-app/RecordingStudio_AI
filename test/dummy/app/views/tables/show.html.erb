@@ -25,30 +25,17 @@
         class: "mb-0 pb-0"
       ) %>
 
-      <div class="overflow-x-auto">
-        <table class="min-w-full text-left text-sm">
-          <thead>
-            <tr class="border-b border-(--surface-border-color)">
-              <th class="px-2 py-2 font-semibold">Column</th>
-              <th class="px-2 py-2 font-semibold">Type</th>
-              <th class="px-2 py-2 font-semibold">Required</th>
-              <th class="px-2 py-2 font-semibold">Sample data</th>
-              <th class="px-2 py-2 font-semibold">High-level explanation</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% table[:columns].each do |column| %>
-              <tr class="border-b border-(--surface-border-color)">
-                <td class="px-2 py-2 align-top font-mono text-xs"><%= column[:name] %></td>
-                <td class="px-2 py-2 align-top"><%= column[:type] %></td>
-                <td class="px-2 py-2 align-top"><%= column[:required] ? "Yes" : "No" %></td>
-                <td class="px-2 py-2 align-top font-mono text-xs"><%= column[:sample] %></td>
-                <td class="px-2 py-2 align-top"><%= column[:explanation] %></td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
+      <%= render FlatPack::Table::Component.new(data: table[:columns]) do |flatpack_table| %>
+        <% flatpack_table.column(title: "Column") do |column| %>
+          <span class="font-mono text-xs"><%= column[:name] %></span>
+        <% end %>
+        <% flatpack_table.column(title: "Type") { |column| column[:type] } %>
+        <% flatpack_table.column(title: "Required") { |column| column[:required] ? "Yes" : "No" } %>
+        <% flatpack_table.column(title: "Sample data") do |column| %>
+          <span class="font-mono text-xs"><%= column[:sample] %></span>
+        <% end %>
+        <% flatpack_table.column(title: "High-level explanation") { |column| column[:explanation] } %>
+      <% end %>
     </section>
   <% end %>
 </div>

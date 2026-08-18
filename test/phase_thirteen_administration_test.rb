@@ -15,6 +15,7 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
   end
 
   def build_recording_lookup(id)
+    @find_count = (@find_count || 0) + 1 if instance_variable_defined?(:@find_count)
     Actor.new(id:)
   end
 
@@ -27,6 +28,7 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
   def test_admin_access_authorizes_each_visible_root_and_keeps_sensitive_permission_separate
     root_ids = [create_recording_id, create_recording_id]
     calls = []
+    @find_count = 0
     @configuration.admin_actor_resolver = ->(controller:) { @actor }
     @configuration.admin_visible_roots_resolver = ->(actor:, controller:) { root_ids }
     @configuration.authorization_handler = lambda do |action:, attribution:, context:|
@@ -38,8 +40,77 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
 
     assert_equal root_ids, access.root_ids
     assert_equal(2, calls.count { |action, _, _| action == "recording_studio_ai.view_execution" })
+    assert_equal 2, @find_count
     refute access.allowed?(:view_sensitive_execution, root_id: root_ids.first, context: { record_id: 1 })
     assert_equal "recording_studio_ai.view_sensitive_execution", calls.last.first
+    assert_equal 2, @find_count, "sensitive checks must reuse cached root recordings"
+  end
+
+  def test_weekly_calls_series_aggregates_in_sql_without_loading_all_runs
+    root_id = create_recording_id
+    this_week = Time.current.beginning_of_week
+    last_week = this_week - 1.week
+    create_run(root_id: root_id, status: "completed", tokens: 5, created_at: this_week + 1.hour)
+    create_run(root_id: root_id, status: "completed", tokens: 7, created_at: this_week + 2.hours)
+    create_run(root_id: root_id, status: "completed", tokens: 3, created_at: last_week + 1.day)
+
+    series = AdminScreens::RecordingStudioAIWidgets.weekly_calls_series(
+      RecordingStudioAI::Run.where(root_recording_id: root_id),
+      weeks_back: 2,
+      series_name: "AI calls"
+    )
+    token_series = AdminScreens::RecordingStudioAIWidgets.weekly_token_series(
+      RecordingStudioAI::Run.where(root_recording_id: root_id),
+      weeks_back: 2,
+      series_name: "Token usage"
+    )
+
+    assert_equal 2, series.first.fetch(:data).length
+    assert_equal 2, series.first.fetch(:data).last.fetch(:y)
+    assert_equal 1, series.first.fetch(:data).first.fetch(:y)
+    assert_equal 12, token_series.first.fetch(:data).last.fetch(:y)
+    assert_equal 3, token_series.first.fetch(:data).first.fetch(:y)
+  end
+
+  def test_top_prompt_call_rows_resolve_names_without_per_prompt_lookups
+    root_id = create_recording_id
+    create_run(
+      root_id: root_id, status: "completed", tokens: 1,
+      prompt_namespace: "docs", prompt_key: "summarize", prompt_name_snapshot: "Summarize page"
+    )
+    create_run(
+      root_id: root_id, status: "completed", tokens: 1,
+      prompt_namespace: "docs", prompt_key: "summarize", prompt_name_snapshot: "Summarize page"
+    )
+    create_run(
+      root_id: root_id, status: "completed", tokens: 1,
+      prompt_namespace: "docs", prompt_key: "outline", prompt_name_snapshot: "Outline"
+    )
+
+    rows = AdminScreens::RecordingStudioAIWidgets.top_prompt_call_rows(
+      RecordingStudioAI::Run.where(root_recording_id: root_id),
+      range: 1.day.ago..Time.current,
+      limit: 5
+    )
+
+    assert_equal ["Summarize page", "docs", "summarize", 2], rows.first
+    assert_equal ["Outline", "docs", "outline", 1], rows.last
+  end
+
+  def test_widget_memo_dedupes_repeated_chart_row_lookups
+    root_id = create_recording_id
+    create_run(root_id: root_id, status: "completed", tokens: 10, resolved_model: "gpt-test")
+    context = Object.new
+    context.define_singleton_method(:root_recording) { Actor.new(id: root_id) }
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+
+    first = AdminScreens::RecordingStudioAIWidgets.top_model_call_volume_rows(context)
+    second = AdminScreens::RecordingStudioAIWidgets.top_model_call_volume_rows(context)
+
+    assert_equal first, second
+    assert_equal [["gpt-test", 1]], first
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
   def test_warning_metrics_are_restricted_to_visible_roots

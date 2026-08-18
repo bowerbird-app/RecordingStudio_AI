@@ -16,7 +16,10 @@
         <% if @sensitive %>
           <div><dt class="opacity-70">Provider ID</dt><dd class="break-all"><%= @batch.provider_batch_id.presence || "None" %></dd></div>
           <div><dt class="opacity-70">Error</dt><dd><%= [@batch.error_category, @batch.error_code, @batch.error_message].compact.join(": ").presence || "None" %></dd></div>
-          <div class="md:col-span-3"><dt class="opacity-70">Metadata</dt><dd><pre class="mt-1 overflow-auto whitespace-pre-wrap text-xs"><%= admin_json(@batch.metadata) %></pre></dd></div>
+          <div class="md:col-span-3">
+            <dt class="opacity-70">Metadata</dt>
+            <dd><%= admin_code_block(admin_json(@batch.metadata), title: "Metadata", language: "json") %></dd>
+          </div>
         <% end %>
       </dl>
     <% end %>
@@ -26,10 +29,37 @@
     <% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Items", subtitle: "Position, linked run, provider outcome, and retained response", variant: :h3, class: "mb-0 pb-0") %><% end %>
     <% card.body do %>
       <% if @items.any? %>
-        <div class="overflow-x-auto"><table class="w-full min-w-max text-left text-sm"><thead><tr class="border-b"><th class="p-3">Position / reference</th><th class="p-3">Run / provider item</th><th class="p-3">Status</th><th class="p-3">Timing</th><th class="p-3">Usage</th><th class="p-3">Finish / error</th><th class="p-3">Response</th></tr></thead><tbody>
-          <% @items.each do |item| %><tr class="border-b align-top"><td class="p-3"><%= item.position %> / <%= item.reference %></td><td class="p-3"><%= link_to "Run #{item.run_id}", admin_run_path(item.run_id) %></td><td class="p-3"><%= render FlatPack::Badge::Component.new(text: item.status.humanize, style: admin_status_style(item.status), size: :sm) %></td><td class="p-3"><%= item.started_at&.to_fs(:short) || "Unknown" %> to <%= item.completed_at&.to_fs(:short) || "In progress" %></td><td class="p-3"><%= admin_tokens(item.total_tokens) %></td><td class="p-3"><%= item.finish_reason.presence || "Unknown" %><% if @sensitive && item.error_code.present? %><div class="text-xs"><%= [item.error_code, item.error_message].compact.join(": ") %></div><% end %></td><td class="p-3"><% if item.response.nil? %>Response content was not retained for this execution.<% elsif @sensitive %><%= link_to "View retained response", admin_retained_response_path(item.response) %><% else %>Retained response is restricted.<% end %></td></tr><% end %>
-        </tbody></table></div>
-      <% else %><p class="text-sm opacity-70">No batch items were recorded.</p><% end %>
+        <%= render FlatPack::Table::Component.new(data: @items) do |table| %>
+          <% table.column(title: "Position / reference") { |item| "#{item.position} / #{item.reference}" } %>
+          <% table.column(title: "Run / provider item") do |item| %>
+            <%= link_to "Run #{item.run_id}", admin_run_path(item.run_id) %>
+          <% end %>
+          <% table.column(title: "Status") do |item| %>
+            <%= render FlatPack::Badge::Component.new(text: item.status.humanize, style: admin_status_style(item.status), size: :sm) %>
+          <% end %>
+          <% table.column(title: "Timing") { |item| "#{item.started_at&.to_fs(:short) || 'Unknown'} to #{item.completed_at&.to_fs(:short) || 'In progress'}" } %>
+          <% table.column(title: "Usage") { |item| admin_tokens(item.total_tokens) } %>
+          <% table.column(title: "Finish / error") do |item| %>
+            <div>
+              <%= item.finish_reason.presence || "Unknown" %>
+              <% if @sensitive && item.error_code.present? %>
+                <div class="text-xs"><%= [item.error_code, item.error_message].compact.join(": ") %></div>
+              <% end %>
+            </div>
+          <% end %>
+          <% table.column(title: "Response") do |item| %>
+            <% if item.response.nil? %>
+              Response content was not retained for this execution.
+            <% elsif @sensitive %>
+              <%= link_to "View retained response", admin_retained_response_path(item.response) %>
+            <% else %>
+              Retained response is restricted.
+            <% end %>
+          <% end %>
+        <% end %>
+      <% else %>
+        <p class="text-sm opacity-70">No batch items were recorded.</p>
+      <% end %>
     <% end %>
   <% end %>
 </div>

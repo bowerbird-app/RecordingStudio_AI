@@ -28,6 +28,12 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     RecordingStudioAccessible.configuration.access_management_authorizer = @original_access_management_authorizer
   end
 
+  test "engine admin redirects unauthenticated visitors to sign in" do
+    get "/recording_studio_ai/admin"
+
+    assert_redirected_to new_user_session_path
+  end
+
   test "admin root remains available" do
     sign_in @user
 

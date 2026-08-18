@@ -10,6 +10,8 @@ module RecordingStudioAI
         @controller = controller
         @actor = resolve_actor!
         @root_ids = resolve_root_ids!
+        @root_recordings = {}
+        preload_root_recordings!
         root_ids.each { |root_id| authorize!(:view_execution, root_id: root_id) }
       end
 
@@ -17,7 +19,7 @@ module RecordingStudioAI
         Authorization.authorize!(
           action,
           attribution: Contracts::Attribution.new(
-            root_recording: RecordingStudio::Recording.find(root_id),
+            root_recording: root_recording_for(root_id),
             initiator: actor,
             execution_source: :admin
           ),
@@ -46,6 +48,19 @@ module RecordingStudioAI
         values = Array(resolver&.call(actor: actor, controller: @controller))
         ids = values.filter_map { |value| value.respond_to?(:id) ? value.id : value }.uniq
         ids.presence || raise(ActiveRecord::RecordNotFound, "no visible administration roots")
+      end
+
+      def preload_root_recordings!
+        klass = RecordingStudio::Recording
+        return unless klass.respond_to?(:where)
+
+        klass.where(id: root_ids).each do |recording|
+          @root_recordings[recording.id] = recording
+        end
+      end
+
+      def root_recording_for(root_id)
+        @root_recordings[root_id] ||= RecordingStudio::Recording.find(root_id)
       end
     end
   end

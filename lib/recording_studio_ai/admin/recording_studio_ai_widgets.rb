@@ -61,12 +61,50 @@ module AdminScreens
       context
     end
 
+    WIDGET_MEMO_KEY = :recording_studio_ai_widget_memo unless const_defined?(:WIDGET_MEMO_KEY)
+
     def clear_admin_context!
       Thread.current[ADMIN_CONTEXT_KEY] = nil
+      Thread.current[WIDGET_MEMO_KEY] = nil
     end
 
     def admin_context
       Thread.current[ADMIN_CONTEXT_KEY]
+    end
+
+    def memoize_widget(key)
+      store = (Thread.current[WIDGET_MEMO_KEY] ||= {})
+      return store[key] if store.key?(key)
+
+      store[key] = yield
+    end
+
+    # DATE(...) is portable across SQLite (gem tests) and PostgreSQL (hosts).
+    def sql_calendar_date(column)
+      Arel.sql("DATE(#{column})")
+    end
+
+    def normalize_sql_date(value)
+      case value
+      when Date then value
+      when Time, DateTime, ActiveSupport::TimeWithZone then value.to_date
+      else Date.parse(value.to_s)
+      end
+    end
+
+    def counts_by_calendar_date(scope, column: "#{scope.klass.table_name}.created_at")
+      scope.group(sql_calendar_date(column)).count.transform_keys { |key| normalize_sql_date(key) }
+    end
+
+    def sums_by_calendar_date(scope, field, column: "#{scope.klass.table_name}.created_at")
+      scope.group(sql_calendar_date(column)).sum(field).transform_keys { |key| normalize_sql_date(key) }
+    end
+
+    def grouped_daily_counts(scope, *group_columns, column: "#{scope.klass.table_name}.created_at")
+      scope.group(*group_columns, sql_calendar_date(column)).count.transform_keys do |key|
+        *identity, date = Array(key)
+        [*identity, normalize_sql_date(date)]
+      end
     end
 
     # Fail closed: missing root yields no rows instead of every tenant's runs.
@@ -204,14 +242,17 @@ module AdminScreens
     end
 
     def p90_latency(scope)
-      percentile_latency(scope.pluck(:latency_ms), percentile: 0.9)
+      count = scope.count
+      return 0 if count.zero?
+
+      offset = [(count * 0.9).ceil - 1, 0].max
+      scope.order(:latency_ms).offset(offset).limit(1).pick(:latency_ms).to_i
     end
 
     def daily_p90_latency_series(scope, range: 30.days.ago..Time.current)
-      scope.where(created_at: range).pluck(:created_at, :latency_ms).group_by do |created_at, _latency_ms|
-        created_at.to_date
-      end.sort_by(&:first).map do |date, rows|
-        { x: date.strftime("%b %-d"), y: percentile_latency(rows.map(&:last), percentile: 0.9) }
+      rows = scope.where(created_at: range).pluck(:created_at, :latency_ms)
+      rows.group_by { |created_at, _latency_ms| created_at.to_date }.sort_by(&:first).map do |date, day_rows|
+        { x: date.strftime("%b %-d"), y: percentile_latency(day_rows.map(&:last), percentile: 0.9) }
       end
     end
 
@@ -226,6 +267,15 @@ module AdminScreens
       date_range = latency_date_range(context, dimension: dimension)
       runs = runs_scope(context).where(created_at: date_range).where.not(latency_ms: nil)
       latency_rows_for_runs(runs, dimension: dimension, date_range: date_range)
+    end
+
+    def latency_chart_rows(context, dimension:, range: 30.days.ago..Time.current, limit: 5)
+      memoize_widget([:latency_chart_rows, context.object_id, dimension, range.begin.to_f, range.end.to_f, limit]) do
+        latency_rows_for_runs(
+          runs_scope(context).where(created_at: range).where.not(latency_ms: nil),
+          dimension: dimension
+        ).first(limit)
+      end
     end
 
     def latency_rows_for_runs(runs, dimension:, date_range: nil)
@@ -335,6 +385,12 @@ module AdminScreens
       end.sort_by { |_model, rate| -rate }.first(limit)
     end
 
+    def retry_rate_chart_rows(context, range: 30.days.ago..Time.current, limit: 3)
+      memoize_widget([:retry_rate_chart_rows, context.object_id, range.begin.to_f, range.end.to_f, limit]) do
+        retry_rate_by_model_rows(runs_scope(context), range: range, limit: limit)
+      end
+    end
+
     def custom_tool_rows(context)
       invocations = tool_scope(context)
       date_range_value = registered_custom_tools_date_range_value(context)
@@ -345,9 +401,12 @@ module AdminScreens
                    end
       range_invocations = invocations.where(created_at: date_range)
       range_counts = range_invocations.group(:tool_key, :tool_version).count
-      daily_counts = range_invocations.group_by do |invocation|
-        [invocation.tool_key, invocation.tool_version, invocation.created_at.to_date]
-      end.transform_values(&:count)
+      daily_counts = grouped_daily_counts(
+        range_invocations,
+        :tool_key,
+        :tool_version,
+        column: "#{RecordingStudioAI::CustomToolInvocation.table_name}.created_at"
+      )
       completed_counts = range_invocations.where(status: "completed").group(:tool_key, :tool_version).count
       error_counts = range_invocations.where(status: %w[failed denied rejected cancelled]).group(:tool_key,
                                                                                                  :tool_version).count
@@ -386,9 +445,13 @@ module AdminScreens
                    end
       range_runs = runs.where(created_at: date_range)
       range_counts = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).count
-      daily_counts = range_runs.group_by do |run|
-        [run.prompt_namespace, run.prompt_key, run.prompt_version, run.created_at.to_date]
-      end.transform_values(&:count)
+      daily_counts = grouped_daily_counts(
+        range_runs,
+        :prompt_namespace,
+        :prompt_key,
+        :prompt_version,
+        column: "#{RecordingStudioAI::Run.table_name}.created_at"
+      )
       completed_counts = range_runs.where(status: "completed").group(:prompt_namespace, :prompt_key,
                                                                      :prompt_version).count
       error_counts = range_runs.where(status: %w[failed cancelled]).group(:prompt_namespace, :prompt_key,
@@ -428,23 +491,35 @@ module AdminScreens
     end
 
     def top_prompt_call_rows(scope, range: 30.days.ago..Time.current, limit: 5)
-      scope.where(created_at: range)
-           .where.not(prompt_key: nil)
-           .group(:prompt_namespace, :prompt_key)
-           .count
-           .sort_by { |_identity, count| -count }
-           .first(limit)
-           .filter_map do |(namespace, key), calls|
-             definition = RecordingStudioAI.prompts.fetch(namespace, key) if namespace.present?
-             name = definition&.name ||
-                    scope.where(prompt_namespace: namespace, prompt_key: key)
-                         .where.not(prompt_name_snapshot: [nil, ""])
-                         .order(created_at: :desc)
-                         .limit(1)
-                         .pick(:prompt_name_snapshot) ||
-                    key
-             [name, namespace, key, calls]
-           end
+      top = scope.where(created_at: range)
+                 .where.not(prompt_key: nil)
+                 .group(:prompt_namespace, :prompt_key)
+                 .count
+                 .sort_by { |_identity, count| -count }
+                 .first(limit)
+      return [] if top.empty?
+
+      snapshot_names = latest_prompt_name_snapshots(scope, top.map(&:first))
+      top.filter_map do |(namespace, key), calls|
+        definition = RecordingStudioAI.prompts.fetch(namespace, key) if namespace.present?
+        name = definition&.name || snapshot_names[[namespace, key]] || key
+        [name, namespace, key, calls]
+      end
+    end
+
+    def latest_prompt_name_snapshots(scope, identities)
+      return {} if identities.empty?
+
+      namespaces = identities.map(&:first).uniq
+      keys = identities.map(&:last).uniq
+      rows = scope.where(prompt_namespace: namespaces, prompt_key: keys)
+                  .where.not(prompt_name_snapshot: [nil, ""])
+                  .order(created_at: :desc)
+                  .pluck(:prompt_namespace, :prompt_key, :prompt_name_snapshot)
+
+      rows.each_with_object({}) do |(namespace, key, name), memo|
+        memo[[namespace, key]] ||= name
+      end
     end
 
     def prompt_chart_label(row)
@@ -507,9 +582,11 @@ module AdminScreens
                    .where(created_at: date_range)
                    .where.not(resolved_provider: [nil, ""])
       call_counts = range_runs.group(:resolved_provider).count
-      daily_counts = range_runs.group_by do |run|
-        [run.resolved_provider.to_s, run.created_at.to_date]
-      end.transform_values(&:count)
+      daily_counts = grouped_daily_counts(
+        range_runs,
+        :resolved_provider,
+        column: "#{RecordingStudioAI::Run.table_name}.created_at"
+      )
 
       rows = RecordingStudioAI.configuration.providers.map do |key, provider|
         provider_key = key.to_s
@@ -533,9 +610,12 @@ module AdminScreens
                    .where(created_at: date_range)
                    .where.not(resolved_model: [nil, ""])
       call_counts = range_runs.group(:resolved_provider, :resolved_model).count
-      daily_counts = range_runs.group_by do |run|
-        [run.resolved_provider.to_s, run.resolved_model.to_s, run.created_at.to_date]
-      end.transform_values(&:count)
+      daily_counts = grouped_daily_counts(
+        range_runs,
+        :resolved_provider,
+        :resolved_model,
+        column: "#{RecordingStudioAI::Run.table_name}.created_at"
+      )
 
       rows = RecordingStudioAI.models.all.map do |definition|
         provider_key = definition.provider.to_s
@@ -610,98 +690,105 @@ module AdminScreens
     end
 
     def mini_chart(series)
-      options = {
-        chart: { toolbar: { show: false }, sparkline: { enabled: true } },
-        colors: ["#000000"],
-        stroke: { curve: "smooth", width: 2 },
-        tooltip: { theme: "light" },
-        xaxis: { labels: { show: false } },
-        yaxis: { min: 0, labels: { show: false } },
-        grid: { show: false }
-      }
-
-      ActionController::Base.helpers.content_tag(
-        :div,
-        nil,
-        class: "h-16 w-36",
-        data: {
-          controller: "flat-pack--chart",
-          "flat-pack--chart-series-value": [{ name: "Calls", data: series }].to_json,
-          "flat-pack--chart-type-value": "line",
-          "flat-pack--chart-options-value": options.to_json,
-          "flat-pack--chart-height-value": 64
-        }
+      render_flatpack(
+        FlatPack::Chart::Component.new(
+          series: [{ name: "Calls", data: series }],
+          type: :line,
+          height: 64,
+          card: false,
+          class: "h-16 w-36",
+          options: {
+            chart: { toolbar: { show: false }, sparkline: { enabled: true } },
+            colors: ["#000000"],
+            stroke: { curve: "smooth", width: 2 },
+            tooltip: { theme: "light" },
+            xaxis: { labels: { show: false } },
+            yaxis: { min: 0, labels: { show: false } },
+            grid: { show: false }
+          }
+        )
       )
     end
 
     def custom_tool_definition_modal(row)
-      helpers = ActionController::Base.helpers
-      modal_id = "custom-tool-definition-#{row.key}-#{row.version}"
       definition = RecordingStudioAI.tools.fetch(row.key, version: row.version)
-      fields = {
-        "Description" => definition.description,
-        "Use when" => definition.use_when,
-        "Do not use when" => definition.do_not_use_when,
-        "Returns" => definition.returns,
-        "Executor" => definition.executor_label,
-        "Safety" => "#{definition.read_only ? 'Read only' : 'Writes'}; destructive: #{definition.destructive ? 'yes' : 'no'}; confirmation: #{definition.requires_confirmation ? 'required' : 'not required'}; idempotent: #{definition.idempotent ? 'yes' : 'no'}"
-      }
       definition_modal(
-        helpers: helpers,
-        modal_id: modal_id,
+        modal_id: "custom-tool-definition-#{row.key}-#{row.version}",
         title: "#{definition.name} v#{definition.version}",
         trigger_text: "#{row.name} v#{row.version}",
         aria_label: "Show definition for #{row.name}",
-        fields: fields
+        fields: {
+          "Description" => definition.description,
+          "Use when" => definition.use_when,
+          "Do not use when" => definition.do_not_use_when,
+          "Returns" => definition.returns,
+          "Executor" => definition.executor_label,
+          "Safety" => "#{definition.read_only ? 'Read only' : 'Writes'}; destructive: #{definition.destructive ? 'yes' : 'no'}; confirmation: #{definition.requires_confirmation ? 'required' : 'not required'}; idempotent: #{definition.idempotent ? 'yes' : 'no'}"
+        }
       )
     end
 
     def prompt_definition_modal(row)
-      helpers = ActionController::Base.helpers
-      modal_id = "registered-prompt-definition-#{row.namespace}-#{row.key}-#{row.version}"
       definition = RecordingStudioAI.prompts.fetch(row.namespace, row.key, version: row.version)
-      fields = {
-        "Namespace" => definition.namespace,
-        "Key" => definition.key,
-        "Short name" => definition.short_name,
-        "Description" => definition.description,
-        "Inputs" => definition.inputs.presence&.join(", ") || "None",
-        "Tools" => if definition.tools.any?
-                     definition.tools.map do |tool|
-                       tool[:version] ? "#{tool.fetch(:key)} v#{tool[:version]}" : tool.fetch(:key)
-                     end.join(", ")
-                   else
-                     "None"
-                   end,
-        "Defaults" => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || "None",
-        "Prompt" => prompt_messages_markup(helpers, definition.messages)
-      }
       definition_modal(
-        helpers: helpers,
-        modal_id: modal_id,
+        modal_id: "registered-prompt-definition-#{row.namespace}-#{row.key}-#{row.version}",
         title: "#{definition.name} v#{definition.version}",
         trigger_text: "#{row.name} v#{row.version}",
         aria_label: "Show definition for #{row.name}",
-        fields: fields
+        fields: {
+          "Namespace" => definition.namespace,
+          "Key" => definition.key,
+          "Short name" => definition.short_name,
+          "Description" => definition.description,
+          "Inputs" => definition.inputs.presence&.join(", ") || "None",
+          "Tools" => prompt_tool_labels(definition),
+          "Defaults" => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || "None",
+          "Prompt" => prompt_messages_markup(definition.messages)
+        }
       )
     end
 
-    def prompt_messages_markup(helpers, messages)
+    def prompt_tool_labels(definition)
+      return "None" if definition.tools.empty?
+
+      definition.tools.map do |tool|
+        tool[:version] ? "#{tool.fetch(:key)} v#{tool[:version]}" : tool.fetch(:key)
+      end.join(", ")
+    end
+
+    def prompt_messages_markup(messages)
+      helpers = ActionController::Base.helpers
       helpers.content_tag(:div, class: "grid gap-3") do
-        helpers.safe_join(messages.map do |message|
-          helpers.content_tag(:div, class: "rounded-md border border-[var(--modal-border-color)] p-3") do
-            helpers.safe_join([
-                                helpers.content_tag(:div, message.fetch(:role).to_s.humanize,
-                                                    class: "mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--surface-muted-content-color)]"),
-                                helpers.content_tag(:pre, message.fetch(:content),
-                                                    class: "whitespace-pre-wrap break-words font-sans text-sm")
-                              ])
-          end
-        end)
+        helpers.safe_join(messages.map { |message| prompt_message_card(message) })
       end
     end
 
-    def definition_modal(helpers:, modal_id:, title:, trigger_text:, aria_label:, fields:)
+    def prompt_message_card(message)
+      render_flatpack(FlatPack::Card::Component.new) do |card|
+        card.header do
+          render_flatpack(
+            FlatPack::PageTitle::Component.new(
+              title: message.fetch(:role).to_s.humanize,
+              variant: :h4,
+              class: "mb-0 pb-0"
+            )
+          )
+        end
+        card.body do
+          render_flatpack(
+            FlatPack::CodeBlock::Component.new(
+              title: "Message",
+              language: "text",
+              code: message.fetch(:content).to_s,
+              separated: false
+            )
+          )
+        end
+      end
+    end
+
+    def definition_modal(modal_id:, title:, trigger_text:, aria_label:, fields:)
+      helpers = ActionController::Base.helpers
       body = helpers.content_tag(:dl, class: "grid gap-4 text-sm") do
         helpers.safe_join(fields.map do |label, value|
           helpers.content_tag(:div) do
@@ -713,39 +800,42 @@ module AdminScreens
           end
         end)
       end
-      modal = helpers.content_tag(
-        :div,
-        helpers.safe_join([
-                            helpers.content_tag(:div, nil, class: "absolute inset-0",
-                                                           data: { action: "click->flat-pack--modal#clickBackdrop" }),
-                            helpers.content_tag(:div,
-                                                class: "relative flex w-full min-h-screen items-start sm:items-center justify-center p-4 sm:p-6") do
-                              helpers.content_tag(:div,
-                                                  class: "relative flex flex-col min-h-0 max-h-[calc(100vh-2rem)] w-full overflow-hidden max-w-2xl p-4 sm:p-6 bg-[var(--modal-surface-color)] rounded-lg shadow-lg border border-[var(--modal-border-color)] transform transition-all duration-300 scale-95 opacity-0", role: "dialog", aria: { modal: true }, data: { "flat-pack--modal-target": "dialog" }) do
-                                helpers.safe_join([
-                                                    helpers.content_tag(:div,
-                                                                        class: "flex items-center justify-between gap-4") do
-                                                      helpers.safe_join([
-                                                                          helpers.content_tag(:h2, title,
-                                                                                              class: "text-lg font-semibold text-[var(--modal-title-color)]"),
-                                                                          helpers.content_tag(:button, "×", type: "button", class: "text-xl", aria: { label: "Close" },
-                                                                                                            data: { action: "flat-pack--modal#close" })
-                                                                        ])
-                                                    end,
-                                                    helpers.content_tag(:div, body, class: "mt-6 min-h-0 flex-1 overflow-y-auto")
-                                                  ])
-                              end
-                            end
-                          ]),
-        id: modal_id,
-        class: "fixed inset-0 z-50 hidden overflow-y-auto bg-[var(--modal-backdrop-color)] backdrop-blur-[var(--modal-backdrop-blur)] transition-opacity duration-300",
-        data: { controller: "flat-pack--modal", "flat-pack--modal-close-on-backdrop-value": true,
-                "flat-pack--modal-close-on-escape-value": true, action: "keydown.esc->flat-pack--modal#close" },
-        aria: { hidden: true }
+      trigger = render_flatpack(
+        FlatPack::Button::Component.new(
+          text: trigger_text,
+          style: :ghost,
+          size: :sm,
+          type: "button",
+          data: { modal_id: modal_id },
+          aria: { label: aria_label }
+        )
       )
-      trigger = helpers.content_tag(:button, trigger_text, type: "button",
-                                                          class: "text-(--color-primary-background-color) underline", data: { modal_id: modal_id }, aria: { label: aria_label })
+      modal = render_flatpack(
+        FlatPack::Modal::Component.new(id: modal_id, title: title, size: :lg)
+      ) do |component|
+        component.body { body }
+      end
       helpers.safe_join([trigger, modal])
+    end
+
+    def render_flatpack(component, &)
+      html = component_view_context.render(component, &)
+      html.respond_to?(:html_safe) ? html : html.to_s.html_safe
+    end
+
+    def component_view_context
+      context = admin_context
+      return context.view_context if context.respond_to?(:view_context) && context.view_context
+      return context.controller.view_context if context&.controller.respond_to?(:view_context)
+
+      fallback_component_view_context
+    end
+
+    def fallback_component_view_context
+      controller = ActionController::Base.new
+      request = ActionDispatch::Request.empty
+      controller.set_request!(request) if controller.respond_to?(:set_request!)
+      controller.view_context
     end
 
     def percentage(part, whole)
@@ -785,22 +875,15 @@ module AdminScreens
     def weekly_calls_series(scope, weeks_back: 12, series_name: "AI calls")
       current_week_start = Time.current.beginning_of_week
       start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
-      calls_by_week = scope.where(created_at: start_week..Time.current)
-                           .group_by { |run| run.created_at.beginning_of_week.to_date }
-
-      week_starts = []
-      cursor = start_week
-      while cursor <= current_week_start
-        week_starts << cursor
-        cursor += 1.week
-      end
+      range = start_week..Time.current
+      daily_counts = counts_by_calendar_date(scope.where(created_at: range))
 
       [{
         name: series_name,
-        data: week_starts.map do |week_start|
+        data: week_starts(start_week, current_week_start).map do |week_start|
           {
             x: week_start.strftime("%b %-d"),
-            y: calls_by_week.fetch(week_start.to_date, []).count
+            y: sum_daily_counts_for_week(daily_counts, week_start)
           }
         end
       }]
@@ -809,26 +892,33 @@ module AdminScreens
     def weekly_token_series(scope, weeks_back: 12, series_name: "Token usage")
       current_week_start = Time.current.beginning_of_week
       start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
-      tokens_by_week = scope.where(created_at: start_week..Time.current)
-                            .group_by { |run| run.created_at.beginning_of_week.to_date }
-
-      week_starts = []
-      cursor = start_week
-      while cursor <= current_week_start
-        week_starts << cursor
-        cursor += 1.week
-      end
+      range = start_week..Time.current
+      daily_sums = sums_by_calendar_date(scope.where(created_at: range), :total_tokens)
 
       [{
         name: series_name,
-        data: week_starts.map do |week_start|
-          week_runs = tokens_by_week.fetch(week_start.to_date, [])
+        data: week_starts(start_week, current_week_start).map do |week_start|
           {
             x: week_start.strftime("%b %-d"),
-            y: week_runs.sum { |run| run.total_tokens.to_i }
+            y: sum_daily_counts_for_week(daily_sums, week_start)
           }
         end
       }]
+    end
+
+    def week_starts(start_week, current_week_start)
+      starts = []
+      cursor = start_week
+      while cursor <= current_week_start
+        starts << cursor
+        cursor += 1.week
+      end
+      starts
+    end
+
+    def sum_daily_counts_for_week(daily_values, week_start)
+      week_end = [week_start.to_date + 6, Time.current.to_date].min
+      (week_start.to_date..week_end).sum { |date| daily_values.fetch(date, 0).to_i }
     end
 
     def top_model_token_rows(scope, range:, limit: 5)
@@ -838,6 +928,23 @@ module AdminScreens
            .sum(:total_tokens)
            .sort_by { |_model, total_tokens| -total_tokens.to_i }
            .first(limit)
+    end
+
+    def top_model_token_chart_rows(context, range: 30.days.ago..Time.current, limit: 5)
+      memoize_widget([:top_model_token_chart_rows, context.object_id, range.begin.to_f, range.end.to_f, limit]) do
+        top_model_token_rows(runs_scope(context), range: range, limit: limit)
+      end
+    end
+
+    def top_model_call_volume_rows(context, range: 30.days.ago..Time.current, limit: 5)
+      memoize_widget([:top_model_call_volume_rows, context.object_id, range.begin.to_f, range.end.to_f, limit]) do
+        runs_scope(context)
+          .where(created_at: range)
+          .group(:resolved_model)
+          .count
+          .sort_by { |_model, count| -count.to_i }
+          .first(limit)
+      end
     end
 
     def token_change_label(scope, current_range:, previous_range:)
@@ -854,7 +961,7 @@ module AdminScreens
       warnings = []
 
       usage_today = scope.where(created_at: now.beginning_of_day..now).count
-      baseline_daily = previous_week.group_by { |run| run.created_at.to_date }.values.map(&:count)
+      baseline_daily = counts_by_calendar_date(previous_week).values
       baseline_average = baseline_daily.empty? ? 0 : (baseline_daily.sum.to_f / baseline_daily.size)
       if usage_today >= [20, (baseline_average * 1.8).ceil].max
         warnings << {

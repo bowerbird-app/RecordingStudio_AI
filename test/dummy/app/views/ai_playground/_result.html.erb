@@ -1,42 +1,51 @@
 <div id="<%= frame_id %>" class="space-y-6">
   <% if error_message.present? %>
-    <div class="space-y-2">
-      <h3 class="text-xl font-semibold text-(--color-danger-background-color)">Execution error</h3>
-      <p class="text-sm"><%= error_message %></p>
-    </div>
+    <%= render FlatPack::Alert::Component.new(
+      title: "That run didn’t work",
+      description: error_message,
+      style: :danger
+    ) %>
   <% end %>
 
   <% if response_payload.present? %>
     <div class="space-y-3">
-      <h3 class="text-xl font-semibold">Execution result</h3>
-      <% if request_id.present? %>
-        <p class="text-sm text-(--surface-muted-content-color)">Request ID: <%= request_id %></p>
-      <% end %>
+      <%= render FlatPack::PageTitle::Component.new(
+        title: "Execution result",
+        subtitle: request_id.present? ? "Request ID: #{request_id}" : nil,
+        variant: :h3,
+        class: "mb-0 pb-0"
+      ) %>
 
       <% if stream_text.present? %>
-        <div class="space-y-2">
-          <h4 class="text-sm font-semibold">Streamed text</h4>
-          <p class="text-sm whitespace-pre-wrap"><%= stream_text %></p>
-        </div>
+        <%= render FlatPack::CodeBlock::Component.new(
+          title: "Streamed text",
+          language: "text",
+          code: stream_text,
+          separated: false
+        ) %>
       <% end %>
 
       <% if stream_events.present? %>
-        <div class="space-y-2">
-          <h4 class="text-sm font-semibold">Stream events</h4>
-          <pre class="overflow-auto rounded-md border border-(--surface-border-color) p-3 text-xs"><%= JSON.pretty_generate(stream_events) %></pre>
-        </div>
+        <%= render FlatPack::CodeBlock::Component.new(
+          title: "Stream events",
+          language: "json",
+          code: JSON.pretty_generate(stream_events),
+          separated: false
+        ) %>
       <% end %>
 
-      <div class="space-y-2">
-        <h4 class="text-sm font-semibold">Response JSON</h4>
-        <pre class="overflow-auto rounded-md border border-(--surface-border-color) p-3 text-xs"><%= JSON.pretty_generate(response_payload) %></pre>
-      </div>
+      <%= render FlatPack::CodeBlock::Component.new(
+        title: "Response JSON",
+        language: "json",
+        code: JSON.pretty_generate(response_payload),
+        separated: false
+      ) %>
     </div>
   <% end %>
 
   <% if created_runs.present? %>
     <div class="space-y-3">
-      <h3 class="text-xl font-semibold">Created runs</h3>
+      <%= render FlatPack::PageTitle::Component.new(title: "Created runs", variant: :h3, class: "mb-0 pb-0") %>
       <%= render FlatPack::List::Component.new(divider: true) do %>
         <% created_runs.each do |run| %>
           <%= render FlatPack::List::Item.new(icon: :cpu_chip) do %>
@@ -52,7 +61,7 @@
 
   <% if created_attempts.present? %>
     <div class="space-y-3">
-      <h3 class="text-xl font-semibold">Created attempts</h3>
+      <%= render FlatPack::PageTitle::Component.new(title: "Created attempts", variant: :h3, class: "mb-0 pb-0") %>
       <%= render FlatPack::List::Component.new(divider: true) do %>
         <% created_attempts.each do |attempt| %>
           <%= render FlatPack::List::Item.new(icon: :clock) do %>

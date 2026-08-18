@@ -23,21 +23,11 @@ module AdminScreens
     change_good_when :down
     chart_type :bar
     series do |context|
-      rows = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-                                             .where(created_at: 30.days.ago..Time.current)
-                                             .where.not(latency_ms: nil),
-        dimension: :model
-      ).first(5)
+      rows = AdminScreens::RecordingStudioAIWidgets.latency_chart_rows(context, dimension: :model)
       [{ name: "P90 latency (ms)", data: rows.map(&:p90_latency_ms) }]
     end
     chart_options do |context|
-      rows = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
-                                             .where(created_at: 30.days.ago..Time.current)
-                                             .where.not(latency_ms: nil),
-        dimension: :model
-      ).first(5)
+      rows = AdminScreens::RecordingStudioAIWidgets.latency_chart_rows(context, dimension: :model)
       {
         height: 240,
         plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
