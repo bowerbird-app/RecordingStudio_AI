@@ -68,6 +68,28 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.5] - 2026-08-18
+
+### Changed
+
+- Admin weekly call/token charts and registered tool/prompt/provider/model
+  sparklines aggregate with SQL `DATE(...)` grouping instead of loading every
+  matching row into Ruby.
+- Admin overview builds the 7-day activity window with grouped SQL queries and
+  reads p95 latency via ordered offset instead of plucking every latency.
+- Admin Access caches root recordings for the request so sensitive checks do not
+  re-`find` each root.
+- Batch sync indexes items once per apply pass instead of `find_by` per provider
+  item.
+- Chart widgets that need the same top-N rows for series and axis labels memoize
+  that query for the request; prompt top-N name resolution uses one snapshot
+  query instead of a lookup per prompt.
+
+### Upgrade notes
+
+- No host configuration changes. Admin chart numbers should match the previous
+  totals; only query shape and request caching changed.
+
 ## [0.2.4] - 2026-08-18
 
 ### Security

@@ -23,11 +23,7 @@ module AdminScreens
     change_good_when :down
     chart_type :bar
     series do |context|
-      rows = AdminScreens::RecordingStudioAIWidgets.top_model_token_rows(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context),
-        range: 30.days.ago..Time.current,
-        limit: 5
-      )
+      rows = AdminScreens::RecordingStudioAIWidgets.top_model_token_chart_rows(context)
 
       [{
         name: "Token usage",
@@ -35,11 +31,7 @@ module AdminScreens
       }]
     end
     chart_options do |context|
-      rows = AdminScreens::RecordingStudioAIWidgets.top_model_token_rows(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context),
-        range: 30.days.ago..Time.current,
-        limit: 5
-      )
+      rows = AdminScreens::RecordingStudioAIWidgets.top_model_token_chart_rows(context)
 
       {
         height: 240,

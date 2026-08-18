@@ -104,18 +104,21 @@ module RecordingStudioAI
       accepted_items = []
       Batch.transaction do
         batch.lock!
+        items_index = batch_items_index(batch)
         result.items.each do |item_result|
-          applied = apply_item_result!(batch, item_result)
+          applied = apply_item_result!(batch, item_result, items_index: items_index)
           accepted_items << applied if applied
         end
-        fail_pending_items!(batch, result.error) if fail_pending_items
-        terminalize_unresolved_items!(batch, result) if %w[completed cancelled expired failed].include?(result.status)
+        fail_pending_items!(batch, result.error, items_index: items_index) if fail_pending_items
+        if %w[completed cancelled expired failed].include?(result.status)
+          terminalize_unresolved_items!(batch, result, items_index: items_index)
+        end
         update_batch!(batch, result)
       end
       result.with(items: accepted_items)
     end
 
-    def terminalize_unresolved_items!(batch, result)
+    def terminalize_unresolved_items!(batch, result, items_index: nil)
       item_status = if result.status == "expired"
                       "expired"
                     else
@@ -129,18 +132,19 @@ module RecordingStudioAI
           retryable: false, provider: batch.provider
         )
       end
-      batch.batch_items.each do |item|
+      indexed_items(batch, items_index).each do |item|
         next if BatchItem.terminal_statuses.include?(item.status)
 
-        apply_item_result!(batch, Providers::BatchItemResult.new(
-                                    reference: item.reference, status: item_status, error: error
-                                  ))
+        apply_item_result!(
+          batch,
+          Providers::BatchItemResult.new(reference: item.reference, status: item_status, error: error),
+          items_index: items_index
+        )
       end
     end
 
-    def apply_item_result!(batch, result)
-      item = batch.batch_items.find_by(reference: result.reference)
-      item ||= batch.batch_items.find_by(provider_item_id: result.provider_item_id) if result.provider_item_id
+    def apply_item_result!(batch, result, items_index: nil)
+      item = find_batch_item(batch, result, items_index: items_index)
       return unless item
 
       result = CostCalculator.apply(
@@ -169,6 +173,28 @@ module RecordingStudioAI
       result
     end
 
+    def batch_items_index(batch)
+      items = batch.batch_items.to_a
+      {
+        by_reference: items.index_by(&:reference),
+        by_provider_item_id: items.select { |item| item.provider_item_id.present? }.index_by(&:provider_item_id)
+      }
+    end
+
+    def indexed_items(batch, items_index)
+      items_index ? items_index.fetch(:by_reference).values : batch.batch_items.to_a
+    end
+
+    def find_batch_item(batch, result, items_index: nil)
+      if items_index
+        items_index.fetch(:by_reference)[result.reference] ||
+          (result.provider_item_id && items_index.fetch(:by_provider_item_id)[result.provider_item_id])
+      else
+        batch.batch_items.find_by(reference: result.reference) ||
+          (result.provider_item_id && batch.batch_items.find_by(provider_item_id: result.provider_item_id))
+      end
+    end
+
     def update_run_from_item!(run, result, completed_at)
       return if Run.terminal_statuses.include?(run.status)
 
@@ -186,8 +212,8 @@ module RecordingStudioAI
                   ))
     end
 
-    def fail_pending_items!(batch, error)
-      batch.batch_items.each do |item|
+    def fail_pending_items!(batch, error, items_index: nil)
+      indexed_items(batch, items_index).each do |item|
         next if BatchItem.terminal_statuses.include?(item.status)
 
         normalized = Providers::BatchItemResult.new(
@@ -197,7 +223,7 @@ module RecordingStudioAI
             message: "Provider batch submission failed.", retryable: false, provider: batch.provider
           )
         )
-        apply_item_result!(batch, normalized)
+        apply_item_result!(batch, normalized, items_index: items_index)
       end
     end
 
