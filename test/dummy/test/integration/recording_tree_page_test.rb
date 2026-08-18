@@ -39,6 +39,8 @@ class RecordingTreePageTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Nothing selected"
     assert_includes response.body, "Switch to a workspace to see its tree."
   end
+
+  test "sidebar includes a link to recording tree page" do
     user = User.create!(email: "recording-tree-sidebar-#{SecureRandom.hex(4)}@example.com", password: "Password123!")
     sign_in user
 
