@@ -13,6 +13,7 @@ namespace :tailwindcss do
     gem_scan_roots = {
       "flat_pack" => ["app/components"],
       "recording_studio" => ["app/views"],
+      "recording_studio_accessible" => ["app/views", "app/components"],
       "recording_studio_admin" => ["app/views", "app/components"],
       "recording_studio_ai" => ["app/views", "lib/recording_studio_ai/admin"],
       "recording_studio_root_switchable" => ["app/views"]

@@ -19,6 +19,8 @@ class TailwindGemSourcesTest < ActiveSupport::TestCase
     assert_includes sources, "#{flatpack}/app/components/**/*.{rb,erb}"
     assert_includes sources, "#{engine}/app/views/**/*.erb"
     assert_includes sources, "#{engine}/lib/recording_studio_ai/admin/**/*.{rb,erb}"
+    accessible = Gem.loaded_specs.fetch("recording_studio_accessible").full_gem_path
+    assert_includes sources, "#{accessible}/app/components/**/*.{rb,erb}"
   end
 
   test "dummy tailwind entry imports generated gem sources" do
