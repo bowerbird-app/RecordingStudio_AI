@@ -103,6 +103,7 @@ class InstallGeneratorTest < Minitest::Test
     assert_includes install_guide, "Active Record Encryption"
     assert_includes install_guide, "ResponseCleanupJob"
     assert_includes install_guide, "admin_visible_roots_resolver"
+    assert_includes install_guide, "Recording Studio Admin's Accessible check"
     assert_includes install_guide, "provider-side retention"
     assert_includes install_guide, "db:rollback"
     refute_includes install_guide, "does not install migrations"

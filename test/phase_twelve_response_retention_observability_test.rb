@@ -305,6 +305,26 @@ class PhaseTwelveResponseRetentionObservabilityTest < RecordingStudioAI::Test::P
     assert_equal retained.attempt.run_id, calls.last[2]["run_id"] || calls.last[2][:run_id]
   end
 
+  def test_reader_skips_authorization_when_preauthorized
+    generate
+    retained = RecordingStudioAI::Response.first
+    called = false
+    RecordingStudioAI.configuration.authorization_handler = lambda do |**|
+      called = true
+      false
+    end
+
+    content = RecordingStudioAI::ResponseReader.new.read(
+      response: retained,
+      initiator: @initiator,
+      execution_source: :admin,
+      preauthorized: true
+    )
+
+    refute called
+    assert_equal "assembled response", content[:content_text]
+  end
+
   def test_reader_rejects_expired_response_without_mutating_it
     generate
     retained = RecordingStudioAI::Response.first
