@@ -262,7 +262,8 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     assert row
     assert_equal 1, row.calls
     assert_equal 4, row.calls_series.length
-    assert_equal 1, row.calls_series.sum { |point| point[:y] }
+    series_total = row.calls_series.sum { |point| point[:y] }
+    assert_equal 1, series_total
   ensure
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
