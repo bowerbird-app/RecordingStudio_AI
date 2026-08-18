@@ -18,6 +18,10 @@ Versioning and Keep a Changelog.
 - Dummy `/config` now matches the public API: `generate` (with `stream: true`)
   and separate batch methods. It no longer lists `stream` as a peer contract
   method.
+- Dummy `/config` moves the configuration table above “Add a Provider” and
+  lists every setting with required, possible values, default, and a short
+  description. The initializer example now sets `batch_synchronization_job`
+  and matches the `retain_responses` default.
 - Dummy sign-in works through Cursor Cloud and Codespaces forwarded previews by
   relaxing the CSRF origin check in development when `CURSOR_AGENT` or
   `CODESPACES` is set. CSRF tokens stay required.

@@ -69,14 +69,29 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Add a Provider"
     assert_includes response.body, "Add a Model"
     assert_includes response.body, "Create Profiles"
+    assert_includes response.body, "Configuration parameters"
     assert_includes response.body, "RecordingStudioAI.models.register"
     assert_includes response.body, "RecordingStudioAI.generate"
     assert_includes response.body, "stream: true"
     assert_includes response.body, "lib/recording_studio_ai/models/"
     assert_includes response.body, "delivery"
     assert_includes response.body, "modalities"
+    assert_includes response.body, ">Param<"
+    assert_includes response.body, ">Required<"
+    assert_includes response.body, ">Possible values<"
+    assert_includes response.body, ">Default<"
+    assert_includes response.body, ">Description<"
     refute_includes response.body, "Implement the contract methods your models need"
     refute_includes response.body, "used by generate, stream, and batch"
+    refute_includes response.body, "Configuration Reference"
+
+    documented = ConfigController::CONFIG_OPTIONS.map { |option| option[:key] }
+    assert_equal configuration_accessor_names.sort, documented.sort
+
+    configuration_accessor_names.each do |name|
+      assert_includes response.body, name, "expected /config to document #{name}"
+      assert_includes response.body, "config.#{name}", "expected initializer example to set #{name}"
+    end
   end
 
   test "ai playground shows capability-driven generate form and batch section" do
@@ -1175,6 +1190,10 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       }
     }
     follow_redirect!
+  end
+
+  def configuration_accessor_names
+    RecordingStudioAI::Configuration.instance_methods(false).grep(/=\z/).map { |name| name.to_s.chomp("=") }
   end
 
   def create_run!(status:, operation:, prompt_key: nil, prompt_name_snapshot: nil, prompt_namespace: nil,

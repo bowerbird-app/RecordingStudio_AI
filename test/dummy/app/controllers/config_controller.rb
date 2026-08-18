@@ -4,291 +4,339 @@ class ConfigController < ApplicationController
   CONFIG_OPTIONS = [
     {
       key: "openai_api_key",
-      required: "Conditional",
+      required: "When using OpenAI",
       accepted_values: "String or nil",
-      explanation: "API key for OpenAI provider. Required when OpenAI-backed profiles or overrides are used."
+      default: 'ENV["OPENAI_API_KEY"]',
+      explanation: "OpenAI API key."
     },
     {
       key: "gemini_api_key",
-      required: "Conditional",
+      required: "When using Gemini",
       accepted_values: "String or nil",
-      explanation: "API key for Gemini provider. Required when Gemini-backed profiles or overrides are used."
+      default: 'ENV["GEMINI_API_KEY"]',
+      explanation: "Gemini API key."
     },
     {
       key: "openai_client",
       required: "No",
-      accepted_values: "Custom client object or nil",
-      explanation: "Inject a custom OpenAI transport/client implementation."
+      accepted_values: "Client object or nil",
+      default: "nil",
+      explanation: "Swap in your own OpenAI client for tests or custom transport."
     },
     {
       key: "gemini_client",
       required: "No",
-      accepted_values: "Custom client object or nil",
-      explanation: "Inject a custom Gemini transport/client implementation."
+      accepted_values: "Client object or nil",
+      default: "nil",
+      explanation: "Swap in your own Gemini client for tests or custom transport."
     },
     {
       key: "default_profile",
-      required: "Yes",
-      accepted_values: "Symbol profile key (for example :low, :medium, :high)",
-      explanation: "Default profile used when requests do not specify a profile."
+      required: "No",
+      accepted_values: "Symbol, for example :low, :medium, :high",
+      default: ":medium",
+      explanation: "Profile used when a request does not pick one."
     },
     {
       key: "profiles",
-      required: "Yes",
-      accepted_values: "Hash of profile keys to ordered { provider:, model: } candidates",
-      explanation: "Core model routing map used by generate (pass stream: true to stream) and batch. Reference models by their provider API model string; capabilities/parameters/tools/modalities come from the model registry (RecordingStudioAI.models)."
+      required: "No",
+      accepted_values: "Hash of profile keys to ordered { provider:, model: } lists",
+      default: "low / medium / high built-in maps",
+      explanation: "Preferred provider and model order for generate (including stream: true) and batch."
     },
     {
       key: "allowed_provider_overrides",
       required: "No",
       accepted_values: "Array of provider symbols",
-      explanation: "Allow explicit provider overrides from callers. Keep empty to force profile-driven routing."
+      default: "[]",
+      explanation: "Providers a caller may force. Leave empty to stay on profiles."
     },
     {
       key: "providers",
       required: "No",
-      accepted_values: "Hash keyed by provider symbol => provider object",
-      explanation: "Provider registry. Override only for custom providers or tests."
+      accepted_values: "Hash of provider symbol => provider object",
+      default: "OpenAI and Gemini adapters",
+      explanation: "Registered providers. Override for a custom adapter or tests."
     },
     {
       key: "discovery_enabled",
       required: "No",
-      accepted_values: "Boolean",
-      explanation: "When true, RecordingStudioAI.configure calls discover_providers! to auto-register provider classes found under lib/recording_studio_ai/providers/*.rb."
+      accepted_values: "true or false",
+      default: "false",
+      explanation: "Auto-register provider classes under lib/recording_studio_ai/providers."
     },
     {
       key: "authorization_handler",
-      required: "Yes",
-      accepted_values: "Callable receiving keyword args",
-      explanation: "Authorization gate for AI actions. Should return true/false."
+      required: "No",
+      accepted_values: "Callable returning true or false",
+      default: "->(**) { false }",
+      explanation: "Return true to allow a call. Ships closed."
     },
     {
       key: "attribution_validator",
-      required: "Yes",
+      required: "No",
       accepted_values: "Callable(root_recording:, context_recording:)",
-      explanation: "Validates recording attribution boundaries before execution."
+      default: "built-in root and context check",
+      explanation: "Checks that the workspace root and context belong together."
     },
     {
       key: "cost_catalogs",
       required: "No",
-      accepted_values: "Hash",
-      explanation: "Per-model pricing metadata for spend reporting and estimation."
+      accepted_values: "Hash of provider/model rates",
+      default: "{}",
+      explanation: "Optional prices for spend estimates. Use microunits per 1M tokens."
     },
     {
       key: "batch_synchronization_job",
       required: "No",
       accepted_values: "ActiveJob class or class-name String",
-      explanation: "Asynchronous batch polling job. Defaults to RecordingStudioAI::BatchSynchronizationJob and uses Sidekiq when configured as the ActiveJob adapter."
+      default: '"RecordingStudioAI::BatchSynchronizationJob"',
+      explanation: "Job that polls provider batches. Uses Sidekiq when that is the ActiveJob adapter."
     },
     {
       key: "batch_synchronization_interval",
-      required: "Yes",
-      accepted_values: "Positive ActiveSupport::Duration",
-      explanation: "Polling/sync interval for provider batch progress checks."
+      required: "No",
+      accepted_values: "Positive duration",
+      default: "1.minute",
+      explanation: "How often batch polling runs."
     },
     {
       key: "maximum_attempts",
-      required: "Yes",
+      required: "No",
       accepted_values: "Integer >= 1",
-      explanation: "Total candidate attempts allowed for one execution."
+      default: "3",
+      explanation: "How many tries one call may take across retries and fallbacks."
     },
     {
       key: "maximum_retries_per_candidate",
-      required: "Yes",
+      required: "No",
       accepted_values: "Integer >= 0",
-      explanation: "Retry count for a single provider/model candidate before fallback."
+      default: "1",
+      explanation: "Retries on the same provider and model before moving on."
     },
     {
       key: "maximum_provider_fallbacks",
-      required: "Yes",
+      required: "No",
       accepted_values: "Integer >= 0",
-      explanation: "Maximum cross-provider fallback hops per execution."
+      default: "1",
+      explanation: "How many times a call may switch provider."
     },
     {
       key: "maximum_profile_fallbacks",
-      required: "Yes",
+      required: "No",
       accepted_values: "Integer >= 0",
-      explanation: "Maximum profile-level fallback hops per execution."
+      default: "1",
+      explanation: "How many times a call may drop to another profile tier."
     },
     {
       key: "profile_fallbacks",
       required: "No",
-      accepted_values: "Hash profile_key => Array[profile_key]",
-      explanation: "Fallback graph between profile tiers when primary profile fails."
+      accepted_values: "Hash of profile_key => [profile_key]",
+      default: "{}",
+      explanation: "Which profile to try next. Empty means no tier fallback."
     },
     {
       key: "request_timeout",
-      required: "Yes",
-      accepted_values: "Numeric >= 0 (seconds)",
-      explanation: "Provider request timeout budget for non-streaming operations."
+      required: "No",
+      accepted_values: "Number of seconds >= 0",
+      default: "120",
+      explanation: "Timeout for a non-streaming provider request."
     },
     {
       key: "stream_idle_timeout",
-      required: "Yes",
-      accepted_values: "Numeric >= 0 (seconds)",
-      explanation: "Maximum idle gap allowed while consuming streaming responses."
+      required: "No",
+      accepted_values: "Number of seconds >= 0",
+      default: "30",
+      explanation: "How long a stream may sit idle before it is cut off."
     },
     {
       key: "total_execution_timeout",
-      required: "Yes",
-      accepted_values: "Numeric >= 0 (seconds)",
-      explanation: "Global wall-clock timeout for an execution, including retries/fallbacks."
+      required: "No",
+      accepted_values: "Number of seconds >= 0",
+      default: "300",
+      explanation: "Wall-clock limit for a whole call, including retries."
     },
     {
       key: "retry_backoff_base",
-      required: "Yes",
-      accepted_values: "Numeric >= 0",
-      explanation: "Base retry delay before jitter/backoff expansion."
+      required: "No",
+      accepted_values: "Number of seconds >= 0",
+      default: "0.25",
+      explanation: "Starting wait before the next retry."
     },
     {
       key: "retry_backoff_max",
-      required: "Yes",
-      accepted_values: "Numeric >= retry_backoff_base",
-      explanation: "Upper bound for retry backoff delay."
+      required: "No",
+      accepted_values: "Number of seconds >= retry_backoff_base",
+      default: "5.0",
+      explanation: "Longest wait between retries."
     },
     {
       key: "retry_jitter",
-      required: "Yes",
-      accepted_values: "Numeric between 0 and 1",
-      explanation: "Randomized jitter factor applied to retry delays."
+      required: "No",
+      accepted_values: "Number from 0 to 1",
+      default: "0.2",
+      explanation: "Random spread added to retry waits."
     },
     {
       key: "retry_random",
-      required: "Yes",
-      accepted_values: "Callable returning a float-like random value",
-      explanation: "Random source used by retry jitter calculations."
+      required: "No",
+      accepted_values: "Callable that returns a float",
+      default: "-> { rand }",
+      explanation: "Random source for retry jitter. Override in tests."
     },
     {
       key: "retry_sleeper",
-      required: "Yes",
+      required: "No",
       accepted_values: "Callable(seconds)",
-      explanation: "Sleeper callback used for retry backoff waiting."
+      default: "->(seconds) { sleep(seconds) }",
+      explanation: "Wait helper for retry backoff. Override in tests."
     },
     {
       key: "maximum_attachment_count",
-      required: "Yes",
+      required: "No",
       accepted_values: "Integer >= 0",
-      explanation: "Maximum number of attachments accepted per request."
+      default: "10",
+      explanation: "How many files one request may attach."
     },
     {
       key: "maximum_attachment_bytes",
-      required: "Yes",
-      accepted_values: "Integer >= 0 (bytes)",
-      explanation: "Maximum size allowed for a single attachment payload."
+      required: "No",
+      accepted_values: "Integer bytes >= 0",
+      default: "20.megabytes",
+      explanation: "Largest size for one attached file."
     },
     {
       key: "maximum_attachment_total_bytes",
-      required: "Yes",
-      accepted_values: "Integer >= 0 (bytes)",
-      explanation: "Maximum combined attachment size allowed in one request."
+      required: "No",
+      accepted_values: "Integer bytes >= 0",
+      default: "50.megabytes",
+      explanation: "Largest combined size for all attachments on one request."
     },
     {
       key: "allowed_attachment_content_types",
       required: "No",
       accepted_values: "Array of MIME type strings",
-      explanation: "Allowlist for attachment content types accepted by input normalization."
+      default: "png, jpeg, gif, webp, pdf, json, plain, csv, markdown",
+      explanation: "File types the addon will accept."
     },
     {
       key: "maximum_custom_tool_rounds",
-      required: "Yes",
+      required: "No",
       accepted_values: "Integer >= 0",
-      explanation: "Maximum number of model-to-tool-call rounds per execution."
+      default: "5",
+      explanation: "How many tool-call rounds one generate may run."
     },
     {
       key: "custom_tool_timeout",
-      required: "Yes",
-      accepted_values: "Numeric >= 0 (seconds)",
-      explanation: "Timeout budget for an individual custom tool execution."
+      required: "No",
+      accepted_values: "Number of seconds >= 0",
+      default: "30",
+      explanation: "Timeout for one custom tool run."
     },
     {
       key: "maximum_custom_tool_result_size",
-      required: "Yes",
-      accepted_values: "Integer >= 0 (bytes)",
-      explanation: "Maximum serialized size accepted for custom tool results."
+      required: "No",
+      accepted_values: "Integer bytes >= 0",
+      default: "256.kilobytes",
+      explanation: "Largest result a custom tool may return."
     },
     {
       key: "custom_tool_confirmation_handler",
-      required: "Yes",
-      accepted_values: "Callable returning :approved/:rejected/:pending/:expired (booleans accepted for compatibility)",
-      explanation: "Confirmation gate used for tools that require explicit approval."
+      required: "No",
+      accepted_values: ":approved, :rejected, :pending, :expired, or a boolean",
+      default: "->(**) { false }",
+      explanation: "Approve or reject tools that need a human yes. Ships closed."
     },
     {
       key: "retain_responses",
-      required: "Yes",
-      accepted_values: "Boolean",
-      explanation: "Enable/disable persistence of retained provider responses."
+      required: "No",
+      accepted_values: "true or false",
+      default: "false",
+      explanation: "Keep a copy of provider responses."
     },
     {
       key: "response_retention_period",
-      required: "Yes",
-      accepted_values: "Positive ActiveSupport::Duration",
-      explanation: "Retention TTL for persisted responses when response retention is enabled."
+      required: "No",
+      accepted_values: "Positive duration",
+      default: "7.days",
+      explanation: "How long kept responses stay around."
     },
     {
       key: "maximum_retained_response_size",
-      required: "Yes",
-      accepted_values: "Integer >= 0 (bytes)",
-      explanation: "Hard cap on persisted response payload size."
+      required: "No",
+      accepted_values: "Integer bytes >= 0",
+      default: "1.megabyte",
+      explanation: "Largest response the addon will store."
     },
     {
       key: "execution_history_retention_period",
       required: "No",
-      accepted_values: "nil or positive ActiveSupport::Duration",
-      explanation: "Optional TTL for execution-history cleanup."
+      accepted_values: "nil or a positive duration",
+      default: "nil",
+      explanation: "Optional cleanup window for run history. nil keeps it."
     },
     {
       key: "response_sanitizer",
       required: "No",
       accepted_values: "Callable or nil",
-      explanation: "Optional sanitizer for normalized response payloads before persistence/logging."
+      default: "nil",
+      explanation: "Optional extra clean-up after the built-in sanitizer."
     },
     {
       key: "instrumentation_enabled",
-      required: "Yes",
-      accepted_values: "Boolean",
-      explanation: "Enable/disable instrumentation and notifications emitted by the gem."
+      required: "No",
+      accepted_values: "true or false",
+      default: "true",
+      explanation: "Emit notifications the host can subscribe to."
     },
     {
       key: "notification_namespace",
-      required: "Yes",
+      required: "No",
       accepted_values: "String",
-      explanation: "Namespace prefix for ActiveSupport notification events."
+      default: '"recording_studio_ai"',
+      explanation: "Prefix for those notification names."
     },
     {
       key: "admin_warning_thresholds",
       required: "No",
-      accepted_values: "Hash",
-      explanation: "Threshold settings for admin warning widgets and operational alerts."
+      accepted_values: "Hash of warning keys to numbers",
+      default: "built-in warning thresholds",
+      explanation: "When admin warning widgets light up."
     },
     {
       key: "admin_slow_call_threshold_ms",
-      required: "Yes",
-      accepted_values: "Integer >= 0",
-      explanation: "Latency threshold (ms) used to classify calls as slow in admin screens."
+      required: "No",
+      accepted_values: "Integer milliseconds >= 0",
+      default: "10_000",
+      explanation: "Latency that counts as a slow call on admin screens."
     },
     {
       key: "admin_expensive_models",
       required: "No",
-      accepted_values: "Array[String]",
-      explanation: "Model identifiers considered expensive for admin analytics and warnings."
+      accepted_values: "Array of model name strings",
+      default: "[]",
+      explanation: "Models treated as expensive in admin warnings."
     },
     {
       key: "admin_actor_resolver",
-      required: "No",
+      required: "For admin",
       accepted_values: "Callable(controller:) or nil",
-      explanation: "Resolves the authenticated actor used by admin screens."
+      default: "nil",
+      explanation: "Who is looking at admin. Admin stays closed until you set this."
     },
     {
       key: "admin_visible_roots_resolver",
-      required: "No",
+      required: "For admin",
       accepted_values: "Callable(actor:, controller:) or nil",
-      explanation: "Limits visible roots in admin to those accessible by the actor."
+      default: "nil",
+      explanation: "Which workspaces that person may see. Admin stays closed until you set this."
     },
     {
       key: "admin_layout",
       required: "No",
       accepted_values: "Layout name String or nil",
-      explanation: "Override for admin layout used by Recording Studio AI admin routes."
+      default: "nil",
+      explanation: "Host layout for admin screens. nil uses the app layout."
     }
   ].freeze
 
@@ -345,6 +393,7 @@ class ConfigController < ApplicationController
 
       # Cost + batch behavior.
       config.cost_catalogs = {}
+      config.batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"
       config.batch_synchronization_interval = 1.minute
 
       # Retry/attempt controls.
@@ -380,7 +429,7 @@ class ConfigController < ApplicationController
       config.custom_tool_confirmation_handler = ->(**) { false }
 
       # Response/history retention.
-      config.retain_responses = true
+      config.retain_responses = false
       config.response_retention_period = 7.days
       config.maximum_retained_response_size = 1.megabyte
       config.execution_history_retention_period = nil
