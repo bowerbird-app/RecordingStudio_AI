@@ -68,6 +68,17 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.3] - 2026-08-18
+
+### Changed
+
+- Extracted `RecordingStudioAI::Orchestrator` into `Orchestration::*`
+  collaborators (planner, persistence, attempt runner, plan executor, stream
+  session, custom tools, response builder). Public `generate` /
+  `generate(stream: true)` behavior is unchanged. Upgrade note: hosts keep
+  calling `RecordingStudioAI.generate`; `Orchestrator::CancellationState` and
+  `Orchestrator::CustomToolContext` remain available as aliases.
+
 ## [0.2.2] - 2026-08-18
 
 ### Changed

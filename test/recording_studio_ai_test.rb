@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.2.2", RecordingStudioAI::VERSION
+    assert_equal "0.2.3", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -20,6 +20,20 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes manifest, "RecordingStudioAdmin.register_section"
     refute_includes File.read(File.join(admin_root, "section.rb")), "class_eval"
     refute_includes manifest, "prepend"
+  end
+
+  def test_orchestrator_extracts_named_collaborators
+    root = File.expand_path("../lib/recording_studio_ai/orchestration", __dir__)
+
+    %w[
+      planner.rb persistence.rb attempt_runner.rb plan_executor.rb
+      stream_session.rb custom_tools.rb response_builder.rb
+    ].each do |file|
+      assert File.exist?(File.join(root, file)), "missing orchestration/#{file}"
+    end
+    assert_equal RecordingStudioAI::Orchestration::CancellationState,
+                 RecordingStudioAI::Orchestrator::CancellationState
+    assert_operator File.foreach(File.expand_path("../lib/recording_studio_ai/orchestrator.rb", __dir__)).count, :<, 120
   end
 
   def test_runtime_dependencies_are_declared
