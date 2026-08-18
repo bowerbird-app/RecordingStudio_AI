@@ -37,7 +37,14 @@ RecordingStudioAI.configure do |config|
   # Polling runs through ActiveJob. Configure Rails with :sidekiq to use Sidekiq.
   config.batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"
   config.batch_synchronization_interval = 1.minute
-  # Replace this deny-by-default handler with the host's RecordingStudioAccessible policy.
+  # Deny by default. Prefer RecordingStudioAI::AccessibleAuthorization once
+  # recording-studio-accessible is installed:
+  #
+  #   config.authorization_handler = RecordingStudioAI::AccessibleAuthorization.method(:call)
+  #
+  # That mapper separates view / execute+tools+batch / confirm+sensitive+retained
+  # onto Accessible :view / :edit / :admin for attribution.root_recording.
+  # Never use `->(**) { true }` in a real host.
   config.authorization_handler = ->(**) { false }
   # Core validates Recording Studio root/context tenancy. Override only for a stricter host policy.
   # config.attribution_validator = ->(root_recording:, context_recording:) { ... }
@@ -55,8 +62,13 @@ RecordingStudioAI.configure do |config|
   config.admin_warning_thresholds = RecordingStudioAI::Configuration.new.admin_warning_thresholds
   config.admin_slow_call_threshold_ms = 10_000
   # Admin access fails closed until the host resolves an authenticated actor and visible roots.
+  # The engine does not authenticate by itself — authenticate in ApplicationController and/or set:
+  # config.admin_authenticate = ->(controller:) { controller.authenticate_user! }
   # config.admin_actor_resolver = ->(controller:) { controller.current_user }
-  # config.admin_visible_roots_resolver = ->(actor:, controller:) { actor.workspaces.pluck(:recording_id) }
+  # Prefer Accessible-granted roots only:
+  # config.admin_visible_roots_resolver = ->(actor:, controller:) {
+  #   RecordingStudioAI::AccessibleAuthorization.accessible_root_ids(actor: actor, minimum_role: :view)
+  # }
   # config.admin_layout = "flat_pack_sidebar"
   config.maximum_attempts = 3
   config.maximum_attachment_count = 10

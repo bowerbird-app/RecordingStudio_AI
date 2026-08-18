@@ -84,6 +84,8 @@ class InstallGeneratorTest < Minitest::Test
       assert_includes initializer, "config.request_timeout = 120"
       assert_includes initializer, "config.stream_idle_timeout = 30"
       assert_includes initializer, "config.authorization_handler"
+      assert_includes initializer, "RecordingStudioAI::AccessibleAuthorization"
+      assert_includes initializer, "config.admin_authenticate"
       assert_includes initializer, "config.attribution_validator"
     end
   end
@@ -96,6 +98,8 @@ class InstallGeneratorTest < Minitest::Test
     assert_includes install_guide, "bin/rails db:migrate"
     assert_includes install_guide, "Configure at least one OpenAI or Gemini credential"
     assert_includes install_guide, "authorization handler"
+    assert_includes install_guide, "AccessibleAuthorization"
+    assert_includes install_guide, "admin_authenticate"
     assert_includes install_guide, "Active Record Encryption"
     assert_includes install_guide, "ResponseCleanupJob"
     assert_includes install_guide, "admin_visible_roots_resolver"

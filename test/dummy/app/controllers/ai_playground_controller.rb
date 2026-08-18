@@ -229,6 +229,8 @@ class AIPlaygroundController < ApplicationController
     upload = form["attachment"].presence || params.dig(:ai_playground, :attachment)
     return [] unless upload.respond_to?(:read)
 
+    enforce_upload_size_before_read!(upload)
+
     data = upload.read
     content_type = upload.content_type.to_s
     type = content_type.start_with?("image/") ? :image : :file
@@ -240,6 +242,29 @@ class AIPlaygroundController < ApplicationController
         filename: upload.original_filename
       }
     ]
+  end
+
+  # Reject oversized uploads from tempfile/Content-Length metadata before
+  # loading bytes into memory. Gem Attachments still validates magic bytes.
+  def enforce_upload_size_before_read!(upload)
+    limit = RecordingStudioAI.configuration.maximum_attachment_bytes
+    size = upload_byte_size(upload)
+    return if size.nil? || size <= limit
+
+    raise RecordingStudioAI::Errors::ContractValidationError.new(
+      "That file is too big for this playground.",
+      code: "invalid_request"
+    )
+  end
+
+  def upload_byte_size(upload)
+    if upload.respond_to?(:size) && !upload.size.nil?
+      upload.size.to_i
+    elsif upload.respond_to?(:tempfile) && upload.tempfile
+      upload.tempfile.size.to_i
+    elsif request.content_length.present?
+      request.content_length.to_i
+    end
   end
 
   def base_request_for(form, root_recording:, request_id:)

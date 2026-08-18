@@ -207,6 +207,25 @@ the latter scope every query before record lookup. Set `admin_layout` when the
 host supplies FlatPack chrome; otherwise the inherited application-controller
 layout remains in effect.
 
+The engine admin controllers do **not** authenticate by themselves. They inherit
+`::ApplicationController` and optionally run `admin_authenticate` when set.
+Hosts must authenticate operators (for example Devise on `ApplicationController`)
+and/or set:
+
+```ruby
+config.admin_authenticate = ->(controller:) { controller.authenticate_user! }
+```
+
+Prefer Accessible-granted roots for `admin_visible_roots_resolver`.
+`RecordingStudioAI::AccessibleAuthorization` maps AI actions onto Accessible
+roles (`:view` / `:edit` / `:admin`) for `attribution.root_recording`:
+
+```ruby
+config.authorization_handler = RecordingStudioAI::AccessibleAuthorization.method(:call)
+```
+
+Never use `->(**) { true }`.
+
 The host authorization handler receives these independent actions:
 
 - `recording_studio_ai.view_execution` for basic lists and details

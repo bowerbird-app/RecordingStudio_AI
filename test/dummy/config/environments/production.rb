@@ -28,6 +28,7 @@ Rails.application.configure do
   # config.assume_ssl = true
 
   # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
+  # Dummy is for local/CI demos only — do not expose it on the public internet without enabling these.
   # config.force_ssl = true
 
   # Skip http-to-https redirect for the default health check endpoint.
