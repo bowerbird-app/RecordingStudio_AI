@@ -90,9 +90,13 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Live response"
     assert_equal 1, response.body.scan(/>Batch items</).size
     assert_equal 3, response.body.scan(/name="ai_playground\[batch_items\]\[\]"/).size
-    refute_includes response.body, "ai-playground-stream#submit"
+    assert_equal 2, response.body.scan(/data-controller="ai-playground-form"/).size
+    assert_includes response.body, "data-ai-playground-form-require-batch-value"
+    assert_equal 4, response.body.scan(/change-&gt;ai-playground-form#refresh"/).size
     assert_includes File.read(Rails.root.join("app/javascript/controllers/ai_playground_form_controller.js")),
                     "new FormData(event.currentTarget)"
+    assert_includes File.read(Rails.root.join("app/javascript/controllers/ai_playground_form_controller.js")),
+                    "requireBatchValue"
   end
 
   test "ai calls table filters by status" do
@@ -220,6 +224,88 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Text Summary"
     assert_includes response.body, "prompt=summarize_text"
     assert_includes response.body, "prompt_namespace=demo"
+  end
+
+  test "registered providers and models widgets and section links appear on the dashboard" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_provider: "openai",
+      resolved_model: "gpt-5"
+    )
+
+    get "/admin"
+
+    assert_response :success
+    assert_includes response.body, "Registered providers"
+    assert_includes response.body, "Registered models"
+    assert_includes response.body, "Registered Providers"
+    assert_includes response.body, "Registered Models"
+    assert_includes response.body, "href=\"/admin/screens/registered_providers\""
+    assert_includes response.body, "href=\"/admin/screens/registered_models\""
+    assert_includes response.body, "openai"
+    assert_includes response.body, "GPT-5"
+  end
+
+  test "registered providers screen lists every configured provider" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_provider: "openai",
+      resolved_model: "gpt-5"
+    )
+
+    get "/admin/screens/registered_providers"
+
+    assert_response :success
+    assert_includes response.body, "Registered providers"
+    assert_includes response.body, "src=\"/admin/screens/registered_providers/table\""
+
+    get "/admin/screens/registered_providers/table"
+
+    assert_response :success
+    assert_includes response.body, "openai"
+    assert_includes response.body, "gemini"
+    assert_includes response.body, "OpenAI"
+    assert_includes response.body, "Gemini"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "ai_calls?"
+    assert_includes response.body, "provider=openai"
+    assert_includes response.body, "date_range_preset=last_30_days"
+  end
+
+  test "registered models screen lists every registered model definition" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_provider: "openai",
+      resolved_model: "gpt-5"
+    )
+
+    get "/admin/screens/registered_models"
+
+    assert_response :success
+    assert_includes response.body, "Registered models"
+    assert_includes response.body, "src=\"/admin/screens/registered_models/table\""
+
+    get "/admin/screens/registered_models/table"
+
+    assert_response :success
+    assert_includes response.body, "gpt-5"
+    assert_includes response.body, "openai"
+    assert_includes response.body, "gemini-2.5-flash"
+    assert_includes response.body, "Temperature"
+    assert_includes response.body, "Verbosity"
+    assert_includes response.body, "Reasoning"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "provider=openai"
+    assert_includes response.body, "model=gpt-5"
+    assert_includes response.body, "date_range_preset=last_30_days"
+    refute_includes response.body, "API model"
+    refute_includes response.body, "Calls (30d)"
   end
 
   test "registered prompts screen shows chart and table metrics" do

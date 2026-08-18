@@ -30,7 +30,8 @@ export default class extends Controller {
     streamUrl: String,
     candidates: Object,
     definitions: Object,
-    toolDescriptions: Object
+    toolDescriptions: Object,
+    requireBatch: { type: Boolean, default: false }
   }
 
   connect() {
@@ -55,6 +56,13 @@ export default class extends Controller {
 
     const previous = this.modelTarget.value
     this.modelTarget.innerHTML = ""
+
+    if (this.requireBatchValue) {
+      candidates = candidates.filter((candidate) => {
+        const definition = this.definitionsValue[candidate.value]
+        return definition?.delivery?.batch === true
+      })
+    }
 
     candidates.forEach((candidate, index) => {
       const option = document.createElement("option")
