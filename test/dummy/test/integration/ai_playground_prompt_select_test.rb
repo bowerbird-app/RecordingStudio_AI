@@ -21,6 +21,11 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Osaka is warm, humid, and packed with street food this week."
     assert_select "textarea[name='ai_playground[prompt_preview]'][disabled]"
     assert_select "textarea[name='ai_playground[prompt]']", count: 1
+    assert_includes response.body, "name=\"ai_playground[use_custom_tool]\""
+    assert_includes response.body, "name=\"ai_playground[tool_key]\""
+    assert_includes response.body, "Dummy Echo Tool"
+    assert_includes response.body, "Dummy Keyword Tool"
+    assert_includes response.body, "Dummy Summary Tool"
   end
 
   test "generate sends the selected registered prompt and its tools" do
@@ -33,7 +38,7 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
     assert captured[:messages].any? { |message| message[:content].include?("Osaka is warm") }
   end
 
-  test "a prompt without tools still allows the playground custom tool checkbox" do
+  test "the playground custom tool is sent with the selected prompt" do
     captured = post_generate!(
       "demo:osaka_weather:1",
       extra: { use_custom_tool: "1", tool_key: "dummy_echo_tool" }
@@ -42,6 +47,18 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
     assert_equal "osaka_weather", captured[:prompt_definition].key
     assert_equal [{ key: "dummy_echo_tool", version: 1 }], captured[:custom_tools]
     assert captured[:messages].any? { |message| message[:content].include?("What's the weather in Osaka?") }
+  end
+
+  test "the playground custom tool is added on top of the prompt's tools" do
+    captured = post_generate!(
+      "demo:analyze_text:1",
+      extra: { use_custom_tool: "1", tool_key: "dummy_summary_tool" }
+    )
+
+    assert_equal "analyze_text", captured[:prompt_definition].key
+    assert_includes captured[:custom_tools], { key: "dummy_echo_tool", version: 1 }
+    assert_includes captured[:custom_tools], { key: "dummy_keyword_tool", version: 1 }
+    assert_includes captured[:custom_tools], { key: "dummy_summary_tool", version: 1 }
   end
 
   private

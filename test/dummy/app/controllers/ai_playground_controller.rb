@@ -123,7 +123,7 @@ class AIPlaygroundController < ApplicationController
       { value: prompt_identity(definition), label: prompt_option_label(definition) }
     end
     @prompt_previews = registered_prompt_definitions.to_h do |definition|
-      [prompt_identity(definition), { preview: prompt_preview_text(definition), tools: definition.tools.any? }]
+      [prompt_identity(definition), { preview: prompt_preview_text(definition) }]
     end
     @profile_candidates = profile_candidates_payload
     @model_definitions = model_definitions_payload
@@ -504,9 +504,8 @@ class AIPlaygroundController < ApplicationController
 
       { key: registered.key, version: registered.version }
     end
-    return prompt_tools if prompt_tools.any?
 
-    custom_tools_for(form)
+    (prompt_tools + custom_tools_for(form)).uniq
   end
 
   def web_search_enabled?(form = @form)

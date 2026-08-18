@@ -94,7 +94,8 @@ Versioning and Keep a Changelog.
   `/usr/local/bundle`.
 - Dummy AI Playground generate form picks a registered prompt from a dropdown
   and shows that prompt in a disabled textarea. Generate sends the registered
-  prompt (including its tools), so Text Analysis exercises echo/keyword tools.
+  prompt (including its tools). The custom-tool checkbox and dropdown stay
+  available so you can add a playground tool on any supported model.
 - AI Calls, Custom Tool Calls, Attempts, Estimated spend, Registered custom
   tools, Registered prompts, Registered providers, and Registered models table
   headers explain each column in everyday language.

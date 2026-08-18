@@ -100,7 +100,7 @@ export default class extends Controller {
 
     show("streamingField", definition?.delivery?.streaming === true)
     show("webSearchField", Array.isArray(definition?.tools) && definition.tools.includes("web_search"))
-    show("customToolsField", this.customToolsVisible(definition))
+    show("customToolsField", Array.isArray(definition?.tools) && definition.tools.includes("custom_tools"))
     show(
       "attachmentField",
       Array.isArray(definition?.modalities?.input) &&
@@ -118,14 +118,6 @@ export default class extends Controller {
       ? this.promptPreviewTarget
       : this.promptPreviewTarget.querySelector("textarea")
     if (field) field.value = prompt.preview || ""
-    this.refreshCapabilities()
-  }
-
-  customToolsVisible(definition) {
-    const prompt = this.hasPromptKeyTarget ? this.promptsValue[this.promptKeyTarget.value] : null
-    if (prompt?.tools) return false
-
-    return Array.isArray(definition?.tools) && definition.tools.includes("custom_tools")
   }
 
   refreshToolDescription() {

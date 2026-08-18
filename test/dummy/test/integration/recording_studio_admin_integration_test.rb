@@ -168,6 +168,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Streaming"
     assert_includes response.body, "Web search"
     assert_includes response.body, "Live response"
+    assert_includes response.body, "Use custom tool"
+    assert_includes response.body, "name=\"ai_playground[tool_key]\""
     assert_equal 1, response.body.scan(/>Batch items</).size
     assert_equal 3, response.body.scan(/name="ai_playground\[batch_items\]\[\]"/).size
     assert_equal 2, response.body.scan(/data-controller="ai-playground-form"/).size
