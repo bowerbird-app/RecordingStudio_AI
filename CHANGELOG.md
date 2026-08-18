@@ -26,6 +26,10 @@ Versioning and Keep a Changelog.
   without a full page reload. Batch submissions render their own result frame
   beneath the batch form.
 - Deduplicated the AI Responses admin table so `Created` appears once.
+- AI Playground keeps SSE streaming on a dedicated Live controller so Devise
+  authentication on the show/generate page redirects to sign-in instead of
+  raising `UncaughtThrowError` (`throw :warden`). Unauthenticated stream
+  requests return 401.
 
 ### Removed
 
