@@ -44,6 +44,8 @@ class AIPlaygroundController < ApplicationController
     root_recording = current_root_recording || RecordingStudio.root_recording_for(Workspace.order(:created_at).first)
     raise "No root recording is available for AI execution." if root_recording.nil?
 
+    @result_mode = batch_mode? ? "batch" : "generate"
+
     if batch_mode?
       @response = execute_batch(root_recording: root_recording, request_id: @request_id)
     else
@@ -52,11 +54,11 @@ class AIPlaygroundController < ApplicationController
 
     @response_payload = @response.to_h
     load_created_records!(@request_id)
-    render :show
+    render_result
   rescue StandardError => error
     @error_message = "#{error.class}: #{error.message}"
     load_created_records!(@request_id)
-    render :show, status: :unprocessable_entity
+    render_result(status: :unprocessable_entity)
   end
 
   def stream
@@ -86,6 +88,55 @@ class AIPlaygroundController < ApplicationController
 
   private
 
+  def render_result(status: :ok)
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace(
+          result_frame_id,
+          partial: "ai_playground/result",
+          locals: result_locals(@result_mode)
+        ), status: status
+      end
+      format.html { render :show, status: status }
+    end
+  end
+
+  def result_frame_id(mode = @result_mode)
+    mode == "batch" ? "batch_result" : "generate_result"
+  end
+  helper_method :result_frame_id
+
+  # Results belong to the section that submitted them, so the other section
+  # renders an empty frame instead of repeating the same payload.
+  def result_locals(mode)
+    return blank_result_locals(mode) unless @result_mode == mode
+
+    {
+      frame_id: result_frame_id(mode),
+      error_message: @error_message,
+      response_payload: @response_payload,
+      request_id: @request_id,
+      stream_text: @stream_text,
+      stream_events: @stream_events,
+      created_runs: @created_runs,
+      created_attempts: @created_attempts
+    }
+  end
+  helper_method :result_locals
+
+  def blank_result_locals(mode)
+    {
+      frame_id: result_frame_id(mode),
+      error_message: nil,
+      response_payload: nil,
+      request_id: nil,
+      stream_text: nil,
+      stream_events: [],
+      created_runs: [],
+      created_attempts: []
+    }
+  end
+
   def setup_page_state
     @provider_options = PROVIDERS.map { |value, label| { value: value, label: label } }
     @profile_options = PROFILES.map { |value, label| { value: value, label: label } }
@@ -102,6 +153,7 @@ class AIPlaygroundController < ApplicationController
     @error_message = nil
     @created_runs = []
     @created_attempts = []
+    @result_mode ||= nil
   end
 
   def sync_selected_model_state!
