@@ -68,6 +68,21 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.7] - 2026-08-18
+
+### Changed
+
+- Engine admin definition modals, sparklines, data tables, warnings, and
+  retained JSON now use Flatpack Modal, Chart, Table, Alert, and CodeBlock
+  instead of copied markup.
+- Dummy playground, tables page, and recording tree empty state use Flatpack
+  Card, Table, Alert, CodeBlock, and EmptyState.
+
+### Upgrade notes
+
+- No host configuration changes. Admin and dummy screens keep the same jobs;
+  markup now comes from Flatpack.
+
 ## [0.2.6] - 2026-08-18
 
 ### Security

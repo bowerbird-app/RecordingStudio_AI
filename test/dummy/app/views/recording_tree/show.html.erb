@@ -11,6 +11,10 @@
       <% render_recording_tree_nodes(tree, tree_root) %>
     <% end %>
   <% else %>
-    <p class="text-sm text-(--surface-muted-content-color)">No recording root is currently selected.</p>
+    <%= render FlatPack::EmptyState::Component.new(
+      title: "Nothing selected",
+      description: "Switch to a workspace to see its tree.",
+      icon: :inbox
+    ) %>
   <% end %>
 </div>

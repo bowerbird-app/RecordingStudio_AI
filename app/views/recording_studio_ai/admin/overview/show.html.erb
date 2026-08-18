@@ -2,18 +2,15 @@
   <%= render FlatPack::PageTitle::Component.new(title: "AI administration", subtitle: "Execution health across the roots you can access.", variant: :h1) %>
 
   <% if @metrics[:breaches].any? %>
-    <%= render FlatPack::Card::Component.new(style: :outlined) do |card| %>
-      <% card.header do %>
-        <%= render FlatPack::PageTitle::Component.new(title: "Warnings", subtitle: "Deterministic thresholds exceeded in the last 24 hours.", variant: :h3, class: "mb-0 pb-0") %>
+    <div class="space-y-3">
+      <% @metrics[:breaches].each do |breach| %>
+        <%= render FlatPack::Alert::Component.new(
+          title: "Threshold crossed",
+          description: "#{breach[:metric].to_s.humanize}: #{breach[:value]}",
+          style: :warning
+        ) %>
       <% end %>
-      <% card.body do %>
-        <div class="flex flex-wrap gap-2">
-          <% @metrics[:breaches].each do |breach| %>
-            <%= render FlatPack::Badge::Component.new(text: "#{breach[:metric].to_s.humanize}: #{breach[:value]}", style: :warning, size: :sm) %>
-          <% end %>
-        </div>
-      <% end %>
-    <% end %>
+    </div>
   <% end %>
 
   <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -38,7 +35,15 @@
     <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
       <% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Last 7 days", subtitle: "Runs, errors, tokens, spend, tools, and batch items", variant: :h3, class: "mb-0 pb-0") %><% end %>
       <% card.body do %>
-        <div class="overflow-x-auto"><table class="w-full text-right text-sm"><thead><tr class="border-b"><th class="p-2 text-left">Day</th><th class="p-2">Runs</th><th class="p-2">Errors</th><th class="p-2">Tokens</th><th class="p-2">Spend μ</th><th class="p-2">Tools</th><th class="p-2">Batch items</th></tr></thead><tbody><% @daily_activity.each do |date, values| %><tr class="border-b"><td class="p-2 text-left"><%= date.strftime("%a %d") %></td><td class="p-2"><%= values[:runs] %></td><td class="p-2"><%= values[:errors] %></td><td class="p-2"><%= values[:tokens].nil? ? "Unknown" : values[:tokens] %></td><td class="p-2"><%= values[:spend].nil? ? "Unknown" : values[:spend] %></td><td class="p-2"><%= values[:tools] %></td><td class="p-2"><%= values[:batch_items] %></td></tr><% end %></tbody></table></div>
+        <%= render FlatPack::Table::Component.new(data: @daily_activity.map { |date, values| values.merge(day: date) }) do |table| %>
+          <% table.column(title: "Day") { |row| row[:day].strftime("%a %d") } %>
+          <% table.column(title: "Runs") { |row| row[:runs] } %>
+          <% table.column(title: "Errors") { |row| row[:errors] } %>
+          <% table.column(title: "Tokens") { |row| row[:tokens].nil? ? "Unknown" : row[:tokens] } %>
+          <% table.column(title: "Spend μ") { |row| row[:spend].nil? ? "Unknown" : row[:spend] } %>
+          <% table.column(title: "Tools") { |row| row[:tools] } %>
+          <% table.column(title: "Batch items") { |row| row[:batch_items] } %>
+        <% end %>
         <p class="mt-3 text-sm opacity-70">30-day p95 duration: <%= admin_duration(@p95_latency) %></p>
       <% end %>
     <% end %>
@@ -72,8 +77,17 @@
     <% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Slow calls", subtitle: "Ten longest recorded runs", variant: :h3, class: "mb-0 pb-0") %><% end %>
     <% card.body do %>
       <% if @slow_runs.any? %>
-        <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b"><th class="p-3">Run</th><th class="p-3">Operation</th><th class="p-3">Provider / model</th><th class="p-3">Duration</th></tr></thead><tbody><% @slow_runs.each do |run| %><tr class="border-b"><td class="p-3"><%= link_to run.id, admin_run_path(run) %></td><td class="p-3"><%= run.operation %></td><td class="p-3"><%= [run.resolved_provider, run.resolved_model].compact.join(" / ").presence || "Unknown" %></td><td class="p-3"><%= admin_duration(run.latency_ms) %></td></tr><% end %></tbody></table></div>
-      <% else %><p class="text-sm opacity-70">No duration data is available.</p><% end %>
+        <%= render FlatPack::Table::Component.new(data: @slow_runs) do |table| %>
+          <% table.column(title: "Run") do |run| %>
+            <%= link_to run.id, admin_run_path(run) %>
+          <% end %>
+          <% table.column(title: "Operation") { |run| run.operation } %>
+          <% table.column(title: "Provider / model") { |run| [run.resolved_provider, run.resolved_model].compact.join(" / ").presence || "Unknown" } %>
+          <% table.column(title: "Duration") { |run| admin_duration(run.latency_ms) } %>
+        <% end %>
+      <% else %>
+        <p class="text-sm opacity-70">No duration data is available.</p>
+      <% end %>
     <% end %>
   <% end %>
 </div>

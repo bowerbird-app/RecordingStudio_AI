@@ -3,9 +3,34 @@
 
   <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
     <% card.body do %>
-      <% if @definitions.any? %><div class="overflow-x-auto"><table class="w-full min-w-max text-left text-sm"><thead><tr class="border-b"><th class="p-3">Tool</th><th class="p-3">Description</th><th class="p-3">Cost / latency</th><th class="p-3">Safety</th><th class="p-3">Calls today / 30 days</th><th class="p-3">Average / p95 duration</th><th class="p-3">Outcomes</th></tr></thead><tbody>
-        <% @definitions.each do |definition| %><% key = [definition.key, definition.version] %><tr class="border-b align-top"><td class="p-3"><%= link_to "#{definition.name} v#{definition.version}", version_admin_custom_tool_path(definition.key, definition.version), class: "font-semibold" %><div class="text-xs opacity-70"><%= definition.key %></div></td><td class="p-3"><%= definition.description %></td><td class="p-3"><%= definition.cost %> / <%= definition.latency %></td><td class="p-3"><%= definition.read_only ? "Read only" : "Writes" %><%= ", destructive" if definition.destructive %><%= ", confirmation required" if definition.requires_confirmation %></td><td class="p-3"><%= @today_counts.fetch(key, 0) %> / <%= @thirty_day_counts.fetch(key, 0) %></td><td class="p-3"><%= admin_duration(@average_latency[key]&.round) %> / <%= admin_duration(@p95_latency[key]) %></td><td class="p-3"><%= @outcomes.select { |(tool_key, version, _), _| tool_key == definition.key && version == definition.version }.map { |(_, _, status), rate| "#{status}: #{number_to_percentage(rate * 100, precision: 1)}" }.join(", ").presence || "No calls" %></td></tr><% end %>
-        </tbody></table></div><% else %><%= render FlatPack::EmptyState::Component.new(title: "No custom tools registered", description: "Registered tool definitions will appear here.") %><% end %>
+      <% if @definitions.any? %>
+        <%= render FlatPack::Table::Component.new(data: @definitions) do |table| %>
+          <% table.column(title: "Tool") do |definition| %>
+            <div>
+              <%= link_to "#{definition.name} v#{definition.version}", version_admin_custom_tool_path(definition.key, definition.version), class: "font-semibold" %>
+              <div class="text-xs opacity-70"><%= definition.key %></div>
+            </div>
+          <% end %>
+          <% table.column(title: "Description") { |definition| definition.description } %>
+          <% table.column(title: "Cost / latency") { |definition| "#{definition.cost} / #{definition.latency}" } %>
+          <% table.column(title: "Safety") do |definition| %>
+            <%= definition.read_only ? "Read only" : "Writes" %><%= ", destructive" if definition.destructive %><%= ", confirmation required" if definition.requires_confirmation %>
+          <% end %>
+          <% table.column(title: "Calls today / 30 days") do |definition| %>
+            <% key = [definition.key, definition.version] %>
+            <%= @today_counts.fetch(key, 0) %> / <%= @thirty_day_counts.fetch(key, 0) %>
+          <% end %>
+          <% table.column(title: "Average / p95 duration") do |definition| %>
+            <% key = [definition.key, definition.version] %>
+            <%= admin_duration(@average_latency[key]&.round) %> / <%= admin_duration(@p95_latency[key]) %>
+          <% end %>
+          <% table.column(title: "Outcomes") do |definition| %>
+            <%= @outcomes.select { |(tool_key, version, _), _| tool_key == definition.key && version == definition.version }.map { |(_, _, status), rate| "#{status}: #{number_to_percentage(rate * 100, precision: 1)}" }.join(", ").presence || "No calls" %>
+          <% end %>
+        <% end %>
+      <% else %>
+        <%= render FlatPack::EmptyState::Component.new(title: "No custom tools registered", description: "Registered tool definitions will appear here.") %>
+      <% end %>
     <% end %>
   <% end %>
 </div>
