@@ -94,6 +94,13 @@ Versioning and Keep a Changelog.
   weeks is no longer stuck at 0%. Lower P90 is treated as an improvement.
 - Registered providers table drops the Starter file column. The Models
   count opens Registered models filtered to that provider.
+- Registered prompts hides Namespace and Key by default and adds a column
+  picker so those fields can be turned back on.
+- Attempts chart and kind badges say "1st attempt" and "After tools"
+  instead of Primary and Continuation.
+- Estimated spend is now Estimated token usage. The screen chart is a
+  horizontal bar of every model in the selected range. The dashboard
+  widget sits after Calls by provider/model.
 
 ### Upgrade notes
 

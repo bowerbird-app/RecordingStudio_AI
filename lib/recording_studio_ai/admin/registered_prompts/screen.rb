@@ -50,7 +50,7 @@ module AdminScreens
 
     table do
       title ""
-      hide_columns_button
+      show_columns_button
       hide_count
 
       column :name,
@@ -83,6 +83,9 @@ module AdminScreens
       column :average_duration, title: "Average duration", header_tooltip: "Typical wait for this prompt."
       column :average_input_tokens, title: "Avg input", header_tooltip: "Typical size of what we send."
       column :average_output_tokens, title: "Avg output", header_tooltip: "Typical size of what comes back."
+
+      default_columns :name, :description, :calls_series, :success_rate, :error_rate, :average_duration,
+                      :average_input_tokens, :average_output_tokens
     end
   end
 end

@@ -55,6 +55,12 @@ module AdminScreens
     remove_const(:ModelRow) if const_defined?(:ModelRow) && ModelRow.members != model_row_members
     ModelRow = Data.define(*model_row_members) unless const_defined?(:ModelRow)
 
+    ATTEMPT_KIND_LABELS = {
+      "primary" => "1st attempt",
+      "retry" => "Retry",
+      "fallback" => "Fallback",
+      "continuation" => "After tools"
+    }.freeze unless const_defined?(:ATTEMPT_KIND_LABELS)
     ADMIN_CONTEXT_KEY = :recording_studio_ai_admin_context unless const_defined?(:ADMIN_CONTEXT_KEY)
 
     def bind_admin_context!(context)
@@ -176,8 +182,12 @@ module AdminScreens
       RecordingStudioAI::Attempt::KINDS.values.filter_map do |kind|
         next unless counts.keys.any? { |count_kind, _bucket| count_kind == kind }
 
-        { name: kind.humanize, data: attempt_kind_data(kind, buckets, counts, bucket) }
+        { name: attempt_kind_label(kind), data: attempt_kind_data(kind, buckets, counts, bucket) }
       end
+    end
+
+    def attempt_kind_label(kind)
+      ATTEMPT_KIND_LABELS.fetch(kind.to_s, kind.to_s.humanize)
     end
 
     def attempt_kind_counts(relation, field, bucket)
@@ -994,6 +1004,17 @@ module AdminScreens
     def top_model_token_chart_rows(context, range: 30.days.ago..Time.current, limit: 5)
       memoize_widget([:top_model_token_chart_rows, context.object_id, range.begin.to_f, range.end.to_f, limit]) do
         top_model_token_rows(runs_scope(context), range: range, limit: limit)
+      end
+    end
+
+    def model_token_totals(runs)
+      memoize_widget([:model_token_totals, runs.object_id]) do
+        runs.reorder(nil)
+            .where.not(resolved_model: [nil, ""])
+            .where.not(total_tokens: nil)
+            .group(:resolved_model)
+            .sum(:total_tokens)
+            .sort_by { |_model, total_tokens| -total_tokens.to_i }
       end
     end
 

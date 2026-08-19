@@ -419,6 +419,29 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal [openai, gemini], widgets.filter_model_rows_by_provider([openai, gemini], Object.new)
   end
 
+  def test_attempt_kind_label_uses_everyday_words
+    widgets = AdminScreens::RecordingStudioAIWidgets
+
+    assert_equal "1st attempt", widgets.attempt_kind_label("primary")
+    assert_equal "After tools", widgets.attempt_kind_label("continuation")
+    assert_equal "Retry", widgets.attempt_kind_label("retry")
+  end
+
+  def test_model_token_totals_ranks_every_model
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    create_run(root_id: root_id, status: "completed", tokens: 10, resolved_model: "small-model", total_tokens: 100)
+    create_run(root_id: root_id, status: "completed", tokens: 20, resolved_model: "big-model", total_tokens: 400)
+    create_run(root_id: root_id, status: "completed", tokens: 5, resolved_model: "small-model", total_tokens: 50)
+
+    totals = widgets.model_token_totals(widgets.runs_scope(context))
+
+    assert_equal [["big-model", 400], ["small-model", 150]], totals
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
   private
 
   def create_run(root_id:, status:, tokens:, **attributes)

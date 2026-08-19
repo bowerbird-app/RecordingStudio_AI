@@ -33,7 +33,7 @@ module AdminScreens
          style: :secondary
 
     link :estimated_spend,
-         text: "Estimated Spend",
+         text: "Estimated token usage",
          url: ->(context) { context.admin_screen_path("estimated_spend") },
          style: :secondary
 
@@ -68,8 +68,8 @@ module AdminScreens
     widget "widgets.recording_studio_ai.registered_prompts"
     widget "widgets.recording_studio_ai.retry_rate_by_model"
     widget "widgets.recording_studio_ai.errors_failed_calls"
-    widget "widgets.recording_studio_ai.estimated_spend"
     widget "widgets.recording_studio_ai.calls_by_provider_model"
+    widget "widgets.recording_studio_ai.estimated_spend"
     widget "widgets.recording_studio_ai.slow_calls"
     widget "widgets.recording_studio_ai.prompt_p90_latency"
     widget "widgets.recording_studio_ai.registered_providers"

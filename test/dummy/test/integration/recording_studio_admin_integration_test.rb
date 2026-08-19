@@ -469,6 +469,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/registered_prompts/table"
 
     assert_response :success
+    assert AdminScreens::RecordingStudioAIRegisteredPromptsScreen.table.show_columns_button?
+    refute_includes AdminScreens::RecordingStudioAIRegisteredPromptsScreen.table.default_column_keys, :namespace
+    refute_includes AdminScreens::RecordingStudioAIRegisteredPromptsScreen.table.default_column_keys, :key
+    assert_includes response.body, "Choose table columns"
+    assert_select "th", text: /\ANamespace/, count: 0
+    assert_select "th", text: /\AKey/, count: 0
     assert_includes response.body, "Text Summary"
     assert_includes response.body, "Avg input"
     assert_includes response.body, "Avg output"
@@ -479,6 +485,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Produce a concise factual summary."
     assert_includes response.body, "Summarize this text:"
     assert_includes response.body, "#000000"
+
+    get "/admin/screens/registered_prompts/table", params: { columns: %w[name namespace key] }
+
+    assert_response :success
+    assert_select "th", text: /\ANamespace/
+    assert_select "th", text: /\AKey/
   end
 
   test "registered prompts screen includes unused registered prompts" do
@@ -739,6 +751,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "href=\"/admin/screens/attempts?run_id=#{selected_run.id}\""
+    assert_includes response.body, "Tool calls"
 
     get "/admin/screens/attempts/table", params: { run_id: selected_run.id }
 
@@ -935,14 +948,17 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     run.attempts.create!(sequence: 1, kind: "primary", status: "failed", provider: "openai", model: "attempt-chart-primary")
     run.attempts.create!(sequence: 2, kind: "retry", status: "completed", provider: "openai", model: "attempt-chart-retry")
     run.attempts.create!(sequence: 3, kind: "fallback", status: "completed", provider: "google", model: "attempt-chart-fallback")
+    run.attempts.create!(sequence: 4, kind: "continuation", status: "completed", provider: "openai", model: "attempt-chart-continuation")
 
     get "/admin/screens/attempts/chart", params: { group_by: "day" }
 
     assert_response :success
     assert_includes response.body, "Attempts by kind"
-    assert_includes response.body, "Primary"
+    assert_includes response.body, "1st attempt"
+    refute_includes response.body, ">Primary<"
     assert_includes response.body, "Retry"
     assert_includes response.body, "Fallback"
+    assert_includes response.body, "After tools"
     assert_includes response.body, "&quot;stacked&quot;:true"
 
     get "/admin/screens/attempts", params: { group_by: "month" }
@@ -1137,20 +1153,57 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "href=\"/admin/screens/estimated_spend\""
+    assert_includes response.body, "Calls by provider/model"
+    assert_includes response.body, "Estimated token usage"
+    widget_keys = AdminScreens::RecordingStudioAISection.widget_keys
+    assert_operator widget_keys.index("widgets.recording_studio_ai.calls_by_provider_model"),
+                    :<,
+                    widget_keys.index("widgets.recording_studio_ai.estimated_spend")
+    calls_at = response.body.index("widgets.recording_studio_ai.calls_by_provider_model")
+    tokens_at = response.body.index("widgets.recording_studio_ai.estimated_spend")
+    assert calls_at, "expected Calls by provider/model on the dashboard"
+    assert tokens_at, "expected Estimated token usage on the dashboard"
+    assert_operator calls_at, :<, tokens_at
   end
 
-  test "estimated spend defaults to the last four weeks grouped by day" do
+  test "estimated token usage defaults to the last four weeks" do
     authenticate_for_admin!
 
     get "/admin/screens/estimated_spend"
 
     assert_response :success
+    assert_includes response.body, "Estimated token usage"
     assert_select "input[value='Last 4 weeks']", minimum: 1
     filters = AdminScreens::RecordingStudioAIEstimatedSpendScreen.filters
+    refute_includes filters.map(&:key), :group_by
     assert_includes filters.map(&:key), :prompt
     assert_equal %i[created_at prompt_name_snapshot status resolved_provider resolved_model total_tokens input_tokens output_tokens],
                  AdminScreens::RecordingStudioAIEstimatedSpendScreen.table.default_column_keys
     assert_includes AdminScreens::RecordingStudioAIEstimatedSpendScreen.table.columns.map(&:key), :id
+  end
+
+  test "estimated token usage chart bars every model in range" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_model: "token-bar-one",
+      total_tokens: 400
+    )
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_model: "token-bar-two",
+      total_tokens: 900
+    )
+
+    get "/admin/screens/estimated_spend/chart"
+
+    assert_response :success
+    assert_includes response.body, "Token usage by model"
+    assert_includes response.body, "token-bar-one"
+    assert_includes response.body, "token-bar-two"
+    assert_includes response.body, "horizontal"
   end
 
   test "estimated spend treats decreased token usage as favorable" do

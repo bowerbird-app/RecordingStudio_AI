@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIEstimatedSpendScreen < RecordingStudioAdmin::Screen
     key "estimated_spend"
     icon :currency_dollar
-    title "Estimated token/model spend"
-    subtitle "Token usage trends and model-level consumption across AI runs."
+    title "Estimated token usage"
+    subtitle "How much we sent and got back, by model."
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
@@ -15,7 +15,6 @@ module AdminScreens
 
     filter_presentation :modal, inline_count: 3
     filter :date_range, field: :created_at, default: :last_4_weeks
-    filter :group_by, values: %i[hour day week month year], default: :day
     filter :status,
            param: :run_status,
            field: :status,
@@ -51,30 +50,23 @@ module AdminScreens
     end
 
     chart do
-      title "Estimated spend trend"
-      subtitle "Token usage over time."
-      type :line
+      title "Token usage by model"
+      subtitle "All models in the selected date range."
+      type :bar
       series do |context|
-        [{
-          name: "Total tokens",
-          data: RecordingStudioAdmin::AdminActivityLogsSupport.date_series(
-            context.query_result.relation.reorder(nil),
-            field: :created_at,
-            bucket: context.filter_value(:group_by) || :day
-          ).map { |point| { x: point[:x], y: point[:y] } }
-        }]
+        rows = AdminScreens::RecordingStudioAIWidgets.model_token_totals(context.query_result.relation)
+        [{ name: "Tokens", data: rows.map { |_model, total_tokens| total_tokens.to_i } }]
       end
-      options do
+      options do |context|
+        rows = AdminScreens::RecordingStudioAIWidgets.model_token_totals(context.query_result.relation)
         {
-          height: 300,
-          stroke: { curve: "smooth", width: 3 },
+          height: [300, (rows.length * 40) + 80].max,
+          plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
           xaxis: {
-            labels: { show: true },
-            axisBorder: { show: false },
-            axisTicks: { show: false }
+            categories: rows.map { |model, _total_tokens| model.presence || "Unknown" },
+            min: 0
           },
-          yaxis: { min: 0 },
-          grid: { xaxis: { lines: { show: false } } }
+          dataLabels: { enabled: false }
         }
       end
     end

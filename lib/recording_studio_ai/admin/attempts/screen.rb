@@ -76,7 +76,7 @@ module AdminScreens
 
     chart do
       title "Attempts by kind"
-      subtitle "Stacked attempt volume by primary, retry, fallback, and continuation."
+      subtitle "Stacked tries: first attempt, retry, other provider, and after tools."
       type :column
       series do |context|
         AdminScreens::RecordingStudioAIWidgets.attempt_kind_series(
@@ -114,10 +114,14 @@ module AdminScreens
       column :run_id, title: "AI call", header_tooltip: "The call this try belongs to."
       column :sequence, title: "Sequence", header_tooltip: "Order of tries on that call."
       column :kind,
-             header_tooltip: "First try, a retry, or a switch to another provider.",
+             header_tooltip: "1st attempt, a retry, a switch to another provider, or a follow-up after tools ran.",
              display: :badge,
              display_options: lambda { |_row, _context, value|
-               { text: value.to_s.humanize, style: :default, size: :sm }
+               {
+                 text: AdminScreens::RecordingStudioAIWidgets.attempt_kind_label(value),
+                 style: :default,
+                 size: :sm
+               }
              }
       column :prompt,
              title: "Prompt",
