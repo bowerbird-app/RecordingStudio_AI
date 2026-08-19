@@ -1,13 +1,52 @@
 # frozen_string_literal: true
 
 module AdminScreens
+  # Admin's built-in group_by filter only accepts time buckets. This definition
+  # keeps the Group by control but switches between model and provider bars.
+  class CallVolumeGroupByFilterDefinition
+    ALLOWED = %w[model provider].freeze
+
+    attr_reader :key, :type, :options
+
+    def initialize(options = {})
+      @key = :group_by
+      @type = :group_by
+      @options = options
+    end
+
+    def param_key
+      (options[:param] || key).to_sym
+    end
+
+    def allowed_values
+      ALLOWED.dup
+    end
+
+    def normalize(params)
+      raw = params[param_key] || params[param_key.to_s]
+      value = raw.to_s
+      return default_value if value.empty?
+
+      ALLOWED.include?(value) ? value.to_sym : default_value
+    end
+
+    def apply(relation, _value, _context)
+      relation
+    end
+
+    private
+
+    def default_value
+      default = (options[:default] || :model).to_s
+      (ALLOWED.include?(default) ? default : ALLOWED.first).to_sym
+    end
+  end
+
   class RecordingStudioAICallsByProviderModelScreen < RecordingStudioAdmin::Screen
     class << self
-      # Admin's built-in group_by filter only accepts time buckets. This screen
-      # groups the bar chart by model or provider instead.
       def filter(name, **options)
         if name.to_sym == :group_by
-          @filters_value << RecordingStudioAdmin::Definitions::FilterDefinition.new(:group_by, :select, options)
+          @filters_value << CallVolumeGroupByFilterDefinition.new(options)
         else
           super
         end
@@ -27,6 +66,7 @@ module AdminScreens
     filter :date_range, field: :created_at, default: :last_4_weeks
     filter :group_by,
            values: %i[model provider],
+           default: :model,
            apply: ->(relation, _value, _context) { relation }
     filter :provider,
            values: -> { AdminScreens::RecordingStudioAIWidgets.run_distinct_values(:resolved_provider) },

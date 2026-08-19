@@ -1207,6 +1207,10 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "src=\"/admin/screens/calls_by_provider_model/chart\""
     filters = AdminScreens::RecordingStudioAICallsByProviderModelScreen.filters
     assert_equal %i[date_range group_by provider], filters.first(3).map(&:key)
+    group_by = filters.find { |filter| filter.key == :group_by }
+    assert_equal :model, group_by.options[:default]
+    assert_equal :model, group_by.normalize({})
+    assert_equal :provider, group_by.normalize(group_by: "provider")
     assert_includes filters.map(&:key), :prompt
     assert_includes filters.map(&:key), :status
     assert_includes filters.map(&:key), :model

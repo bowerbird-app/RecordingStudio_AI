@@ -105,8 +105,9 @@ Versioning and Keep a Changelog.
 - AI Calls chart is a horizontal bar of call volume by model in the
   selected date range, matching the Calls by provider/model widget.
 - Calls by provider/model is its own admin screen with a horizontal bar
-  chart (models by default, or providers via Group by). The dashboard
-  widget opens that screen. Prompt and status filters sit in the modal.
+  chart (models by default, or providers via Group by). The Group by
+  control defaults to Model. The dashboard widget opens that screen.
+  Prompt, status, and model filters sit in the modal.
 - Dashboard P90 widgets are renamed to AI Prompt P90 latency and AI
   response p90 latency, with the prompt widget shown first.
 
