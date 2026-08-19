@@ -485,6 +485,15 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
+  def test_registered_model_keys_lists_registered_definitions
+    keys = AdminScreens::RecordingStudioAIWidgets.registered_model_keys
+
+    assert_includes keys, "gpt-5-mini"
+    assert_includes keys, "gemini-2.5-flash"
+    refute_includes keys, "calls-screen-one"
+    assert_equal keys, keys.uniq.sort
+  end
+
   def test_response_run_reads_the_attempt_or_batch_item_run
     root_id = create_recording_id
     run = create_run(root_id: root_id, status: "completed", tokens: 10, prompt_name_snapshot: "Osaka Weather")

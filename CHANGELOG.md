@@ -107,9 +107,10 @@ Versioning and Keep a Changelog.
 - Calls by provider/model is its own admin screen with a horizontal bar
   chart (models by default, or providers via Group by). The Group by
   control defaults to Model. The dashboard widget opens that screen.
-  Prompt, status, and model filters sit in the modal.
+  Prompt, status, and model filters sit in the modal. Provider and model
+  filters only list registered providers and models.
 - Dashboard P90 widgets are renamed to AI Prompt P90 latency and AI
-  response p90 latency, with the prompt widget shown first.
+  Response P90 latency, with the prompt widget shown first.
 - AI Responses table shows the run as `#123`, adds Prompt name, and drops
   Type, Finish, and Bytes. Date range, provider, and model stay inline.
 

@@ -69,7 +69,7 @@ module AdminScreens
            default: :model,
            apply: ->(relation, _value, _context) { relation }
     filter :provider,
-           values: -> { AdminScreens::RecordingStudioAIWidgets.run_distinct_values(:resolved_provider) },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.registered_provider_keys },
            apply: ->(relation, value, _context) { relation.where(resolved_provider: value) }
     filter :prompt,
            field: :prompt_key,
@@ -82,7 +82,7 @@ module AdminScreens
            apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
     filter :model,
            field: :resolved_model,
-           values: -> { AdminScreens::RecordingStudioAIWidgets.run_distinct_values(:resolved_model) },
+           values: -> { AdminScreens::RecordingStudioAIWidgets.registered_model_keys },
            apply: ->(relation, value, _context) { relation.where(resolved_model: value) }
 
     summary do

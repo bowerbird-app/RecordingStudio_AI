@@ -1179,9 +1179,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert tokens_at, "expected Estimated token usage on the dashboard"
     assert_operator calls_at, :<, tokens_at
     prompt_p90_at = response.body.index("<h3 class=\"text-xl font-semibold\">AI Prompt P90 latency</h3>")
-    response_p90_at = response.body.index("<h3 class=\"text-xl font-semibold\">AI response p90 latency</h3>")
+    response_p90_at = response.body.index("<h3 class=\"text-xl font-semibold\">AI Response P90 latency</h3>")
     assert prompt_p90_at, "expected AI Prompt P90 latency on the dashboard"
-    assert response_p90_at, "expected AI response p90 latency on the dashboard"
+    assert response_p90_at, "expected AI Response P90 latency on the dashboard"
     assert_operator prompt_p90_at, :<, response_p90_at
   end
 
@@ -1214,6 +1214,14 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes filters.map(&:key), :prompt
     assert_includes filters.map(&:key), :status
     assert_includes filters.map(&:key), :model
+    provider_filter = filters.find { |filter| filter.key == :provider }
+    model_filter = filters.find { |filter| filter.key == :model }
+    assert_equal AdminScreens::RecordingStudioAIWidgets.registered_provider_keys,
+                 provider_filter.allowed_values
+    assert_equal AdminScreens::RecordingStudioAIWidgets.registered_model_keys,
+                 model_filter.allowed_values
+    refute_includes provider_filter.allowed_values, "google"
+    refute_includes model_filter.allowed_values, "calls-screen-one"
 
     get "/admin/screens/calls_by_provider_model/chart"
 
@@ -1385,7 +1393,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin"
 
     assert_response :success
-    assert_includes response.body, "AI response p90 latency"
+    assert_includes response.body, "AI Response P90 latency"
     assert_includes response.body, "href=\"/admin/screens/latency_by_model\""
   end
 

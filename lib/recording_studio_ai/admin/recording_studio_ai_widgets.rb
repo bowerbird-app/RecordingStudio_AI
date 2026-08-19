@@ -705,6 +705,10 @@ module AdminScreens
       RecordingStudioAI.configuration.providers.keys.map(&:to_s)
     end
 
+    def registered_model_keys
+      RecordingStudioAI.models.all.map { |definition| definition.model.to_s }.uniq.sort
+    end
+
     def registered_models_path(context, provider:)
       "#{context.admin_screen_path('registered_models')}?#{{ provider: provider }.to_query}"
     end
