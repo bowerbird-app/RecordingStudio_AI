@@ -1159,8 +1159,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_operator widget_keys.index("widgets.recording_studio_ai.calls_by_provider_model"),
                     :<,
                     widget_keys.index("widgets.recording_studio_ai.estimated_spend")
-    calls_at = response.body.index("widgets.recording_studio_ai.calls_by_provider_model")
-    tokens_at = response.body.index("widgets.recording_studio_ai.estimated_spend")
+    calls_at = response.body.index("<h3 class=\"text-xl font-semibold\">Calls by provider/model</h3>")
+    tokens_at = response.body.index("<h3 class=\"text-xl font-semibold\">Estimated token usage</h3>")
     assert calls_at, "expected Calls by provider/model on the dashboard"
     assert tokens_at, "expected Estimated token usage on the dashboard"
     assert_operator calls_at, :<, tokens_at
