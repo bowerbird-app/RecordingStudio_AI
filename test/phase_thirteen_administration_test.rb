@@ -435,9 +435,13 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     create_run(root_id: root_id, status: "completed", tokens: 20, resolved_model: "big-model", total_tokens: 400)
     create_run(root_id: root_id, status: "completed", tokens: 5, resolved_model: "small-model", total_tokens: 50)
 
+    create_run(root_id: root_id, status: "completed", tokens: 8, resolved_model: nil, total_tokens: 75)
+    current = Struct.new(:start_date, :end_date, :preset_key).new(Date.current, Date.current, nil)
     totals = widgets.model_token_totals(widgets.runs_scope(context))
 
-    assert_equal [["big-model", 400], ["small-model", 150]], totals
+    assert_equal [["big-model", 400], ["small-model", 150], ["Unknown", 75]], totals
+    assert_equal 625, widgets.token_total_for_range(context, date_range: current)
+    assert_equal 0, widgets.token_total_for_range(context, date_range: nil)
   ensure
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end

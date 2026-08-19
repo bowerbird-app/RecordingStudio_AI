@@ -46,7 +46,16 @@ module AdminScreens
            }
 
     summary do
+      label "Tokens"
       change_good_when :down
+      value do |context|
+        context.query_result.relation.except(:order).sum(:total_tokens)
+      end
+      previous_value do |context|
+        widgets = AdminScreens::RecordingStudioAIWidgets
+        previous = widgets.previous_period_date_range(context.filter_value(:date_range))
+        widgets.token_total_for_range(context, date_range: previous)
+      end
     end
 
     chart do

@@ -694,7 +694,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/ai_calls/table"
 
     assert_response :success
-    assert_includes response.body, "href=\"/admin/screens/tool_calls?run_id=#{selected_run.id}\""
+    tool_calls_href = response.body[%r{href="(/admin/screens/tool_calls\?[^"]*run_id=#{selected_run.id}[^"]*)"}]
+    assert tool_calls_href, "expected a Tool calls link for the selected run"
+    assert_includes tool_calls_href, "run_id=#{selected_run.id}"
 
     get "/admin/screens/tool_calls/table", params: { run_id: selected_run.id }
 
@@ -750,7 +752,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/ai_calls/table"
 
     assert_response :success
-    assert_includes response.body, "href=\"/admin/screens/attempts?run_id=#{selected_run.id}\""
+    attempts_href = response.body[%r{href="(/admin/screens/attempts\?[^"]*run_id=#{selected_run.id}[^"]*)"}]
+    assert attempts_href, "expected an Attempts link for the selected run"
+    assert_includes attempts_href, "run_id=#{selected_run.id}"
     assert_includes response.body, "Tool calls"
 
     get "/admin/screens/attempts/table", params: { run_id: selected_run.id }
@@ -1204,6 +1208,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "token-bar-one"
     assert_includes response.body, "token-bar-two"
     assert_includes response.body, "horizontal"
+    assert_match(/text-5xl[^>]*>1,?300</, response.body)
+    refute_match(/text-5xl[^>]*>2</, response.body)
   end
 
   test "estimated spend treats decreased token usage as favorable" do

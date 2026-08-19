@@ -144,7 +144,7 @@ module AdminScreens
 
                ActionController::Base.helpers.link_to(
                  count,
-                 "#{context.admin_screen_path('attempts')}?run_id=#{run.id}",
+                 AdminScreens::RecordingStudioAIWidgets.run_filtered_screen_path(context, "attempts", run),
                  class: "text-(--color-primary-background-color)",
                  data: { turbo_frame: "_top" }
                )
@@ -158,7 +158,7 @@ module AdminScreens
 
                ActionController::Base.helpers.link_to(
                  count,
-                 "#{context.admin_screen_path('tool_calls')}?run_id=#{run.id}",
+                 AdminScreens::RecordingStudioAIWidgets.run_filtered_screen_path(context, "tool_calls", run),
                  class: "text-(--color-primary-background-color)",
                  data: { turbo_frame: "_top" }
                )

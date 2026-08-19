@@ -99,8 +99,9 @@ Versioning and Keep a Changelog.
 - Attempts chart and kind badges say "1st attempt" and "After tools"
   instead of Primary and Continuation.
 - Estimated spend is now Estimated token usage. The screen chart is a
-  horizontal bar of every model in the selected range. The dashboard
-  widget sits after Calls by provider/model.
+  horizontal bar of every model in the selected range, and the headline
+  number is token total rather than call count. The dashboard widget
+  sits after Calls by provider/model.
 
 ### Upgrade notes
 

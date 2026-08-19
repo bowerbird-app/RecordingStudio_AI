@@ -76,7 +76,7 @@ module AdminScreens
 
     chart do
       title "Attempts by kind"
-      subtitle "Stacked tries: first attempt, retry, other provider, and after tools."
+      subtitle "Stacked tries: 1st attempt, retry, fallback, and after tools."
       type :column
       series do |context|
         AdminScreens::RecordingStudioAIWidgets.attempt_kind_series(

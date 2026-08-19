@@ -1012,12 +1012,26 @@ module AdminScreens
     def model_token_totals(runs)
       memoize_widget([:model_token_totals, runs.object_id]) do
         runs.reorder(nil)
-            .where.not(resolved_model: [nil, ""])
             .where.not(total_tokens: nil)
             .group(:resolved_model)
             .sum(:total_tokens)
-            .sort_by { |_model, total_tokens| -total_tokens.to_i }
+            .each_with_object(Hash.new(0)) do |(model, total_tokens), totals|
+              totals[model.presence || "Unknown"] += total_tokens.to_i
+            end
+            .sort_by { |_model, total_tokens| -total_tokens }
       end
+    end
+
+    def token_total_for_range(context, date_range:)
+      range = prompt_created_at_range(date_range)
+      return 0 unless range
+
+      runs_scope(context).where.not(total_tokens: nil).where(created_at: range).sum(:total_tokens).to_i
+    end
+
+    def run_filtered_screen_path(context, screen_key, run)
+      query = date_range_query(context, screen: AdminScreens::RecordingStudioAICallsScreen).merge(run_id: run.id)
+      "#{context.admin_screen_path(screen_key)}?#{query.to_query}"
     end
 
     def top_model_call_volume_rows(context, range: 30.days.ago..Time.current, limit: 5)
