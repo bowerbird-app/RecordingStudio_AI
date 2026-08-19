@@ -1,18 +1,36 @@
 <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(title: "Retained response #{@response[:id]}", subtitle: "Authorized debugging content for run #{@run.id}.", variant: :h1) %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
-    <% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Retention metadata", variant: :h3, class: "mb-0 pb-0") %><% end %>
-    <% card.body do %>
-      <dl class="grid gap-4 text-sm md:grid-cols-3">
-        <div><dt class="opacity-70">Type</dt><dd><%= @response[:response_type].humanize %></dd></div>
-        <div><dt class="opacity-70">Complete / truncated</dt><dd><%= @response[:complete] ? "Complete" : "Incomplete" %> / <%= @response[:truncated] ? "Truncated" : "Not truncated" %></dd></div>
-        <div><dt class="opacity-70">Size / expiry</dt><dd><%= number_to_human_size(@response[:byte_size]) %> / <%= @response[:expires_at]&.to_fs(:long) || "No expiry" %></dd></div>
-        <div><dt class="opacity-70">Content type</dt><dd><%= @response[:content_type].presence || "Unknown" %></dd></div>
-        <div><dt class="opacity-70">Run</dt><dd><%= link_to @run.id, admin_run_path(@run) %></dd></div>
-      </dl>
-    <% end %>
-  <% end %>
+  <% retention_rows = [
+       { label: "Type", value: @response[:response_type].humanize },
+       {
+         label: "Complete / truncated",
+         value: "#{@response[:complete] ? 'Complete' : 'Incomplete'} / #{@response[:truncated] ? 'Truncated' : 'Not truncated'}"
+       },
+       {
+         label: "Size / expiry",
+         value: "#{number_to_human_size(@response[:byte_size])} / #{@response[:expires_at]&.to_fs(:long) || 'No expiry'}"
+       },
+       { label: "Content type", value: @response[:content_type].presence || "Unknown" },
+       { label: "Run", value: link_to(@run.id, admin_run_path(@run)) }
+     ] %>
+
+  <div class="overflow-x-auto rounded-lg border border-[var(--table-border-color)]">
+    <table class="w-full border-collapse bg-[var(--table-background-color)]">
+      <tbody class="divide-y divide-[var(--table-row-divider-color)]">
+        <% retention_rows.each do |row| %>
+          <tr class="transition-colors duration-fast hover:bg-[var(--table-row-hover-background-color)]">
+            <th scope="row" class="w-1/3 px-[var(--table-padding)] py-[var(--table-padding)] text-left text-sm font-normal text-[var(--table-cell-text-color)] opacity-70">
+              <%= row[:label] %>
+            </th>
+            <td class="px-[var(--table-padding)] py-[var(--table-padding)] text-sm text-[var(--table-cell-text-color)]">
+              <%= row[:value] %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
 
   <% if @response[:content_text].present? %>
     <%= admin_code_block(@response[:content_text], title: "Extracted output", language: "text") %>

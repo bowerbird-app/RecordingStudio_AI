@@ -113,6 +113,8 @@ Versioning and Keep a Changelog.
   Response P90 latency, with the prompt widget shown first.
 - AI Responses table shows the run as `#123`, adds Prompt name, and drops
   Type, Finish, and Bytes. Date range, provider, and model stay inline.
+- Retained response detail shows retention metadata in a simple table
+  instead of a card.
 
 ### Upgrade notes
 
