@@ -358,12 +358,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "ai_calls?"
     assert_includes response.body, "provider=openai"
     assert_includes response.body, "date_range_preset=last_30_days"
-    assert_includes response.body, "Show file"
-    assert_includes response.body, "class MyProvider"
-    assert_includes response.body, "MY_PROVIDER_API_KEY"
-    assert_includes response.body, "ENV.fetch"
-    assert_includes response.body, "configuration_api_key"
-    assert_includes response.body, "attr_accessor :my_provider_api_key"
+    assert_includes response.body, "registered_models?"
+    assert_includes response.body, "Registered models for openai"
+    refute_includes response.body, "Show file"
+    refute_includes response.body, "Starter file"
+    refute_includes response.body, "class MyProvider"
+    refute_includes response.body, "MY_PROVIDER_API_KEY"
   end
 
   test "registered models screen lists every registered model definition" do
@@ -396,6 +396,23 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "date_range_preset=last_30_days"
     refute_includes response.body, "API model"
     refute_includes response.body, "Calls (30d)"
+  end
+
+  test "registered models screen can filter to one provider" do
+    authenticate_for_admin!
+
+    get "/admin/screens/registered_models", params: { provider: "openai" }
+
+    assert_response :success
+    assert_includes response.body, "value=\"openai\""
+
+    get "/admin/screens/registered_models/table", params: { provider: "openai" }
+
+    assert_response :success
+    assert_includes response.body, "gpt-5"
+    assert_includes response.body, "openai"
+    refute_includes response.body, "gemini-2.5-flash"
+    refute_includes response.body, ">gemini<"
   end
 
   test "registered prompts screen shows chart and table metrics" do

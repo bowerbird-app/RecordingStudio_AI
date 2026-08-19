@@ -408,6 +408,17 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
+  def test_filter_model_rows_by_provider_keeps_matching_rows
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    openai = Struct.new(:provider).new("openai")
+    gemini = Struct.new(:provider).new("gemini")
+    context = Object.new
+    def context.filter_value(key) = key.to_sym == :provider ? "openai" : nil
+
+    assert_equal [openai], widgets.filter_model_rows_by_provider([openai, gemini], context)
+    assert_equal [openai, gemini], widgets.filter_model_rows_by_provider([openai, gemini], Object.new)
+  end
+
   private
 
   def create_run(root_id:, status:, tokens:, **attributes)

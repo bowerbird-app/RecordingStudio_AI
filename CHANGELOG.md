@@ -92,11 +92,16 @@ Versioning and Keep a Changelog.
 - Latency by model and Latency by prompt chart summaries use overall P90
   in the selected date range, not the number of grouped rows, so Last 4
   weeks is no longer stuck at 0%. Lower P90 is treated as an improvement.
+- Registered providers table drops the Starter file column. The Models
+  count opens Registered models filtered to that provider.
 
 ### Upgrade notes
 
 - Hosts that copied the dummy Flatpack sidebar header still show Flatpack’s
   version until they override that badge the same way.
+- The providers admin table no longer ships a Starter file modal. Use the
+  dummy `/config` starter, or `RecordingStudioAI::Providers::StarterExample`,
+  if you still need a copy-paste adapter.
 
 ## [0.2.10] - 2026-08-18
 

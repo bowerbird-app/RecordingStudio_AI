@@ -682,7 +682,24 @@ module AdminScreens
           end
         )
       end
-      rows.sort_by { |row| [-row.calls, row.provider, row.model] }
+      filter_model_rows_by_provider(rows, context).sort_by { |row| [-row.calls, row.provider, row.model] }
+    end
+
+    def registered_provider_keys
+      RecordingStudioAI.configuration.providers.keys.map(&:to_s)
+    end
+
+    def registered_models_path(context, provider:)
+      "#{context.admin_screen_path('registered_models')}?#{{ provider: provider }.to_query}"
+    end
+
+    def filter_model_rows_by_provider(rows, context)
+      return rows unless context.respond_to?(:filter_value)
+
+      provider = context.filter_value(:provider).to_s.presence
+      return rows if provider.blank?
+
+      rows.select { |row| row.provider.to_s == provider }
     end
 
     def parameter_default_label(definition, name)
@@ -770,44 +787,6 @@ module AdminScreens
           "Safety" => "#{definition.read_only ? 'Read only' : 'Writes'}; destructive: #{definition.destructive ? 'yes' : 'no'}; confirmation: #{definition.requires_confirmation ? 'required' : 'not required'}; idempotent: #{definition.idempotent ? 'yes' : 'no'}"
         }
       )
-    end
-
-    def provider_starter_modal(row)
-      modal_id = "registered-provider-starter-#{row.key}"
-      body = render_flatpack(
-        FlatPack::CodeBlock::Component.new(
-          title: "Starter files",
-          snippets: [
-            {
-              label: "my_provider.rb",
-              language: "ruby",
-              code: RecordingStudioAI::Providers::StarterExample::CLASS_CODE
-            },
-            {
-              label: "Initializer",
-              language: "ruby",
-              code: RecordingStudioAI::Providers::StarterExample::INITIALIZER_CODE
-            }
-          ],
-          separated: false
-        )
-      )
-      trigger = render_flatpack(
-        FlatPack::Button::Component.new(
-          text: "Show file",
-          style: :ghost,
-          size: :sm,
-          type: "button",
-          data: { modal_id: modal_id },
-          aria: { label: "Show a starter provider file" }
-        )
-      )
-      modal = render_flatpack(
-        FlatPack::Modal::Component.new(id: modal_id, title: "Add a provider", size: :xl)
-      ) do |component|
-        component.body { body }
-      end
-      ActionController::Base.helpers.safe_join([trigger, modal])
     end
 
     def prompt_definition_modal(row)
