@@ -51,6 +51,6 @@ module AdminScreens
         grid: { xaxis: { lines: { show: false } } }
       }
     end
-    link_to { |context| context.admin_screen_path("ai_calls") }
+    link_to { |context| context.admin_screen_path("calls_by_provider_model") }
   end
 end

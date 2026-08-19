@@ -3,7 +3,7 @@
 module AdminScreens
   RecordingStudioAIPromptP90LatencyWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.prompt_p90_latency") do
     type :chart
-    title "Prompt P90 latency"
+    title "AI Prompt P90 latency"
     subtitle "Top 5 prompts by P90 latency over the last 30 days."
     description "Compares prompt response speed using the latency at or below which 90% of calls completed."
     metadata { { period_label: "Last 30 days" } }

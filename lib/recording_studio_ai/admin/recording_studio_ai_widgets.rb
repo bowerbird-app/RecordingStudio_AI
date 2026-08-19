@@ -1041,14 +1041,25 @@ module AdminScreens
     end
 
     def model_call_totals(runs)
-      memoize_widget([:model_call_totals, runs.object_id]) do
+      call_volume_totals(runs, group_by: :model)
+    end
+
+    def call_volume_group_by(context)
+      value = context.filter_value(:group_by)
+      value = "model" if value.blank?
+      value.to_s == "provider" ? :provider : :model
+    end
+
+    def call_volume_totals(runs, group_by: :model)
+      column = group_by.to_sym == :provider ? :resolved_provider : :resolved_model
+      memoize_widget([:call_volume_totals, runs.object_id, column]) do
         runs.reorder(nil)
-            .group(:resolved_model)
+            .group(column)
             .count
-            .each_with_object(Hash.new(0)) do |(model, count), totals|
-              totals[model.presence || "Unknown"] += count.to_i
+            .each_with_object(Hash.new(0)) do |(value, count), totals|
+              totals[value.presence || "Unknown"] += count.to_i
             end
-            .sort_by { |model, count| [-count, model.to_s.downcase] }
+            .sort_by { |label, count| [-count, label.to_s.downcase] }
       end
     end
 

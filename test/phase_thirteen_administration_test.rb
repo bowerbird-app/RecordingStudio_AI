@@ -462,6 +462,29 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
+  def test_call_volume_totals_can_group_by_provider
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    create_run(root_id: root_id, status: "completed", tokens: 10, resolved_provider: "openai", resolved_model: "a")
+    create_run(root_id: root_id, status: "completed", tokens: 20, resolved_provider: "openai", resolved_model: "b")
+    create_run(root_id: root_id, status: "completed", tokens: 5, resolved_provider: "google", resolved_model: "c")
+
+    totals = widgets.call_volume_totals(widgets.runs_scope(context), group_by: :provider)
+
+    assert_equal [["openai", 2], ["google", 1]], totals
+
+    model_context = Object.new
+    def model_context.filter_value(_key) = nil
+    provider_context = Object.new
+    def provider_context.filter_value(_key) = "provider"
+
+    assert_equal :model, widgets.call_volume_group_by(model_context)
+    assert_equal :provider, widgets.call_volume_group_by(provider_context)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
   private
 
   def create_run(root_id:, status:, tokens:, **attributes)

@@ -640,6 +640,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       AdminScreens::RecordingStudioAIRegisteredPromptsScreen,
       AdminScreens::RecordingStudioAIAttemptsScreen,
       AdminScreens::RecordingStudioAIEstimatedSpendScreen,
+      AdminScreens::RecordingStudioAICallsByProviderModelScreen,
       AdminScreens::RecordingStudioAIRegisteredProvidersScreen,
       AdminScreens::RecordingStudioAIRegisteredModelsScreen
     ]
@@ -661,6 +662,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       "registered_prompts" => "Typical size of what we send.",
       "attempts" => "How this try ended.",
       "estimated_spend" => "Size of what we sent.",
+      "calls_by_provider_model" => "Who we asked.",
       "registered_providers" => "Whether keys are set so it can run.",
       "registered_models" => "How wild the answers can get."
     }.each do |key, phrase|
@@ -1168,11 +1170,70 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_operator widget_keys.index("widgets.recording_studio_ai.calls_by_provider_model"),
                     :<,
                     widget_keys.index("widgets.recording_studio_ai.estimated_spend")
+    assert_operator widget_keys.index("widgets.recording_studio_ai.prompt_p90_latency"),
+                    :<,
+                    widget_keys.index("widgets.recording_studio_ai.slow_calls")
     calls_at = response.body.index("<h3 class=\"text-xl font-semibold\">Calls by provider/model</h3>")
     tokens_at = response.body.index("<h3 class=\"text-xl font-semibold\">Estimated token usage</h3>")
     assert calls_at, "expected Calls by provider/model on the dashboard"
     assert tokens_at, "expected Estimated token usage on the dashboard"
     assert_operator calls_at, :<, tokens_at
+    prompt_p90_at = response.body.index("<h3 class=\"text-xl font-semibold\">AI Prompt P90 latency</h3>")
+    response_p90_at = response.body.index("<h3 class=\"text-xl font-semibold\">AI response p90 latency</h3>")
+    assert prompt_p90_at, "expected AI Prompt P90 latency on the dashboard"
+    assert response_p90_at, "expected AI response p90 latency on the dashboard"
+    assert_operator prompt_p90_at, :<, response_p90_at
+  end
+
+  test "calls by provider model screen bars models by default" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_provider: "openai",
+      resolved_model: "calls-screen-one"
+    )
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_provider: "google",
+      resolved_model: "calls-screen-two"
+    )
+
+    get "/admin/screens/calls_by_provider_model"
+
+    assert_response :success
+    assert_includes response.body, "Calls by provider/model"
+    assert_includes response.body, "src=\"/admin/screens/calls_by_provider_model/chart\""
+    filters = AdminScreens::RecordingStudioAICallsByProviderModelScreen.filters
+    assert_equal %i[date_range group_by provider], filters.first(3).map(&:key)
+    assert_includes filters.map(&:key), :prompt
+    assert_includes filters.map(&:key), :status
+    assert_includes filters.map(&:key), :model
+
+    get "/admin/screens/calls_by_provider_model/chart"
+
+    assert_response :success
+    assert_includes response.body, "Calls by model"
+    assert_includes response.body, "calls-screen-one"
+    assert_includes response.body, "calls-screen-two"
+    assert_includes response.body, "horizontal"
+
+    get "/admin/screens/calls_by_provider_model/chart", params: { group_by: "provider" }
+
+    assert_response :success
+    assert_includes response.body, "Calls by provider"
+    assert_includes response.body, "openai"
+    assert_includes response.body, "google"
+  end
+
+  test "calls by provider model widget links to its screen" do
+    authenticate_for_admin!
+
+    get "/admin"
+
+    assert_response :success
+    assert_includes response.body, "href=\"/admin/screens/calls_by_provider_model\""
   end
 
   test "estimated token usage defaults to the last four weeks" do
@@ -1320,7 +1381,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin"
 
     assert_response :success
-    assert_includes response.body, "AI Calls P90 Latency"
+    assert_includes response.body, "AI response p90 latency"
     assert_includes response.body, "href=\"/admin/screens/latency_by_model\""
   end
 
@@ -1330,7 +1391,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin"
 
     assert_response :success
-    assert_includes response.body, "Prompt P90 latency"
+    assert_includes response.body, "AI Prompt P90 latency"
     assert_includes response.body, "href=\"/admin/screens/latency_by_prompt\""
   end
 
