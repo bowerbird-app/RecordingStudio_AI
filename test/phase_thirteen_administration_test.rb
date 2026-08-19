@@ -353,6 +353,34 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     refute query.key?(:date_range_preset)
   end
 
+  def test_prompt_call_count_uses_the_selected_range_not_definition_count
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    current = Struct.new(:start_date, :end_date, :preset_key).new(Date.current - 27, Date.current, :last_4_weeks)
+    previous = widgets.previous_period_date_range(current)
+
+    create_run(
+      root_id: root_id, status: "completed", tokens: 4, prompt_key: "current-prompt",
+      created_at: current.end_date.beginning_of_day + 1.hour
+    )
+    create_run(
+      root_id: root_id, status: "completed", tokens: 4, prompt_key: "previous-prompt",
+      created_at: previous.end_date.beginning_of_day + 1.hour
+    )
+    create_run(
+      root_id: root_id, status: "completed", tokens: 4, prompt_key: "older-prompt",
+      created_at: previous.start_date.beginning_of_day - 2.days
+    )
+
+    assert_equal 1, widgets.prompt_call_count(context, date_range: current)
+    assert_equal 1, widgets.prompt_call_count(context, date_range: previous)
+    assert_equal current.start_date - 28.days, previous.start_date
+    assert_equal 0, widgets.prompt_call_count(context, date_range: nil)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
   private
 
   def create_run(root_id:, status:, tokens:, **attributes)

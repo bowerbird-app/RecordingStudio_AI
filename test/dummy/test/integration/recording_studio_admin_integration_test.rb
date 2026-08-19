@@ -444,6 +444,10 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "demo.analyze_text"
     assert_includes response.body, "demo.osaka_weather"
     assert_includes response.body, "demo.summarize_text"
+    assert_match(/text-5xl[^>]*>2</, response.body)
+    assert_includes response.body, "+100%"
+    assert_includes response.body, "Last 4 weeks"
+    refute_includes response.body, ">0%</span>"
 
     get "/admin/screens/registered_prompts/table"
 

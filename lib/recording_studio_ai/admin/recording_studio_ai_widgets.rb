@@ -21,6 +21,7 @@ module AdminScreens
                               :success_rate, :error_rate, :average_duration, :average_input_tokens,
                               :average_output_tokens)
     end
+    DateRangeWindow = Data.define(:start_date, :end_date, :preset_key) unless const_defined?(:DateRangeWindow)
     latency_row_members = %i[
       name calls calls_series p50_latency_ms p90_latency_ms average_latency_ms max_latency_ms
       prompt_namespace prompt_key prompt_version resolved_model
@@ -437,12 +438,7 @@ module AdminScreens
 
     def prompt_rows(context)
       runs = runs_scope(context).where.not(prompt_key: nil)
-      date_range_value = registered_prompts_date_range_value(context)
-      date_range = if date_range_value.respond_to?(:start_date) && date_range_value.respond_to?(:end_date)
-                     date_range_value.start_date.beginning_of_day..date_range_value.end_date.end_of_day
-                   else
-                     30.days.ago..Time.current
-                   end
+      date_range = prompt_created_at_range(registered_prompts_date_range_value(context)) || (30.days.ago..Time.current)
       range_runs = runs.where(created_at: date_range)
       range_counts = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).count
       daily_counts = grouped_daily_counts(
@@ -574,6 +570,30 @@ module AdminScreens
 
       screen = AdminScreens::RecordingStudioAIRegisteredPromptsScreen
       screen.filters.find { |filter| filter.key == :date_range }.normalize(context.params)
+    end
+
+    def previous_period_date_range(date_range)
+      return unless date_range.respond_to?(:start_date) && date_range.respond_to?(:end_date)
+      return unless date_range.start_date && date_range.end_date
+
+      span_days = (date_range.end_date - date_range.start_date).to_i + 1
+      previous_end = date_range.start_date - 1.day
+      previous_start = previous_end - (span_days - 1).days
+      DateRangeWindow.new(previous_start, previous_end, nil)
+    end
+
+    def prompt_call_count(context, date_range:)
+      range = prompt_created_at_range(date_range)
+      return 0 unless range
+
+      runs_scope(context).where.not(prompt_key: nil).where(created_at: range).count
+    end
+
+    def prompt_created_at_range(date_range)
+      return unless date_range.respond_to?(:start_date) && date_range.respond_to?(:end_date)
+      return unless date_range.start_date && date_range.end_date
+
+      date_range.start_date.beginning_of_day..date_range.end_date.end_of_day
     end
 
     def provider_rows(context)

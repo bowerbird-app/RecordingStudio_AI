@@ -86,6 +86,9 @@ Versioning and Keep a Changelog.
   Flatpack’s gem version.
 - Attempts table shows the tool names used on a try, when that try asked
   for tools.
+- Registered prompts chart summary counts calls in the selected date range,
+  not the number of prompt definitions, so the period change is no longer
+  stuck at 0%.
 
 ### Upgrade notes
 
