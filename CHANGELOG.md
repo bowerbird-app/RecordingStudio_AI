@@ -102,6 +102,8 @@ Versioning and Keep a Changelog.
   horizontal bar of every model in the selected range, and the headline
   number is token total rather than call count. The dashboard widget
   sits after Calls by provider/model.
+- AI Calls chart is a horizontal bar of call volume by model in the
+  selected date range, matching the Calls by provider/model widget.
 
 ### Upgrade notes
 

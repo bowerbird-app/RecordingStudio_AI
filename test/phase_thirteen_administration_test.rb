@@ -446,6 +446,22 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
+  def test_model_call_totals_ranks_every_model
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    create_run(root_id: root_id, status: "completed", tokens: 10, resolved_model: "small-model")
+    create_run(root_id: root_id, status: "completed", tokens: 20, resolved_model: "big-model")
+    create_run(root_id: root_id, status: "completed", tokens: 5, resolved_model: "small-model")
+    create_run(root_id: root_id, status: "completed", tokens: 8, resolved_model: nil)
+
+    totals = widgets.model_call_totals(widgets.runs_scope(context))
+
+    assert_equal [["small-model", 2], ["big-model", 1], ["Unknown", 1]], totals
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
   private
 
   def create_run(root_id:, status:, tokens:, **attributes)

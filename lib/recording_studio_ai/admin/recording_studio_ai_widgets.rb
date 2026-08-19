@@ -1018,7 +1018,7 @@ module AdminScreens
             .each_with_object(Hash.new(0)) do |(model, total_tokens), totals|
               totals[model.presence || "Unknown"] += total_tokens.to_i
             end
-            .sort_by { |_model, total_tokens| -total_tokens }
+            .sort_by { |model, total_tokens| [-total_tokens, model.to_s.downcase] }
       end
     end
 
@@ -1036,12 +1036,19 @@ module AdminScreens
 
     def top_model_call_volume_rows(context, range: 30.days.ago..Time.current, limit: 5)
       memoize_widget([:top_model_call_volume_rows, context.object_id, range.begin.to_f, range.end.to_f, limit]) do
-        runs_scope(context)
-          .where(created_at: range)
-          .group(:resolved_model)
-          .count
-          .sort_by { |_model, count| -count.to_i }
-          .first(limit)
+        model_call_totals(runs_scope(context).where(created_at: range)).first(limit)
+      end
+    end
+
+    def model_call_totals(runs)
+      memoize_widget([:model_call_totals, runs.object_id]) do
+        runs.reorder(nil)
+            .group(:resolved_model)
+            .count
+            .each_with_object(Hash.new(0)) do |(model, count), totals|
+              totals[model.presence || "Unknown"] += count.to_i
+            end
+            .sort_by { |model, count| [-count, model.to_s.downcase] }
       end
     end
 
