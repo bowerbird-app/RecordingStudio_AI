@@ -485,6 +485,20 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
+  def test_response_run_reads_the_attempt_or_batch_item_run
+    root_id = create_recording_id
+    run = create_run(root_id: root_id, status: "completed", tokens: 10, prompt_name_snapshot: "Osaka Weather")
+    attempt = run.attempts.create!(
+      sequence: 1, kind: "primary", status: "completed", provider: "openai", model: "gpt-test"
+    )
+    response = RecordingStudioAI::Response.create!(
+      attempt: attempt, response_type: "generation", provider: "openai", model: "gpt-test",
+      complete: true, byte_size: 8
+    )
+
+    assert_equal run, AdminScreens::RecordingStudioAIWidgets.response_run(response)
+  end
+
   private
 
   def create_run(root_id:, status:, tokens:, **attributes)

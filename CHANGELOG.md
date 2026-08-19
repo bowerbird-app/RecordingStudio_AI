@@ -110,6 +110,8 @@ Versioning and Keep a Changelog.
   Prompt, status, and model filters sit in the modal.
 - Dashboard P90 widgets are renamed to AI Prompt P90 latency and AI
   response p90 latency, with the prompt widget shown first.
+- AI Responses table shows the run as `#123`, adds Prompt name, and drops
+  Type, Finish, and Bytes. Date range, provider, and model stay inline.
 
 ### Upgrade notes
 

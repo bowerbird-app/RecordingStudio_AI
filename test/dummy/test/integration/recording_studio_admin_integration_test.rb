@@ -1389,6 +1389,52 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "href=\"/admin/screens/latency_by_model\""
   end
 
+  test "ai responses table shows hashed run ids and prompt names" do
+    authenticate_for_admin!
+    run = create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_key: "osaka-weather",
+      prompt_name_snapshot: "Osaka Weather"
+    )
+    attempt = run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      provider: "openai",
+      model: "gpt-test",
+      started_at: Time.current,
+      completed_at: Time.current
+    )
+    RecordingStudioAI::Response.create!(
+      attempt: attempt,
+      response_type: "generation",
+      provider: "openai",
+      model: "gpt-test",
+      complete: true,
+      byte_size: 24,
+      finish_reason: "stop",
+      content_text: "sunny",
+      expires_at: 7.days.from_now
+    )
+
+    get "/admin/screens/recording_studio_ai_responses/table"
+
+    assert_response :success
+    assert_includes response.body, "##{run.id}"
+    assert_includes response.body, "Osaka Weather"
+    assert_includes response.body, "Prompt name"
+    column_keys = AdminScreens::RecordingStudioAIResponsesScreen.table.columns.map(&:key)
+    assert_includes column_keys, :prompt_name
+    refute_includes column_keys, :response_type
+    refute_includes column_keys, :finish_reason
+    refute_includes column_keys, :byte_size
+    filters = AdminScreens::RecordingStudioAIResponsesScreen.filters.map(&:key)
+    assert_equal %i[date_range provider model], filters.first(3)
+    refute_includes filters, :type
+    refute_includes filters, :finish
+  end
+
   test "prompt p90 latency widget links to latency by prompt" do
     authenticate_for_admin!
 

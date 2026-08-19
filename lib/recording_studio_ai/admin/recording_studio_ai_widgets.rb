@@ -152,6 +152,10 @@ module AdminScreens
       )
     end
 
+    def response_run(row)
+      row.attempt&.run || row.batch_item&.run
+    end
+
     def run_distinct_values(column)
       runs_scope.distinct.order(column).pluck(column).compact_blank
     end
