@@ -55,12 +55,14 @@ module AdminScreens
     remove_const(:ModelRow) if const_defined?(:ModelRow) && ModelRow.members != model_row_members
     ModelRow = Data.define(*model_row_members) unless const_defined?(:ModelRow)
 
-    ATTEMPT_KIND_LABELS = {
-      "primary" => "1st attempt",
-      "retry" => "Retry",
-      "fallback" => "Fallback",
-      "continuation" => "After tools"
-    }.freeze unless const_defined?(:ATTEMPT_KIND_LABELS)
+    unless const_defined?(:ATTEMPT_KIND_LABELS)
+      ATTEMPT_KIND_LABELS = {
+        "primary" => "1st attempt",
+        "retry" => "Retry",
+        "fallback" => "Fallback",
+        "continuation" => "After tools"
+      }.freeze
+    end
     ADMIN_CONTEXT_KEY = :recording_studio_ai_admin_context unless const_defined?(:ADMIN_CONTEXT_KEY)
 
     def bind_admin_context!(context)
