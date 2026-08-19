@@ -78,6 +78,18 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.11] - 2026-08-19
+
+### Changed
+
+- Dummy host sidebar header shows `RecordingStudioAI::VERSION` instead of
+  Flatpack’s gem version.
+
+### Upgrade notes
+
+- Hosts that copied the dummy Flatpack sidebar header still show Flatpack’s
+  version until they override that badge the same way.
+
 ## [0.2.10] - 2026-08-18
 
 ### Changed
