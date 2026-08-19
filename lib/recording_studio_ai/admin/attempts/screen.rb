@@ -8,7 +8,8 @@ module AdminScreens
     subtitle "Provider attempts for AI calls, ordered by their execution sequence."
 
     query do |context|
-      AdminScreens::RecordingStudioAIWidgets.attempts_scope(context).includes(:run).order(:sequence)
+      relation = AdminScreens::RecordingStudioAIWidgets.attempts_scope(context)
+      relation.includes(:run).preload(:requested_custom_tool_invocations).order(:sequence)
     end
 
     filter_presentation :modal, inline_count: 3
@@ -125,6 +126,16 @@ module AdminScreens
              value: lambda { |attempt, _context|
                attempt.run&.prompt_name_snapshot.presence || attempt.run&.prompt_key || "No prompt"
              }
+      column :tools,
+             title: "Tools",
+             sortable: false,
+             header_tooltip: "Tools this try used, by name.",
+             value: lambda { |attempt, _context|
+               names = attempt.requested_custom_tool_invocations.sort_by(&:id).filter_map do |invocation|
+                 invocation.tool_name_snapshot.presence || invocation.tool_key.presence
+               end.uniq
+               names.join(", ").presence
+             }
       column :status,
              header_tooltip: "How this try ended.",
              display: :badge,
@@ -143,7 +154,7 @@ module AdminScreens
       column :total_tokens, title: "Tokens", header_tooltip: "Rough size of what went in and came back."
       column :error_code, title: "Error code", header_tooltip: "Why it failed, when it failed."
 
-      default_columns :created_at, :prompt, :status, :provider, :model, :latency_ms, :total_tokens, :error_code
+      default_columns :created_at, :prompt, :tools, :status, :provider, :model, :latency_ms, :total_tokens, :error_code
 
       default_sort :sequence, direction: :asc
       paginate per_page: 25

@@ -84,6 +84,8 @@ Versioning and Keep a Changelog.
 
 - Dummy host sidebar header shows `RecordingStudioAI::VERSION` instead of
   Flatpack’s gem version.
+- Attempts table shows the tool names used on a try, when that try asked
+  for tools.
 
 ### Upgrade notes
 

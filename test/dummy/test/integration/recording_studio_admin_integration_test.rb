@@ -780,6 +780,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Prompt"
     assert_select "th", text: /Created/
     assert_select "th", text: /\APrompt/
+    assert_select "th", text: /\ATools/
     assert_select "th", text: /\AStatus/
     assert_select "th", text: /\AAI call/, count: 0
     assert_select "th", text: /\ASequence/, count: 0
@@ -854,6 +855,57 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Matching Attempt Prompt"
     refute_includes response.body, "other-attempt-model"
     refute_includes response.body, "Other Attempt Prompt"
+  end
+
+  test "attempts table shows tool names used on that try" do
+    authenticate_for_admin!
+    matching_run = create_run!(status: "completed", operation: "generation")
+    other_run = create_run!(status: "completed", operation: "generation")
+    matching_attempt = matching_run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      provider: "openai",
+      model: "attempt-with-tools"
+    )
+    other_run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      provider: "openai",
+      model: "attempt-without-tools"
+    )
+    matching_attempt.requested_custom_tool_invocations.create!(
+      run: matching_run,
+      tool_key: "dummy_echo_tool",
+      tool_version: 1,
+      tool_name_snapshot: "Dummy Echo Tool",
+      status: "completed",
+      read_only: true,
+      destructive: false,
+      requires_confirmation: false,
+      idempotent: true
+    )
+    matching_attempt.requested_custom_tool_invocations.create!(
+      run: matching_run,
+      tool_key: "dummy_summary_tool",
+      tool_version: 1,
+      tool_name_snapshot: "Dummy Summary Tool",
+      status: "completed",
+      read_only: true,
+      destructive: false,
+      requires_confirmation: false,
+      idempotent: true
+    )
+
+    get "/admin/screens/attempts/table"
+
+    assert_response :success
+    assert_includes response.body, "Dummy Echo Tool"
+    assert_includes response.body, "Dummy Summary Tool"
+    refute_includes response.body, "dummy_echo_tool"
+    refute_includes response.body, "dummy_summary_tool"
+    assert_select "th", text: /\ATools/
   end
 
   test "attempts chart stacks volume by kind and accepts a grouping filter" do
