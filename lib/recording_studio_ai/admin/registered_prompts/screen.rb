@@ -14,6 +14,18 @@ module AdminScreens
     filter_presentation :modal, inline_count: 1
     filter :date_range, field: :created_at, default: :last_4_weeks
 
+    summary do
+      label "Calls"
+      value do |context|
+        Array(context.query_result&.relation).sum { |row| row.respond_to?(:calls) ? row.calls.to_i : 0 }
+      end
+      previous_value do |context|
+        widgets = AdminScreens::RecordingStudioAIWidgets
+        previous = widgets.previous_period_date_range(widgets.registered_prompts_date_range_value(context))
+        widgets.prompt_call_count(context, date_range: previous)
+      end
+    end
+
     chart do
       title "Prompt call volume"
       subtitle "All registered prompts by call volume in the selected date range."
@@ -38,7 +50,7 @@ module AdminScreens
 
     table do
       title ""
-      hide_columns_button
+      show_columns_button
       hide_count
 
       column :name,
@@ -71,6 +83,9 @@ module AdminScreens
       column :average_duration, title: "Average duration", header_tooltip: "Typical wait for this prompt."
       column :average_input_tokens, title: "Avg input", header_tooltip: "Typical size of what we send."
       column :average_output_tokens, title: "Avg output", header_tooltip: "Typical size of what comes back."
+
+      default_columns :name, :description, :calls_series, :success_rate, :error_rate, :average_duration,
+                      :average_input_tokens, :average_output_tokens
     end
   end
 end

@@ -48,6 +48,9 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
     get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
     assert_response :success
     assert_includes response.body, "viewable retained body"
+    refute_includes response.body, "Retention metadata"
+    assert_includes response.body, "Complete / truncated"
+    assert_includes response.body, "Content type"
   end
 
   test "retained response page still authorizes after a code reload" do

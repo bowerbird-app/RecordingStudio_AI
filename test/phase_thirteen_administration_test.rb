@@ -353,6 +353,161 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     refute query.key?(:date_range_preset)
   end
 
+  def test_prompt_call_count_uses_the_selected_range_not_definition_count
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    current = Struct.new(:start_date, :end_date, :preset_key).new(Date.current - 27, Date.current, :last_4_weeks)
+    previous = widgets.previous_period_date_range(current)
+
+    create_run(
+      root_id: root_id, status: "completed", tokens: 4, prompt_key: "current-prompt",
+      created_at: current.end_date.beginning_of_day + 1.hour
+    )
+    create_run(
+      root_id: root_id, status: "completed", tokens: 4, prompt_key: "previous-prompt",
+      created_at: previous.end_date.beginning_of_day + 1.hour
+    )
+    create_run(
+      root_id: root_id, status: "completed", tokens: 4, prompt_key: "older-prompt",
+      created_at: previous.start_date.beginning_of_day - 2.days
+    )
+
+    assert_equal 1, widgets.prompt_call_count(context, date_range: current)
+    assert_equal 1, widgets.prompt_call_count(context, date_range: previous)
+    assert_equal current.start_date - 28.days, previous.start_date
+    assert_equal 0, widgets.prompt_call_count(context, date_range: nil)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
+  def test_latency_p90_for_range_uses_selected_runs_not_row_count
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    current = Struct.new(:start_date, :end_date, :preset_key).new(Date.current - 27, Date.current, :last_4_weeks)
+    previous = widgets.previous_period_date_range(current)
+
+    [100, 200, 300, 400, 500, 600, 700, 800, 900, 10_000].each do |latency_ms|
+      create_run(
+        root_id: root_id, status: "completed", tokens: 4, latency_ms: latency_ms,
+        resolved_model: "p90-model", created_at: current.end_date.beginning_of_day + 1.hour
+      )
+    end
+    10.times do
+      create_run(
+        root_id: root_id, status: "completed", tokens: 4, latency_ms: 100,
+        resolved_model: "p90-model", created_at: previous.end_date.beginning_of_day + 1.hour
+      )
+    end
+
+    assert_equal 900, widgets.latency_p90_for_range(context, date_range: current)
+    assert_equal 100, widgets.latency_p90_for_range(context, date_range: previous)
+    assert_equal 0, widgets.latency_p90_for_range(context, date_range: nil)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
+  def test_filter_model_rows_by_provider_keeps_matching_rows
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    openai = Struct.new(:provider).new("openai")
+    gemini = Struct.new(:provider).new("gemini")
+    context = Object.new
+    def context.filter_value(key) = key.to_sym == :provider ? "openai" : nil
+
+    assert_equal [openai], widgets.filter_model_rows_by_provider([openai, gemini], context)
+    assert_equal [openai, gemini], widgets.filter_model_rows_by_provider([openai, gemini], Object.new)
+  end
+
+  def test_attempt_kind_label_uses_everyday_words
+    widgets = AdminScreens::RecordingStudioAIWidgets
+
+    assert_equal "1st attempt", widgets.attempt_kind_label("primary")
+    assert_equal "After tools", widgets.attempt_kind_label("continuation")
+    assert_equal "Retry", widgets.attempt_kind_label("retry")
+  end
+
+  def test_model_token_totals_ranks_every_model
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    create_run(root_id: root_id, status: "completed", tokens: 10, resolved_model: "small-model", total_tokens: 100)
+    create_run(root_id: root_id, status: "completed", tokens: 20, resolved_model: "big-model", total_tokens: 400)
+    create_run(root_id: root_id, status: "completed", tokens: 5, resolved_model: "small-model", total_tokens: 50)
+
+    create_run(root_id: root_id, status: "completed", tokens: 8, resolved_model: nil, total_tokens: 75)
+    current = Struct.new(:start_date, :end_date, :preset_key).new(Date.current, Date.current, nil)
+    totals = widgets.model_token_totals(widgets.runs_scope(context))
+
+    assert_equal [["big-model", 400], ["small-model", 150], ["Unknown", 75]], totals
+    assert_equal 625, widgets.token_total_for_range(context, date_range: current)
+    assert_equal 0, widgets.token_total_for_range(context, date_range: nil)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
+  def test_model_call_totals_ranks_every_model
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    create_run(root_id: root_id, status: "completed", tokens: 10, resolved_model: "small-model")
+    create_run(root_id: root_id, status: "completed", tokens: 20, resolved_model: "big-model")
+    create_run(root_id: root_id, status: "completed", tokens: 5, resolved_model: "small-model")
+    create_run(root_id: root_id, status: "completed", tokens: 8, resolved_model: nil)
+
+    totals = widgets.model_call_totals(widgets.runs_scope(context))
+
+    assert_equal [["small-model", 2], ["big-model", 1], ["Unknown", 1]], totals
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
+  def test_call_volume_totals_can_group_by_provider
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    create_run(root_id: root_id, status: "completed", tokens: 10, resolved_provider: "openai", resolved_model: "a")
+    create_run(root_id: root_id, status: "completed", tokens: 20, resolved_provider: "openai", resolved_model: "b")
+    create_run(root_id: root_id, status: "completed", tokens: 5, resolved_provider: "google", resolved_model: "c")
+
+    totals = widgets.call_volume_totals(widgets.runs_scope(context), group_by: :provider)
+
+    assert_equal [["openai", 2], ["google", 1]], totals
+
+    model_context = Object.new
+    def model_context.filter_value(_key) = nil
+    provider_context = Object.new
+    def provider_context.filter_value(_key) = "provider"
+
+    assert_equal :model, widgets.call_volume_group_by(model_context)
+    assert_equal :provider, widgets.call_volume_group_by(provider_context)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
+  def test_registered_model_keys_lists_registered_definitions
+    keys = AdminScreens::RecordingStudioAIWidgets.registered_model_keys
+
+    assert_includes keys, "gpt-5-mini"
+    assert_includes keys, "gemini-2.5-flash"
+    refute_includes keys, "calls-screen-one"
+    assert_equal keys, keys.uniq.sort
+  end
+
+  def test_response_run_reads_the_attempt_or_batch_item_run
+    root_id = create_recording_id
+    run = create_run(root_id: root_id, status: "completed", tokens: 10, prompt_name_snapshot: "Osaka Weather")
+    attempt = run.attempts.create!(
+      sequence: 1, kind: "primary", status: "completed", provider: "openai", model: "gpt-test"
+    )
+    response = RecordingStudioAI::Response.create!(
+      attempt: attempt, response_type: "generation", provider: "openai", model: "gpt-test",
+      complete: true, byte_size: 8
+    )
+
+    assert_equal run, AdminScreens::RecordingStudioAIWidgets.response_run(response)
+  end
+
   private
 
   def create_run(root_id:, status:, tokens:, **attributes)

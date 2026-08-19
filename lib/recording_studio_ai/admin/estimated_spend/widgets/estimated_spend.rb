@@ -3,9 +3,9 @@
 module AdminScreens
   RecordingStudioAIEstimatedSpendWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.estimated_spend") do
     type :chart
-    title "Estimated token/model spend"
+    title "Estimated token usage"
     subtitle "Top 5 models by token usage in the last 30 days."
-    description "Ranks models by token usage so spend concentration is immediately visible."
+    description "Ranks models by token usage so the heavy hitters are easy to spot."
     metadata { { period_label: "Last 30 days" } }
     value do |context|
       runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)

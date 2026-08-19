@@ -3,7 +3,7 @@
 module AdminScreens
   RecordingStudioAISlowCallsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.slow_calls") do
     type :chart
-    title "AI Calls P90 Latency"
+    title "AI Response P90 latency"
     subtitle "90th-percentile AI call latency over the last 30 days."
     description "Shows the latency at or below which 90% of AI calls completed, without letting isolated outliers dominate."
     metadata { { period_label: "Last 30 days" } }

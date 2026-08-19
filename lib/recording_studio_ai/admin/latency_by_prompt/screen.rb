@@ -14,6 +14,17 @@ module AdminScreens
     filter_presentation :modal, inline_count: 1
     filter :date_range, field: :created_at, default: :last_4_weeks
 
+    summary do
+      label "P90 (ms)"
+      change_good_when :down
+      value do |context|
+        AdminScreens::RecordingStudioAIWidgets.latency_summary_p90(context, dimension: :prompt)
+      end
+      previous_value do |context|
+        AdminScreens::RecordingStudioAIWidgets.latency_summary_p90(context, dimension: :prompt, previous: true)
+      end
+    end
+
     chart do
       title "Prompt P90 latency"
       subtitle "Latency at or below which 90% of calls completed."

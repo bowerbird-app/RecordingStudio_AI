@@ -1,9 +1,10 @@
 <%= render FlatPack::Sidebar::Component.new(side: sidebar_side) do |sidebar| %>
   <% sidebar.header do %>
-    <%= render FlatPack::Sidebar::Header::Component.new(
+    <%= render SidebarHeaderComponent.new(
       brand_abbr: "AI",
       title: "Recording Studio AI",
-      subtitle: "Phase 1 foundation"
+      subtitle: "Phase 1 foundation",
+      version: RecordingStudioAI::VERSION
     ) %>
   <% end %>
 

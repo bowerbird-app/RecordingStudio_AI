@@ -198,22 +198,27 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes response.body, ">Completed<"
   end
 
-  test "ai calls chart accepts a grouping filter" do
+  test "ai calls chart bars every model in range" do
     authenticate_for_admin!
-    create_run!(status: "completed", operation: "generation")
+    create_run!(status: "completed", operation: "generation", resolved_model: "calls-bar-one")
+    create_run!(status: "completed", operation: "generation", resolved_model: "calls-bar-two")
+    create_run!(status: "completed", operation: "generation", resolved_model: "calls-bar-one")
 
-    get "/admin/screens/ai_calls/chart", params: { group_by: "month" }
-
-    assert_response :success
-    assert_includes response.body, "AI calls trend"
-
-    get "/admin/screens/ai_calls", params: { group_by: "month" }
+    get "/admin/screens/ai_calls/chart"
 
     assert_response :success
-    assert_includes response.body, "group_by=month"
-    assert_includes response.body, "controllers/recording_studio_admin/screen_filters_controller"
-    assert_select "input[name='group_by']", count: 1
-    assert_equal 1, response.body.scan(/name="run_status"/).size
+    assert_includes response.body, "Calls by model"
+    assert_includes response.body, "calls-bar-one"
+    assert_includes response.body, "calls-bar-two"
+    assert_includes response.body, "horizontal"
+    filters = AdminScreens::RecordingStudioAICallsScreen.filters
+    refute_includes filters.map(&:key), :group_by
+
+    get "/admin/screens/ai_calls"
+
+    assert_response :success
+    assert_includes response.body, "src=\"/admin/screens/ai_calls/chart\""
+    assert_includes response.body, "AI Calls"
   end
 
   test "ai calls defaults its date range to the last four weeks" do
@@ -358,12 +363,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "ai_calls?"
     assert_includes response.body, "provider=openai"
     assert_includes response.body, "date_range_preset=last_30_days"
-    assert_includes response.body, "Show file"
-    assert_includes response.body, "class MyProvider"
-    assert_includes response.body, "MY_PROVIDER_API_KEY"
-    assert_includes response.body, "ENV.fetch"
-    assert_includes response.body, "configuration_api_key"
-    assert_includes response.body, "attr_accessor :my_provider_api_key"
+    assert_includes response.body, "registered_models?"
+    assert_includes response.body, "Registered models for openai"
+    refute_includes response.body, "Show file"
+    refute_includes response.body, "Starter file"
+    refute_includes response.body, "class MyProvider"
+    refute_includes response.body, "MY_PROVIDER_API_KEY"
   end
 
   test "registered models screen lists every registered model definition" do
@@ -396,6 +401,23 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "date_range_preset=last_30_days"
     refute_includes response.body, "API model"
     refute_includes response.body, "Calls (30d)"
+  end
+
+  test "registered models screen can filter to one provider" do
+    authenticate_for_admin!
+
+    get "/admin/screens/registered_models", params: { provider: "openai" }
+
+    assert_response :success
+    assert_includes response.body, "value=\"openai\""
+
+    get "/admin/screens/registered_models/table", params: { provider: "openai" }
+
+    assert_response :success
+    assert_includes response.body, "gpt-5"
+    assert_includes response.body, "openai"
+    refute_includes response.body, "gemini-2.5-flash"
+    refute_includes response.body, ">gemini<"
   end
 
   test "registered prompts screen shows chart and table metrics" do
@@ -444,10 +466,20 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "demo.analyze_text"
     assert_includes response.body, "demo.osaka_weather"
     assert_includes response.body, "demo.summarize_text"
+    assert_match(/text-5xl[^>]*>2</, response.body)
+    assert_includes response.body, "+100%"
+    assert_includes response.body, "Last 4 weeks"
+    refute_includes response.body, ">0%</span>"
 
     get "/admin/screens/registered_prompts/table"
 
     assert_response :success
+    assert AdminScreens::RecordingStudioAIRegisteredPromptsScreen.table.show_columns_button?
+    refute_includes AdminScreens::RecordingStudioAIRegisteredPromptsScreen.table.default_column_keys, :namespace
+    refute_includes AdminScreens::RecordingStudioAIRegisteredPromptsScreen.table.default_column_keys, :key
+    assert_includes response.body, "Choose table columns"
+    assert_select "th", text: /\ANamespace/, count: 0
+    assert_select "th", text: /\AKey/, count: 0
     assert_includes response.body, "Text Summary"
     assert_includes response.body, "Avg input"
     assert_includes response.body, "Avg output"
@@ -458,6 +490,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Produce a concise factual summary."
     assert_includes response.body, "Summarize this text:"
     assert_includes response.body, "#000000"
+
+    get "/admin/screens/registered_prompts/table", params: { columns: %w[name namespace key] }
+
+    assert_response :success
+    assert_select "th", text: /\ANamespace/
+    assert_select "th", text: /\AKey/
   end
 
   test "registered prompts screen includes unused registered prompts" do
@@ -602,6 +640,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       AdminScreens::RecordingStudioAIRegisteredPromptsScreen,
       AdminScreens::RecordingStudioAIAttemptsScreen,
       AdminScreens::RecordingStudioAIEstimatedSpendScreen,
+      AdminScreens::RecordingStudioAICallsByProviderModelScreen,
       AdminScreens::RecordingStudioAIRegisteredProvidersScreen,
       AdminScreens::RecordingStudioAIRegisteredModelsScreen
     ]
@@ -623,6 +662,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       "registered_prompts" => "Typical size of what we send.",
       "attempts" => "How this try ended.",
       "estimated_spend" => "Size of what we sent.",
+      "calls_by_provider_model" => "Who we asked.",
       "registered_providers" => "Whether keys are set so it can run.",
       "registered_models" => "How wild the answers can get."
     }.each do |key, phrase|
@@ -661,7 +701,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/ai_calls/table"
 
     assert_response :success
-    assert_includes response.body, "href=\"/admin/screens/tool_calls?run_id=#{selected_run.id}\""
+    tool_calls_href = response.body[%r{href="(/admin/screens/tool_calls\?[^"]*run_id=#{selected_run.id}[^"]*)"}]
+    assert tool_calls_href, "expected a Tool calls link for the selected run"
+    assert_includes tool_calls_href, "run_id=#{selected_run.id}"
 
     get "/admin/screens/tool_calls/table", params: { run_id: selected_run.id }
 
@@ -717,7 +759,10 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/ai_calls/table"
 
     assert_response :success
-    assert_includes response.body, "href=\"/admin/screens/attempts?run_id=#{selected_run.id}\""
+    attempts_href = response.body[%r{href="(/admin/screens/attempts\?[^"]*run_id=#{selected_run.id}[^"]*)"}]
+    assert attempts_href, "expected an Attempts link for the selected run"
+    assert_includes attempts_href, "run_id=#{selected_run.id}"
+    assert_includes response.body, "Tool calls"
 
     get "/admin/screens/attempts/table", params: { run_id: selected_run.id }
 
@@ -780,6 +825,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Prompt"
     assert_select "th", text: /Created/
     assert_select "th", text: /\APrompt/
+    assert_select "th", text: /\ATools/
     assert_select "th", text: /\AStatus/
     assert_select "th", text: /\AAI call/, count: 0
     assert_select "th", text: /\ASequence/, count: 0
@@ -856,20 +902,74 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "Other Attempt Prompt"
   end
 
+  test "attempts table shows tool names used on that try" do
+    authenticate_for_admin!
+    matching_run = create_run!(status: "completed", operation: "generation")
+    other_run = create_run!(status: "completed", operation: "generation")
+    matching_attempt = matching_run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      provider: "openai",
+      model: "attempt-with-tools"
+    )
+    other_run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      provider: "openai",
+      model: "attempt-without-tools"
+    )
+    matching_attempt.requested_custom_tool_invocations.create!(
+      run: matching_run,
+      tool_key: "dummy_echo_tool",
+      tool_version: 1,
+      tool_name_snapshot: "Dummy Echo Tool",
+      status: "completed",
+      read_only: true,
+      destructive: false,
+      requires_confirmation: false,
+      idempotent: true
+    )
+    matching_attempt.requested_custom_tool_invocations.create!(
+      run: matching_run,
+      tool_key: "dummy_summary_tool",
+      tool_version: 1,
+      tool_name_snapshot: "Dummy Summary Tool",
+      status: "completed",
+      read_only: true,
+      destructive: false,
+      requires_confirmation: false,
+      idempotent: true
+    )
+
+    get "/admin/screens/attempts/table"
+
+    assert_response :success
+    assert_includes response.body, "Dummy Echo Tool"
+    assert_includes response.body, "Dummy Summary Tool"
+    refute_includes response.body, "dummy_echo_tool"
+    refute_includes response.body, "dummy_summary_tool"
+    assert_select "th", text: /\ATools/
+  end
+
   test "attempts chart stacks volume by kind and accepts a grouping filter" do
     authenticate_for_admin!
     run = create_run!(status: "completed", operation: "generation")
     run.attempts.create!(sequence: 1, kind: "primary", status: "failed", provider: "openai", model: "attempt-chart-primary")
     run.attempts.create!(sequence: 2, kind: "retry", status: "completed", provider: "openai", model: "attempt-chart-retry")
     run.attempts.create!(sequence: 3, kind: "fallback", status: "completed", provider: "google", model: "attempt-chart-fallback")
+    run.attempts.create!(sequence: 4, kind: "continuation", status: "completed", provider: "openai", model: "attempt-chart-continuation")
 
     get "/admin/screens/attempts/chart", params: { group_by: "day" }
 
     assert_response :success
     assert_includes response.body, "Attempts by kind"
-    assert_includes response.body, "Primary"
+    assert_includes response.body, "1st attempt"
+    refute_includes response.body, ">Primary<"
     assert_includes response.body, "Retry"
     assert_includes response.body, "Fallback"
+    assert_includes response.body, "After tools"
     assert_includes response.body, "&quot;stacked&quot;:true"
 
     get "/admin/screens/attempts", params: { group_by: "month" }
@@ -1064,20 +1164,130 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "href=\"/admin/screens/estimated_spend\""
+    assert_includes response.body, "Calls by provider/model"
+    assert_includes response.body, "Estimated token usage"
+    widget_keys = AdminScreens::RecordingStudioAISection.widget_keys
+    assert_operator widget_keys.index("widgets.recording_studio_ai.calls_by_provider_model"),
+                    :<,
+                    widget_keys.index("widgets.recording_studio_ai.estimated_spend")
+    assert_operator widget_keys.index("widgets.recording_studio_ai.prompt_p90_latency"),
+                    :<,
+                    widget_keys.index("widgets.recording_studio_ai.slow_calls")
+    calls_at = response.body.index("<h3 class=\"text-xl font-semibold\">Calls by provider/model</h3>")
+    tokens_at = response.body.index("<h3 class=\"text-xl font-semibold\">Estimated token usage</h3>")
+    assert calls_at, "expected Calls by provider/model on the dashboard"
+    assert tokens_at, "expected Estimated token usage on the dashboard"
+    assert_operator calls_at, :<, tokens_at
+    prompt_p90_at = response.body.index("<h3 class=\"text-xl font-semibold\">AI Prompt P90 latency</h3>")
+    response_p90_at = response.body.index("<h3 class=\"text-xl font-semibold\">AI Response P90 latency</h3>")
+    assert prompt_p90_at, "expected AI Prompt P90 latency on the dashboard"
+    assert response_p90_at, "expected AI Response P90 latency on the dashboard"
+    assert_operator prompt_p90_at, :<, response_p90_at
   end
 
-  test "estimated spend defaults to the last four weeks grouped by day" do
+  test "calls by provider model screen bars models by default" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_provider: "openai",
+      resolved_model: "calls-screen-one"
+    )
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_provider: "google",
+      resolved_model: "calls-screen-two"
+    )
+
+    get "/admin/screens/calls_by_provider_model"
+
+    assert_response :success
+    assert_includes response.body, "Calls by provider/model"
+    assert_includes response.body, "src=\"/admin/screens/calls_by_provider_model/chart\""
+    filters = AdminScreens::RecordingStudioAICallsByProviderModelScreen.filters
+    assert_equal %i[date_range group_by provider], filters.first(3).map(&:key)
+    group_by = filters.find { |filter| filter.key == :group_by }
+    assert_equal :model, group_by.options[:default]
+    assert_equal :model, group_by.normalize({})
+    assert_equal :provider, group_by.normalize(group_by: "provider")
+    assert_includes filters.map(&:key), :prompt
+    assert_includes filters.map(&:key), :status
+    assert_includes filters.map(&:key), :model
+    provider_filter = filters.find { |filter| filter.key == :provider }
+    model_filter = filters.find { |filter| filter.key == :model }
+    assert_equal AdminScreens::RecordingStudioAIWidgets.registered_provider_keys,
+                 provider_filter.allowed_values
+    assert_equal AdminScreens::RecordingStudioAIWidgets.registered_model_keys,
+                 model_filter.allowed_values
+    refute_includes provider_filter.allowed_values, "google"
+    refute_includes model_filter.allowed_values, "calls-screen-one"
+
+    get "/admin/screens/calls_by_provider_model/chart"
+
+    assert_response :success
+    assert_includes response.body, "Calls by model"
+    assert_includes response.body, "calls-screen-one"
+    assert_includes response.body, "calls-screen-two"
+    assert_includes response.body, "horizontal"
+
+    get "/admin/screens/calls_by_provider_model/chart", params: { group_by: "provider" }
+
+    assert_response :success
+    assert_includes response.body, "Calls by provider"
+    assert_includes response.body, "openai"
+    assert_includes response.body, "google"
+  end
+
+  test "calls by provider model widget links to its screen" do
+    authenticate_for_admin!
+
+    get "/admin"
+
+    assert_response :success
+    assert_includes response.body, "href=\"/admin/screens/calls_by_provider_model\""
+  end
+
+  test "estimated token usage defaults to the last four weeks" do
     authenticate_for_admin!
 
     get "/admin/screens/estimated_spend"
 
     assert_response :success
+    assert_includes response.body, "Estimated token usage"
     assert_select "input[value='Last 4 weeks']", minimum: 1
     filters = AdminScreens::RecordingStudioAIEstimatedSpendScreen.filters
+    refute_includes filters.map(&:key), :group_by
     assert_includes filters.map(&:key), :prompt
     assert_equal %i[created_at prompt_name_snapshot status resolved_provider resolved_model total_tokens input_tokens output_tokens],
                  AdminScreens::RecordingStudioAIEstimatedSpendScreen.table.default_column_keys
     assert_includes AdminScreens::RecordingStudioAIEstimatedSpendScreen.table.columns.map(&:key), :id
+  end
+
+  test "estimated token usage chart bars every model in range" do
+    authenticate_for_admin!
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_model: "token-bar-one",
+      total_tokens: 400
+    )
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_model: "token-bar-two",
+      total_tokens: 900
+    )
+
+    get "/admin/screens/estimated_spend/chart"
+
+    assert_response :success
+    assert_includes response.body, "Token usage by model"
+    assert_includes response.body, "token-bar-one"
+    assert_includes response.body, "token-bar-two"
+    assert_includes response.body, "horizontal"
+    assert_match(/text-5xl[^>]*>1,?300</, response.body)
+    refute_match(/text-5xl[^>]*>2</, response.body)
   end
 
   test "estimated spend treats decreased token usage as favorable" do
@@ -1183,8 +1393,54 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin"
 
     assert_response :success
-    assert_includes response.body, "AI Calls P90 Latency"
+    assert_includes response.body, "AI Response P90 latency"
     assert_includes response.body, "href=\"/admin/screens/latency_by_model\""
+  end
+
+  test "ai responses table shows hashed run ids and prompt names" do
+    authenticate_for_admin!
+    run = create_run!(
+      status: "completed",
+      operation: "generation",
+      prompt_key: "osaka-weather",
+      prompt_name_snapshot: "Osaka Weather"
+    )
+    attempt = run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      provider: "openai",
+      model: "gpt-test",
+      started_at: Time.current,
+      completed_at: Time.current
+    )
+    RecordingStudioAI::Response.create!(
+      attempt: attempt,
+      response_type: "generation",
+      provider: "openai",
+      model: "gpt-test",
+      complete: true,
+      byte_size: 24,
+      finish_reason: "stop",
+      content_text: "sunny",
+      expires_at: 7.days.from_now
+    )
+
+    get "/admin/screens/recording_studio_ai_responses/table"
+
+    assert_response :success
+    assert_includes response.body, "##{run.id}"
+    assert_includes response.body, "Osaka Weather"
+    assert_includes response.body, "Prompt name"
+    column_keys = AdminScreens::RecordingStudioAIResponsesScreen.table.columns.map(&:key)
+    assert_includes column_keys, :prompt_name
+    refute_includes column_keys, :response_type
+    refute_includes column_keys, :finish_reason
+    refute_includes column_keys, :byte_size
+    filters = AdminScreens::RecordingStudioAIResponsesScreen.filters.map(&:key)
+    assert_equal %i[date_range provider model], filters.first(3)
+    refute_includes filters, :type
+    refute_includes filters, :finish
   end
 
   test "prompt p90 latency widget links to latency by prompt" do
@@ -1193,7 +1449,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin"
 
     assert_response :success
-    assert_includes response.body, "Prompt P90 latency"
+    assert_includes response.body, "AI Prompt P90 latency"
     assert_includes response.body, "href=\"/admin/screens/latency_by_prompt\""
   end
 
@@ -1237,6 +1493,10 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Model P90 latency"
     assert_includes response.body, "P90 latency (ms)"
+    assert_match(/text-5xl[^>]*>900</, response.body)
+    assert_includes response.body, "+100%"
+    assert_includes response.body, "Last 4 weeks"
+    refute_includes response.body, ">0%</span>"
   end
 
   test "latency by prompt shows grouped P90 latency" do
@@ -1275,6 +1535,10 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Prompt P90 latency"
     assert_includes response.body, "P90 latency (ms)"
+    assert_match(/text-5xl[^>]*>900</, response.body)
+    assert_includes response.body, "+100%"
+    assert_includes response.body, "Last 4 weeks"
+    refute_includes response.body, ">0%</span>"
   end
 
   test "latency by model mini chart follows the selected date range into ai calls" do

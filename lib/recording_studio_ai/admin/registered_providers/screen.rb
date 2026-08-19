@@ -5,7 +5,7 @@ module AdminScreens
     key "registered_providers"
     icon :server
     title "Registered providers"
-    subtitle "Who's wired up. Open Starter file if you need another."
+    subtitle "Who's wired up."
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.provider_rows(context)
@@ -18,13 +18,6 @@ module AdminScreens
 
       column :key, title: "Provider", header_tooltip: "The provider's name."
       column :class_name, title: "Implementation", header_tooltip: "The code that talks to it."
-      column :starter,
-             title: "Starter file",
-             sortable: false,
-             header_tooltip: "A copy-paste adapter, including how the env key is wired.",
-             value: lambda { |row, _context|
-               AdminScreens::RecordingStudioAIWidgets.provider_starter_modal(row)
-             }
       column :configured,
              title: "Configured",
              header_tooltip: "Whether keys are set so it can run.",
@@ -48,7 +41,17 @@ module AdminScreens
                  aria: { label: "AI calls for #{row.key} in the last 30 days" }
                )
              }
-      column :models_count, title: "Models", header_tooltip: "How many models this provider has."
+      column :models_count,
+             title: "Models",
+             header_tooltip: "How many models this provider has. Open it to see them.",
+             value: lambda { |row, context|
+               ActionController::Base.helpers.link_to(
+                 row.models_count.to_s,
+                 AdminScreens::RecordingStudioAIWidgets.registered_models_path(context, provider: row.key),
+                 data: { turbo_frame: "_top" },
+                 aria: { label: "Registered models for #{row.key}" }
+               )
+             }
     end
   end
 end

@@ -78,6 +78,52 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
 
+## [0.2.11] - 2026-08-19
+
+### Changed
+
+- Dummy host sidebar header shows `RecordingStudioAI::VERSION` instead of
+  Flatpack’s gem version.
+- Attempts table shows the tool names used on a try, when that try asked
+  for tools.
+- Registered prompts chart summary counts calls in the selected date range,
+  not the number of prompt definitions, so the period change is no longer
+  stuck at 0%.
+- Latency by model and Latency by prompt chart summaries use overall P90
+  in the selected date range, not the number of grouped rows, so Last 4
+  weeks is no longer stuck at 0%. Lower P90 is treated as an improvement.
+- Registered providers table drops the Starter file column. The Models
+  count opens Registered models filtered to that provider.
+- Registered prompts hides Namespace and Key by default and adds a column
+  picker so those fields can be turned back on.
+- Attempts chart and kind badges say "1st attempt" and "After tools"
+  instead of Primary and Continuation.
+- Estimated spend is now Estimated token usage. The screen chart is a
+  horizontal bar of every model in the selected range, and the headline
+  number is token total rather than call count. The dashboard widget
+  sits after Calls by provider/model.
+- AI Calls chart is a horizontal bar of call volume by model in the
+  selected date range, matching the Calls by provider/model widget.
+- Calls by provider/model is its own admin screen with a horizontal bar
+  chart (models by default, or providers via Group by). The Group by
+  control defaults to Model. The dashboard widget opens that screen.
+  Prompt, status, and model filters sit in the modal. Provider and model
+  filters only list registered providers and models.
+- Dashboard P90 widgets are renamed to AI Prompt P90 latency and AI
+  Response P90 latency, with the prompt widget shown first.
+- AI Responses table shows the run as `#123`, adds Prompt name, and drops
+  Type, Finish, and Bytes. Date range, provider, and model stay inline.
+- Retained response detail shows retention metadata in a simple table
+  instead of a card.
+
+### Upgrade notes
+
+- Hosts that copied the dummy Flatpack sidebar header still show Flatpack’s
+  version until they override that badge the same way.
+- The providers admin table no longer ships a Starter file modal. Use the
+  dummy `/config` starter, or `RecordingStudioAI::Providers::StarterExample`,
+  if you still need a copy-paste adapter.
+
 ## [0.2.10] - 2026-08-18
 
 ### Changed

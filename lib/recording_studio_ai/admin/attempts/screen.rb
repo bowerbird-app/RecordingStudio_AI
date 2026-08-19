@@ -8,7 +8,8 @@ module AdminScreens
     subtitle "Provider attempts for AI calls, ordered by their execution sequence."
 
     query do |context|
-      AdminScreens::RecordingStudioAIWidgets.attempts_scope(context).includes(:run).order(:sequence)
+      relation = AdminScreens::RecordingStudioAIWidgets.attempts_scope(context)
+      relation.includes(:run).preload(:requested_custom_tool_invocations).order(:sequence)
     end
 
     filter_presentation :modal, inline_count: 3
@@ -75,7 +76,7 @@ module AdminScreens
 
     chart do
       title "Attempts by kind"
-      subtitle "Stacked attempt volume by primary, retry, fallback, and continuation."
+      subtitle "Stacked tries: 1st attempt, retry, fallback, and after tools."
       type :column
       series do |context|
         AdminScreens::RecordingStudioAIWidgets.attempt_kind_series(
@@ -113,10 +114,14 @@ module AdminScreens
       column :run_id, title: "AI call", header_tooltip: "The call this try belongs to."
       column :sequence, title: "Sequence", header_tooltip: "Order of tries on that call."
       column :kind,
-             header_tooltip: "First try, a retry, or a switch to another provider.",
+             header_tooltip: "1st attempt, a retry, a switch to another provider, or a follow-up after tools ran.",
              display: :badge,
              display_options: lambda { |_row, _context, value|
-               { text: value.to_s.humanize, style: :default, size: :sm }
+               {
+                 text: AdminScreens::RecordingStudioAIWidgets.attempt_kind_label(value),
+                 style: :default,
+                 size: :sm
+               }
              }
       column :prompt,
              title: "Prompt",
@@ -124,6 +129,16 @@ module AdminScreens
              header_tooltip: "The prompt this try used.",
              value: lambda { |attempt, _context|
                attempt.run&.prompt_name_snapshot.presence || attempt.run&.prompt_key || "No prompt"
+             }
+      column :tools,
+             title: "Tools",
+             sortable: false,
+             header_tooltip: "Tools this try used, by name.",
+             value: lambda { |attempt, _context|
+               names = attempt.requested_custom_tool_invocations.sort_by(&:id).filter_map do |invocation|
+                 invocation.tool_name_snapshot.presence || invocation.tool_key.presence
+               end.uniq
+               names.join(", ").presence
              }
       column :status,
              header_tooltip: "How this try ended.",
@@ -143,7 +158,7 @@ module AdminScreens
       column :total_tokens, title: "Tokens", header_tooltip: "Rough size of what went in and came back."
       column :error_code, title: "Error code", header_tooltip: "Why it failed, when it failed."
 
-      default_columns :created_at, :prompt, :status, :provider, :model, :latency_ms, :total_tokens, :error_code
+      default_columns :created_at, :prompt, :tools, :status, :provider, :model, :latency_ms, :total_tokens, :error_code
 
       default_sort :sequence, direction: :asc
       paginate per_page: 25

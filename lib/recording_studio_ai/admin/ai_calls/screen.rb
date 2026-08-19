@@ -13,7 +13,6 @@ module AdminScreens
 
     filter_presentation :modal, inline_count: 3
     filter :date_range, field: :created_at, default: :last_4_weeks
-    filter :group_by, values: %i[hour day week month year], default: :day
     filter :status,
            param: :run_status,
            field: :status,
@@ -63,30 +62,23 @@ module AdminScreens
     end
 
     chart do
-      title "AI calls trend"
-      subtitle "Weekly call volume for the last 12 weeks."
-      type :line
+      title "Calls by model"
+      subtitle "All models in the selected date range."
+      type :bar
       series do |context|
-        [{
-          name: "AI calls",
-          data: RecordingStudioAdmin::AdminActivityLogsSupport.date_series(
-            context.query_result.relation.reorder(nil),
-            field: :created_at,
-            bucket: context.filter_value(:group_by) || :day
-          )
-        }]
+        rows = AdminScreens::RecordingStudioAIWidgets.model_call_totals(context.query_result.relation)
+        [{ name: "Calls", data: rows.map { |_model, count| count.to_i } }]
       end
-      options do
+      options do |context|
+        rows = AdminScreens::RecordingStudioAIWidgets.model_call_totals(context.query_result.relation)
         {
-          height: 300,
-          stroke: { curve: "smooth", width: 3 },
+          height: [300, (rows.length * 40) + 80].max,
+          plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
           xaxis: {
-            labels: { show: true },
-            axisBorder: { show: false },
-            axisTicks: { show: false }
+            categories: rows.map { |model, _count| model.presence || "Unknown" },
+            min: 0
           },
-          yaxis: { min: 0 },
-          grid: { xaxis: { lines: { show: false } } }
+          dataLabels: { enabled: false }
         }
       end
     end
@@ -144,7 +136,7 @@ module AdminScreens
 
                ActionController::Base.helpers.link_to(
                  count,
-                 "#{context.admin_screen_path('attempts')}?run_id=#{run.id}",
+                 AdminScreens::RecordingStudioAIWidgets.run_filtered_screen_path(context, "attempts", run),
                  class: "text-(--color-primary-background-color)",
                  data: { turbo_frame: "_top" }
                )
@@ -158,7 +150,7 @@ module AdminScreens
 
                ActionController::Base.helpers.link_to(
                  count,
-                 "#{context.admin_screen_path('tool_calls')}?run_id=#{run.id}",
+                 AdminScreens::RecordingStudioAIWidgets.run_filtered_screen_path(context, "tool_calls", run),
                  class: "text-(--color-primary-background-color)",
                  data: { turbo_frame: "_top" }
                )

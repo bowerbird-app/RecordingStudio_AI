@@ -13,16 +13,10 @@ module AdminScreens
 
     filter_presentation :modal, inline_count: 3
     filter :date_range, field: :created_at, default: :last_30_days
-    filter :type,
-           values: -> { AdminScreens::RecordingStudioAIWidgets.response_distinct_values(:response_type) },
-           apply: ->(relation, value, _context) { relation.where(response_type: value) }
     filter :provider,
            options: -> { AdminScreens::RecordingStudioAIWidgets.response_distinct_values(:provider) }
     filter :model,
            options: -> { AdminScreens::RecordingStudioAIWidgets.response_distinct_values(:model) }
-    filter :finish,
-           options: -> { AdminScreens::RecordingStudioAIWidgets.response_distinct_values(:finish_reason) },
-           apply: ->(relation, value, _context) { relation.where(finish_reason: value) }
     filter :complete,
            values: ["1"],
            control: :checkbox,
@@ -62,13 +56,6 @@ module AdminScreens
                  data: { turbo_frame: "_top" }
                )
              }
-      column :response_type,
-             title: "Type",
-             display: :badge,
-             display_options: lambda { |_row, _context, value|
-               style = value.to_s == "error" ? :danger : :default
-               { text: value.to_s.humanize, style: style, size: :sm }
-             }
       column :source,
              sortable: false,
              value: lambda { |row, _context|
@@ -77,10 +64,19 @@ module AdminScreens
       column :run_id,
              title: "Run",
              sortable: false,
-             value: ->(row, _context) { row.attempt&.run_id || row.batch_item&.run_id }
+             value: lambda { |row, _context|
+               run_id = AdminScreens::RecordingStudioAIWidgets.response_run(row)&.id
+               "##{run_id}" if run_id.present?
+             }
+      column :prompt_name,
+             title: "Prompt name",
+             sortable: false,
+             value: lambda { |row, _context|
+               run = AdminScreens::RecordingStudioAIWidgets.response_run(row)
+               run&.prompt_name_snapshot.presence || run&.prompt_key || "No prompt"
+             }
       column :provider
       column :model
-      column :finish_reason, title: "Finish", sortable: false
       column :completion,
              title: "Complete",
              sortable: false,
@@ -102,7 +98,6 @@ module AdminScreens
                        end
                { text: value, style: style, size: :sm }
              }
-      column :byte_size, title: "Bytes"
       column :expires_at, title: "Expires"
 
       default_sort :created_at, direction: :desc

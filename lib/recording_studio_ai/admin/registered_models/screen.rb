@@ -11,6 +11,13 @@ module AdminScreens
       AdminScreens::RecordingStudioAIWidgets.model_rows(context)
     end
 
+    filter_presentation :modal, inline_count: 1
+    filter :provider,
+           values: -> { AdminScreens::RecordingStudioAIWidgets.registered_provider_keys },
+           apply: lambda { |rows, value, _context|
+             Array(rows).select { |row| row.provider.to_s == value.to_s }
+           }
+
     table do
       title ""
       hide_columns_button

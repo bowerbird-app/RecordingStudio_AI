@@ -21,6 +21,7 @@ module AdminScreens
                               :success_rate, :error_rate, :average_duration, :average_input_tokens,
                               :average_output_tokens)
     end
+    DateRangeWindow = Data.define(:start_date, :end_date, :preset_key) unless const_defined?(:DateRangeWindow)
     latency_row_members = %i[
       name calls calls_series p50_latency_ms p90_latency_ms average_latency_ms max_latency_ms
       prompt_namespace prompt_key prompt_version resolved_model
@@ -54,6 +55,14 @@ module AdminScreens
     remove_const(:ModelRow) if const_defined?(:ModelRow) && ModelRow.members != model_row_members
     ModelRow = Data.define(*model_row_members) unless const_defined?(:ModelRow)
 
+    unless const_defined?(:ATTEMPT_KIND_LABELS)
+      ATTEMPT_KIND_LABELS = {
+        "primary" => "1st attempt",
+        "retry" => "Retry",
+        "fallback" => "Fallback",
+        "continuation" => "After tools"
+      }.freeze
+    end
     ADMIN_CONTEXT_KEY = :recording_studio_ai_admin_context unless const_defined?(:ADMIN_CONTEXT_KEY)
 
     def bind_admin_context!(context)
@@ -143,6 +152,10 @@ module AdminScreens
       )
     end
 
+    def response_run(row)
+      row.attempt&.run || row.batch_item&.run
+    end
+
     def run_distinct_values(column)
       runs_scope.distinct.order(column).pluck(column).compact_blank
     end
@@ -175,8 +188,12 @@ module AdminScreens
       RecordingStudioAI::Attempt::KINDS.values.filter_map do |kind|
         next unless counts.keys.any? { |count_kind, _bucket| count_kind == kind }
 
-        { name: kind.humanize, data: attempt_kind_data(kind, buckets, counts, bucket) }
+        { name: attempt_kind_label(kind), data: attempt_kind_data(kind, buckets, counts, bucket) }
       end
+    end
+
+    def attempt_kind_label(kind)
+      ATTEMPT_KIND_LABELS.fetch(kind.to_s, kind.to_s.humanize)
     end
 
     def attempt_kind_counts(relation, field, bucket)
@@ -368,11 +385,35 @@ module AdminScreens
     end
 
     def latency_date_range(context, dimension:)
-      screen = dimension == :model ? AdminScreens::RecordingStudioAILatencyByModelScreen : AdminScreens::RecordingStudioAILatencyByPromptScreen
-      date_range = context.filter_value(:date_range) || screen.filters.find do |filter|
-        filter.key == :date_range
-      end.normalize(context.params)
-      date_range.start_date.beginning_of_day..date_range.end_date.end_of_day
+      prompt_created_at_range(latency_date_range_value(context, dimension: dimension))
+    end
+
+    def latency_date_range_value(context, dimension:)
+      selected = context.filter_value(:date_range)
+      return selected if selected
+
+      latency_screen_for(dimension).filters.find { |filter| filter.key == :date_range }.normalize(context.params)
+    end
+
+    def latency_screen_for(dimension)
+      if dimension == :model
+        AdminScreens::RecordingStudioAILatencyByModelScreen
+      else
+        AdminScreens::RecordingStudioAILatencyByPromptScreen
+      end
+    end
+
+    def latency_summary_p90(context, dimension:, previous: false)
+      date_range = latency_date_range_value(context, dimension: dimension)
+      date_range = previous_period_date_range(date_range) if previous
+      latency_p90_for_range(context, date_range: date_range)
+    end
+
+    def latency_p90_for_range(context, date_range:)
+      range = date_range.is_a?(Range) ? date_range : prompt_created_at_range(date_range)
+      return 0 unless range
+
+      p90_latency(runs_scope(context).where(created_at: range).where.not(latency_ms: nil))
     end
 
     def retry_rate_by_model_rows(scope, range: 30.days.ago..Time.current, limit: 3)
@@ -437,12 +478,7 @@ module AdminScreens
 
     def prompt_rows(context)
       runs = runs_scope(context).where.not(prompt_key: nil)
-      date_range_value = registered_prompts_date_range_value(context)
-      date_range = if date_range_value.respond_to?(:start_date) && date_range_value.respond_to?(:end_date)
-                     date_range_value.start_date.beginning_of_day..date_range_value.end_date.end_of_day
-                   else
-                     30.days.ago..Time.current
-                   end
+      date_range = prompt_created_at_range(registered_prompts_date_range_value(context)) || (30.days.ago..Time.current)
       range_runs = runs.where(created_at: date_range)
       range_counts = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).count
       daily_counts = grouped_daily_counts(
@@ -576,6 +612,30 @@ module AdminScreens
       screen.filters.find { |filter| filter.key == :date_range }.normalize(context.params)
     end
 
+    def previous_period_date_range(date_range)
+      return unless date_range.respond_to?(:start_date) && date_range.respond_to?(:end_date)
+      return unless date_range.start_date && date_range.end_date
+
+      span_days = (date_range.end_date - date_range.start_date).to_i + 1
+      previous_end = date_range.start_date - 1.day
+      previous_start = previous_end - (span_days - 1).days
+      DateRangeWindow.new(previous_start, previous_end, nil)
+    end
+
+    def prompt_call_count(context, date_range:)
+      range = prompt_created_at_range(date_range)
+      return 0 unless range
+
+      runs_scope(context).where.not(prompt_key: nil).where(created_at: range).count
+    end
+
+    def prompt_created_at_range(date_range)
+      return unless date_range.respond_to?(:start_date) && date_range.respond_to?(:end_date)
+      return unless date_range.start_date && date_range.end_date
+
+      date_range.start_date.beginning_of_day..date_range.end_date.end_of_day
+    end
+
     def provider_rows(context)
       date_range = 30.days.ago.beginning_of_day..Time.current
       range_runs = runs_scope(context)
@@ -638,7 +698,28 @@ module AdminScreens
           end
         )
       end
-      rows.sort_by { |row| [-row.calls, row.provider, row.model] }
+      filter_model_rows_by_provider(rows, context).sort_by { |row| [-row.calls, row.provider, row.model] }
+    end
+
+    def registered_provider_keys
+      RecordingStudioAI.configuration.providers.keys.map(&:to_s)
+    end
+
+    def registered_model_keys
+      RecordingStudioAI.models.all.map { |definition| definition.model.to_s }.uniq.sort
+    end
+
+    def registered_models_path(context, provider:)
+      "#{context.admin_screen_path('registered_models')}?#{{ provider: provider }.to_query}"
+    end
+
+    def filter_model_rows_by_provider(rows, context)
+      return rows unless context.respond_to?(:filter_value)
+
+      provider = context.filter_value(:provider).to_s.presence
+      return rows if provider.blank?
+
+      rows.select { |row| row.provider.to_s == provider }
     end
 
     def parameter_default_label(definition, name)
@@ -726,44 +807,6 @@ module AdminScreens
           "Safety" => "#{definition.read_only ? 'Read only' : 'Writes'}; destructive: #{definition.destructive ? 'yes' : 'no'}; confirmation: #{definition.requires_confirmation ? 'required' : 'not required'}; idempotent: #{definition.idempotent ? 'yes' : 'no'}"
         }
       )
-    end
-
-    def provider_starter_modal(row)
-      modal_id = "registered-provider-starter-#{row.key}"
-      body = render_flatpack(
-        FlatPack::CodeBlock::Component.new(
-          title: "Starter files",
-          snippets: [
-            {
-              label: "my_provider.rb",
-              language: "ruby",
-              code: RecordingStudioAI::Providers::StarterExample::CLASS_CODE
-            },
-            {
-              label: "Initializer",
-              language: "ruby",
-              code: RecordingStudioAI::Providers::StarterExample::INITIALIZER_CODE
-            }
-          ],
-          separated: false
-        )
-      )
-      trigger = render_flatpack(
-        FlatPack::Button::Component.new(
-          text: "Show file",
-          style: :ghost,
-          size: :sm,
-          type: "button",
-          data: { modal_id: modal_id },
-          aria: { label: "Show a starter provider file" }
-        )
-      )
-      modal = render_flatpack(
-        FlatPack::Modal::Component.new(id: modal_id, title: "Add a provider", size: :xl)
-      ) do |component|
-        component.body { body }
-      end
-      ActionController::Base.helpers.safe_join([trigger, modal])
     end
 
     def prompt_definition_modal(row)
@@ -974,14 +1017,57 @@ module AdminScreens
       end
     end
 
+    def model_token_totals(runs)
+      memoize_widget([:model_token_totals, runs.object_id]) do
+        runs.reorder(nil)
+            .where.not(total_tokens: nil)
+            .group(:resolved_model)
+            .sum(:total_tokens)
+            .each_with_object(Hash.new(0)) do |(model, total_tokens), totals|
+              totals[model.presence || "Unknown"] += total_tokens.to_i
+            end
+            .sort_by { |model, total_tokens| [-total_tokens, model.to_s.downcase] }
+      end
+    end
+
+    def token_total_for_range(context, date_range:)
+      range = prompt_created_at_range(date_range)
+      return 0 unless range
+
+      runs_scope(context).where.not(total_tokens: nil).where(created_at: range).sum(:total_tokens).to_i
+    end
+
+    def run_filtered_screen_path(context, screen_key, run)
+      query = date_range_query(context, screen: AdminScreens::RecordingStudioAICallsScreen).merge(run_id: run.id)
+      "#{context.admin_screen_path(screen_key)}?#{query.to_query}"
+    end
+
     def top_model_call_volume_rows(context, range: 30.days.ago..Time.current, limit: 5)
       memoize_widget([:top_model_call_volume_rows, context.object_id, range.begin.to_f, range.end.to_f, limit]) do
-        runs_scope(context)
-          .where(created_at: range)
-          .group(:resolved_model)
-          .count
-          .sort_by { |_model, count| -count.to_i }
-          .first(limit)
+        model_call_totals(runs_scope(context).where(created_at: range)).first(limit)
+      end
+    end
+
+    def model_call_totals(runs)
+      call_volume_totals(runs, group_by: :model)
+    end
+
+    def call_volume_group_by(context)
+      value = context.filter_value(:group_by)
+      value = "model" if value.blank?
+      value.to_s == "provider" ? :provider : :model
+    end
+
+    def call_volume_totals(runs, group_by: :model)
+      column = group_by.to_sym == :provider ? :resolved_provider : :resolved_model
+      memoize_widget([:call_volume_totals, runs.object_id, column]) do
+        runs.reorder(nil)
+            .group(column)
+            .count
+            .each_with_object(Hash.new(0)) do |(value, count), totals|
+              totals[value.presence || "Unknown"] += count.to_i
+            end
+            .sort_by { |label, count| [-count, label.to_s.downcase] }
       end
     end
 
