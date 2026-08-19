@@ -369,11 +369,35 @@ module AdminScreens
     end
 
     def latency_date_range(context, dimension:)
-      screen = dimension == :model ? AdminScreens::RecordingStudioAILatencyByModelScreen : AdminScreens::RecordingStudioAILatencyByPromptScreen
-      date_range = context.filter_value(:date_range) || screen.filters.find do |filter|
-        filter.key == :date_range
-      end.normalize(context.params)
-      date_range.start_date.beginning_of_day..date_range.end_date.end_of_day
+      prompt_created_at_range(latency_date_range_value(context, dimension: dimension))
+    end
+
+    def latency_date_range_value(context, dimension:)
+      selected = context.filter_value(:date_range)
+      return selected if selected
+
+      latency_screen_for(dimension).filters.find { |filter| filter.key == :date_range }.normalize(context.params)
+    end
+
+    def latency_screen_for(dimension)
+      if dimension == :model
+        AdminScreens::RecordingStudioAILatencyByModelScreen
+      else
+        AdminScreens::RecordingStudioAILatencyByPromptScreen
+      end
+    end
+
+    def latency_summary_p90(context, dimension:, previous: false)
+      date_range = latency_date_range_value(context, dimension: dimension)
+      date_range = previous_period_date_range(date_range) if previous
+      latency_p90_for_range(context, date_range: date_range)
+    end
+
+    def latency_p90_for_range(context, date_range:)
+      range = date_range.is_a?(Range) ? date_range : prompt_created_at_range(date_range)
+      return 0 unless range
+
+      p90_latency(runs_scope(context).where(created_at: range).where.not(latency_ms: nil))
     end
 
     def retry_rate_by_model_rows(scope, range: 30.days.ago..Time.current, limit: 3)

@@ -1293,6 +1293,10 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Model P90 latency"
     assert_includes response.body, "P90 latency (ms)"
+    assert_match(/text-5xl[^>]*>900</, response.body)
+    assert_includes response.body, "+100%"
+    assert_includes response.body, "Last 4 weeks"
+    refute_includes response.body, ">0%</span>"
   end
 
   test "latency by prompt shows grouped P90 latency" do
@@ -1331,6 +1335,10 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Prompt P90 latency"
     assert_includes response.body, "P90 latency (ms)"
+    assert_match(/text-5xl[^>]*>900</, response.body)
+    assert_includes response.body, "+100%"
+    assert_includes response.body, "Last 4 weeks"
+    refute_includes response.body, ">0%</span>"
   end
 
   test "latency by model mini chart follows the selected date range into ai calls" do

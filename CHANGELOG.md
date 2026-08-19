@@ -89,6 +89,9 @@ Versioning and Keep a Changelog.
 - Registered prompts chart summary counts calls in the selected date range,
   not the number of prompt definitions, so the period change is no longer
   stuck at 0%.
+- Latency by model and Latency by prompt chart summaries use overall P90
+  in the selected date range, not the number of grouped rows, so Last 4
+  weeks is no longer stuck at 0%. Lower P90 is treated as an improvement.
 
 ### Upgrade notes
 

@@ -381,6 +381,33 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
+  def test_latency_p90_for_range_uses_selected_runs_not_row_count
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    current = Struct.new(:start_date, :end_date, :preset_key).new(Date.current - 27, Date.current, :last_4_weeks)
+    previous = widgets.previous_period_date_range(current)
+
+    [100, 200, 300, 400, 500, 600, 700, 800, 900, 10_000].each do |latency_ms|
+      create_run(
+        root_id: root_id, status: "completed", tokens: 4, latency_ms: latency_ms,
+        resolved_model: "p90-model", created_at: current.end_date.beginning_of_day + 1.hour
+      )
+    end
+    10.times do
+      create_run(
+        root_id: root_id, status: "completed", tokens: 4, latency_ms: 100,
+        resolved_model: "p90-model", created_at: previous.end_date.beginning_of_day + 1.hour
+      )
+    end
+
+    assert_equal 900, widgets.latency_p90_for_range(context, date_range: current)
+    assert_equal 100, widgets.latency_p90_for_range(context, date_range: previous)
+    assert_equal 0, widgets.latency_p90_for_range(context, date_range: nil)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
   private
 
   def create_run(root_id:, status:, tokens:, **attributes)
