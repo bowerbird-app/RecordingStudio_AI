@@ -68,6 +68,26 @@
     ) %>
 
     <%= render FlatPack::CodeBlock::Component.new(
+      title: "Explicit fallbacks",
+      language: "ruby",
+      code: <<~'RUBY'
+        # Skip configured profiles for this call. Hop the list in order.
+        # Do not combine fallbacks: with provider: or model:.
+        # temperature: 1 travels to the next hop when that model supports it.
+        response = RecordingStudioAI.generate(
+          prompt: "Summarize this page for an editor.",
+          purpose: "page_summary",
+          temperature: 1,
+          fallbacks: [
+            { provider: :openai, model: "gpt-5-mini" },
+            { provider: :gemini, model: "gemini-2.5-flash" }
+          ],
+          **attribution
+        )
+      RUBY
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
       title: "Streaming generation",
       language: "ruby",
       code: <<~'RUBY'

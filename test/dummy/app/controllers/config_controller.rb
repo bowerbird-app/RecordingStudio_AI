@@ -560,6 +560,17 @@ class ConfigController < ApplicationController
     # order and picks the first whose provider is configured and whose registered
     # model supports the request's required capabilities. Reference models by their
     # provider API model string; capabilities come from the model registry.
+    #
+    # For a one-off hop list that skips these profiles, pass fallbacks: on generate:
+    #   RecordingStudioAI.generate(
+    #     prompt: "...",
+    #     temperature: 1,
+    #     fallbacks: [
+    #       { provider: :openai, model: "gpt-5-mini" },
+    #       { provider: :gemini, model: "gemini-2.5-flash" }
+    #     ],
+    #     **attribution
+    #   )
     RecordingStudioAI.configure do |config|
       config.default_profile = :medium
       config.profiles = {

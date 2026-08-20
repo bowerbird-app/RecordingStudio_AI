@@ -44,8 +44,15 @@ Versioning and Keep a Changelog.
   `recording_studio_ai_runs`.
 
 - `RecordingStudioAI.generate` accepts `stream: true`, optional `model:` override,
-  and flat generation parameters (`temperature`, `verbosity`, `max_output_tokens`,
-  `reasoning_effort`) validated against the model registry.
+  optional `fallbacks: [{ provider:, model: }, ...]`, and flat generation
+  parameters (`temperature`, `verbosity`, `max_output_tokens`, `reasoning_effort`)
+  validated against the model registry. Upgrade note: on profile hops or explicit
+  `fallbacks:`, caller overrides travel to the next candidate when that model
+  supports them (clamped to its range) and are omitted when it does not. A hop
+  no longer fails the run for an unsupported parameter such as `verbosity`.
+  Parameters you did not set stay unset so each model can use its own default.
+  Do not combine `fallbacks:` with `provider:` or `model:`; `profile:` still
+  records run attribution when using explicit fallbacks.
 - AI Playground uses a single capability-driven generate form (plus a separate
   batch section) instead of Chat / Streaming / Tool Calls / Batch tabs.
 
