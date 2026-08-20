@@ -15,6 +15,9 @@ Versioning and Keep a Changelog.
 
 ### Changed
 
+- AI Calls chart is a line of call volume over time again, with Group by
+  hour/day/week/month/year. The Calls by provider/model screen still has the
+  horizontal bar by model or provider.
 - Dummy `/config` now matches the public API: `generate` (with `stream: true`)
   and separate batch methods. It no longer lists `stream` as a peer contract
   method.
@@ -77,6 +80,11 @@ Versioning and Keep a Changelog.
 ### Removed
 
 - `RecordingStudioAI.stream` and `RecordingStudioAI.stream!`.
+
+### Upgrade notes
+
+- The AI Calls admin chart is a time series again. Use Calls by provider/model
+  for the horizontal bar of volume by model or provider.
 
 ## [0.2.11] - 2026-08-19
 
