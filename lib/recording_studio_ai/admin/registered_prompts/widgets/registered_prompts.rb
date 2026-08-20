@@ -13,14 +13,13 @@ module AdminScreens
         range: 30.days.ago..Time.current,
         limit: 5
       )
-      rows.map do |name, namespace, prompt_key, calls|
+      rows.map do |name, prompt_key, calls|
         {
           icon: :document_text,
           text: name,
           trailing: "#{AdminScreens::RecordingStudioAIWidgets.number(calls)} calls",
           href: "#{context.admin_screen_path('ai_calls')}?#{{
-            prompt: prompt_key,
-            prompt_namespace: namespace
+            prompt: prompt_key
           }.compact.to_query}"
         }
       end.presence || [{ text: "No prompt calls in the last 30 days." }]

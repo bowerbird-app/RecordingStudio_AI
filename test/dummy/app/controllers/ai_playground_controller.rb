@@ -462,7 +462,7 @@ class AIPlaygroundController < ApplicationController
   end
 
   def prompt_identity(definition)
-    "#{definition.namespace}:#{definition.key}:#{definition.version}"
+    "#{definition.key}:#{definition.version}"
   end
 
   def prompt_option_label(definition)
@@ -511,10 +511,10 @@ class AIPlaygroundController < ApplicationController
 
   def selected_prompt_definition(form = @form)
     identity = form.fetch("prompt_key", default_prompt_identity).to_s
-    namespace, key, version = identity.split(":", 3)
-    return registered_prompt_definitions.first if namespace.blank? || key.blank?
+    key, version = identity.split(":", 2)
+    return registered_prompt_definitions.first if key.blank?
 
-    RecordingStudioAI.prompts.fetch(namespace, key, version: version.present? ? version.to_i : nil) ||
+    RecordingStudioAI.prompts.fetch(key, version: version.present? ? version.to_i : nil) ||
       registered_prompt_definitions.first
   end
 

@@ -6,16 +6,14 @@ module RecordingStudioAI
       PLACEHOLDER = /\{\{([a-z][a-z0-9_]*)\}\}/.freeze
       ROLES = %w[system user assistant].freeze
 
-      attr_reader :owner, :namespace, :key, :version, :name, :short_name, :description,
+      attr_reader :owner, :key, :version, :name, :description,
                   :messages, :inputs, :tools, :defaults
 
-      def initialize(owner: nil, namespace:, key:, version:, name:, short_name:, description:, messages:, inputs:, tools: [], defaults: {})
+      def initialize(owner: nil, key:, version:, name:, description:, messages:, inputs:, tools: [], defaults: {})
         @owner = owner.nil? ? nil : normalize_identifier(owner, "prompt owner")
-        @namespace = normalize_identifier(namespace, "prompt namespace")
         @key = normalize_identifier(key, "prompt key")
         @version = version
         @name = name.to_s.strip
-        @short_name = short_name.to_s.strip
         @description = description.to_s.strip
         @inputs = normalize_inputs(inputs)
         @messages = normalize_messages(messages)
@@ -94,7 +92,7 @@ module RecordingStudioAI
 
       def validate!
         validation_error!("prompt version must be a positive integer") unless version.is_a?(Integer) && version.positive?
-        %i[name short_name description].each do |attribute|
+        %i[name description].each do |attribute|
           validation_error!("prompt #{attribute} must be a non-empty String") if public_send(attribute).empty?
         end
 

@@ -403,11 +403,9 @@ allowlist of registered custom tools:
 ```ruby
 RecordingStudioAI.prompts.register(
   owner: "support_app",
-  namespace: :support,
   key: :customer_reply,
   version: 1,
   name: "Customer Support Reply",
-  short_name: "Support Reply",
   description: "Creates a concise response to a customer message.",
   inputs: %i[customer_name message],
   messages: [
@@ -418,7 +416,7 @@ RecordingStudioAI.prompts.register(
   defaults: { profile: :medium, purpose: "customer_reply" }
 )
 
-RecordingStudioAI.prompt(:support, :customer_reply, version: 1).call(
+RecordingStudioAI.prompt(:customer_reply, version: 1).call(
   inputs: { customer_name: customer.name, message: message.body },
   root_recording: root_recording,
   initiator: current_user
@@ -428,7 +426,7 @@ RecordingStudioAI.prompt(:support, :customer_reply, version: 1).call(
 The method-style facade is also available for the latest registered version:
 
 ```ruby
-RecordingStudioAI.prompt_methods.support.customer_reply(
+RecordingStudioAI.prompt_methods.customer_reply(
   inputs: { customer_name: customer.name, message: message.body },
   root_recording: root_recording,
   initiator: current_user
@@ -446,9 +444,23 @@ end
 ```
 
 Prompt inputs use strict `{{snake_case}}` placeholders. Rendered templates and
-values are never persisted. Runs snapshot the prompt namespace, key, version,
-name, and short name, allowing AI Calls reporting to filter and group prompt
-usage. Custom tool invocations inherit prompt attribution through their run.
+values are never persisted. Runs snapshot the prompt key, version, and name,
+allowing AI Calls reporting to filter and group prompt usage. Custom tool
+invocations inherit prompt attribution through their run.
+
+Hosts can replace an existing registration with the same key and version using
+`override: true`:
+
+```ruby
+RecordingStudioAI.prompts.register(
+  key: :customer_reply,
+  version: 1,
+  name: "Customer Support Reply",
+  description: "...",
+  override: true,
+  # ...
+)
+```
 
 ## Resolution and execution (Phase 5)
 

@@ -7,6 +7,21 @@ Versioning and Keep a Changelog.
 
 ### Added
 
+- `RecordingStudioAI.prompts.register(..., override: true)` replaces an existing
+  prompt registration with the same key and version, matching model registration.
+
+### Changed
+
+- Prompt registration drops `namespace` and `short_name`. Prompts are keyed by
+  `key` and `version` only; `name` remains the display label. Upgrade note:
+  remove `namespace` and `short_name` from `RecordingStudioAI.prompts.register`
+  calls, replace `RecordingStudioAI.prompt(:namespace, :key)` with
+  `RecordingStudioAI.prompt(:key)`, and replace
+  `RecordingStudioAI.prompt_methods.namespace.key` with
+  `RecordingStudioAI.prompt_methods.key`. Run the migration that removes
+  `prompt_namespace` and `prompt_short_name_snapshot` from
+  `recording_studio_ai_runs`.
+
 - `RecordingStudioAI.generate` accepts `stream: true`, optional `model:` override,
   and flat generation parameters (`temperature`, `verbosity`, `max_output_tokens`,
   `reasoning_effort`) validated against the model registry.

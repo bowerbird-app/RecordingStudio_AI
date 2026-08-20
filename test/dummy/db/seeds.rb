@@ -71,11 +71,9 @@ begin
 
   prompt_attributes = lambda do |prompt_definition|
     {
-      prompt_namespace: prompt_definition.namespace,
       prompt_key: prompt_definition.key,
       prompt_version: prompt_definition.version,
-      prompt_name_snapshot: prompt_definition.name,
-      prompt_short_name_snapshot: prompt_definition.short_name
+      prompt_name_snapshot: prompt_definition.name
     }
   end
 

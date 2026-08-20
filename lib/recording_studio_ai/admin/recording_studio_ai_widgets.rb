@@ -11,20 +11,20 @@ module AdminScreens
                             :error_rate, :average_duration)
     end
     if const_defined?(:PromptRow) && PromptRow.members != %i[
-      namespace key version name short_name description calls calls_series success_rate error_rate
+      key version name description calls calls_series success_rate error_rate
       average_duration average_input_tokens average_output_tokens
     ]
       remove_const(:PromptRow)
     end
     unless const_defined?(:PromptRow)
-      PromptRow = Data.define(:namespace, :key, :version, :name, :short_name, :description, :calls, :calls_series,
+      PromptRow = Data.define(:key, :version, :name, :description, :calls, :calls_series,
                               :success_rate, :error_rate, :average_duration, :average_input_tokens,
                               :average_output_tokens)
     end
     DateRangeWindow = Data.define(:start_date, :end_date, :preset_key) unless const_defined?(:DateRangeWindow)
     latency_row_members = %i[
       name calls calls_series p50_latency_ms p90_latency_ms average_latency_ms max_latency_ms
-      prompt_namespace prompt_key prompt_version resolved_model
+      prompt_key prompt_version resolved_model
     ]
     remove_const(:LatencyRow) if const_defined?(:LatencyRow) && LatencyRow.members != latency_row_members
     LatencyRow = Data.define(*latency_row_members) unless const_defined?(:LatencyRow)
@@ -296,13 +296,13 @@ module AdminScreens
     end
 
     def latency_rows_for_runs(runs, dimension:, date_range: nil)
-      grouped_latencies = runs.pluck(:resolved_model, :prompt_namespace, :prompt_name_snapshot, :prompt_key,
+      grouped_latencies = runs.pluck(:resolved_model, :prompt_name_snapshot, :prompt_key,
                                      :prompt_version, :latency_ms, :created_at).group_by do |row|
         latency_row_group_key(row, dimension: dimension)
       end
 
       grouped_latencies.map do |identity, rows|
-        latencies = rows.map { |row| row[5] }
+        latencies = rows.map { |row| row[4] }
         LatencyRow.new(
           identity.fetch(:name),
           latencies.length,
@@ -311,7 +311,6 @@ module AdminScreens
           percentile_latency(latencies, percentile: 0.9),
           (latencies.sum.to_f / latencies.length).round,
           latencies.max,
-          identity[:prompt_namespace],
           identity[:prompt_key],
           identity[:prompt_version],
           identity[:resolved_model]
@@ -320,7 +319,7 @@ module AdminScreens
     end
 
     def latency_row_group_key(row, dimension:)
-      model, prompt_namespace, prompt_name, prompt_key, prompt_version, = row
+      model, prompt_name, prompt_key, prompt_version, = row
       if dimension == :model
         { name: model.presence || "Unknown model", resolved_model: model.presence }
       else
@@ -331,7 +330,6 @@ module AdminScreens
                end
         {
           name: name,
-          prompt_namespace: prompt_namespace,
           prompt_key: prompt_key,
           prompt_version: prompt_version
         }
@@ -358,7 +356,6 @@ module AdminScreens
         context,
         screen: AdminScreens::RecordingStudioAILatencyByPromptScreen,
         prompt: row.prompt_key,
-        prompt_namespace: row.prompt_namespace,
         prompt_version: row.prompt_version
       )
     end
@@ -480,32 +477,27 @@ module AdminScreens
       runs = runs_scope(context).where.not(prompt_key: nil)
       date_range = prompt_created_at_range(registered_prompts_date_range_value(context)) || (30.days.ago..Time.current)
       range_runs = runs.where(created_at: date_range)
-      range_counts = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).count
+      range_counts = range_runs.group(:prompt_key, :prompt_version).count
       daily_counts = grouped_daily_counts(
         range_runs,
-        :prompt_namespace,
         :prompt_key,
         :prompt_version,
         column: "#{RecordingStudioAI::Run.table_name}.created_at"
       )
-      completed_counts = range_runs.where(status: "completed").group(:prompt_namespace, :prompt_key,
-                                                                     :prompt_version).count
-      error_counts = range_runs.where(status: %w[failed cancelled]).group(:prompt_namespace, :prompt_key,
-                                                                          :prompt_version).count
-      average_latencies = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).average(:latency_ms)
-      average_input_tokens = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).average(:input_tokens)
-      average_output_tokens = range_runs.group(:prompt_namespace, :prompt_key, :prompt_version).average(:output_tokens)
+      completed_counts = range_runs.where(status: "completed").group(:prompt_key, :prompt_version).count
+      error_counts = range_runs.where(status: %w[failed cancelled]).group(:prompt_key, :prompt_version).count
+      average_latencies = range_runs.group(:prompt_key, :prompt_version).average(:latency_ms)
+      average_input_tokens = range_runs.group(:prompt_key, :prompt_version).average(:input_tokens)
+      average_output_tokens = range_runs.group(:prompt_key, :prompt_version).average(:output_tokens)
 
       RecordingStudioAI.prompts.all.map do |definition|
-        key = [definition.namespace, definition.key, definition.version]
+        key = [definition.key, definition.version]
         total = range_counts.fetch(key, 0)
 
         PromptRow.new(
-          definition.namespace,
           definition.key,
           definition.version,
           definition.name,
-          definition.short_name,
           definition.description,
           total,
           (date_range.begin.to_date..date_range.end.to_date).map do |date|
@@ -517,7 +509,7 @@ module AdminScreens
           average_tokens(average_input_tokens[key]),
           average_tokens(average_output_tokens[key])
         )
-      end.sort_by { |row| [-row.calls, row.namespace, row.key, row.version] }
+      end.sort_by { |row| [-row.calls, row.key, row.version] }
     end
 
     def average_tokens(value)
@@ -529,37 +521,35 @@ module AdminScreens
     def top_prompt_call_rows(scope, range: 30.days.ago..Time.current, limit: 5)
       top = scope.where(created_at: range)
                  .where.not(prompt_key: nil)
-                 .group(:prompt_namespace, :prompt_key)
+                 .group(:prompt_key)
                  .count
                  .sort_by { |_identity, count| -count }
                  .first(limit)
       return [] if top.empty?
 
       snapshot_names = latest_prompt_name_snapshots(scope, top.map(&:first))
-      top.filter_map do |(namespace, key), calls|
-        definition = RecordingStudioAI.prompts.fetch(namespace, key) if namespace.present?
-        name = definition&.name || snapshot_names[[namespace, key]] || key
-        [name, namespace, key, calls]
+      top.filter_map do |prompt_key, calls|
+        definition = RecordingStudioAI.prompts.fetch(prompt_key) if prompt_key.present?
+        name = definition&.name || snapshot_names[prompt_key] || prompt_key
+        [name, prompt_key, calls]
       end
     end
 
-    def latest_prompt_name_snapshots(scope, identities)
-      return {} if identities.empty?
+    def latest_prompt_name_snapshots(scope, keys)
+      return {} if keys.empty?
 
-      namespaces = identities.map(&:first).uniq
-      keys = identities.map(&:last).uniq
-      rows = scope.where(prompt_namespace: namespaces, prompt_key: keys)
+      rows = scope.where(prompt_key: keys)
                   .where.not(prompt_name_snapshot: [nil, ""])
                   .order(created_at: :desc)
-                  .pluck(:prompt_namespace, :prompt_key, :prompt_name_snapshot)
+                  .pluck(:prompt_key, :prompt_name_snapshot)
 
-      rows.each_with_object({}) do |(namespace, key, name), memo|
-        memo[[namespace, key]] ||= name
+      rows.each_with_object({}) do |(prompt_key, name), memo|
+        memo[prompt_key] ||= name
       end
     end
 
     def prompt_chart_label(row)
-      "#{row.name} (#{row.namespace}.#{row.key} v#{row.version})"
+      "#{row.name} (#{row.key} v#{row.version})"
     end
 
     def prompt_calls_path(context, row)
@@ -569,7 +559,6 @@ module AdminScreens
       )
       query = range_query.merge(
         prompt: row.key,
-        prompt_namespace: row.namespace,
         prompt_version: row.version
       )
       "/admin/screens/ai_calls?#{query.to_query}"
@@ -810,16 +799,14 @@ module AdminScreens
     end
 
     def prompt_definition_modal(row)
-      definition = RecordingStudioAI.prompts.fetch(row.namespace, row.key, version: row.version)
+      definition = RecordingStudioAI.prompts.fetch(row.key, version: row.version)
       definition_modal(
-        modal_id: "registered-prompt-definition-#{row.namespace}-#{row.key}-#{row.version}",
+        modal_id: "registered-prompt-definition-#{row.key}-#{row.version}",
         title: "#{definition.name} v#{definition.version}",
         trigger_text: "#{row.name} v#{row.version}",
         aria_label: "Show definition for #{row.name}",
         fields: {
-          "Namespace" => definition.namespace,
           "Key" => definition.key,
-          "Short name" => definition.short_name,
           "Description" => definition.description,
           "Inputs" => definition.inputs.presence&.join(", ") || "None",
           "Tools" => prompt_tool_labels(definition),
