@@ -869,15 +869,12 @@ module AdminScreens
         end)
       end
       trigger = render_flatpack(
-        FlatPack::Button::Component.new(
-          text: trigger_text,
-          style: :ghost,
-          size: :sm,
-          type: "button",
-          data: { modal_id: modal_id },
+        FlatPack::Link::Component.new(
+          href: "#",
+          data: { modal_id: modal_id, turbo: false },
           aria: { label: aria_label }
         )
-      )
+      ) { trigger_text }
       modal = render_flatpack(
         FlatPack::Modal::Component.new(id: modal_id, title: title, size: :lg)
       ) do |component|

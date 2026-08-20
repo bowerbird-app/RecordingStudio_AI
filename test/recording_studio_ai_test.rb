@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.2.15", RecordingStudioAI::VERSION
+assert_equal "0.2.15", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -103,7 +103,8 @@ class RecordingStudioAITest < Minitest::Test
     widgets = File.read(File.expand_path("../lib/recording_studio_ai/admin/recording_studio_ai_widgets.rb", __dir__))
     assert_includes widgets, "FlatPack::Modal::Component"
     assert_includes widgets, "FlatPack::Chart::Component"
-    assert_includes widgets, "FlatPack::Button::Component"
+    assert_includes widgets, "FlatPack::Link::Component"
+    refute_includes widgets, "prompt_namespace"
     refute_includes widgets, "click->flat-pack--modal#clickBackdrop"
   end
 end

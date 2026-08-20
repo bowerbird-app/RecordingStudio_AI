@@ -503,7 +503,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Avg output"
     assert_includes response.body, ">160<"
     assert_includes response.body, ">60<"
-    assert_includes response.body, "data-modal-id=\"registered-prompt-definition-summarize_text-1\""
+    assert_select "a.flat-pack-link[data-modal-id='registered-prompt-definition-summarize_text-1']",
+                  text: /Text Summary/
+    assert_select "button[data-modal-id='registered-prompt-definition-summarize_text-1']", count: 0
     assert_includes response.body, "Creates a concise summary of supplied text"
     assert_includes response.body, "Produce a concise factual summary."
     assert_includes response.body, "Summarize this text:"
@@ -600,8 +602,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "Dummy Echo Tool"
-    assert_includes response.body, "<button"
-    assert_includes response.body, "data-modal-id=\"custom-tool-definition-dummy_echo_tool-1\""
+    assert_select "a.flat-pack-link[data-modal-id='custom-tool-definition-dummy_echo_tool-1']",
+                  text: /Dummy Echo Tool/
+    assert_select "button[data-modal-id='custom-tool-definition-dummy_echo_tool-1']", count: 0
     assert_includes response.body, "data-controller=\"flat-pack--modal\""
     assert_includes response.body, "class=\"grid gap-4 text-sm\""
     refute_includes response.body, "md:grid-cols-2"
