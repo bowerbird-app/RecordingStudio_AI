@@ -2,6 +2,9 @@
 # Cloud Agent install phase for the RecordingStudio_AI gem template.
 # Refreshes gem dependencies, prepares the dummy host-app database, and
 # builds Tailwind CSS. Safe to run repeatedly (idempotent).
+#
+# The saved Cloud Agent environment runs the equivalent commands inline; this
+# script is the local/developer entrypoint and the source of truth for them.
 set -euo pipefail
 
 # db:prepare needs PostgreSQL up during install/build. Starting an already
