@@ -449,14 +449,29 @@ allowing AI Calls reporting to filter and group prompt usage. Custom tool
 invocations inherit prompt attribution through their run.
 
 Hosts can replace an existing registration with the same key and version using
-`override: true`:
+`override: true` on models, prompts, and tools:
 
 ```ruby
+RecordingStudioAI.models.register(
+  provider: :openai,
+  key: "gpt-5",
+  model: "gpt-5",
+  override: true,
+  # ...
+)
+
 RecordingStudioAI.prompts.register(
   key: :customer_reply,
   version: 1,
   name: "Customer Support Reply",
   description: "...",
+  override: true,
+  # ...
+)
+
+RecordingStudioAI.tools.register(
+  key: :summarize_record,
+  version: 1,
   override: true,
   # ...
 )

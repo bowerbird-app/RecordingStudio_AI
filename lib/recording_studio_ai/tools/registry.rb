@@ -7,10 +7,10 @@ module RecordingStudioAI
         @definitions = {}
       end
 
-      def register(**)
-        definition = RecordingStudioAI::Tools::Definition.new(**)
+      def register(override: false, **attributes)
+        definition = RecordingStudioAI::Tools::Definition.new(**attributes)
         key = storage_key(definition.key, definition.version)
-        if @definitions.key?(key)
+        if @definitions.key?(key) && !override
           raise RecordingStudioAI::Errors::ContractValidationError.new(
             "tool #{definition.key} version #{definition.version} is already registered",
             code: "invalid_request"

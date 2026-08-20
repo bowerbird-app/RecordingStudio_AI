@@ -9,6 +9,8 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.prompts.register(..., override: true)` replaces an existing
   prompt registration with the same key and version, matching model registration.
+- `RecordingStudioAI.tools.register(..., override: true)` replaces an existing
+  tool registration with the same key and version, matching models and prompts.
 - Model parameter specs require `type:` (`:number`, `:integer`, or `:string`).
 
 ### Changed
