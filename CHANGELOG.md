@@ -12,6 +12,9 @@ Versioning and Keep a Changelog.
 
 ### Changed
 
+- Registered prompt and custom tool name cells open their definition modal from
+  a Flatpack link instead of a ghost button.
+
 - Prompt registration drops `namespace` and `short_name`. Prompts are keyed by
   `key` and `version` only; `name` remains the display label. Upgrade note:
   remove `namespace` and `short_name` from `RecordingStudioAI.prompts.register`
