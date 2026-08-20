@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-assert_equal "0.2.15", RecordingStudioAI::VERSION
+assert_equal "0.2.16", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration

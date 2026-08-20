@@ -827,31 +827,27 @@ module AdminScreens
     def prompt_messages_markup(messages)
       helpers = ActionController::Base.helpers
       helpers.content_tag(:div, class: "grid gap-3") do
-        helpers.safe_join(messages.map { |message| prompt_message_card(message) })
+        helpers.safe_join(messages.map { |message| prompt_message_block(message) })
       end
     end
 
-    def prompt_message_card(message)
-      render_flatpack(FlatPack::Card::Component.new) do |card|
-        card.header do
-          render_flatpack(
-            FlatPack::PageTitle::Component.new(
-              title: message.fetch(:role).to_s.humanize,
-              variant: :h4,
-              class: "mb-0 pb-0"
-            )
-          )
-        end
-        card.body do
-          render_flatpack(
-            FlatPack::CodeBlock::Component.new(
-              title: "Message",
-              language: "text",
-              code: message.fetch(:content).to_s,
-              separated: false
-            )
-          )
-        end
+    def prompt_message_block(message)
+      render_flatpack(
+        FlatPack::CodeBlock::Component.new(
+          title: prompt_message_title(message.fetch(:role)),
+          language: "text",
+          code: message.fetch(:content).to_s,
+          separated: false
+        )
+      )
+    end
+
+    def prompt_message_title(role)
+      case role.to_s
+      when "system" then "System Prompt"
+      when "user" then "User Prompt"
+      else
+        role.to_s.humanize
       end
     end
 

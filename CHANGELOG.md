@@ -34,6 +34,8 @@ Versioning and Keep a Changelog.
   `verbosity: { type: :string, ... }`, `max_output_tokens: { type: :integer, ... }`).
 - Registered prompt and custom tool name cells open their definition modal from
   a Flatpack link instead of a ghost button.
+- Registered Prompts definition modal shows System Prompt and User Prompt code
+  blocks without a wrapping card.
 
 - Prompt registration drops `namespace` and `short_name`. Prompts are keyed by
   `key` and `version` only; `name` remains the display label. Upgrade note:

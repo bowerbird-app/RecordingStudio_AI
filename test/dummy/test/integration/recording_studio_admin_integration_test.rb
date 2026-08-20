@@ -506,6 +506,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_select "a.flat-pack-link[data-modal-id='registered-prompt-definition-summarize_text-1']",
                   text: /Text Summary/
     assert_select "button[data-modal-id='registered-prompt-definition-summarize_text-1']", count: 0
+    assert_includes response.body, "System Prompt"
+    assert_includes response.body, "User Prompt"
     assert_includes response.body, "Creates a concise summary of supplied text"
     assert_includes response.body, "Produce a concise factual summary."
     assert_includes response.body, "Summarize this text:"
