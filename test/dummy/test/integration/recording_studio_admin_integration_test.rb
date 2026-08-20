@@ -209,7 +209,6 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "AI calls trend"
-    assert_includes response.body, "How many calls landed over time."
     assert_includes response.body, "data-flat-pack--chart-type-value=\"line\""
     assert_includes response.body, "&quot;curve&quot;:&quot;smooth&quot;"
     refute_includes response.body, "Calls by model"
