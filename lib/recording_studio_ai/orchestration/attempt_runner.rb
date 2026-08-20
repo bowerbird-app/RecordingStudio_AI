@@ -11,8 +11,10 @@ module RecordingStudioAI
         @stream_provider = StreamProvider.new(configuration: configuration, stream_session: stream_session)
       end
 
-      def execute(request, candidate, operation:)
-        request = apply_resolved_generation_parameters!(request, candidate)
+      def execute(request, candidate, operation:, parameter_overrides: {})
+        request = apply_resolved_generation_parameters!(
+          request, candidate, parameter_overrides: parameter_overrides
+        )
         buffer_stream_events = operation == :stream && request[:schema]
         @stream_session&.start_buffering! if buffer_stream_events
         result = run_provider(request, candidate, operation: operation)
@@ -65,15 +67,31 @@ module RecordingStudioAI
         )
       end
 
-      def apply_resolved_generation_parameters!(request, candidate)
-        provided = RecordingStudioAI::Models::Definition::KNOWN_PARAMETERS
-                   .index_with { |name| request[name] }.compact
-        return request if provided.empty?
-
+      def apply_resolved_generation_parameters!(request, candidate, parameter_overrides: {})
         definition = RecordingStudioAI.models.fetch(candidate.provider, candidate.model)
-        return request unless definition
+        known = RecordingStudioAI::Models::Definition::KNOWN_PARAMETERS
+        caller_provided = known.index_with { |name| request[name] }.compact
+        overlays = parameter_overrides.to_h.transform_keys(&:to_sym).slice(*known).compact
+        overlays = overlays.reject { |name, _value| caller_provided.key?(name) }
+        return request if caller_provided.empty? && overlays.empty?
+        return request.merge(caller_provided.merge(overlays)) unless definition
 
-        request.merge(RecordingStudioAI::Models::ParameterValidation.adapt_for_model(definition, provided))
+        adapted_caller = RecordingStudioAI::Models::ParameterValidation.adapt_for_model(
+          definition, caller_provided
+        )
+        adapted_overlay = if overlays.empty?
+                            known.index_with { nil }
+                          else
+                            RecordingStudioAI::Models::ParameterValidation.adapt_for_model(definition, overlays)
+                          end
+
+        request.merge(
+          known.to_h do |name|
+            value = adapted_caller[name]
+            value = adapted_overlay[name] if value.nil?
+            [name, value]
+          end
+        )
       end
 
       def provider_timeout(request)

@@ -43,7 +43,12 @@ module RecordingStudioAI
             run, request, planned, executions.length + 1, attempt_kind(executions, retry_index)
           )
           @stream_session&.active_attempt = attempt if operation == :stream
-          result = @attempt_runner.execute(request, planned.candidate, operation: operation)
+          result = @attempt_runner.execute(
+            request,
+            planned.candidate,
+            operation: operation,
+            parameter_overrides: planned.parameter_overrides
+          )
           @persistence.complete_attempt!(attempt, result)
           executions << ExecutedAttempt.new(record: attempt, result: result)
 

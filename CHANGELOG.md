@@ -12,6 +12,17 @@ Versioning and Keep a Changelog.
   `override: true`. Default is `true` (current behavior). Set `overridable: false`
   to lock a gem prompt. `replace_owner` still only swaps that owner's own
   registrations.
+- Webhook preparation for provider batch completion via
+  `recording_studio_webhooks` (optional host dependency, not a gemspec require):
+  `RecordingStudioAI.refresh_batch_from_webhook` looks up a batch by
+  `provider_batch_id` within `root_recording` and runs the existing
+  `refresh_batch` path with `execution_source: :webhook`. Optional OpenAI
+  recipes `RecordingStudioAI::Webhooks::OpenaiProvider.register!` and
+  `OpenaiBatchCompletion.register!` register intake verify + `batch.*` wake
+  actions when the webhooks gem is installed. Keep
+  `BatchSynchronizationJob` as the poll fallback. Set
+  `config.openai_webhook_secret` and `config.webhook_batch_initiator` (or pass
+  `initiator:`) before using the recipes.
 - `RecordingStudioAI::Models::ParameterValidation.adapt_for_model` soft-applies
   caller generation overrides to a candidate: keeps supported values (clamped to
   that model's range), omits unsupported parameters and disallowed enum values,
@@ -20,10 +31,15 @@ Versioning and Keep a Changelog.
   travels to the next candidate when that model supports it, instead of failing
   the hop or resetting to the fallback model's default.
 - `RecordingStudioAI.generate(..., fallbacks: [...])` takes an explicit ordered
-  candidate list (`{ provider:, model: }`) and skips configured profiles and
-  `profile_fallbacks`. Do not combine `fallbacks:` with `provider:` or `model:`.
-  Caller generation overrides still adapt per hop. `profile:` remains for run
-  attribution only.
+  candidate list (`{ provider:, model: }` plus optional generation params) and
+  skips configured profiles, `profile_fallbacks`, and `model_fallbacks`. Do not
+  combine `fallbacks:` with `provider:` or `model:`. Caller generation overrides
+  still adapt per hop. `profile:` remains for run attribution only.
+- `config.model_fallbacks` maps a pinned primary `[provider, model]` (or
+  `"provider/model"`) to an ordered hop list. Used only when `provider:` and
+  `model:` are both set and `fallbacks:` is not. Profile walks ignore it. Entries
+  may include hop-only param overlays (for example `temperature:`); caller
+  overrides still win, then entry overlays fill gaps, then the model default.
 - `RecordingStudioAI.prompts.register(..., override: true)` replaces an existing
   prompt registration with the same key and version, matching model registration.
 - `RecordingStudioAI.tools.register(..., override: true)` replaces an existing
@@ -39,6 +55,12 @@ Versioning and Keep a Changelog.
   `verbosity: { type: :string, ... }`, `max_output_tokens: { type: :integer, ... }`).
 - Registered prompt and custom tool name cells open their definition modal from
   a Flatpack link instead of a ghost button.
+- Registered Prompts definition modal shows System Prompt and User Prompt code
+  blocks without a wrapping card. The modal drops the outer "Prompt" label,
+  renames Key to Prompt Key, and shows Registered by from the prompt `owner`
+  (gem or host label such as `RecordingStudioAI`, `Host`, or
+  `RecordingStudioAdmin`). Upgrade note: set `owner:` to a PascalCase gem or
+  host label when registering prompts; snake_case owners are no longer valid.
 
 - Prompt registration drops `namespace` and `short_name`. Prompts are keyed by
   `key` and `version` only; `name` remains the display label. Upgrade note:

@@ -101,6 +101,20 @@ class ConfigController < ApplicationController
       explanation: "How often batch polling runs."
     },
     {
+      key: "openai_webhook_secret",
+      required: "No",
+      accepted_values: "String or nil",
+      default: 'ENV["OPENAI_WEBHOOK_SECRET"]',
+      explanation: "Signing secret for optional OpenAI batch webhooks via recording_studio_webhooks. Never store this on endpoint metadata."
+    },
+    {
+      key: "webhook_batch_initiator",
+      required: "No",
+      accepted_values: "Callable or nil",
+      default: "nil",
+      explanation: "Returns the initiator when refresh_batch_from_webhook omits initiator:. Required for OpenAI batch webhook recipes."
+    },
+    {
       key: "maximum_attempts",
       required: "No",
       accepted_values: "Integer >= 1",
@@ -134,6 +148,13 @@ class ConfigController < ApplicationController
       accepted_values: "Hash of profile_key => [profile_key]",
       default: "{}",
       explanation: "Which profile to try next. Empty means tier fallback never happens, whatever the limit above says."
+    },
+    {
+      key: "model_fallbacks",
+      required: "No",
+      accepted_values: "Hash of [provider, model] or \"provider/model\" => [{ provider:, model:, ...params }]",
+      default: "{}",
+      explanation: "Per-model hop list used only when provider and model are both pinned and generate(fallbacks:) is not set. Profile walks ignore this. Optional params on an entry are hop-only overlays; caller overrides still win."
     },
     {
       key: "request_timeout",
@@ -380,6 +401,12 @@ class ConfigController < ApplicationController
       }
       # Tier fallback only happens when this map is filled, for example { high: [:medium] }.
       config.profile_fallbacks = {}
+      # Per pinned model only. Profile walks ignore this. Optional params are hop overlays.
+      # config.model_fallbacks = {
+      #   [:openai, "gpt-5-mini"] => [
+      #     { provider: :gemini, model: "gemini-2.5-flash", temperature: 1.0 }
+      #   ]
+      # }
 
       # OpenAI and Gemini are registered already. Set this only for custom adapters or tests.
       # config.providers = { my_provider: MyProvider.new(configuration: config) }
@@ -401,6 +428,11 @@ class ConfigController < ApplicationController
       config.cost_catalogs = {}
       config.batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"
       config.batch_synchronization_interval = 1.minute
+      # Optional OpenAI batch webhook wake-ups (requires recording_studio_webhooks).
+      # config.openai_webhook_secret = ENV.fetch("OPENAI_WEBHOOK_SECRET", nil)
+      # config.webhook_batch_initiator = ->(root_recording:, **) { SystemActor.for(root_recording) }
+      # RecordingStudioAI::Webhooks::OpenaiProvider.register!
+      # RecordingStudioAI::Webhooks::OpenaiBatchCompletion.register!
 
       # Retry/attempt controls.
       config.maximum_attempts = 3
@@ -590,6 +622,14 @@ class ConfigController < ApplicationController
 
       # Optional: allow one tier to fall back to another when no candidate resolves.
       config.profile_fallbacks = { high: [:medium], medium: [:low] }
+
+      # Optional: hops for a pinned provider+model when generate(fallbacks:) is not set.
+      # Profile walks ignore this map. Entry params overlay only when the caller omitted them.
+      config.model_fallbacks = {
+        [:openai, "gpt-5-mini"] => [
+          { provider: :gemini, model: "gemini-2.5-flash", temperature: 1.0 }
+        ]
+      }
     end
   RUBY
 

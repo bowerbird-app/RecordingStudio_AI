@@ -161,7 +161,7 @@ end
 # Dummy-host prompt catalog.
 DUMMY_PROMPTS = [
   {
-    owner: "dummy_app",
+    owner: "Host",
     key: :summarize_text,
     version: 1,
     name: "Text Summary",
@@ -175,7 +175,7 @@ DUMMY_PROMPTS = [
     defaults: { profile: :low, purpose: "text_summary" }
   },
   {
-    owner: "dummy_app",
+    owner: "Host",
     key: :analyze_text,
     version: 1,
     name: "Text Analysis",
@@ -192,7 +192,7 @@ DUMMY_PROMPTS = [
     defaults: { profile: :low, purpose: "text_analysis" }
   },
   {
-    owner: "dummy_app",
+    owner: "Host",
     key: :osaka_weather,
     version: 1,
     name: "Osaka Weather",
@@ -203,6 +203,6 @@ DUMMY_PROMPTS = [
   }
 ].freeze
 
-RecordingStudioAI.prompts.replace_owner("dummy_app") do |registry|
+RecordingStudioAI.prompts.replace_owner("Host") do |registry|
   DUMMY_PROMPTS.each { |prompt_definition| registry.register(**prompt_definition) }
 end

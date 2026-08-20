@@ -31,6 +31,7 @@ Metrics/ClassLength:
     - 'test/**/*'
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/prompts/definition.rb'
     - 'lib/recording_studio_ai/orchestration/**/*'
 
 Metrics/ModuleLength:
@@ -43,7 +44,9 @@ Metrics/MethodLength:
     - 'lib/generators/**/*'
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/prompts/definition.rb'
     - 'lib/recording_studio_ai/orchestration/**/*'
+    - 'lib/recording_studio_ai/webhooks/**/*'
 
 Metrics/AbcSize:
   Exclude:
@@ -52,6 +55,7 @@ Metrics/AbcSize:
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
     - 'lib/recording_studio_ai/orchestration/**/*'
+    - 'lib/recording_studio_ai/webhooks/**/*'
 
 Metrics/BlockLength:
   Exclude:
@@ -63,16 +67,19 @@ Metrics/CyclomaticComplexity:
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
     - 'lib/recording_studio_ai/orchestration/**/*'
+    - 'lib/recording_studio_ai/webhooks/**/*'
 
 Metrics/PerceivedComplexity:
   Exclude:
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'
     - 'lib/recording_studio_ai/orchestration/**/*'
+    - 'lib/recording_studio_ai/webhooks/**/*'
 
 Metrics/ParameterLists:
   Exclude:
     - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/webhooks/**/*'
 
 # Model catalog files are keyed by the provider model slug (dots become hyphens),
 # so their filenames are intentionally not snake_case.

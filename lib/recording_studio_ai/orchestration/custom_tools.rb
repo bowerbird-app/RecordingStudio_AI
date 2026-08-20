@@ -34,7 +34,12 @@ module RecordingStudioAI
           end
 
           continuation, history = continue_after_tools(run, request, planned, executions, outcomes)
-          result = @attempt_runner.execute(request.merge(history), planned.candidate, operation: operation)
+          result = @attempt_runner.execute(
+            request.merge(history),
+            planned.candidate,
+            operation: operation,
+            parameter_overrides: planned.parameter_overrides
+          )
           result = enforce_round_limit(result, rounds)
           @persistence.complete_attempt!(continuation, result)
           executions << ExecutedAttempt.new(record: continuation, result: result)

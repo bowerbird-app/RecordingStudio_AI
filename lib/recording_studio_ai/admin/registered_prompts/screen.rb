@@ -59,7 +59,11 @@ module AdminScreens
              value: lambda { |row, _context|
                AdminScreens::RecordingStudioAIWidgets.prompt_definition_modal(row)
              }
-      column :key, title: "Key", header_tooltip: "Stable name used in code."
+      column :key, title: "Prompt Key", header_tooltip: "Stable name used in code."
+      column :owner,
+             title: "Registered by",
+             header_tooltip: "Which gem or host registered this prompt.",
+             value: ->(row, _context) { row.owner.presence || "—" }
       column :description, title: "Description", header_tooltip: "What this prompt is for."
       column :calls_series,
              title: "Calls",
@@ -83,7 +87,7 @@ module AdminScreens
       column :average_input_tokens, title: "Avg input", header_tooltip: "Typical size of what we send."
       column :average_output_tokens, title: "Avg output", header_tooltip: "Typical size of what comes back."
 
-      default_columns :name, :description, :calls_series, :success_rate, :error_rate, :average_duration,
+      default_columns :name, :owner, :description, :calls_series, :success_rate, :error_rate, :average_duration,
                       :average_input_tokens, :average_output_tokens
     end
   end

@@ -135,8 +135,11 @@ Retries remain on the same candidate. Same-profile provider fallback follows
 candidate order, while profile-tier fallback only follows explicit
 `profile_fallbacks` mappings. For a one-off hop list that skips profiles, pass
 `fallbacks: [{ provider:, model: }, ...]` on `generate` (not with `provider:` or
-`model:`). Caller generation overrides carry through every hop when the next
-model supports them; unsupported ones are dropped rather than failing the hop.
+`model:`). For a pinned `provider:` + `model:` without call `fallbacks:`,
+`config.model_fallbacks` can list the next hops (optional per-entry param
+overlays allowed). Profile walks ignore `model_fallbacks`. Caller generation
+overrides carry through every hop when the next model supports them;
+unsupported ones are dropped rather than failing the hop.
 Usage and compatible-currency cost aggregate across every reported attempt.
 
 ## Operations
@@ -256,6 +259,7 @@ Phase 2 introduced validation and normalized return contracts for:
 - `RecordingStudioAI.generate!(...)`
 - `RecordingStudioAI.submit_batch(...)`
 - `RecordingStudioAI.refresh_batch(...)`
+- `RecordingStudioAI.refresh_batch_from_webhook(...)`
 - `RecordingStudioAI.cancel_batch(...)`
 - `RecordingStudioAI.read_retained_response(...)`
 - `RecordingStudioAI.tools.register(...)`
@@ -320,6 +324,25 @@ provider. It creates one batch and one linked run and batch item per request.
 statuses, reported usage, and compatible-currency cost. `cancel_batch` requires
 the selected candidate to declare `provider_batch_cancellation`. Batch lookup
 uses the local batch ID and enforces the supplied Recording Studio root.
+
+Provider batch webhooks (optional) wake the same refresh path. Install
+[`recording_studio_webhooks`](https://github.com/bowerbird-app/RecordingStudio_webhooks),
+point an OpenAI project webhook at the intake URL, then:
+
+```ruby
+config.openai_webhook_secret =
+  Rails.application.credentials.dig(:openai, :webhook_secret) ||
+  ENV.fetch("OPENAI_WEBHOOK_SECRET", nil)
+config.webhook_batch_initiator = ->(root_recording:, **) { SystemActor.for(root_recording) }
+
+RecordingStudioAI::Webhooks::OpenaiProvider.register!
+RecordingStudioAI::Webhooks::OpenaiBatchCompletion.register!
+```
+
+`OpenaiBatchCompletion` calls `refresh_batch_from_webhook`, which never trusts
+payload results — it always retrieves from the provider. Polling via
+`refresh_batch_async` remains the missed-delivery fallback (and the only option
+for providers without batch webhooks).
 
 OpenAI batches upload `purpose: batch` JSONL for `/v1/responses` through the
 official Ruby SDK and parse output/error files by `custom_id`. Gemini batches
@@ -422,7 +445,7 @@ allowlist of registered custom tools:
 
 ```ruby
 RecordingStudioAI.prompts.register(
-  owner: "support_app",
+  owner: "SupportApp",
   key: :customer_reply,
   version: 1,
   name: "Customer Support Reply",
@@ -457,7 +480,7 @@ Hosts and extension gems can replace only their own reloadable declarations:
 
 ```ruby
 Rails.application.reloader.to_prepare do
-  RecordingStudioAI.prompts.replace_owner("support_app") do |registry|
+  RecordingStudioAI.prompts.replace_owner("SupportApp") do |registry|
     SupportPrompts.register(registry)
   end
 end
@@ -478,7 +501,7 @@ Gem registers an open prompt:
 ```ruby
 # In a gem initializer
 RecordingStudioAI.prompts.register(
-  owner: "support_gem",
+  owner: "SupportGem",
   key: :customer_reply,
   version: 1,
   name: "Customer Support Reply",
@@ -499,7 +522,7 @@ the gem:
 ```ruby
 # config/initializers/recording_studio_ai_prompts.rb
 RecordingStudioAI.prompts.register(
-  owner: "host_app",
+  owner: "Host",
   key: :customer_reply,
   version: 1,
   name: "Host Customer Reply",
@@ -529,7 +552,7 @@ Lock a prompt so hosts cannot replace it:
 
 ```ruby
 RecordingStudioAI.prompts.register(
-  owner: "support_gem",
+  owner: "SupportGem",
   key: :billing_escalation,
   version: 1,
   name: "Billing Escalation",

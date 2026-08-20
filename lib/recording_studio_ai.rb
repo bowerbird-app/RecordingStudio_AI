@@ -12,6 +12,7 @@ require "recording_studio_ai/accessible_authorization"
 require "recording_studio_ai/tools"
 require "recording_studio_ai/prompts"
 require "recording_studio_ai/models"
+require "recording_studio_ai/fallback_entries"
 require "recording_studio_ai/attachments"
 require "recording_studio_ai/cost_calculator"
 require "recording_studio_ai/structured_output"
@@ -28,6 +29,7 @@ require "recording_studio_ai/warning_metrics"
 require "recording_studio_ai/admin/access"
 require "recording_studio_ai/orchestrator"
 require "recording_studio_ai/batch_orchestrator"
+require "recording_studio_ai/webhooks"
 
 module RecordingStudioAI
   class << self
@@ -41,6 +43,13 @@ module RecordingStudioAI
       yield(configuration)
       discover_providers! if configuration.discovery_enabled
       configuration.validate!
+    end
+
+    # Wake refresh_batch from a provider batch webhook. Looks up the local batch
+    # by provider_batch_id within root_recording, then runs the same poll path
+    # with execution_source: :webhook. Does not trust payload results.
+    def refresh_batch_from_webhook(**)
+      Webhooks::BatchRefresh.call(**)
     end
 
     def register_provider(key, provider)

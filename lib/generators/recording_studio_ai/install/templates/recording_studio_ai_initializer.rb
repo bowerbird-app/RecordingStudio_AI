@@ -37,6 +37,14 @@ RecordingStudioAI.configure do |config|
   # Polling runs through ActiveJob. Configure Rails with :sidekiq to use Sidekiq.
   config.batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"
   config.batch_synchronization_interval = 1.minute
+  # Optional OpenAI batch webhook wake-ups via recording_studio_webhooks.
+  # Keep polling as the missed-delivery fallback. Set an initiator for system wakes:
+  # config.openai_webhook_secret =
+  #   Rails.application.credentials.dig(:openai, :webhook_secret) || ENV.fetch("OPENAI_WEBHOOK_SECRET", nil)
+  # config.webhook_batch_initiator = ->(root_recording:, **) { SystemActor.for(root_recording) }
+  # Then register:
+  # RecordingStudioAI::Webhooks::OpenaiProvider.register!
+  # RecordingStudioAI::Webhooks::OpenaiBatchCompletion.register!
   # Deny by default. Prefer RecordingStudioAI::AccessibleAuthorization once
   # recording-studio-accessible is installed:
   #
@@ -87,6 +95,15 @@ RecordingStudioAI.configure do |config|
   config.maximum_profile_fallbacks = 1
   # Profile-tier fallback is disabled unless explicitly mapped, for example: { high: [:medium] }.
   config.profile_fallbacks = {}
+  # Pinned provider+model hops only (ignored on profile walks and generate(fallbacks:)).
+  # Keys: [provider, model] or "provider/model". Entries may include param overlays.
+  # Example:
+  # config.model_fallbacks = {
+  #   [:openai, "gpt-5-mini"] => [
+  #     { provider: :gemini, model: "gemini-2.5-flash", temperature: 1.0 }
+  #   ]
+  # }
+  config.model_fallbacks = {}
   config.maximum_custom_tool_rounds = 5
   config.custom_tool_timeout = 30
   config.maximum_custom_tool_result_size = 256.kilobytes
