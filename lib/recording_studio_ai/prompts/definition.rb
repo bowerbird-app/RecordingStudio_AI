@@ -7,9 +7,20 @@ module RecordingStudioAI
       ROLES = %w[system user assistant].freeze
 
       attr_reader :owner, :key, :version, :name, :description,
-                  :messages, :inputs, :tools, :defaults
+                  :messages, :inputs, :tools, :defaults, :overridable
 
-      def initialize(owner: nil, key:, version:, name:, description:, messages:, inputs:, tools: [], defaults: {})
+      def initialize(
+        owner: nil,
+        key:,
+        version:,
+        name:,
+        description:,
+        messages:,
+        inputs:,
+        tools: [],
+        defaults: {},
+        overridable: true
+      )
         @owner = owner.nil? ? nil : normalize_owner(owner)
         @key = normalize_identifier(key, "prompt key")
         @version = version
@@ -19,9 +30,14 @@ module RecordingStudioAI
         @messages = normalize_messages(messages)
         @tools = normalize_tools(tools)
         @defaults = RecordingStudioAI::Contracts::Containment.ensure_serializable!(defaults, path: "prompt.defaults").freeze
+        @overridable = normalize_overridable(overridable)
 
         validate!
         freeze
+      end
+
+      def overridable?
+        overridable
       end
 
       def render(inputs)
@@ -55,6 +71,12 @@ module RecordingStudioAI
         validation_error!("#{label} must be snake_case") unless identifier.match?(/\A[a-z][a-z0-9_]*\z/)
 
         identifier
+      end
+
+      def normalize_overridable(value)
+        return value if value.equal?(true) || value.equal?(false)
+
+        validation_error!("prompt overridable must be true or false")
       end
 
       def normalize_inputs(value)

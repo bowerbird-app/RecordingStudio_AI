@@ -7,6 +7,11 @@ Versioning and Keep a Changelog.
 
 ### Added
 
+- `RecordingStudioAI.prompts.register(..., overridable: true|false)` declares
+  whether another registration may replace the same key and version with
+  `override: true`. Default is `true` (current behavior). Set `overridable: false`
+  to lock a gem prompt. `replace_owner` still only swaps that owner's own
+  registrations.
 - Webhook preparation for provider batch completion via
   `recording_studio_webhooks` (optional host dependency, not a gemspec require):
   `RecordingStudioAI.refresh_batch_from_webhook` looks up a batch by

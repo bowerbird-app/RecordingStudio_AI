@@ -10,10 +10,18 @@ module RecordingStudioAI
       def register(override: false, **attributes)
         definition = RecordingStudioAI::Prompts::Definition.new(**attributes)
         storage = storage_key(definition.key, definition.version)
+        existing = @definitions[storage]
 
-        if @definitions.key?(storage) && !override
+        if existing && !override
           raise RecordingStudioAI::Errors::ContractValidationError.new(
             "prompt #{definition.key} version #{definition.version} is already registered",
+            code: "invalid_request"
+          )
+        end
+
+        if existing && override && !existing.overridable?
+          raise RecordingStudioAI::Errors::ContractValidationError.new(
+            "prompt #{definition.key} version #{definition.version} is not overridable",
             code: "invalid_request"
           )
         end

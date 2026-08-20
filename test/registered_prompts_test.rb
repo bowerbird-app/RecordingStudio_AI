@@ -49,6 +49,37 @@ class RegisteredPromptsTest < Minitest::Test
     assert_equal 1, RecordingStudioAI.prompts.all.length
   end
 
+  def test_registered_prompt_override_rejected_when_not_overridable
+    register_prompt(overridable: false)
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      register_prompt(name: "Host Override", override: true)
+    end
+
+    assert_equal "invalid_request", error.code
+    assert_match(/not overridable/, error.message)
+    assert_equal "Customer Support Reply", RecordingStudioAI.prompts.fetch(:customer_reply).name
+  end
+
+  def test_registered_prompt_override_allowed_when_marked_overridable
+    register_prompt(owner: "SupportGem", overridable: true)
+    register_prompt(
+      owner: "Host",
+      name: "Host Customer Reply",
+      override: true,
+      overridable: true,
+      messages: [
+        { role: :system, content: "Be brief and friendly." },
+        { role: :user, content: "{{customer_name}}: {{message}}" }
+      ]
+    )
+
+    definition = RecordingStudioAI.prompts.fetch(:customer_reply, version: 1)
+    assert_equal "Host Customer Reply", definition.name
+    assert_equal "Host", definition.owner
+    assert_equal "Be brief and friendly.", definition.messages.first.fetch(:content)
+  end
+
   def test_request_validation_rejects_unregistered_prompt_definitions
     definition = RecordingStudioAI::Prompts::Definition.new(**prompt_attributes(owner: "Host"))
 
@@ -75,11 +106,14 @@ class RegisteredPromptsTest < Minitest::Test
 
   private
 
-  def register_prompt(owner: nil, name: "Customer Support Reply", override: false)
-    RecordingStudioAI.prompts.register(**prompt_attributes(owner: owner, name: name), override: override)
+  def register_prompt(owner: nil, name: "Customer Support Reply", override: false, overridable: true, **extras)
+    RecordingStudioAI.prompts.register(
+      **prompt_attributes(owner: owner, name: name, overridable: overridable, **extras),
+      override: override
+    )
   end
 
-  def prompt_attributes(owner:, name: "Customer Support Reply")
+  def prompt_attributes(owner:, name: "Customer Support Reply", overridable: true, **extras)
     {
       owner: owner,
       key: :customer_reply,
@@ -91,8 +125,9 @@ class RegisteredPromptsTest < Minitest::Test
         { role: :user, content: "{{customer_name}}: {{message}}" }
       ],
       tools: [{ key: :registered_tool, version: 1 }],
-      defaults: { profile: :medium, purpose: "customer_reply" }
-    }
+      defaults: { profile: :medium, purpose: "customer_reply" },
+      overridable: overridable
+    }.merge(extras)
   end
 
   def register_tool
