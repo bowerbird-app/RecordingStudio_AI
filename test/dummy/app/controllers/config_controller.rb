@@ -136,6 +136,13 @@ class ConfigController < ApplicationController
       explanation: "Which profile to try next. Empty means tier fallback never happens, whatever the limit above says."
     },
     {
+      key: "model_fallbacks",
+      required: "No",
+      accepted_values: "Hash of [provider, model] or \"provider/model\" => [{ provider:, model:, ...params }]",
+      default: "{}",
+      explanation: "Per-model hop list used only when provider and model are both pinned and generate(fallbacks:) is not set. Profile walks ignore this. Optional params on an entry are hop-only overlays; caller overrides still win."
+    },
+    {
       key: "request_timeout",
       required: "No",
       accepted_values: "Number of seconds >= 0",
@@ -380,6 +387,12 @@ class ConfigController < ApplicationController
       }
       # Tier fallback only happens when this map is filled, for example { high: [:medium] }.
       config.profile_fallbacks = {}
+      # Per pinned model only. Profile walks ignore this. Optional params are hop overlays.
+      # config.model_fallbacks = {
+      #   [:openai, "gpt-5-mini"] => [
+      #     { provider: :gemini, model: "gemini-2.5-flash", temperature: 1.0 }
+      #   ]
+      # }
 
       # OpenAI and Gemini are registered already. Set this only for custom adapters or tests.
       # config.providers = { my_provider: MyProvider.new(configuration: config) }
@@ -590,6 +603,14 @@ class ConfigController < ApplicationController
 
       # Optional: allow one tier to fall back to another when no candidate resolves.
       config.profile_fallbacks = { high: [:medium], medium: [:low] }
+
+      # Optional: hops for a pinned provider+model when generate(fallbacks:) is not set.
+      # Profile walks ignore this map. Entry params overlay only when the caller omitted them.
+      config.model_fallbacks = {
+        [:openai, "gpt-5-mini"] => [
+          { provider: :gemini, model: "gemini-2.5-flash", temperature: 1.0 }
+        ]
+      }
     end
   RUBY
 
