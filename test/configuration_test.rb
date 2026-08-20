@@ -37,6 +37,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal 1, configuration.maximum_provider_fallbacks
     assert_equal 1, configuration.maximum_profile_fallbacks
     assert_empty configuration.profile_fallbacks
+    assert_empty configuration.model_fallbacks
     assert_equal 5, configuration.maximum_custom_tool_rounds
     assert_equal 30, configuration.custom_tool_timeout
     assert_equal 256.kilobytes, configuration.maximum_custom_tool_result_size

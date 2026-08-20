@@ -11,13 +11,13 @@ module AdminScreens
                             :error_rate, :average_duration)
     end
     if const_defined?(:PromptRow) && PromptRow.members != %i[
-      key version name description calls calls_series success_rate error_rate
+      key version name owner description calls calls_series success_rate error_rate
       average_duration average_input_tokens average_output_tokens
     ]
       remove_const(:PromptRow)
     end
     unless const_defined?(:PromptRow)
-      PromptRow = Data.define(:key, :version, :name, :description, :calls, :calls_series,
+      PromptRow = Data.define(:key, :version, :name, :owner, :description, :calls, :calls_series,
                               :success_rate, :error_rate, :average_duration, :average_input_tokens,
                               :average_output_tokens)
     end
@@ -498,6 +498,7 @@ module AdminScreens
           definition.key,
           definition.version,
           definition.name,
+          definition.owner,
           definition.description,
           total,
           (date_range.begin.to_date..date_range.end.to_date).map do |date|
@@ -806,13 +807,14 @@ module AdminScreens
         trigger_text: "#{row.name} v#{row.version}",
         aria_label: "Show definition for #{row.name}",
         fields: {
-          "Key" => definition.key,
+          "Prompt Key" => definition.key,
+          "Registered by" => definition.owner.presence || "—",
           "Description" => definition.description,
           "Inputs" => definition.inputs.presence&.join(", ") || "None",
           "Tools" => prompt_tool_labels(definition),
-          "Defaults" => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || "None",
-          "Prompt" => prompt_messages_markup(definition.messages)
-        }
+          "Defaults" => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || "None"
+        },
+        trailing: prompt_messages_markup(definition.messages)
       )
     end
 
@@ -827,38 +829,34 @@ module AdminScreens
     def prompt_messages_markup(messages)
       helpers = ActionController::Base.helpers
       helpers.content_tag(:div, class: "grid gap-3") do
-        helpers.safe_join(messages.map { |message| prompt_message_card(message) })
+        helpers.safe_join(messages.map { |message| prompt_message_block(message) })
       end
     end
 
-    def prompt_message_card(message)
-      render_flatpack(FlatPack::Card::Component.new) do |card|
-        card.header do
-          render_flatpack(
-            FlatPack::PageTitle::Component.new(
-              title: message.fetch(:role).to_s.humanize,
-              variant: :h4,
-              class: "mb-0 pb-0"
-            )
-          )
-        end
-        card.body do
-          render_flatpack(
-            FlatPack::CodeBlock::Component.new(
-              title: "Message",
-              language: "text",
-              code: message.fetch(:content).to_s,
-              separated: false
-            )
-          )
-        end
+    def prompt_message_block(message)
+      render_flatpack(
+        FlatPack::CodeBlock::Component.new(
+          title: prompt_message_title(message.fetch(:role)),
+          language: "text",
+          code: message.fetch(:content).to_s,
+          separated: false
+        )
+      )
+    end
+
+    def prompt_message_title(role)
+      case role.to_s
+      when "system" then "System Prompt"
+      when "user" then "User Prompt"
+      else
+        role.to_s.humanize
       end
     end
 
-    def definition_modal(modal_id:, title:, trigger_text:, aria_label:, fields:)
+    def definition_modal(modal_id:, title:, trigger_text:, aria_label:, fields:, trailing: nil)
       helpers = ActionController::Base.helpers
-      body = helpers.content_tag(:dl, class: "grid gap-4 text-sm") do
-        helpers.safe_join(fields.map do |label, value|
+      body = helpers.content_tag(:div, class: "grid gap-4 text-sm") do
+        labeled = fields.map do |label, value|
           helpers.content_tag(:div) do
             helpers.safe_join([
                                 helpers.content_tag(:dt, label,
@@ -866,7 +864,8 @@ module AdminScreens
                                 helpers.content_tag(:dd, value)
                               ])
           end
-        end)
+        end
+        helpers.safe_join([*labeled, trailing].compact)
       end
       trigger = render_flatpack(
         FlatPack::Link::Component.new(

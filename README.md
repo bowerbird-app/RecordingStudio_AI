@@ -135,8 +135,11 @@ Retries remain on the same candidate. Same-profile provider fallback follows
 candidate order, while profile-tier fallback only follows explicit
 `profile_fallbacks` mappings. For a one-off hop list that skips profiles, pass
 `fallbacks: [{ provider:, model: }, ...]` on `generate` (not with `provider:` or
-`model:`). Caller generation overrides carry through every hop when the next
-model supports them; unsupported ones are dropped rather than failing the hop.
+`model:`). For a pinned `provider:` + `model:` without call `fallbacks:`,
+`config.model_fallbacks` can list the next hops (optional per-entry param
+overlays allowed). Profile walks ignore `model_fallbacks`. Caller generation
+overrides carry through every hop when the next model supports them;
+unsupported ones are dropped rather than failing the hop.
 Usage and compatible-currency cost aggregate across every reported attempt.
 
 ## Operations
