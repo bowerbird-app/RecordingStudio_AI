@@ -18,6 +18,7 @@ Versioning and Keep a Changelog.
 - AI Calls chart is a line of call volume over time again, with Group by
   hour/day/week/month/year. The Calls by provider/model screen still has the
   horizontal bar by model or provider.
+- Retained response detail uses a Flatpack table for retention metadata.
 - Dummy `/config` now matches the public API: `generate` (with `stream: true`)
   and separate batch methods. It no longer lists `stream` as a peer contract
   method.
