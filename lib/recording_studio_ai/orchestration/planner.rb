@@ -11,6 +11,8 @@ module RecordingStudioAI
       def plan(request, operation:)
         capability_operation = operation == :stream ? :streaming : :generation
         capabilities = RecordingStudioAI::Capabilities.for_request(request, operation: capability_operation)
+        return explicit_fallbacks_plan(request, capabilities) if request[:fallbacks]
+
         profiles = [request[:profile]] + fallback_profiles(request[:profile])
         profiles.flat_map { |profile| candidates_for(profile, request, capabilities) }
       end
@@ -21,6 +23,15 @@ module RecordingStudioAI
         Array(@configuration.profile_fallbacks[profile.to_sym])
           .first(@configuration.maximum_profile_fallbacks)
           .map(&:to_sym)
+      end
+
+      def explicit_fallbacks_plan(request, capabilities)
+        @resolver.candidates_from_entries(
+          request[:fallbacks],
+          required_capabilities: capabilities
+        ).map do |candidate|
+          PlannedCandidate.new(candidate: candidate, profile: request[:profile])
+        end
       end
 
       def candidates_for(profile, request, capabilities)

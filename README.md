@@ -263,10 +263,12 @@ Calls validate request contracts and return normalized contract objects.
 `generate` and `generate!` resolve configured OpenAI or Gemini candidates and
 dispatch through the shared provider contract. Pass `stream: true` to receive
 incremental events (block or Enumerator). Optional `model:` pins a profile
-candidate; flat generation parameters (`temperature`, `verbosity`,
-`max_output_tokens`, `reasoning_effort`) are validated against the model
-registry. `RecordingStudioAI.stream` / `stream!` were removed — use
-`generate(stream: true)`.
+candidate; optional `fallbacks: [{ provider:, model: }, ...]` supplies an
+explicit hop list and skips configured profiles. Flat generation parameters
+(`temperature`, `verbosity`, `max_output_tokens`, `reasoning_effort`) are
+validated against the model registry and carry through profile or explicit
+fallback hops when the next model supports them. `RecordingStudioAI.stream` /
+`stream!` were removed — use `generate(stream: true)`.
 
 ## Adding a provider
 

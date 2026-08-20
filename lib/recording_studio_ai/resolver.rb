@@ -27,15 +27,19 @@ module RecordingStudioAI
       candidates = Array(@configuration.profiles[profile.to_sym]).map { |entry| build_candidate(entry) }
       candidates.select! { |candidate| candidate.provider == provider_key } if provider_key
       candidates.select! { |candidate| candidate.model == model_key } if model_key
-      candidates.select! do |candidate|
-        provider = @configuration.providers[candidate.provider]
-        provider && (!provider.respond_to?(:configured?) || provider.configured?)
-      end
+      select_configured_capable!(candidates, required_capabilities, allow_empty: allow_empty, model: model_key)
+    end
 
-      eligible = candidates.select { |candidate| candidate.supports?(required_capabilities) }
-      return eligible if eligible.any? || allow_empty
-
-      raise_resolution_error!(candidates, required_capabilities, model: model_key)
+    # Explicit generate(fallbacks: [...]) list. Same shape as profile entries
+    # ({ provider:, model: }); skips configured profiles and profile_fallbacks.
+    def candidates_from_entries(entries, required_capabilities:, allow_empty: false)
+      candidates = Array(entries).map { |entry| build_candidate(entry) }
+      select_configured_capable!(
+        candidates,
+        required_capabilities,
+        allow_empty: allow_empty,
+        source: :fallbacks
+      )
     end
 
     private
@@ -50,6 +54,18 @@ module RecordingStudioAI
         "Provider override #{provider_key} is not enabled",
         code: "configuration"
       )
+    end
+
+    def select_configured_capable!(candidates, required_capabilities, allow_empty:, model: nil, source: :profile)
+      candidates.select! do |candidate|
+        provider = @configuration.providers[candidate.provider]
+        provider && (!provider.respond_to?(:configured?) || provider.configured?)
+      end
+
+      eligible = candidates.select { |candidate| candidate.supports?(required_capabilities) }
+      return eligible if eligible.any? || allow_empty
+
+      raise_resolution_error!(candidates, required_capabilities, model: model, source: source)
     end
 
     def build_candidate(entry)
@@ -70,10 +86,12 @@ module RecordingStudioAI
       definition&.capabilities
     end
 
-    def raise_resolution_error!(candidates, required_capabilities, model: nil)
+    def raise_resolution_error!(candidates, required_capabilities, model: nil, source: :profile)
       category = candidates.empty? ? "configuration" : "unsupported_capability"
       code = candidates.empty? ? "not_implemented" : "unsupported_capability"
-      message = if candidates.empty? && model
+      message = if candidates.empty? && source == :fallbacks
+                  "No candidates from the requested fallbacks are available."
+                elsif candidates.empty? && model
                   "No candidates match the requested profile, provider, and model (#{model})."
                 elsif candidates.empty?
                   "No candidates are configured for the requested profile and provider."

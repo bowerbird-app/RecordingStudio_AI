@@ -14,6 +14,11 @@ Versioning and Keep a Changelog.
   in `AttemptRunner` use this so a caller override (for example `temperature: 1`)
   travels to the next candidate when that model supports it, instead of failing
   the hop or resetting to the fallback model's default.
+- `RecordingStudioAI.generate(..., fallbacks: [...])` takes an explicit ordered
+  candidate list (`{ provider:, model: }`) and skips configured profiles and
+  `profile_fallbacks`. Do not combine `fallbacks:` with `provider:` or `model:`.
+  Caller generation overrides still adapt per hop. `profile:` remains for run
+  attribution only.
 - `RecordingStudioAI.prompts.register(..., override: true)` replaces an existing
   prompt registration with the same key and version, matching model registration.
 - `RecordingStudioAI.tools.register(..., override: true)` replaces an existing

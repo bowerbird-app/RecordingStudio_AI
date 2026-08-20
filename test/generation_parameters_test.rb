@@ -132,6 +132,52 @@ class GenerationParametersTest < RecordingStudioAI::Test::IsolatedCase
 
     assert_match(/verbosity is not supported/, error.message)
   end
+
+  def test_validate_accepts_explicit_fallbacks_list
+    request = RecordingStudioAI::Contracts::RequestValidation.validate_generation_request!(
+      root_recording: @root_recording,
+      initiator: @initiator,
+      prompt: "hello",
+      fallbacks: [
+        { provider: :openai, model: "gpt-5-mini" },
+        { provider: :gemini, model: "gemini-2.5-flash" }
+      ],
+      temperature: 1.0
+    )
+
+    assert_equal [
+      { provider: :openai, model: "gpt-5-mini" },
+      { provider: :gemini, model: "gemini-2.5-flash" }
+    ], request[:fallbacks]
+    assert_in_delta 1.0, request[:temperature]
+  end
+
+  def test_validate_rejects_fallbacks_combined_with_model
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Contracts::RequestValidation.validate_generation_request!(
+        root_recording: @root_recording,
+        initiator: @initiator,
+        prompt: "hello",
+        model: "gpt-5-mini",
+        fallbacks: [{ provider: :openai, model: "gpt-5-mini" }]
+      )
+    end
+
+    assert_match(/fallbacks cannot be combined with provider or model/, error.message)
+  end
+
+  def test_validate_rejects_empty_fallbacks
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Contracts::RequestValidation.validate_generation_request!(
+        root_recording: @root_recording,
+        initiator: @initiator,
+        prompt: "hello",
+        fallbacks: []
+      )
+    end
+
+    assert_match(/fallbacks must be a non-empty Array/, error.message)
+  end
 end
 
 class GenerationParameterProfileFallbackTest < RecordingStudioAI::Test::PersistenceCase
@@ -219,6 +265,39 @@ class GenerationParameterProfileFallbackTest < RecordingStudioAI::Test::Persiste
     assert response.success?
     assert_in_delta 2.0, first.calls.first[:request][:temperature]
     assert_in_delta 2.0, second.calls.first[:request][:temperature]
+  end
+
+  def test_explicit_fallbacks_skip_profile_order_and_keep_temperature_override
+    first = QueueProvider.new(failed_result)
+    second = QueueProvider.new(success_result)
+    configuration = RecordingStudioAI.configuration
+    configuration.providers = { openai: first, gemini: second }
+    configuration.profiles[:low] = [
+      { provider: :gemini, model: "gemini-2.5-flash" },
+      { provider: :openai, model: "gpt-5-mini" }
+    ]
+
+    response = RecordingStudioAI.generate(
+      prompt: "hello",
+      profile: :low,
+      root_recording: @root_recording,
+      initiator: @initiator,
+      temperature: 1.0,
+      verbosity: "high",
+      fallbacks: [
+        { provider: :openai, model: "gpt-5-mini" },
+        { provider: :gemini, model: "gemini-2.5-flash" }
+      ]
+    )
+
+    assert response.success?
+    assert_equal "gpt-5-mini", first.calls.first[:candidate].model
+    assert_equal "gemini-2.5-flash", second.calls.first[:candidate].model
+    assert_in_delta 1.0, first.calls.first[:request][:temperature]
+    assert_equal "high", first.calls.first[:request][:verbosity]
+    assert_in_delta 1.0, second.calls.first[:request][:temperature]
+    assert_nil second.calls.first[:request][:verbosity]
+    assert_equal %w[primary fallback], response.attempts.map(&:kind)
   end
 
   private
