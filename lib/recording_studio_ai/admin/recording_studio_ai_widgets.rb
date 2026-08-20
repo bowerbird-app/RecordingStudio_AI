@@ -870,7 +870,7 @@ module AdminScreens
       end
       trigger = render_flatpack(
         FlatPack::Link::Component.new(
-          href: "##{modal_id}",
+          href: "#",
           data: { modal_id: modal_id, turbo: false },
           aria: { label: aria_label }
         )
