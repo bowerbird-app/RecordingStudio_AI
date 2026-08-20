@@ -12,10 +12,10 @@ RecordingStudioAI.models.register(
     batch_cancellation: true
   },
   parameters: {
-    temperature: { supported: true, min: 0.0, max: 2.0, default: 1.0, step: 0.1 },
-    verbosity: { supported: true, values: %w[low medium high], default: "high" },
-    max_output_tokens: { supported: true, min: 1, max: 128_000, default: 16_384 },
-    reasoning_effort: { supported: true, values: %w[minimal low medium high], default: "high" }
+    temperature: { type: :number, min: 0.0, max: 2.0, default: 1.0, step: 0.1 },
+    verbosity: { type: :string, values: %w[low medium high], default: "high" },
+    max_output_tokens: { type: :integer, min: 1, max: 128_000, default: 16_384 },
+    reasoning_effort: { type: :string, values: %w[minimal low medium high], default: "high" }
   },
   tools: %i[web_search file_search code_execution image_generation custom_tools],
   modalities: {

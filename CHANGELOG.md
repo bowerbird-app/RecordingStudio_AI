@@ -9,8 +9,15 @@ Versioning and Keep a Changelog.
 
 - `RecordingStudioAI.prompts.register(..., override: true)` replaces an existing
   prompt registration with the same key and version, matching model registration.
+- Model parameter specs require `type:` (`:number`, `:integer`, or `:string`).
 
 ### Changed
+
+- Model parameter registration drops `supported:`. Listing a parameter means it
+  is supported; omit it when the model cannot take it. Upgrade note: remove
+  `supported: true/false` from `RecordingStudioAI.models.register` parameter
+  hashes, and add `type:` (for example `temperature: { type: :number, ... }`,
+  `verbosity: { type: :string, ... }`, `max_output_tokens: { type: :integer, ... }`).
 
 - Prompt registration drops `namespace` and `short_name`. Prompts are keyed by
   `key` and `version` only; `name` remains the display label. Upgrade note:

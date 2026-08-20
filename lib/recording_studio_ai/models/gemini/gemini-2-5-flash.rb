@@ -12,8 +12,8 @@ RecordingStudioAI.models.register(
     batch_cancellation: true
   },
   parameters: {
-    temperature: { supported: true, min: 0.0, max: 2.0, default: 1.0, step: 0.1 },
-    max_output_tokens: { supported: true, min: 1, max: 65_536, default: 4_096 }
+    temperature: { type: :number, min: 0.0, max: 2.0, default: 1.0, step: 0.1 },
+    max_output_tokens: { type: :integer, min: 1, max: 65_536, default: 4_096 }
   },
   tools: %i[web_search code_execution custom_tools],
   modalities: {

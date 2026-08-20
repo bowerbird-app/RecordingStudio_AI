@@ -15,7 +15,8 @@ module RecordingStudioAI
       DELIVERY_KEYS = %i[streaming structured_output batch batch_cancellation].freeze
 
       KNOWN_PARAMETERS = %i[temperature verbosity max_output_tokens reasoning_effort].freeze
-      PARAMETER_KEYS = %i[supported min max default step values].freeze
+      PARAMETER_TYPES = %i[number integer string].freeze
+      PARAMETER_KEYS = %i[type min max default step values].freeze
 
       TOOLS = %i[web_search file_search code_execution image_generation custom_tools].freeze
 
@@ -58,8 +59,7 @@ module RecordingStudioAI
       end
 
       def supports_parameter?(name)
-        spec = parameter(name)
-        spec ? spec.fetch(:supported, false) : false
+        parameters.key?(name.to_sym)
       end
 
       def supports_tool?(tool)
@@ -132,15 +132,26 @@ module RecordingStudioAI
         validation_error!("model parameter #{name} must be a Hash") unless spec.is_a?(Hash)
 
         symbolized = spec.transform_keys(&:to_sym)
+        if symbolized.key?(:supported)
+          validation_error!(
+            "model parameter #{name} no longer accepts supported:; omit the parameter when it is unsupported"
+          )
+        end
+
         unknown = symbolized.keys - PARAMETER_KEYS
         validation_error!("unknown keys for parameter #{name}: #{unknown.join(', ')}") if unknown.any?
 
-        supported = symbolized.fetch(:supported, true) == true
+        type = symbolized[:type]&.to_sym
+        validation_error!("model parameter #{name} requires type: (#{PARAMETER_TYPES.join(', ')})") if type.nil?
+        unless PARAMETER_TYPES.include?(type)
+          validation_error!("model parameter #{name} type must be one of: #{PARAMETER_TYPES.join(', ')}")
+        end
+
         values = symbolized[:values]
         validation_error!("model parameter #{name} values must be an Array") if values && !values.is_a?(Array)
 
         {
-          supported: supported,
+          type: type,
           min: symbolized[:min],
           max: symbolized[:max],
           default: symbolized[:default],

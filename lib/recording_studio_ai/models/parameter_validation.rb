@@ -6,6 +6,15 @@ module RecordingStudioAI
     # a model definition when one is known, or performs type-only checks when the
     # resolved model is not yet available.
     module ParameterValidation
+      # Fallback types used when provider+model are not yet resolved to a registry
+      # definition. Built-in registrations always declare their own type.
+      FALLBACK_TYPES = {
+        temperature: :number,
+        max_output_tokens: :integer,
+        verbosity: :string,
+        reasoning_effort: :string
+      }.freeze
+
       module_function
 
       def normalize!(definition, parameters)
@@ -34,12 +43,12 @@ module RecordingStudioAI
           value = provided[name]
           next [name, nil] if value.nil?
 
-          [name, coerce_value!(name, value)]
+          [name, coerce_value!(name, value, FALLBACK_TYPES.fetch(name))]
         end
       end
 
       def normalize_value!(name, value, spec)
-        coerced = coerce_value!(name, value)
+        coerced = coerce_value!(name, value, spec.fetch(:type))
         if spec[:values]
           allowed = spec[:values].map(&:to_s)
           unless allowed.include?(coerced.to_s)
@@ -54,21 +63,21 @@ module RecordingStudioAI
         coerced
       end
 
-      def coerce_value!(name, value)
-        case name
-        when :temperature
-          validation_error!("parameter temperature must be a Number") unless value.is_a?(Numeric)
+      def coerce_value!(name, value, type)
+        case type.to_sym
+        when :number
+          validation_error!("parameter #{name} must be a Number") unless value.is_a?(Numeric)
           value.to_f
-        when :max_output_tokens
+        when :integer
           unless value.is_a?(Integer) || (value.is_a?(String) && value.match?(/\A-?\d+\z/))
-            validation_error!("parameter max_output_tokens must be an Integer")
+            validation_error!("parameter #{name} must be an Integer")
           end
           Integer(value)
-        when :verbosity, :reasoning_effort
+        when :string
           validation_error!("parameter #{name} must be a String") unless value.is_a?(String) || value.is_a?(Symbol)
           value.to_s
         else
-          value
+          validation_error!("parameter #{name} has unknown type: #{type}")
         end
       end
 

@@ -529,13 +529,13 @@ class ConfigController < ApplicationController
         batch_cancellation: true
       },
 
-      # Tunable parameters. Declare support plus bounds/defaults so the playground
-      # can render the right controls and requests can be validated.
+      # Tunable parameters. Listing a parameter means the model supports it;
+      # omit unsupported ones. type is required (number, integer, or string).
       parameters: {
-        temperature:       { supported: true, min: 0.0, max: 2.0, default: 1.0, step: 0.1 },
-        verbosity:         { supported: true, values: %w[low medium high], default: "medium" },
-        max_output_tokens: { supported: true, min: 1, max: 128_000, default: 8_192 },
-        reasoning_effort:  { supported: true, values: %w[minimal low medium high], default: "medium" }
+        temperature:       { type: :number, min: 0.0, max: 2.0, default: 1.0, step: 0.1 },
+        verbosity:         { type: :string, values: %w[low medium high], default: "medium" },
+        max_output_tokens: { type: :integer, min: 1, max: 128_000, default: 8_192 },
+        reasoning_effort:  { type: :string, values: %w[minimal low medium high], default: "medium" }
       },
 
       # Native/provider tools the model can use. custom_tools = host function calling.
