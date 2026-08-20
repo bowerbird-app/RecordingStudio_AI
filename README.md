@@ -122,6 +122,13 @@ In GitHub Codespaces or other restricted environments, you may need to enable ac
 
 See the [FlatPack README](https://github.com/bowerbird-app/flatpack) for full documentation.
 
+## Cloud Agent environment
+
+Cursor Cloud Agents boot from a snapshot that includes Ruby 3.3.6 and
+PostgreSQL 16. The setup mirrors `.cursor/install.sh` (dependencies, database,
+Tailwind) and `.cursor/start.sh` (start PostgreSQL on each boot). Run the app
+with `cd test/dummy && bin/dev`.
+
 ## Tech Stack
 
 | Component       | Version |
