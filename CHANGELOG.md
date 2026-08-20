@@ -7,6 +7,17 @@ Versioning and Keep a Changelog.
 
 ### Added
 
+- Webhook preparation for provider batch completion via
+  `recording_studio_webhooks` (optional host dependency, not a gemspec require):
+  `RecordingStudioAI.refresh_batch_from_webhook` looks up a batch by
+  `provider_batch_id` within `root_recording` and runs the existing
+  `refresh_batch` path with `execution_source: :webhook`. Optional OpenAI
+  recipes `RecordingStudioAI::Webhooks::OpenaiProvider.register!` and
+  `OpenaiBatchCompletion.register!` register intake verify + `batch.*` wake
+  actions when the webhooks gem is installed. Keep
+  `BatchSynchronizationJob` as the poll fallback. Set
+  `config.openai_webhook_secret` and `config.webhook_batch_initiator` (or pass
+  `initiator:`) before using the recipes.
 - `RecordingStudioAI::Models::ParameterValidation.adapt_for_model` soft-applies
   caller generation overrides to a candidate: keeps supported values (clamped to
   that model's range), omits unsupported parameters and disallowed enum values,

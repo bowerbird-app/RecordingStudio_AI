@@ -256,6 +256,7 @@ Phase 2 introduced validation and normalized return contracts for:
 - `RecordingStudioAI.generate!(...)`
 - `RecordingStudioAI.submit_batch(...)`
 - `RecordingStudioAI.refresh_batch(...)`
+- `RecordingStudioAI.refresh_batch_from_webhook(...)`
 - `RecordingStudioAI.cancel_batch(...)`
 - `RecordingStudioAI.read_retained_response(...)`
 - `RecordingStudioAI.tools.register(...)`
@@ -320,6 +321,25 @@ provider. It creates one batch and one linked run and batch item per request.
 statuses, reported usage, and compatible-currency cost. `cancel_batch` requires
 the selected candidate to declare `provider_batch_cancellation`. Batch lookup
 uses the local batch ID and enforces the supplied Recording Studio root.
+
+Provider batch webhooks (optional) wake the same refresh path. Install
+[`recording_studio_webhooks`](https://github.com/bowerbird-app/RecordingStudio_webhooks),
+point an OpenAI project webhook at the intake URL, then:
+
+```ruby
+config.openai_webhook_secret =
+  Rails.application.credentials.dig(:openai, :webhook_secret) ||
+  ENV.fetch("OPENAI_WEBHOOK_SECRET", nil)
+config.webhook_batch_initiator = ->(root_recording:, **) { SystemActor.for(root_recording) }
+
+RecordingStudioAI::Webhooks::OpenaiProvider.register!
+RecordingStudioAI::Webhooks::OpenaiBatchCompletion.register!
+```
+
+`OpenaiBatchCompletion` calls `refresh_batch_from_webhook`, which never trusts
+payload results — it always retrieves from the provider. Polling via
+`refresh_batch_async` remains the missed-delivery fallback (and the only option
+for providers without batch webhooks).
 
 OpenAI batches upload `purpose: batch` JSONL for `/v1/responses` through the
 official Ruby SDK and parse output/error files by `custom_id`. Gemini batches

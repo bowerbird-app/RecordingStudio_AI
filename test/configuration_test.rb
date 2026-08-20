@@ -43,6 +43,8 @@ class ConfigurationTest < Minitest::Test
     assert_empty configuration.cost_catalogs
     assert_equal "RecordingStudioAI::BatchSynchronizationJob", configuration.batch_synchronization_job
     assert_equal 1.minute, configuration.batch_synchronization_interval
+    assert_nil configuration.openai_webhook_secret
+    assert_nil configuration.webhook_batch_initiator
     assert_equal 300, configuration.total_execution_timeout
     refute configuration.custom_tool_confirmation_handler.call
     assert_nil configuration.openai_api_key

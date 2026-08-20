@@ -42,6 +42,8 @@ module RecordingStudioAI
       :notification_namespace,
       :openai_api_key,
       :openai_client,
+      :openai_webhook_secret,
+      :webhook_batch_initiator,
       :profiles,
       :profile_fallbacks,
       :request_timeout,
@@ -122,6 +124,10 @@ module RecordingStudioAI
       @notification_namespace = "recording_studio_ai"
       @openai_api_key = ENV.fetch("OPENAI_API_KEY", nil)
       @openai_client = nil
+      @openai_webhook_secret = ENV.fetch("OPENAI_WEBHOOK_SECRET", nil)
+      # Returns the initiator used when refresh_batch_from_webhook omits initiator:.
+      # Example: ->(root_recording:, **) { SystemActor.instance }
+      @webhook_batch_initiator = nil
       @profiles = {
         low: [
           { provider: :openai, model: "gpt-5-mini" },
@@ -176,6 +182,9 @@ module RecordingStudioAI
       end
       unless batch_synchronization_job.is_a?(String) || batch_synchronization_job.respond_to?(:perform_later)
         invalid_configuration!("batch_synchronization_job must respond to perform_later")
+      end
+      if !webhook_batch_initiator.nil? && !webhook_batch_initiator.respond_to?(:call)
+        invalid_configuration!("webhook_batch_initiator must be nil or respond to call")
       end
       self
     end
