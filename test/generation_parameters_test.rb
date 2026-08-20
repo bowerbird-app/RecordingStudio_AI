@@ -133,3 +133,118 @@ class GenerationParametersTest < RecordingStudioAI::Test::IsolatedCase
     assert_match(/verbosity is not supported/, error.message)
   end
 end
+
+class GenerationParameterProfileFallbackTest < RecordingStudioAI::Test::PersistenceCase
+  Actor = Struct.new(:id)
+
+  class QueueProvider < RecordingStudioAI::Providers::Base
+    attr_reader :calls
+
+    def initialize(*results)
+      @results = results
+      @calls = []
+    end
+
+    def generate(request:, candidate:)
+      calls << { request: request, candidate: candidate }
+      @results.shift || raise("unexpected provider call")
+    end
+  end
+
+  def setup
+    super
+    @root_recording = Actor.new(create_recording_id)
+    @initiator = Actor.new(51)
+    isolate_allow_all_configuration!
+    RecordingStudioAI.configuration.maximum_retries_per_candidate = 0
+  end
+
+  def test_profile_fallback_keeps_temperature_override_and_omits_unsupported_verbosity
+    first = QueueProvider.new(failed_result)
+    second = QueueProvider.new(success_result)
+    configure_low_profile(first: first, second: second)
+
+    response = RecordingStudioAI.generate(
+      prompt: "hello",
+      profile: :low,
+      root_recording: @root_recording,
+      initiator: @initiator,
+      temperature: 1.0,
+      verbosity: "high"
+    )
+
+    assert response.success?
+    assert_equal 1, first.calls.length
+    assert_equal 1, second.calls.length
+
+    assert_in_delta 1.0, first.calls.first[:request][:temperature]
+    assert_equal "high", first.calls.first[:request][:verbosity]
+    assert_equal "gpt-5-mini", first.calls.first[:candidate].model
+
+    assert_in_delta 1.0, second.calls.first[:request][:temperature]
+    assert_nil second.calls.first[:request][:verbosity]
+    assert_equal "gemini-2.5-flash", second.calls.first[:candidate].model
+  end
+
+  def test_profile_fallback_does_not_invent_temperature_when_caller_omitted_it
+    first = QueueProvider.new(failed_result)
+    second = QueueProvider.new(success_result)
+    configure_low_profile(first: first, second: second)
+
+    response = RecordingStudioAI.generate(
+      prompt: "hello",
+      profile: :low,
+      root_recording: @root_recording,
+      initiator: @initiator
+    )
+
+    assert response.success?
+    assert_nil first.calls.first[:request][:temperature]
+    assert_nil second.calls.first[:request][:temperature]
+  end
+
+  def test_profile_fallback_clamps_temperature_to_the_next_model_range
+    first = QueueProvider.new(failed_result)
+    second = QueueProvider.new(success_result)
+    configure_low_profile(first: first, second: second)
+
+    response = RecordingStudioAI.generate(
+      prompt: "hello",
+      profile: :low,
+      root_recording: @root_recording,
+      initiator: @initiator,
+      temperature: 2.5
+    )
+
+    assert response.success?
+    assert_in_delta 2.0, first.calls.first[:request][:temperature]
+    assert_in_delta 2.0, second.calls.first[:request][:temperature]
+  end
+
+  private
+
+  def configure_low_profile(first:, second:)
+    configuration = RecordingStudioAI.configuration
+    configuration.providers = { openai: first, gemini: second }
+    configuration.profiles[:low] = [
+      { provider: :openai, model: "gpt-5-mini" },
+      { provider: :gemini, model: "gemini-2.5-flash" }
+    ]
+  end
+
+  def success_result
+    RecordingStudioAI::Providers::Result.new(text: "ok", finish_reason: "stop")
+  end
+
+  def failed_result
+    RecordingStudioAI::Providers::Result.new(
+      error: RecordingStudioAI::Contracts::NormalizedError.new(
+        category: "timeout",
+        code: "timeout",
+        message: "Provider failed.",
+        retryable: true,
+        provider: "openai"
+      )
+    )
+  end
+end
