@@ -59,7 +59,6 @@ module AdminScreens
              value: lambda { |row, _context|
                AdminScreens::RecordingStudioAIWidgets.prompt_definition_modal(row)
              }
-      column :namespace, title: "Namespace", header_tooltip: "Group this prompt belongs to."
       column :key, title: "Key", header_tooltip: "Stable name used in code."
       column :description, title: "Description", header_tooltip: "What this prompt is for."
       column :calls_series,

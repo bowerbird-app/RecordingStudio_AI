@@ -18,7 +18,7 @@ class RegisteredPromptsTest < Minitest::Test
   def test_registered_prompt_renders_messages_uses_registered_tools_and_passes_attribution
     register_tool
     definition = register_prompt
-    invocation = RecordingStudioAI.prompt(:support, :customer_reply, version: 1)
+    invocation = RecordingStudioAI.prompt(:customer_reply, version: 1)
     captured_request = invocation.send(
       :request,
       { customer_name: "Ada", message: "Where is my order?" },
@@ -34,11 +34,19 @@ class RegisteredPromptsTest < Minitest::Test
     register_prompt
 
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
-      RecordingStudioAI.prompt(:support, :customer_reply).call(inputs: {}, root_recording: Object.new, initiator: Object.new)
+      RecordingStudioAI.prompt(:customer_reply).call(inputs: {}, root_recording: Object.new, initiator: Object.new)
     end
     assert_equal "invalid_request", error.code
 
     assert_raises(RecordingStudioAI::Errors::ContractValidationError) { register_prompt }
+  end
+
+  def test_registered_prompt_override_replaces_existing_registration
+    register_prompt
+    register_prompt(name: "Updated Reply", override: true)
+
+    assert_equal "Updated Reply", RecordingStudioAI.prompts.fetch(:customer_reply).name
+    assert_equal 1, RecordingStudioAI.prompts.all.length
   end
 
   def test_request_validation_rejects_unregistered_prompt_definitions
@@ -56,34 +64,34 @@ class RegisteredPromptsTest < Minitest::Test
     register_tool
     register_prompt(owner: :host_app)
 
-    assert RecordingStudioAI.prompt_methods.respond_to?(:support)
-    assert RecordingStudioAI.prompt_methods.support.respond_to?(:customer_reply)
+    assert RecordingStudioAI.prompt_methods.respond_to?(:customer_reply)
 
     RecordingStudioAI.prompts.replace_owner(:host_app) do |registry|
-      registry.register(**prompt_attributes(owner: :host_app, short_name: "Reply"))
+      registry.register(**prompt_attributes(owner: :host_app, name: "Updated Reply"))
     end
 
-    assert_equal "Reply", RecordingStudioAI.prompts.fetch(:support, :customer_reply).short_name
+    assert_equal "Updated Reply", RecordingStudioAI.prompts.fetch(:customer_reply).name
   end
 
   private
 
-  def register_prompt(owner: nil)
-    RecordingStudioAI.prompts.register(**prompt_attributes(owner: owner))
+  def register_prompt(owner: nil, name: "Customer Support Reply", override: false)
+    RecordingStudioAI.prompts.register(**prompt_attributes(owner: owner, name: name), override: override)
   end
 
-  def prompt_attributes(owner:, short_name: "Support Reply")
+  def prompt_attributes(owner:, name: "Customer Support Reply")
     {
       owner: owner,
-      namespace: :support,
       key: :customer_reply,
       version: 1,
-      name: "Customer Support Reply",
-      short_name: short_name,
-      description: "Creates a concise customer response.",
+      name: name,
+      description: "Creates a concise response to a customer message.",
       inputs: %i[customer_name message],
-      messages: [{ role: :user, content: "{{customer_name}}: {{message}}" }],
-      tools: [{ key: :registered_tool, version: 1 }]
+      messages: [
+        { role: :user, content: "{{customer_name}}: {{message}}" }
+      ],
+      tools: [{ key: :registered_tool, version: 1 }],
+      defaults: { profile: :medium, purpose: "customer_reply" }
     }
   end
 
@@ -91,20 +99,20 @@ class RegisteredPromptsTest < Minitest::Test
     RecordingStudioAI.tools.register(
       key: :registered_tool,
       version: 1,
-      name: "Registered Tool",
-      description: "A prompt tool.",
-      use_when: "The prompt needs it.",
-      do_not_use_when: "The prompt does not need it.",
+      name: "Registered tool",
+      description: "Tool for prompt tests.",
+      use_when: "Testing.",
+      do_not_use_when: "Never.",
       parameters: [],
       returns: "A result.",
-      cost: :negligible,
-      latency: :instant,
+      cost: :low,
+      latency: :fast,
       read_only: true,
       destructive: false,
       requires_confirmation: false,
       idempotent: true,
-      executor_label: "Test",
-      executor: ->(_arguments, _context) { {} }
+      executor_label: "Tests.registered_tool",
+      executor: ->(_arguments, _context) { { ok: true } }
     )
   end
 end

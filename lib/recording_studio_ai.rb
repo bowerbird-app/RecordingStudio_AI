@@ -213,11 +213,11 @@ module RecordingStudioAI
       end
     end
 
-    def prompt(namespace, key, version: nil)
-      definition = prompts.fetch(namespace, key, version: version)
+    def prompt(key, version: nil)
+      definition = prompts.fetch(key, version: version)
       unless definition
         raise RecordingStudioAI::Errors::ContractValidationError.new(
-          "prompt #{namespace}.#{key}#{" version #{version}" if version} is not registered",
+          "prompt #{key}#{" version #{version}" if version} is not registered",
           code: "invalid_request"
         )
       end

@@ -26,11 +26,6 @@ module AdminScreens
            title: "Prompt",
            field: :prompt_key,
            values: -> { AdminScreens::RecordingStudioAIWidgets.run_present_distinct_values(:prompt_key) }
-    filter :prompt_namespace,
-           title: "Prompt namespace",
-           field: :prompt_namespace,
-           values: -> { AdminScreens::RecordingStudioAIWidgets.run_present_distinct_values(:prompt_namespace) },
-           apply: ->(relation, value, _context) { relation.where(prompt_namespace: value) }
     filter :prompt_version,
            title: "Prompt version",
            field: :prompt_version,
@@ -104,10 +99,8 @@ module AdminScreens
               "requested_provider ILIKE :search",
               "resolved_provider ILIKE :search",
               "resolved_model ILIKE :search",
-              "prompt_namespace ILIKE :search",
               "prompt_key ILIKE :search",
               "prompt_name_snapshot ILIKE :search",
-              "prompt_short_name_snapshot ILIKE :search",
               "CAST(id AS TEXT) ILIKE :search"
             ].join(" OR "),
             search: search

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_14_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_20_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -283,8 +283,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_130000) do
     t.string "profile_key"
     t.string "prompt_key"
     t.string "prompt_name_snapshot"
-    t.string "prompt_namespace"
-    t.string "prompt_short_name_snapshot"
     t.integer "prompt_version"
     t.string "purpose"
     t.bigint "reasoning_tokens"
@@ -305,7 +303,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_14_130000) do
     t.index ["initiator_type", "initiator_id"], name: "idx_on_initiator_type_initiator_id_c688e18770"
     t.index ["job_id"], name: "index_recording_studio_ai_runs_on_job_id"
     t.index ["profile_key", "created_at"], name: "index_recording_studio_ai_runs_on_profile_key_and_created_at"
-    t.index ["prompt_namespace", "prompt_key", "prompt_version", "created_at"], name: "idx_rsai_runs_prompt_created_at"
+    t.index ["prompt_key", "prompt_version", "created_at"], name: "idx_rsai_runs_prompt_created_at"
     t.index ["purpose", "created_at"], name: "index_recording_studio_ai_runs_on_purpose_and_created_at"
     t.index ["request_id"], name: "index_recording_studio_ai_runs_on_request_id"
     t.index ["resolved_provider", "resolved_model", "created_at"], name: "idx_rsai_runs_provider_model_created_at"

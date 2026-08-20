@@ -2,45 +2,20 @@
 
 module RecordingStudioAI
   module Prompts
-    class NamespaceProxy
-      def initialize(registry, namespace)
-        @registry = registry
-        @namespace = namespace
-      end
-
-      def method_missing(key, ...)
-        Invocation.new(@registry.fetch(@namespace, key) || missing_prompt!(key)).call(...)
-      end
-
-      def respond_to_missing?(key, include_private = false)
-        @registry.fetch(@namespace, key).present? || super
-      end
-
-      private
-
-      def missing_prompt!(key)
-        raise RecordingStudioAI::Errors::ContractValidationError.new(
-          "prompt #{@namespace}.#{key} is not registered",
-          code: "invalid_request"
-        )
-      end
-    end
-
     class MethodProxy
       def initialize(registry)
         @registry = registry
       end
 
-      def method_missing(namespace, ...)
-        return NamespaceProxy.new(@registry, namespace) if (definition = @registry.all.find do |item|
-          item.namespace == namespace.to_s
-        end) && definition
+      def method_missing(key, ...)
+        definition = @registry.fetch(key)
+        return Invocation.new(definition).public_send(...) if definition
 
         super
       end
 
-      def respond_to_missing?(namespace, include_private = false)
-        @registry.all.any? { |definition| definition.namespace == namespace.to_s } || super
+      def respond_to_missing?(key, include_private = false)
+        @registry.fetch(key).present? || super
       end
     end
 

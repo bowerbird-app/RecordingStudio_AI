@@ -7,30 +7,30 @@ module RecordingStudioAI
         @definitions = {}
       end
 
-      def register(**)
-        definition = RecordingStudioAI::Prompts::Definition.new(**)
-        key = storage_key(definition.namespace, definition.key, definition.version)
-        if @definitions.key?(key)
+      def register(override: false, **attributes)
+        definition = RecordingStudioAI::Prompts::Definition.new(**attributes)
+        storage = storage_key(definition.key, definition.version)
+
+        if @definitions.key?(storage) && !override
           raise RecordingStudioAI::Errors::ContractValidationError.new(
-            "prompt #{definition.namespace}.#{definition.key} version #{definition.version} is already registered",
+            "prompt #{definition.key} version #{definition.version} is already registered",
             code: "invalid_request"
           )
         end
 
-        @definitions[key] = definition
+        @definitions[storage] = definition
         definition
       end
 
-      def fetch(namespace, key, version: nil)
-        namespace = namespace.to_s
+      def fetch(key, version: nil)
         key = key.to_s
-        return @definitions[storage_key(namespace, key, version)] if version
+        return @definitions[storage_key(key, version)] if version
 
-        @definitions.values.select { |definition| definition.namespace == namespace && definition.key == key }.max_by(&:version)
+        @definitions.values.select { |definition| definition.key == key }.max_by(&:version)
       end
 
       def all
-        @definitions.values.sort_by { |definition| [definition.namespace, definition.key, definition.version] }
+        @definitions.values.sort_by { |definition| [definition.key, definition.version] }
       end
 
       def replace_owner(owner)
@@ -45,7 +45,7 @@ module RecordingStudioAI
         end
 
         retained = @definitions.reject { |_key, definition| definition.owner == owner }
-        additions = replacements.all.to_h { |definition| [storage_key(definition.namespace, definition.key, definition.version), definition] }
+        additions = replacements.all.to_h { |definition| [storage_key(definition.key, definition.version), definition] }
         collisions = retained.keys & additions.keys
         if collisions.any?
           raise RecordingStudioAI::Errors::ContractValidationError.new(
@@ -59,8 +59,8 @@ module RecordingStudioAI
 
       private
 
-      def storage_key(namespace, key, version)
-        "#{namespace}:#{key}:#{version}"
+      def storage_key(key, version)
+        "#{key}:#{version}"
       end
     end
   end

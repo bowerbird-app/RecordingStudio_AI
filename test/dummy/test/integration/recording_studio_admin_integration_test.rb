@@ -322,7 +322,6 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     create_run!(
       status: "completed",
       operation: "generation",
-      prompt_namespace: "demo",
       prompt_key: "summarize_text",
       prompt_version: 1,
       prompt_name_snapshot: "Text Summary"
@@ -336,7 +335,6 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "href=\"/admin/screens/registered_prompts\""
     assert_includes response.body, "Text Summary"
     assert_includes response.body, "prompt=summarize_text"
-    assert_includes response.body, "prompt_namespace=demo"
   end
 
   test "registered providers and models widgets and section links appear on the dashboard" do
@@ -449,7 +447,6 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     create_run!(
       status: "completed",
       operation: "generation",
-      prompt_namespace: "demo",
       prompt_key: "summarize_text",
       prompt_version: 1,
       prompt_name_snapshot: "Text Summary",
@@ -460,7 +457,6 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     create_run!(
       status: "failed",
       operation: "generation",
-      prompt_namespace: "demo",
       prompt_key: "summarize_text",
       prompt_version: 1,
       prompt_name_snapshot: "Text Summary",
@@ -487,9 +483,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Text Summary"
     assert_includes response.body, "Text Analysis"
     assert_includes response.body, "Osaka Weather"
-    assert_includes response.body, "demo.analyze_text"
-    assert_includes response.body, "demo.osaka_weather"
-    assert_includes response.body, "demo.summarize_text"
+    assert_includes response.body, "analyze_text"
+    assert_includes response.body, "osaka_weather"
+    assert_includes response.body, "summarize_text"
     assert_match(/text-5xl[^>]*>2</, response.body)
     assert_includes response.body, "+100%"
     assert_includes response.body, "Last 4 weeks"
@@ -499,26 +495,23 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert AdminScreens::RecordingStudioAIRegisteredPromptsScreen.table.show_columns_button?
-    refute_includes AdminScreens::RecordingStudioAIRegisteredPromptsScreen.table.default_column_keys, :namespace
     refute_includes AdminScreens::RecordingStudioAIRegisteredPromptsScreen.table.default_column_keys, :key
     assert_includes response.body, "Choose table columns"
-    assert_select "th", text: /\ANamespace/, count: 0
     assert_select "th", text: /\AKey/, count: 0
     assert_includes response.body, "Text Summary"
     assert_includes response.body, "Avg input"
     assert_includes response.body, "Avg output"
     assert_includes response.body, ">160<"
     assert_includes response.body, ">60<"
-    assert_includes response.body, "data-modal-id=\"registered-prompt-definition-demo-summarize_text-1\""
+    assert_includes response.body, "data-modal-id=\"registered-prompt-definition-summarize_text-1\""
     assert_includes response.body, "Creates a concise summary of supplied text"
     assert_includes response.body, "Produce a concise factual summary."
     assert_includes response.body, "Summarize this text:"
     assert_includes response.body, "#000000"
 
-    get "/admin/screens/registered_prompts/table", params: { columns: %w[name namespace key] }
+    get "/admin/screens/registered_prompts/table", params: { columns: %w[name key] }
 
     assert_response :success
-    assert_select "th", text: /\ANamespace/
     assert_select "th", text: /\AKey/
   end
 
@@ -528,11 +521,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     unused_prompt_name = "Unused Prompt #{unused_prompt_key}"
     RecordingStudioAI.prompts.register(
       owner: "dummy_app",
-      namespace: :demo,
       key: unused_prompt_key.to_sym,
       version: 1,
       name: unused_prompt_name,
-      short_name: "Unused",
       description: "An unused registered prompt for admin coverage.",
       inputs: [],
       messages: [{ role: :user, content: "Unused prompt content" }],
@@ -1609,7 +1600,6 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       status: "completed",
       operation: "generation",
       prompt_key: "latency-chart-prompt",
-      prompt_namespace: "demo",
       prompt_version: 1,
       prompt_name_snapshot: "Latency Chart Prompt",
       latency_ms: 400
@@ -1711,13 +1701,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     RecordingStudioAI::Configuration.instance_methods(false).grep(/=\z/).map { |name| name.to_s.chomp("=") }
   end
 
-  def create_run!(status:, operation:, prompt_key: nil, prompt_name_snapshot: nil, prompt_namespace: nil,
+  def create_run!(status:, operation:, prompt_key: nil, prompt_name_snapshot: nil,
                   prompt_version: nil, resolved_model: nil, resolved_provider: nil,
                   total_tokens: nil, input_tokens: nil, output_tokens: nil, latency_ms: nil)
     RecordingStudioAI::Run.create!(
       operation: operation,
       status: status,
-      prompt_namespace: prompt_namespace,
       prompt_key: prompt_key,
       prompt_version: prompt_version,
       prompt_name_snapshot: prompt_name_snapshot,

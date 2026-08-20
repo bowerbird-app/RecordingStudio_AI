@@ -76,15 +76,15 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     root_id = create_recording_id
     create_run(
       root_id: root_id, status: "completed", tokens: 1,
-      prompt_namespace: "docs", prompt_key: "summarize", prompt_name_snapshot: "Summarize page"
+      prompt_key: "summarize", prompt_name_snapshot: "Summarize page"
     )
     create_run(
       root_id: root_id, status: "completed", tokens: 1,
-      prompt_namespace: "docs", prompt_key: "summarize", prompt_name_snapshot: "Summarize page"
+      prompt_key: "summarize", prompt_name_snapshot: "Summarize page"
     )
     create_run(
       root_id: root_id, status: "completed", tokens: 1,
-      prompt_namespace: "docs", prompt_key: "outline", prompt_name_snapshot: "Outline"
+      prompt_key: "outline", prompt_name_snapshot: "Outline"
     )
 
     rows = AdminScreens::RecordingStudioAIWidgets.top_prompt_call_rows(
@@ -93,8 +93,8 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
       limit: 5
     )
 
-    assert_equal ["Summarize page", "docs", "summarize", 2], rows.first
-    assert_equal ["Outline", "docs", "outline", 1], rows.last
+    assert_equal ["Summarize page", "summarize", 2], rows.first
+    assert_equal ["Outline", "outline", 1], rows.last
   end
 
   def test_widget_memo_dedupes_repeated_chart_row_lookups

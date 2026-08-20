@@ -158,15 +158,13 @@ DUMMY_TOOLS.each do |tool_definition|
   RecordingStudioAI.tools.register(**tool_definition)
 end
 
-# Dummy-host prompt catalog. `namespace` groups related prompts; this host uses "demo".
+# Dummy-host prompt catalog.
 DUMMY_PROMPTS = [
   {
     owner: "dummy_app",
-    namespace: :demo,
     key: :summarize_text,
     version: 1,
     name: "Text Summary",
-    short_name: "Summary",
     description: "Creates a concise summary of supplied text using the registered summary tool.",
     inputs: %i[text],
     messages: [
@@ -178,11 +176,9 @@ DUMMY_PROMPTS = [
   },
   {
     owner: "dummy_app",
-    namespace: :demo,
     key: :analyze_text,
     version: 1,
     name: "Text Analysis",
-    short_name: "Analysis",
     description: "Echoes supplied text and extracts keywords using the registered demo tools.",
     inputs: %i[text],
     messages: [
@@ -197,11 +193,9 @@ DUMMY_PROMPTS = [
   },
   {
     owner: "dummy_app",
-    namespace: :demo,
     key: :osaka_weather,
     version: 1,
     name: "Osaka Weather",
-    short_name: "Osaka Weather",
     description: "Asks for the current weather in Osaka.",
     inputs: [],
     messages: [{ role: :user, content: "What's the weather in Osaka?" }],
