@@ -83,4 +83,53 @@ class GenerationParametersTest < RecordingStudioAI::Test::IsolatedCase
     assert_equal :gemini, candidate.provider
     assert_equal "gemini-2.5-flash", candidate.model
   end
+
+  def test_adapt_for_model_keeps_supported_overrides_and_omits_unsupported
+    gpt = RecordingStudioAI.models.fetch(:openai, "gpt-5-mini")
+    flash = RecordingStudioAI.models.fetch(:gemini, "gemini-2.5-flash")
+    overrides = { temperature: 0.3, verbosity: "high", max_output_tokens: 128 }
+
+    adapted_gpt = RecordingStudioAI::Models::ParameterValidation.adapt_for_model(gpt, overrides)
+    adapted_flash = RecordingStudioAI::Models::ParameterValidation.adapt_for_model(flash, overrides)
+
+    assert_in_delta 0.3, adapted_gpt[:temperature]
+    assert_equal "high", adapted_gpt[:verbosity]
+    assert_equal 128, adapted_gpt[:max_output_tokens]
+
+    assert_in_delta 0.3, adapted_flash[:temperature]
+    assert_nil adapted_flash[:verbosity]
+    assert_equal 128, adapted_flash[:max_output_tokens]
+  end
+
+  def test_adapt_for_model_clamps_numeric_overrides_to_the_candidate_range
+    flash = RecordingStudioAI.models.fetch(:gemini, "gemini-2.5-flash")
+    adapted = RecordingStudioAI::Models::ParameterValidation.adapt_for_model(
+      flash,
+      temperature: 2.5,
+      max_output_tokens: 128
+    )
+
+    assert_in_delta 2.0, adapted[:temperature]
+    assert_equal 128, adapted[:max_output_tokens]
+  end
+
+  def test_adapt_for_model_omits_enum_values_the_candidate_does_not_allow
+    gpt = RecordingStudioAI.models.fetch(:openai, "gpt-5-mini")
+    adapted = RecordingStudioAI::Models::ParameterValidation.adapt_for_model(
+      gpt,
+      reasoning_effort: "ludicrous"
+    )
+
+    assert_nil adapted[:reasoning_effort]
+  end
+
+  def test_normalize_still_raises_for_unsupported_parameter_on_pinned_model
+    flash = RecordingStudioAI.models.fetch(:gemini, "gemini-2.5-flash")
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Models::ParameterValidation.normalize!(flash, verbosity: "high")
+    end
+
+    assert_match(/verbosity is not supported/, error.message)
+  end
 end

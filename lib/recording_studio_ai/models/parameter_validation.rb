@@ -18,9 +18,7 @@ module RecordingStudioAI
       module_function
 
       def normalize!(definition, parameters)
-        provided = parameters.transform_keys(&:to_sym).compact
-        unknown = provided.keys - Definition::KNOWN_PARAMETERS
-        validation_error!("unknown generation parameters: #{unknown.join(', ')}") if unknown.any?
+        provided = compact_known_parameters!(parameters)
 
         Definition::KNOWN_PARAMETERS.to_h do |name|
           value = provided[name]
@@ -34,10 +32,24 @@ module RecordingStudioAI
         end
       end
 
+      # Soft application of caller overrides for a candidate hop. Keeps a value when
+      # the model supports it (clamped to that model's range). Omits it when the
+      # model does not support it or when an enum value is not allowed. Does not
+      # raise for unsupported parameters — use +normalize!+ when a pinned model
+      # must reject them at request time.
+      def adapt_for_model(definition, parameters)
+        provided = compact_known_parameters!(parameters)
+
+        Definition::KNOWN_PARAMETERS.to_h do |name|
+          value = provided[name]
+          next [name, nil] if value.nil? || !definition.supports_parameter?(name)
+
+          [name, adapt_value(name, value, definition.parameter(name))]
+        end
+      end
+
       def normalize_without_definition!(parameters)
-        provided = parameters.transform_keys(&:to_sym).compact
-        unknown = provided.keys - Definition::KNOWN_PARAMETERS
-        validation_error!("unknown generation parameters: #{unknown.join(', ')}") if unknown.any?
+        provided = compact_known_parameters!(parameters)
 
         Definition::KNOWN_PARAMETERS.to_h do |name|
           value = provided[name]
@@ -45,6 +57,13 @@ module RecordingStudioAI
 
           [name, coerce_value!(name, value, FALLBACK_TYPES.fetch(name))]
         end
+      end
+
+      def compact_known_parameters!(parameters)
+        provided = parameters.transform_keys(&:to_sym).compact
+        unknown = provided.keys - Definition::KNOWN_PARAMETERS
+        validation_error!("unknown generation parameters: #{unknown.join(', ')}") if unknown.any?
+        provided
       end
 
       def normalize_value!(name, value, spec)
@@ -60,6 +79,20 @@ module RecordingStudioAI
         validation_error!("parameter #{name} must be >= #{spec[:min]}") if spec.key?(:min) && coerced < spec[:min]
         validation_error!("parameter #{name} must be <= #{spec[:max]}") if spec.key?(:max) && coerced > spec[:max]
 
+        coerced
+      end
+
+      def adapt_value(name, value, spec)
+        coerced = coerce_value!(name, value, spec.fetch(:type))
+        if spec[:values]
+          allowed = spec[:values].map(&:to_s)
+          return nil unless allowed.include?(coerced.to_s)
+
+          return coerced.to_s
+        end
+
+        coerced = spec[:min] if spec.key?(:min) && coerced < spec[:min]
+        coerced = spec[:max] if spec.key?(:max) && coerced > spec[:max]
         coerced
       end
 
