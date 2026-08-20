@@ -101,6 +101,20 @@ class ConfigController < ApplicationController
       explanation: "How often batch polling runs."
     },
     {
+      key: "openai_webhook_secret",
+      required: "No",
+      accepted_values: "String or nil",
+      default: 'ENV["OPENAI_WEBHOOK_SECRET"]',
+      explanation: "Signing secret for optional OpenAI batch webhooks via recording_studio_webhooks. Never store this on endpoint metadata."
+    },
+    {
+      key: "webhook_batch_initiator",
+      required: "No",
+      accepted_values: "Callable or nil",
+      default: "nil",
+      explanation: "Returns the initiator when refresh_batch_from_webhook omits initiator:. Required for OpenAI batch webhook recipes."
+    },
+    {
       key: "maximum_attempts",
       required: "No",
       accepted_values: "Integer >= 1",
@@ -414,6 +428,11 @@ class ConfigController < ApplicationController
       config.cost_catalogs = {}
       config.batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"
       config.batch_synchronization_interval = 1.minute
+      # Optional OpenAI batch webhook wake-ups (requires recording_studio_webhooks).
+      # config.openai_webhook_secret = ENV.fetch("OPENAI_WEBHOOK_SECRET", nil)
+      # config.webhook_batch_initiator = ->(root_recording:, **) { SystemActor.for(root_recording) }
+      # RecordingStudioAI::Webhooks::OpenaiProvider.register!
+      # RecordingStudioAI::Webhooks::OpenaiBatchCompletion.register!
 
       # Retry/attempt controls.
       config.maximum_attempts = 3

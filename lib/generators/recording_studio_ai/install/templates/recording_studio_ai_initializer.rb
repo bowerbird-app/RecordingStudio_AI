@@ -37,6 +37,14 @@ RecordingStudioAI.configure do |config|
   # Polling runs through ActiveJob. Configure Rails with :sidekiq to use Sidekiq.
   config.batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"
   config.batch_synchronization_interval = 1.minute
+  # Optional OpenAI batch webhook wake-ups via recording_studio_webhooks.
+  # Keep polling as the missed-delivery fallback. Set an initiator for system wakes:
+  # config.openai_webhook_secret =
+  #   Rails.application.credentials.dig(:openai, :webhook_secret) || ENV.fetch("OPENAI_WEBHOOK_SECRET", nil)
+  # config.webhook_batch_initiator = ->(root_recording:, **) { SystemActor.for(root_recording) }
+  # Then register:
+  # RecordingStudioAI::Webhooks::OpenaiProvider.register!
+  # RecordingStudioAI::Webhooks::OpenaiBatchCompletion.register!
   # Deny by default. Prefer RecordingStudioAI::AccessibleAuthorization once
   # recording-studio-accessible is installed:
   #
