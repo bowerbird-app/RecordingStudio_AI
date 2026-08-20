@@ -28,7 +28,7 @@ class AIPlaygroundUploadSafetyTest < ActionDispatch::IntegrationTest
       post "/ai_playground", params: {
         ai_playground: {
           mode: "generate",
-          prompt_key: "demo:osaka_weather:1",
+          prompt_key: "osaka_weather:1",
           profile: "medium",
           provider: "auto",
           attachment: Rack::Test::UploadedFile.new(file.path, "text/plain")
@@ -68,7 +68,7 @@ class AIPlaygroundUploadSafetyTest < ActionDispatch::IntegrationTest
     post "/ai_playground", params: {
       ai_playground: {
         mode: "generate",
-        prompt_key: "demo:osaka_weather:1",
+        prompt_key: "osaka_weather:1",
         profile: "medium",
         provider: "auto"
       }

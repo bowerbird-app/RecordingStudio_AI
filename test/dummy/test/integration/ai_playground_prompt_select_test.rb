@@ -14,9 +14,9 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "name=\"ai_playground[prompt_key]\""
-    assert_includes response.body, "demo:analyze_text:1"
-    assert_includes response.body, "demo:osaka_weather:1"
-    assert_includes response.body, "demo:summarize_text:1"
+    assert_includes response.body, "analyze_text:1"
+    assert_includes response.body, "osaka_weather:1"
+    assert_includes response.body, "summarize_text:1"
     assert_includes response.body, "Use the available tools to inspect the supplied text"
     assert_includes response.body, "{{text}}"
     refute_includes response.body, "Osaka is warm, humid, and packed with street food this week."
@@ -31,7 +31,7 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
   end
 
   test "generate sends the selected registered prompt, custom text, and its tools" do
-    captured = post_generate!("demo:analyze_text:1", extra: { prompt_inputs: { text: "Cats chase yarn across the kitchen." } })
+    captured = post_generate!("analyze_text:1", extra: { prompt_inputs: { text: "Cats chase yarn across the kitchen." } })
 
     assert_response :success
     assert_equal "analyze_text", captured[:prompt_definition].key
@@ -44,7 +44,7 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
 
   test "generate sends custom text for summarize_text" do
     captured = post_generate!(
-      "demo:summarize_text:1",
+      "summarize_text:1",
       extra: { prompt_inputs: { text: "Bring your own paragraph for the summary." } }
     )
 
@@ -57,7 +57,7 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
   end
 
   test "generate asks for text when a prompt expects it" do
-    captured = post_generate!("demo:analyze_text:1")
+    captured = post_generate!("analyze_text:1")
 
     assert_response :unprocessable_entity
     assert_nil captured
@@ -66,7 +66,7 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
 
   test "the playground custom tool is sent with the selected prompt" do
     captured = post_generate!(
-      "demo:osaka_weather:1",
+      "osaka_weather:1",
       extra: { use_custom_tool: "1", tool_key: "dummy_echo_tool" }
     )
 
@@ -78,7 +78,7 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
 
   test "the playground custom tool is added on top of the prompt's tools" do
     captured = post_generate!(
-      "demo:analyze_text:1",
+      "analyze_text:1",
       extra: {
         use_custom_tool: "1",
         tool_key: "dummy_summary_tool",
