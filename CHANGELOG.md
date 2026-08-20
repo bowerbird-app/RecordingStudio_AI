@@ -7,6 +7,11 @@ Versioning and Keep a Changelog.
 
 ### Added
 
+- `RecordingStudioAI.prompts.register(..., overridable: true|false)` declares
+  whether another registration may replace the same key and version with
+  `override: true`. Default is `true` (current behavior). Set `overridable: false`
+  to lock a gem prompt. `replace_owner` still only swaps that owner's own
+  registrations.
 - `RecordingStudioAI::Models::ParameterValidation.adapt_for_model` soft-applies
   caller generation overrides to a candidate: keeps supported values (clamped to
   that model's range), omits unsupported parameters and disallowed enum values,

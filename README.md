@@ -469,22 +469,91 @@ allowing AI Calls reporting to filter and group prompt usage. Custom tool
 invocations inherit prompt attribution through their run.
 
 Hosts can replace an existing registration with the same key and version using
-`override: true` on models, prompts, and tools:
+`override: true` on models, prompts, and tools. For prompts, the existing entry
+must allow it: set `overridable: true` when registering (the default), or lock
+the entry with `overridable: false` so hosts cannot replace it.
+
+Gem registers an open prompt:
+
+```ruby
+# In a gem initializer
+RecordingStudioAI.prompts.register(
+  owner: "support_gem",
+  key: :customer_reply,
+  version: 1,
+  name: "Customer Support Reply",
+  description: "Creates a concise response to a customer message.",
+  overridable: true, # default; omit if you want the same behavior
+  inputs: %i[customer_name message],
+  messages: [
+    { role: :system, content: "Write a concise, helpful customer response." },
+    { role: :user, content: "{{customer_name}}: {{message}}" }
+  ],
+  defaults: { profile: :medium, purpose: "customer_reply" }
+)
+```
+
+Host overrides that same key and version in an app initializer that loads after
+the gem:
+
+```ruby
+# config/initializers/recording_studio_ai_prompts.rb
+RecordingStudioAI.prompts.register(
+  owner: "host_app",
+  key: :customer_reply,
+  version: 1,
+  name: "Host Customer Reply",
+  description: "Our in-house tone for customer replies.",
+  override: true, # required to replace the gem entry
+  overridable: true, # whether a later register may replace this host entry
+  inputs: %i[customer_name message],
+  messages: [
+    { role: :system, content: "Be brief, warm, and specific. No filler." },
+    { role: :user, content: "{{customer_name}}: {{message}}" }
+  ],
+  defaults: { profile: :medium, purpose: "customer_reply" }
+)
+```
+
+Calls keep using the same key — no call-site change:
+
+```ruby
+RecordingStudioAI.prompt(:customer_reply).call(
+  inputs: { customer_name: customer.name, message: message.body },
+  root_recording: root_recording,
+  initiator: current_user
+)
+```
+
+Lock a prompt so hosts cannot replace it:
+
+```ruby
+RecordingStudioAI.prompts.register(
+  owner: "support_gem",
+  key: :billing_escalation,
+  version: 1,
+  name: "Billing Escalation",
+  description: "Fixed wording for billing escalations.",
+  overridable: false,
+  inputs: %i[account_id],
+  messages: [
+    { role: :system, content: "Escalate billing issues with the required disclaimer." },
+    { role: :user, content: "Account {{account_id}}" }
+  ]
+)
+# Later register(..., override: true) for the same key/version raises.
+```
+
+`replace_owner` still replaces only that owner's own registrations on reload and
+does not bypass another owner's `overridable: false` entry.
+
+Models and tools still use `override: true` without an `overridable:` policy:
 
 ```ruby
 RecordingStudioAI.models.register(
   provider: :openai,
   key: "gpt-5",
   model: "gpt-5",
-  override: true,
-  # ...
-)
-
-RecordingStudioAI.prompts.register(
-  key: :customer_reply,
-  version: 1,
-  name: "Customer Support Reply",
-  description: "...",
   override: true,
   # ...
 )
