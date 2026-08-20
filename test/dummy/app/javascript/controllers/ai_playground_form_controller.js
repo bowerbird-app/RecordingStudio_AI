@@ -92,12 +92,12 @@ export default class extends Controller {
     }
 
     const parameters = definition?.parameters || {}
-    const hasParameters = Object.values(parameters).some((spec) => spec?.supported)
+    const hasParameters = Object.keys(parameters).length > 0
     show("parametersPanel", hasParameters)
-    show("temperatureField", parameters.temperature?.supported === true)
-    show("verbosityField", parameters.verbosity?.supported === true)
-    show("maxOutputTokensField", parameters.max_output_tokens?.supported === true)
-    show("reasoningEffortField", parameters.reasoning_effort?.supported === true)
+    show("temperatureField", "temperature" in parameters)
+    show("verbosityField", "verbosity" in parameters)
+    show("maxOutputTokensField", "max_output_tokens" in parameters)
+    show("reasoningEffortField", "reasoning_effort" in parameters)
 
     show("streamingField", definition?.delivery?.streaming === true)
     show("webSearchField", Array.isArray(definition?.tools) && definition.tools.includes("web_search"))

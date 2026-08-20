@@ -16,6 +16,7 @@ module RecordingStudioAI
                                        execution_source: nil, request_id: nil, job_id: nil,
                                        metadata: {}, prompt_definition: nil,
                                        temperature: nil, verbosity: nil, max_output_tokens: nil, reasoning_effort: nil,
+                                       fallbacks: nil,
                                        **unknown)
         reject_unknown_keys!(unknown, path: "generation request")
         profile ||= RecordingStudioAI.configuration.default_profile
@@ -28,6 +29,8 @@ module RecordingStudioAI
         ensure_system_instruction!(system_instruction, messages)
         ensure_boolean!(stream, path: "stream")
         normalized_model = normalize_model_override!(model)
+        normalized_fallbacks = normalize_fallbacks!(fallbacks)
+        ensure_fallbacks_compatible!(fallbacks: normalized_fallbacks, provider: provider, model: normalized_model)
         normalized_schema = RecordingStudioAI::StructuredOutput.validate_schema!(schema)
         normalized_attachments = RecordingStudioAI::Attachments.validate!(attachments)
         normalized_provider_tools = ensure_provider_native_tools!(provider_native_tools)
@@ -60,6 +63,7 @@ module RecordingStudioAI
           profile: profile.to_sym,
           provider: provider&.to_sym,
           model: normalized_model,
+          fallbacks: normalized_fallbacks,
           stream: stream == true,
           purpose: purpose,
           schema: normalized_schema,
@@ -241,6 +245,57 @@ module RecordingStudioAI
         value
       end
 
+      def normalize_fallbacks!(fallbacks)
+        return nil if fallbacks.nil?
+
+        unless fallbacks.is_a?(Array) && !fallbacks.empty?
+          raise RecordingStudioAI::Errors::ContractValidationError.new(
+            "fallbacks must be a non-empty Array",
+            code: "invalid_request"
+          )
+        end
+
+        fallbacks.map.with_index do |entry, index|
+          unless entry.is_a?(Hash)
+            raise RecordingStudioAI::Errors::ContractValidationError.new(
+              "fallbacks[#{index}] must be a Hash",
+              code: "invalid_request"
+            )
+          end
+
+          normalized = entry.transform_keys(&:to_sym)
+          reject_unknown_keys!(normalized.except(:provider, :model), path: "fallbacks[#{index}]")
+
+          provider = normalized[:provider]
+          if provider.nil? || provider.to_s.strip.empty?
+            raise RecordingStudioAI::Errors::ContractValidationError.new(
+              "fallbacks[#{index}].provider is required",
+              code: "invalid_request"
+            )
+          end
+
+          model = normalized[:model]
+          if model.nil? || model.to_s.strip.empty?
+            raise RecordingStudioAI::Errors::ContractValidationError.new(
+              "fallbacks[#{index}].model is required",
+              code: "invalid_request"
+            )
+          end
+
+          { provider: provider.to_sym, model: model.to_s.strip }
+        end
+      end
+
+      def ensure_fallbacks_compatible!(fallbacks:, provider:, model:)
+        return if fallbacks.nil?
+        return if provider.nil? && model.nil?
+
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          "fallbacks cannot be combined with provider or model",
+          code: "invalid_request"
+        )
+      end
+
       def ensure_boolean!(value, path:)
         return if [true, false].include?(value)
 
@@ -252,8 +307,9 @@ module RecordingStudioAI
 
       # Normalize flat generation parameters. When provider + model are known and
       # registered, validate supported ranges/values immediately. Otherwise keep
-      # type-normalized values and let the orchestrator validate against the
-      # resolved candidate before calling the provider.
+      # type-normalized caller overrides; each profile hop adapts them to that
+      # candidate via ParameterValidation.adapt_for_model (keep when supported,
+      # omit when not).
       def normalize_generation_parameters!(temperature: nil, verbosity: nil, max_output_tokens: nil,
                                            reasoning_effort: nil, provider: nil, model: nil)
         parameters = {

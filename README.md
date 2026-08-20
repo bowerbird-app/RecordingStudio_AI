@@ -133,8 +133,11 @@ candidate that has a configured provider and supports every requested
 capability. Model names remain in configuration rather than application logic.
 Retries remain on the same candidate. Same-profile provider fallback follows
 candidate order, while profile-tier fallback only follows explicit
-`profile_fallbacks` mappings. Usage and compatible-currency cost aggregate
-across every reported attempt.
+`profile_fallbacks` mappings. For a one-off hop list that skips profiles, pass
+`fallbacks: [{ provider:, model: }, ...]` on `generate` (not with `provider:` or
+`model:`). Caller generation overrides carry through every hop when the next
+model supports them; unsupported ones are dropped rather than failing the hop.
+Usage and compatible-currency cost aggregate across every reported attempt.
 
 ## Operations
 
@@ -263,10 +266,27 @@ Calls validate request contracts and return normalized contract objects.
 `generate` and `generate!` resolve configured OpenAI or Gemini candidates and
 dispatch through the shared provider contract. Pass `stream: true` to receive
 incremental events (block or Enumerator). Optional `model:` pins a profile
-candidate; flat generation parameters (`temperature`, `verbosity`,
-`max_output_tokens`, `reasoning_effort`) are validated against the model
-registry. `RecordingStudioAI.stream` / `stream!` were removed — use
-`generate(stream: true)`.
+candidate. Optional `fallbacks:` supplies an explicit ordered hop list and
+skips configured profiles:
+
+```ruby
+RecordingStudioAI.generate(
+  prompt: "Summarize this page.",
+  temperature: 1,
+  fallbacks: [
+    { provider: :openai, model: "gpt-5-mini" },
+    { provider: :gemini, model: "gemini-2.5-flash" }
+  ],
+  root_recording: root_recording,
+  initiator: current_user
+)
+```
+
+Flat generation parameters (`temperature`, `verbosity`, `max_output_tokens`,
+`reasoning_effort`) are validated against the model registry. On profile or
+explicit fallback hops they stay when the next model supports them and are
+omitted when it does not. `RecordingStudioAI.stream` / `stream!` were removed —
+use `generate(stream: true)`.
 
 ## Adding a provider
 
@@ -449,14 +469,29 @@ allowing AI Calls reporting to filter and group prompt usage. Custom tool
 invocations inherit prompt attribution through their run.
 
 Hosts can replace an existing registration with the same key and version using
-`override: true`:
+`override: true` on models, prompts, and tools:
 
 ```ruby
+RecordingStudioAI.models.register(
+  provider: :openai,
+  key: "gpt-5",
+  model: "gpt-5",
+  override: true,
+  # ...
+)
+
 RecordingStudioAI.prompts.register(
   key: :customer_reply,
   version: 1,
   name: "Customer Support Reply",
   description: "...",
+  override: true,
+  # ...
+)
+
+RecordingStudioAI.tools.register(
+  key: :summarize_record,
+  version: 1,
   override: true,
   # ...
 )

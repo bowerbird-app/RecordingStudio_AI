@@ -7,11 +7,31 @@ Versioning and Keep a Changelog.
 
 ### Added
 
+- `RecordingStudioAI::Models::ParameterValidation.adapt_for_model` soft-applies
+  caller generation overrides to a candidate: keeps supported values (clamped to
+  that model's range), omits unsupported parameters and disallowed enum values,
+  and does not raise the way `normalize!` does for a pinned model. Profile hops
+  in `AttemptRunner` use this so a caller override (for example `temperature: 1`)
+  travels to the next candidate when that model supports it, instead of failing
+  the hop or resetting to the fallback model's default.
+- `RecordingStudioAI.generate(..., fallbacks: [...])` takes an explicit ordered
+  candidate list (`{ provider:, model: }`) and skips configured profiles and
+  `profile_fallbacks`. Do not combine `fallbacks:` with `provider:` or `model:`.
+  Caller generation overrides still adapt per hop. `profile:` remains for run
+  attribution only.
 - `RecordingStudioAI.prompts.register(..., override: true)` replaces an existing
   prompt registration with the same key and version, matching model registration.
+- `RecordingStudioAI.tools.register(..., override: true)` replaces an existing
+  tool registration with the same key and version, matching models and prompts.
+- Model parameter specs require `type:` (`:number`, `:integer`, or `:string`).
 
 ### Changed
 
+- Model parameter registration drops `supported:`. Listing a parameter means it
+  is supported; omit it when the model cannot take it. Upgrade note: remove
+  `supported: true/false` from `RecordingStudioAI.models.register` parameter
+  hashes, and add `type:` (for example `temperature: { type: :number, ... }`,
+  `verbosity: { type: :string, ... }`, `max_output_tokens: { type: :integer, ... }`).
 - Registered prompt and custom tool name cells open their definition modal from
   a Flatpack link instead of a ghost button.
 
@@ -26,8 +46,15 @@ Versioning and Keep a Changelog.
   `recording_studio_ai_runs`.
 
 - `RecordingStudioAI.generate` accepts `stream: true`, optional `model:` override,
-  and flat generation parameters (`temperature`, `verbosity`, `max_output_tokens`,
-  `reasoning_effort`) validated against the model registry.
+  optional `fallbacks: [{ provider:, model: }, ...]`, and flat generation
+  parameters (`temperature`, `verbosity`, `max_output_tokens`, `reasoning_effort`)
+  validated against the model registry. Upgrade note: on profile hops or explicit
+  `fallbacks:`, caller overrides travel to the next candidate when that model
+  supports them (clamped to its range) and are omitted when it does not. A hop
+  no longer fails the run for an unsupported parameter such as `verbosity`.
+  Parameters you did not set stay unset so each model can use its own default.
+  Do not combine `fallbacks:` with `provider:` or `model:`; `profile:` still
+  records run attribution when using explicit fallbacks.
 - AI Playground uses a single capability-driven generate form (plus a separate
   batch section) instead of Chat / Streaming / Tool Calls / Batch tabs.
 

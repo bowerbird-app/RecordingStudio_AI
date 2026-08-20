@@ -14,7 +14,7 @@ class ModelsRegistryTest < Minitest::Test
       model: "gpt-5",
       display_name: "GPT-5",
       delivery: { streaming: true, structured_output: true, batch: true, batch_cancellation: true },
-      parameters: { temperature: { supported: true, min: 0.0, max: 2.0, default: 1.0, step: 0.1 } },
+      parameters: { temperature: { type: :number, min: 0.0, max: 2.0, default: 1.0, step: 0.1 } },
       tools: %i[web_search custom_tools],
       modalities: { input: %i[text image file], output: %i[text] }
     )
@@ -91,7 +91,7 @@ class ModelsRegistryTest < Minitest::Test
   def test_unknown_parameter_raises
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
       @registry.register(provider: :openai, key: "gpt-5", model: "gpt-5",
-                         parameters: { top_p: { supported: true } })
+                         parameters: { top_p: { type: :number } })
     end
     assert_match(/unknown model parameter/, error.message)
   end
@@ -161,8 +161,7 @@ class ModelsRegistryTest < Minitest::Test
       key: "gpt-5",
       model: "gpt-5",
       parameters: {
-        temperature: { supported: true, min: 0.0, max: 2.0, default: 1.0 },
-        verbosity: { supported: false, values: %w[low medium high] }
+        temperature: { type: :number, min: 0.0, max: 2.0, default: 1.0 }
       },
       tools: %i[web_search]
     )
@@ -172,6 +171,29 @@ class ModelsRegistryTest < Minitest::Test
     refute definition.supports_parameter?(:reasoning_effort)
     assert definition.supports_tool?(:web_search)
     refute definition.supports_tool?(:code_execution)
+    assert_equal :number, definition.parameter(:temperature)[:type]
     assert_equal 2.0, definition.parameter(:temperature)[:max]
+  end
+
+  def test_parameter_requires_type_and_rejects_supported_flag
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      @registry.register(
+        provider: :openai,
+        key: "gpt-5",
+        model: "gpt-5",
+        parameters: { temperature: { min: 0.0, max: 2.0 } }
+      )
+    end
+    assert_match(/requires type:/, error.message)
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      @registry.register(
+        provider: :openai,
+        key: "gpt-5",
+        model: "gpt-5",
+        parameters: { temperature: { supported: true, type: :number } }
+      )
+    end
+    assert_match(/no longer accepts supported:/, error.message)
   end
 end

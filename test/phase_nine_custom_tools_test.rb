@@ -624,15 +624,24 @@ class PhaseNineCustomToolsTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal 1, RecordingStudioAI.tools.all.length
   end
 
+  def test_tool_override_replaces_existing_registration
+    register_tool
+    register_tool(name: "Updated summarize", override: true)
+
+    definition = RecordingStudioAI.tools.fetch(:summarize_record, version: 1)
+    assert_equal "Updated summarize", definition.name
+    assert_equal 1, RecordingStudioAI.tools.all.length
+  end
+
   private
 
   def register_tool(executor: ->(arguments, _context) { { topic: arguments.fetch("topic") } },
                     requires_confirmation: false, idempotent: true, parameters: nil,
-                    read_only: true, destructive: false)
+                    read_only: true, destructive: false, name: "Summarize record", override: false)
     RecordingStudioAI.tools.register(
       key: :summarize_record,
       version: 1,
-      name: "Summarize record",
+      name: name,
       description: "Summarizes a record.",
       use_when: "A concise summary is needed.",
       do_not_use_when: "The source is unavailable.",
@@ -655,7 +664,8 @@ class PhaseNineCustomToolsTest < RecordingStudioAI::Test::PersistenceCase
       requires_confirmation: requires_confirmation,
       idempotent: idempotent,
       executor_label: "Summarizers.record",
-      executor: executor
+      executor: executor,
+      override: override
     )
   end
 
