@@ -248,42 +248,7 @@ module RecordingStudioAI
       def normalize_fallbacks!(fallbacks)
         return nil if fallbacks.nil?
 
-        unless fallbacks.is_a?(Array) && !fallbacks.empty?
-          raise RecordingStudioAI::Errors::ContractValidationError.new(
-            "fallbacks must be a non-empty Array",
-            code: "invalid_request"
-          )
-        end
-
-        fallbacks.map.with_index do |entry, index|
-          unless entry.is_a?(Hash)
-            raise RecordingStudioAI::Errors::ContractValidationError.new(
-              "fallbacks[#{index}] must be a Hash",
-              code: "invalid_request"
-            )
-          end
-
-          normalized = entry.transform_keys(&:to_sym)
-          reject_unknown_keys!(normalized.except(:provider, :model), path: "fallbacks[#{index}]")
-
-          provider = normalized[:provider]
-          if provider.nil? || provider.to_s.strip.empty?
-            raise RecordingStudioAI::Errors::ContractValidationError.new(
-              "fallbacks[#{index}].provider is required",
-              code: "invalid_request"
-            )
-          end
-
-          model = normalized[:model]
-          if model.nil? || model.to_s.strip.empty?
-            raise RecordingStudioAI::Errors::ContractValidationError.new(
-              "fallbacks[#{index}].model is required",
-              code: "invalid_request"
-            )
-          end
-
-          { provider: provider.to_sym, model: model.to_s.strip }
-        end
+        RecordingStudioAI::FallbackEntries.normalize_list!(fallbacks, path: "fallbacks")
       end
 
       def ensure_fallbacks_compatible!(fallbacks:, provider:, model:)

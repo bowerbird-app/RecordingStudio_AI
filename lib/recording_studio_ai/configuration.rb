@@ -46,6 +46,7 @@ module RecordingStudioAI
       :webhook_batch_initiator,
       :profiles,
       :profile_fallbacks,
+      :model_fallbacks,
       :request_timeout,
       :retry_backoff_base,
       :retry_backoff_max,
@@ -143,6 +144,7 @@ module RecordingStudioAI
         ]
       }
       @profile_fallbacks = {}
+      @model_fallbacks = {}
       @request_timeout = 120
       @retry_backoff_base = 0.25
       @retry_backoff_max = 5.0
@@ -186,7 +188,12 @@ module RecordingStudioAI
       if !webhook_batch_initiator.nil? && !webhook_batch_initiator.respond_to?(:call)
         invalid_configuration!("webhook_batch_initiator must be nil or respond to call")
       end
+      normalize_model_fallbacks!
       self
+    end
+
+    def model_fallbacks_for(provider, model)
+      Array(@model_fallbacks[[provider.to_sym, model.to_s]])
     end
 
     def batch_synchronization_job_class
@@ -196,6 +203,42 @@ module RecordingStudioAI
     end
 
     private
+
+    def normalize_model_fallbacks!
+      raw = @model_fallbacks || {}
+      invalid_configuration!("model_fallbacks must be a Hash") unless raw.is_a?(Hash)
+
+      normalized = {}
+      raw.each do |key, entries|
+        provider, model = normalize_model_fallback_key!(key)
+        list = begin
+          RecordingStudioAI::FallbackEntries.normalize_list!(entries, path: "model_fallbacks[#{provider}/#{model}]")
+        rescue RecordingStudioAI::Errors::ContractValidationError => e
+          invalid_configuration!(e.message)
+        end
+        normalized[[provider, model]] = list
+      end
+      @model_fallbacks = normalized
+    end
+
+    def normalize_model_fallback_key!(key)
+      case key
+      when Array
+        invalid_configuration!("model_fallbacks keys must be [provider, model]") unless key.length == 2
+        provider, model = key
+      when String
+        provider, model = key.split("/", 2)
+        invalid_configuration!("model_fallbacks string keys must look like provider/model") if model.nil? || model.empty?
+      else
+        invalid_configuration!("model_fallbacks keys must be [provider, model] or \"provider/model\"")
+      end
+
+      provider = provider.to_sym
+      model = model.to_s.strip
+      invalid_configuration!("model_fallbacks provider is required") if provider.to_s.empty?
+      invalid_configuration!("model_fallbacks model is required") if model.empty?
+      [provider, model]
+    end
 
     def install_shipped_providers
       [

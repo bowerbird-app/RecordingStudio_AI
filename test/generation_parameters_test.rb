@@ -301,6 +301,133 @@ class GenerationParameterProfileFallbackTest < RecordingStudioAI::Test::Persiste
     assert_equal %w[primary fallback], response.attempts.map(&:kind)
   end
 
+  def test_generate_fallbacks_ignore_model_fallbacks_map
+    first = QueueProvider.new(failed_result)
+    second = QueueProvider.new(success_result)
+    ignored = QueueProvider.new(success_result("must not run"))
+    configuration = RecordingStudioAI.configuration
+    configuration.providers = { openai: first, gemini: second, other: ignored }
+    configuration.allowed_provider_overrides = %i[openai gemini other]
+    configuration.profiles[:low] = [
+      { provider: :openai, model: "gpt-5-mini" }
+    ]
+    configuration.model_fallbacks = {
+      [:openai, "gpt-5-mini"] => [{ provider: :other, model: "gpt-5" }]
+    }
+    configuration.validate!
+
+    response = RecordingStudioAI.generate(
+      prompt: "hello",
+      profile: :low,
+      root_recording: @root_recording,
+      initiator: @initiator,
+      fallbacks: [
+        { provider: :openai, model: "gpt-5-mini" },
+        { provider: :gemini, model: "gemini-2.5-flash" }
+      ]
+    )
+
+    assert response.success?
+    assert_equal "gemini-2.5-flash", second.calls.first[:candidate].model
+    assert_empty ignored.calls
+  end
+
+  def test_pinned_primary_uses_model_fallbacks_with_entry_temperature_overlay
+    first = QueueProvider.new(failed_result)
+    second = QueueProvider.new(success_result)
+    configuration = RecordingStudioAI.configuration
+    configuration.providers = { openai: first, gemini: second }
+    configuration.allowed_provider_overrides = %i[openai gemini]
+    configuration.profiles[:low] = [
+      { provider: :openai, model: "gpt-5-mini" },
+      { provider: :gemini, model: "gemini-2.5-flash" }
+    ]
+    configuration.model_fallbacks = {
+      [:openai, "gpt-5-mini"] => [
+        { provider: :gemini, model: "gemini-2.5-flash", temperature: 0.4 }
+      ]
+    }
+    configuration.validate!
+
+    response = RecordingStudioAI.generate(
+      prompt: "hello",
+      profile: :low,
+      provider: :openai,
+      model: "gpt-5-mini",
+      root_recording: @root_recording,
+      initiator: @initiator
+    )
+
+    assert response.success?
+    assert_equal 1, first.calls.length
+    assert_equal 1, second.calls.length
+    assert_nil first.calls.first[:request][:temperature]
+    assert_in_delta 0.4, second.calls.first[:request][:temperature]
+    assert_equal %w[primary fallback], response.attempts.map(&:kind)
+  end
+
+  def test_caller_temperature_wins_over_model_fallback_entry_overlay
+    first = QueueProvider.new(failed_result)
+    second = QueueProvider.new(success_result)
+    configuration = RecordingStudioAI.configuration
+    configuration.providers = { openai: first, gemini: second }
+    configuration.allowed_provider_overrides = %i[openai gemini]
+    configuration.profiles[:low] = [
+      { provider: :openai, model: "gpt-5-mini" }
+    ]
+    configuration.model_fallbacks = {
+      [:openai, "gpt-5-mini"] => [
+        { provider: :gemini, model: "gemini-2.5-flash", temperature: 0.4 }
+      ]
+    }
+    configuration.validate!
+
+    response = RecordingStudioAI.generate(
+      prompt: "hello",
+      profile: :low,
+      provider: :openai,
+      model: "gpt-5-mini",
+      temperature: 1.5,
+      root_recording: @root_recording,
+      initiator: @initiator
+    )
+
+    assert response.success?
+    assert_in_delta 1.5, first.calls.first[:request][:temperature]
+    assert_in_delta 1.5, second.calls.first[:request][:temperature]
+  end
+
+  def test_profile_walk_ignores_model_fallbacks
+    first = QueueProvider.new(failed_result)
+    second = QueueProvider.new(success_result)
+    ignored = QueueProvider.new(success_result("must not run"))
+    configuration = RecordingStudioAI.configuration
+    configuration.providers = { openai: first, gemini: second, other: ignored }
+    configuration.profiles[:low] = [
+      { provider: :openai, model: "gpt-5-mini" },
+      { provider: :gemini, model: "gemini-2.5-flash" }
+    ]
+    configuration.model_fallbacks = {
+      [:openai, "gpt-5-mini"] => [{ provider: :other, model: "gpt-5" }]
+    }
+    configuration.validate!
+
+    response = RecordingStudioAI.generate(
+      prompt: "hello",
+      profile: :low,
+      temperature: 2.0,
+      verbosity: "low",
+      root_recording: @root_recording,
+      initiator: @initiator
+    )
+
+    assert response.success?
+    assert_equal "gemini-2.5-flash", second.calls.first[:candidate].model
+    assert_in_delta 2.0, second.calls.first[:request][:temperature]
+    assert_nil second.calls.first[:request][:verbosity]
+    assert_empty ignored.calls
+  end
+
   private
 
   def configure_low_profile(first:, second:)
@@ -312,8 +439,8 @@ class GenerationParameterProfileFallbackTest < RecordingStudioAI::Test::Persiste
     ]
   end
 
-  def success_result
-    RecordingStudioAI::Providers::Result.new(text: "ok", finish_reason: "stop")
+  def success_result(text = "ok")
+    RecordingStudioAI::Providers::Result.new(text: text, finish_reason: "stop")
   end
 
   def failed_result

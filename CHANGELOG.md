@@ -26,10 +26,15 @@ Versioning and Keep a Changelog.
   travels to the next candidate when that model supports it, instead of failing
   the hop or resetting to the fallback model's default.
 - `RecordingStudioAI.generate(..., fallbacks: [...])` takes an explicit ordered
-  candidate list (`{ provider:, model: }`) and skips configured profiles and
-  `profile_fallbacks`. Do not combine `fallbacks:` with `provider:` or `model:`.
-  Caller generation overrides still adapt per hop. `profile:` remains for run
-  attribution only.
+  candidate list (`{ provider:, model: }` plus optional generation params) and
+  skips configured profiles, `profile_fallbacks`, and `model_fallbacks`. Do not
+  combine `fallbacks:` with `provider:` or `model:`. Caller generation overrides
+  still adapt per hop. `profile:` remains for run attribution only.
+- `config.model_fallbacks` maps a pinned primary `[provider, model]` (or
+  `"provider/model"`) to an ordered hop list. Used only when `provider:` and
+  `model:` are both set and `fallbacks:` is not. Profile walks ignore it. Entries
+  may include hop-only param overlays (for example `temperature:`); caller
+  overrides still win, then entry overlays fill gaps, then the model default.
 - `RecordingStudioAI.prompts.register(..., override: true)` replaces an existing
   prompt registration with the same key and version, matching model registration.
 - `RecordingStudioAI.tools.register(..., override: true)` replaces an existing
@@ -45,6 +50,12 @@ Versioning and Keep a Changelog.
   `verbosity: { type: :string, ... }`, `max_output_tokens: { type: :integer, ... }`).
 - Registered prompt and custom tool name cells open their definition modal from
   a Flatpack link instead of a ghost button.
+- Registered Prompts definition modal shows System Prompt and User Prompt code
+  blocks without a wrapping card. The modal drops the outer "Prompt" label,
+  renames Key to Prompt Key, and shows Registered by from the prompt `owner`
+  (gem or host label such as `RecordingStudioAI`, `Host`, or
+  `RecordingStudioAdmin`). Upgrade note: set `owner:` to a PascalCase gem or
+  host label when registering prompts; snake_case owners are no longer valid.
 
 - Prompt registration drops `namespace` and `short_name`. Prompts are keyed by
   `key` and `version` only; `name` remains the display label. Upgrade note:
