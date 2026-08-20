@@ -198,27 +198,48 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes response.body, ">Completed<"
   end
 
-  test "ai calls chart bars every model in range" do
+  test "ai calls chart plots a line of volume over time" do
     authenticate_for_admin!
-    create_run!(status: "completed", operation: "generation", resolved_model: "calls-bar-one")
-    create_run!(status: "completed", operation: "generation", resolved_model: "calls-bar-two")
-    create_run!(status: "completed", operation: "generation", resolved_model: "calls-bar-one")
+    first = create_run!(status: "completed", operation: "generation", resolved_model: "calls-line-one")
+    second = create_run!(status: "completed", operation: "generation", resolved_model: "calls-line-two")
+    first.update!(created_at: 2.days.ago)
+    second.update!(created_at: 1.day.ago)
 
     get "/admin/screens/ai_calls/chart"
 
     assert_response :success
-    assert_includes response.body, "Calls by model"
-    assert_includes response.body, "calls-bar-one"
-    assert_includes response.body, "calls-bar-two"
-    assert_includes response.body, "horizontal"
+    assert_includes response.body, "AI calls trend"
+    assert_includes response.body, "data-flat-pack--chart-type-value=\"line\""
+    assert_includes response.body, "&quot;curve&quot;:&quot;smooth&quot;"
+    refute_includes response.body, "Calls by model"
+    refute_includes response.body, "horizontal"
     filters = AdminScreens::RecordingStudioAICallsScreen.filters
-    refute_includes filters.map(&:key), :group_by
+    assert_includes filters.map(&:key), :group_by
+    assert_equal %i[date_range group_by status], filters.first(3).map(&:key)
 
     get "/admin/screens/ai_calls"
 
     assert_response :success
     assert_includes response.body, "src=\"/admin/screens/ai_calls/chart\""
     assert_includes response.body, "AI Calls"
+    assert_includes response.body, "name=\"group_by\""
+  end
+
+  test "ai calls chart accepts a grouping filter" do
+    authenticate_for_admin!
+    create_run!(status: "completed", operation: "generation")
+
+    get "/admin/screens/ai_calls/chart", params: { group_by: "month" }
+
+    assert_response :success
+    assert_includes response.body, "AI calls trend"
+    assert_includes response.body, "data-flat-pack--chart-type-value=\"line\""
+
+    get "/admin/screens/ai_calls", params: { group_by: "week" }
+
+    assert_response :success
+    assert_includes response.body, "group_by=week"
+    assert_select "input[name='group_by']", count: 1
   end
 
   test "ai calls defaults its date range to the last four weeks" do
@@ -229,7 +250,10 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "value=\"last_4_weeks\""
     assert_includes response.body, "Tool key"
+    assert_includes response.body, "name=\"group_by\""
     refute_includes response.body, ">Short name<"
+    filters = AdminScreens::RecordingStudioAICallsScreen.filters
+    assert_equal %i[date_range group_by status], filters.first(3).map(&:key)
   end
 
   test "ai calls chart marks increased failed and cancelled runs as unfavorable" do
