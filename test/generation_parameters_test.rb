@@ -187,6 +187,7 @@ class GenerationParameterProfileFallbackTest < RecordingStudioAI::Test::Persiste
     attr_reader :calls
 
     def initialize(*results)
+      super()
       @results = results
       @calls = []
     end
