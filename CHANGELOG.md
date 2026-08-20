@@ -35,7 +35,11 @@ Versioning and Keep a Changelog.
 - Registered prompt and custom tool name cells open their definition modal from
   a Flatpack link instead of a ghost button.
 - Registered Prompts definition modal shows System Prompt and User Prompt code
-  blocks without a wrapping card.
+  blocks without a wrapping card. The modal drops the outer "Prompt" label,
+  renames Key to Prompt Key, and shows Registered by from the prompt `owner`
+  (gem or host label such as `RecordingStudioAI`, `Host`, or
+  `RecordingStudioAdmin`). Upgrade note: set `owner:` to a PascalCase gem or
+  host label when registering prompts; snake_case owners are no longer valid.
 
 - Prompt registration drops `namespace` and `short_name`. Prompts are keyed by
   `key` and `version` only; `name` remains the display label. Upgrade note:

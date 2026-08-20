@@ -498,6 +498,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes AdminScreens::RecordingStudioAIRegisteredPromptsScreen.table.default_column_keys, :key
     assert_includes response.body, "Choose table columns"
     assert_select "th", text: /\AKey/, count: 0
+    assert_select "th", text: /Registered by/
     assert_includes response.body, "Text Summary"
     assert_includes response.body, "Avg input"
     assert_includes response.body, "Avg output"
@@ -506,6 +507,10 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_select "a.flat-pack-link[data-modal-id='registered-prompt-definition-summarize_text-1']",
                   text: /Text Summary/
     assert_select "button[data-modal-id='registered-prompt-definition-summarize_text-1']", count: 0
+    assert_includes response.body, "Prompt Key"
+    assert_includes response.body, "Registered by"
+    assert_includes response.body, "Host"
+    refute_includes response.body, ">Prompt</dt>"
     assert_includes response.body, "System Prompt"
     assert_includes response.body, "User Prompt"
     assert_includes response.body, "Creates a concise summary of supplied text"
@@ -516,7 +521,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/registered_prompts/table", params: { columns: %w[name key] }
 
     assert_response :success
-    assert_select "th", text: /\AKey/
+    assert_select "th", text: /\APrompt Key/
   end
 
   test "registered prompts screen includes unused registered prompts" do
@@ -524,7 +529,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     unused_prompt_key = "unused_prompt_#{SecureRandom.hex(4)}"
     unused_prompt_name = "Unused Prompt #{unused_prompt_key}"
     RecordingStudioAI.prompts.register(
-      owner: "dummy_app",
+      owner: "Host",
       key: unused_prompt_key.to_sym,
       version: 1,
       name: unused_prompt_name,

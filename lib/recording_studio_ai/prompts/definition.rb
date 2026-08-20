@@ -10,7 +10,7 @@ module RecordingStudioAI
                   :messages, :inputs, :tools, :defaults
 
       def initialize(owner: nil, key:, version:, name:, description:, messages:, inputs:, tools: [], defaults: {})
-        @owner = owner.nil? ? nil : normalize_identifier(owner, "prompt owner")
+        @owner = owner.nil? ? nil : normalize_owner(owner)
         @key = normalize_identifier(key, "prompt key")
         @version = version
         @name = name.to_s.strip
@@ -37,6 +37,18 @@ module RecordingStudioAI
       end
 
       private
+
+      # Who registered the prompt (a gem or the host app), not an actor.
+      # Prefer labels like RecordingStudioAI, Host, or RecordingStudioAdmin.
+      def normalize_owner(value)
+        owner = value.to_s.strip
+        validation_error!("prompt owner must be a non-empty label") if owner.empty?
+        unless owner.match?(/\A[A-Za-z][A-Za-z0-9]*\z/)
+          validation_error!("prompt owner must be a gem or host label (e.g. RecordingStudioAI, Host)")
+        end
+
+        owner
+      end
 
       def normalize_identifier(value, label)
         identifier = value.to_s

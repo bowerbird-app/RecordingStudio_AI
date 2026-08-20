@@ -50,7 +50,7 @@ class RegisteredPromptsTest < Minitest::Test
   end
 
   def test_request_validation_rejects_unregistered_prompt_definitions
-    definition = RecordingStudioAI::Prompts::Definition.new(**prompt_attributes(owner: :host_app))
+    definition = RecordingStudioAI::Prompts::Definition.new(**prompt_attributes(owner: "Host"))
 
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
       RecordingStudioAI::Contracts::RequestValidation.send(:ensure_prompt_definition!, definition)
@@ -62,12 +62,12 @@ class RegisteredPromptsTest < Minitest::Test
 
   def test_method_style_invocation_and_owner_replacement
     register_tool
-    register_prompt(owner: :host_app)
+    register_prompt(owner: "Host")
 
     assert RecordingStudioAI.prompt_methods.respond_to?(:customer_reply)
 
-    RecordingStudioAI.prompts.replace_owner(:host_app) do |registry|
-      registry.register(**prompt_attributes(owner: :host_app, name: "Updated Reply"))
+    RecordingStudioAI.prompts.replace_owner("Host") do |registry|
+      registry.register(**prompt_attributes(owner: "Host", name: "Updated Reply"))
     end
 
     assert_equal "Updated Reply", RecordingStudioAI.prompts.fetch(:customer_reply).name
