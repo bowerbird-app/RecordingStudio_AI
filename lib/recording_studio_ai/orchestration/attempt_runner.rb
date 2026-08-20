@@ -73,7 +73,7 @@ module RecordingStudioAI
         definition = RecordingStudioAI.models.fetch(candidate.provider, candidate.model)
         return request unless definition
 
-        request.merge(RecordingStudioAI::Models::ParameterValidation.normalize!(definition, provided))
+        request.merge(RecordingStudioAI::Models::ParameterValidation.adapt_for_model(definition, provided))
       end
 
       def provider_timeout(request)

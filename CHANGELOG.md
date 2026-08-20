@@ -10,7 +10,10 @@ Versioning and Keep a Changelog.
 - `RecordingStudioAI::Models::ParameterValidation.adapt_for_model` soft-applies
   caller generation overrides to a candidate: keeps supported values (clamped to
   that model's range), omits unsupported parameters and disallowed enum values,
-  and does not raise the way `normalize!` does for a pinned model.
+  and does not raise the way `normalize!` does for a pinned model. Profile hops
+  in `AttemptRunner` use this so a caller override (for example `temperature: 1`)
+  travels to the next candidate when that model supports it, instead of failing
+  the hop or resetting to the fallback model's default.
 - `RecordingStudioAI.prompts.register(..., override: true)` replaces an existing
   prompt registration with the same key and version, matching model registration.
 - `RecordingStudioAI.tools.register(..., override: true)` replaces an existing

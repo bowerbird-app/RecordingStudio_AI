@@ -252,8 +252,9 @@ module RecordingStudioAI
 
       # Normalize flat generation parameters. When provider + model are known and
       # registered, validate supported ranges/values immediately. Otherwise keep
-      # type-normalized values and let the orchestrator validate against the
-      # resolved candidate before calling the provider.
+      # type-normalized caller overrides; each profile hop adapts them to that
+      # candidate via ParameterValidation.adapt_for_model (keep when supported,
+      # omit when not).
       def normalize_generation_parameters!(temperature: nil, verbosity: nil, max_output_tokens: nil,
                                            reasoning_effort: nil, provider: nil, model: nil)
         parameters = {
