@@ -107,10 +107,16 @@
           **attribution
         )
 
-        # A registered prompt can already allowlist tools. Those come from the
-        # prompt registration — do not pass custom_tools: on prompt(...).call.
-        response = RecordingStudioAI.prompt(:project_status_reply).call(
-          inputs: { project_id: project.id.to_s },
+        # On a registered prompt, custom_tools: merges with the prompt's tools
+        # (additive by key; same key from the caller replaces the prompt entry).
+        # Tools are only offered — the model decides whether to call them.
+        response = RecordingStudioAI.prompt(:customer_reply).call(
+          inputs: { customer_name: customer.name, message: message.body },
+          custom_tools: [{ key: "lookup_project", version: 1 }],
+          fallbacks: [
+            { provider: :openai, model: "gpt-5-mini" },
+            { provider: :gemini, model: "gemini-2.5-flash" }
+          ],
           **attribution
         )
       RUBY
