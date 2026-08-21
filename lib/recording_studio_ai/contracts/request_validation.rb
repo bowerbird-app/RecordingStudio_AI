@@ -4,7 +4,6 @@ module RecordingStudioAI
   module Contracts
     module RequestValidation
       PROFILES = %i[low medium high].freeze
-      MESSAGE_ROLES = %w[system user assistant].freeze
       MAXIMUM_PURPOSE_LENGTH = 64
 
       module_function
@@ -23,10 +22,12 @@ module RecordingStudioAI
         ensure_profile!(profile)
         ensure_machine_purpose!(purpose) if purpose
         ensure_attribution!(root_recording: root_recording, initiator: initiator)
-        ensure_single_input_channel!(prompt: prompt, messages: messages)
-        ensure_messages!(messages) if messages
-        ensure_attachment_target!(attachments, messages)
-        ensure_system_instruction!(system_instruction, messages)
+        ensure_generation_input!(
+          prompt: prompt,
+          messages: messages,
+          system_instruction: system_instruction,
+          attachments: attachments
+        )
         ensure_boolean!(stream, path: "stream")
         normalized_model = normalize_model_override!(model)
         normalized_fallbacks = normalize_fallbacks!(fallbacks)
@@ -42,18 +43,6 @@ module RecordingStudioAI
           reasoning_effort: reasoning_effort,
           provider: provider,
           model: normalized_model
-        )
-
-        attribution = RecordingStudioAI::Contracts::Attribution.new(
-          root_recording: root_recording,
-          context_recording: context_recording,
-          initiator: initiator,
-          initiator_kind: initiator_kind,
-          executor: executor,
-          impersonator: impersonator,
-          execution_source: execution_source,
-          request_id: request_id,
-          job_id: job_id
         )
 
         {
@@ -72,7 +61,17 @@ module RecordingStudioAI
           custom_tools: normalized_custom_tools,
           custom_tool_definitions: resolve_custom_tools!(normalized_custom_tools),
           prompt_definition: ensure_prompt_definition!(prompt_definition),
-          attribution: attribution,
+          attribution: attribution_from!(
+            root_recording: root_recording,
+            context_recording: context_recording,
+            initiator: initiator,
+            initiator_kind: initiator_kind,
+            executor: executor,
+            impersonator: impersonator,
+            execution_source: execution_source,
+            request_id: request_id,
+            job_id: job_id
+          ),
           metadata: RecordingStudioAI::Metadata.sanitize!(metadata, path: "metadata"),
           temperature: generation_parameters[:temperature],
           verbosity: generation_parameters[:verbosity],
@@ -108,24 +107,22 @@ module RecordingStudioAI
           )
         end
 
-        attribution = RecordingStudioAI::Contracts::Attribution.new(
-          root_recording: root_recording,
-          context_recording: context_recording,
-          initiator: initiator,
-          initiator_kind: initiator_kind,
-          executor: executor,
-          impersonator: impersonator,
-          execution_source: execution_source,
-          request_id: request_id,
-          job_id: job_id
-        )
-
         {
           items: normalized_items,
           profile: profile.to_sym,
           provider: provider&.to_sym,
           model: normalize_model_override!(model),
-          attribution: attribution,
+          attribution: attribution_from!(
+            root_recording: root_recording,
+            context_recording: context_recording,
+            initiator: initiator,
+            initiator_kind: initiator_kind,
+            executor: executor,
+            impersonator: impersonator,
+            execution_source: execution_source,
+            request_id: request_id,
+            job_id: job_id
+          ),
           metadata: RecordingStudioAI::Metadata.sanitize!(metadata, path: "metadata")
         }
       end
@@ -161,10 +158,12 @@ module RecordingStudioAI
         end
 
         ensure_machine_purpose!(item[:purpose]) if item[:purpose]
-        ensure_single_input_channel!(prompt: item[:prompt], messages: item[:messages])
-        ensure_messages!(item[:messages]) if item[:messages]
-        ensure_attachment_target!(item.fetch(:attachments, []), item[:messages])
-        ensure_system_instruction!(item[:system_instruction], item[:messages])
+        ensure_generation_input!(
+          prompt: item[:prompt],
+          messages: item[:messages],
+          system_instruction: item[:system_instruction],
+          attachments: item.fetch(:attachments, [])
+        )
         generation_parameters = normalize_generation_parameters!(
           temperature: item[:temperature],
           verbosity: item[:verbosity],
@@ -204,21 +203,19 @@ module RecordingStudioAI
 
         ensure_attribution!(root_recording: root_recording, initiator: initiator)
 
-        attribution = RecordingStudioAI::Contracts::Attribution.new(
-          root_recording: root_recording,
-          context_recording: context_recording,
-          initiator: initiator,
-          initiator_kind: initiator_kind,
-          executor: executor,
-          impersonator: impersonator,
-          execution_source: execution_source,
-          request_id: request_id,
-          job_id: job_id
-        )
-
         {
           batch_id: batch_id.to_s,
-          attribution: attribution
+          attribution: attribution_from!(
+            root_recording: root_recording,
+            context_recording: context_recording,
+            initiator: initiator,
+            initiator_kind: initiator_kind,
+            executor: executor,
+            impersonator: impersonator,
+            execution_source: execution_source,
+            request_id: request_id,
+            job_id: job_id
+          )
         }
       end
 
@@ -344,6 +341,29 @@ module RecordingStudioAI
         )
       end
 
+      def attribution_from!(root_recording:, initiator:, context_recording: nil, executor: nil,
+                            impersonator: nil, initiator_kind: nil, execution_source: nil,
+                            request_id: nil, job_id: nil)
+        RecordingStudioAI::Contracts::Attribution.new(
+          root_recording: root_recording,
+          context_recording: context_recording,
+          initiator: initiator,
+          initiator_kind: initiator_kind,
+          executor: executor,
+          impersonator: impersonator,
+          execution_source: execution_source,
+          request_id: request_id,
+          job_id: job_id
+        )
+      end
+
+      def ensure_generation_input!(prompt:, messages:, system_instruction:, attachments:)
+        ensure_single_input_channel!(prompt: prompt, messages: messages)
+        ensure_messages!(messages) if messages
+        ensure_attachment_target!(attachments, messages)
+        ensure_system_instruction!(system_instruction, messages)
+      end
+
       def ensure_single_input_channel!(prompt:, messages:)
         prompt_present = prompt.is_a?(String) && !prompt.strip.empty?
         messages_present = messages.is_a?(Array) && !messages.empty?
@@ -364,6 +384,7 @@ module RecordingStudioAI
           )
         end
 
+        roles = RecordingStudioAI::Prompts::Definition::ROLES
         messages.each_with_index do |message, index|
           unless message.is_a?(Hash)
             raise RecordingStudioAI::Errors::ContractValidationError.new(
@@ -375,9 +396,9 @@ module RecordingStudioAI
           role = message[:role] || message["role"]
           content = message[:content] || message["content"]
 
-          unless MESSAGE_ROLES.include?(role.to_s)
+          unless roles.include?(role.to_s)
             raise RecordingStudioAI::Errors::ContractValidationError.new(
-              "messages[#{index}].role must be one of: #{MESSAGE_ROLES.join(', ')}",
+              "messages[#{index}].role must be one of: #{roles.join(', ')}",
               code: "invalid_request"
             )
           end
@@ -435,8 +456,7 @@ module RecordingStudioAI
 
           key = normalized[:key].to_s
           version = normalized[:version]
-          valid_key = key.length <= RecordingStudioAI::Providers::ToolCall::MAX_KEY_LENGTH && key.match?(/\A[a-z0-9_]+\z/)
-          unless valid_key && version.is_a?(Integer) && version.positive?
+          unless RecordingStudioAI::Providers::ToolCall.valid_key?(key) && version.is_a?(Integer) && version.positive?
             custom_tool_error!("custom_tools[#{index}] requires a snake_case key and positive integer version")
           end
 

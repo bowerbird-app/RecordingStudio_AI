@@ -218,6 +218,8 @@ module RecordingStudioAI
 
     def load_builtin_models!
       Dir.glob(File.expand_path("recording_studio_ai/models/*/*.rb", __dir__)).each do |file|
+        next if File.basename(file) == "constants.rb"
+
         load file
       end
     end

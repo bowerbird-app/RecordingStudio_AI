@@ -81,7 +81,7 @@ module RecordingStudioAI
     end
 
     def optional_parameters!(normalized)
-      parameters = Models::Definition::KNOWN_PARAMETERS.index_with { |name| normalized[name] }.compact
+      parameters = parameter_overrides_from(normalized)
       return {} if parameters.empty?
 
       Models::ParameterValidation.normalize_without_definition!(parameters).compact

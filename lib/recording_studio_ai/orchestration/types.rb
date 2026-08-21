@@ -15,7 +15,7 @@ module RecordingStudioAI
         super(
           candidate: candidate,
           profile: profile,
-          parameter_overrides: overrides.slice(*known).compact.freeze
+          parameter_overrides: RecordingStudioAI::FallbackEntries.parameter_overrides_from(overrides).freeze
         )
       end
     end

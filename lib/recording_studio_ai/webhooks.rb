@@ -13,5 +13,12 @@ module RecordingStudioAI
   # recording_studio_webhooks, register the optional OpenAI recipes, and keep
   # BatchSynchronizationJob as a poll fallback.
   module Webhooks
+    module_function
+
+    def require_webhooks_gem!(message)
+      return if defined?(RecordingStudioWebhooks)
+
+      raise LoadError, message
+    end
   end
 end

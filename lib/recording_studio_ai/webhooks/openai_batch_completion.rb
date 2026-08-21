@@ -38,10 +38,9 @@ module RecordingStudioAI
       end
 
       def require_webhooks_gem!
-        return if defined?(RecordingStudioWebhooks)
-
-        raise LoadError,
-              "recording_studio_webhooks is required to register the OpenAI batch completion action"
+        Webhooks.require_webhooks_gem!(
+          "recording_studio_webhooks is required to register the OpenAI batch completion action"
+        )
       end
       module_function :require_webhooks_gem!
     end

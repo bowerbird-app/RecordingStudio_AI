@@ -25,6 +25,29 @@ module RecordingStudioAI
 
         remaining
       end
+
+      def completion_clock(started_at, completed_at = Time.current)
+        {
+          completed_at: completed_at,
+          latency_ms: elapsed_ms(started_at, completed_at)
+        }
+      end
+
+      def result_error_attributes(error)
+        {
+          error_category: error&.category,
+          error_code: error&.code,
+          error_message: error&.message
+        }
+      end
+
+      def result_completion_attributes(result, started_at:, completed_at: Time.current)
+        {
+          status: result.success? ? "completed" : "failed",
+          **completion_clock(started_at, completed_at),
+          **result_error_attributes(result.error)
+        }
+      end
     end
   end
 end

@@ -8,6 +8,11 @@ module RecordingStudioAI
 
       attr_reader :provider_tool_call_id, :key, :arguments
 
+      def self.valid_key?(key)
+        value = key.to_s
+        value.length <= MAX_KEY_LENGTH && value.match?(/\A[a-z0-9_]+\z/)
+      end
+
       def initialize(provider_tool_call_id:, key:, arguments:)
         @provider_tool_call_id = provider_tool_call_id.to_s
         @key = key.to_s
@@ -31,8 +36,7 @@ module RecordingStudioAI
 
       def validate!
         valid_id = !provider_tool_call_id.empty? && provider_tool_call_id.length <= MAX_PROVIDER_TOOL_CALL_ID_LENGTH
-        valid_key = key.length <= MAX_KEY_LENGTH && key.match?(/\A[a-z0-9_]+\z/)
-        return if valid_id && valid_key && arguments.is_a?(Hash)
+        return if valid_id && self.class.valid_key?(key) && arguments.is_a?(Hash)
 
         raise RecordingStudioAI::Errors::ContractValidationError.new(
           "tool call requires an id, snake_case key, and Hash arguments",

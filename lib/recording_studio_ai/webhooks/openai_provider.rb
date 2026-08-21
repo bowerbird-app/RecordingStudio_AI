@@ -28,7 +28,7 @@ module RecordingStudioAI
           hash = OpenaiBatchPayload.normalize_hash(payload)
           next nil if hash.nil?
 
-          hash[:type] || hash["type"]
+          OpenaiBatchPayload.hash_value(hash, :type)
         end
       end
 
@@ -60,10 +60,9 @@ module RecordingStudioAI
       module_function :openai_client
 
       def require_webhooks_gem!
-        return if defined?(RecordingStudioWebhooks)
-
-        raise LoadError,
-              "recording_studio_webhooks is required to register the OpenAI webhook provider"
+        Webhooks.require_webhooks_gem!(
+          "recording_studio_webhooks is required to register the OpenAI webhook provider"
+        )
       end
       module_function :require_webhooks_gem!
     end

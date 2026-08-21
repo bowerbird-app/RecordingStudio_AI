@@ -29,23 +29,20 @@ module RecordingStudioAI
         final_attempt = final_execution.record
         usage = Aggregation.usage(executions)
         run.update!(Aggregation.token_metrics(usage).merge(
-                      status: final_result.success? ? "completed" : "failed",
+                      Support.result_completion_attributes(
+                        final_result, started_at: run.started_at, completed_at: completed_at
+                      ),
                       resolved_provider: final_attempt.provider,
                       resolved_model: final_attempt.model,
                       attempt_count: executions.length,
                       retry_count: executions.count { |execution| execution.record.kind == "retry" },
                       fallback_count: executions.count { |execution| execution.record.kind == "fallback" },
                       custom_tool_invocation_count: custom_tool_invocation_count(run),
-                      completed_at: completed_at,
-                      latency_ms: Support.elapsed_ms(run.started_at, completed_at),
                       output_character_count: final_result.text&.length,
                       web_search_used: executions.any? do |execution|
                         execution.result.provider_native_tools.include?("web_search")
                       end,
-                      citation_count: executions.sum { |execution| execution.result.citations.length },
-                      error_category: final_result.error&.category,
-                      error_code: final_result.error&.code,
-                      error_message: final_result.error&.message
+                      citation_count: executions.sum { |execution| execution.result.citations.length }
                     ))
       end
 
@@ -55,11 +52,8 @@ module RecordingStudioAI
         run.update!(
           status: "failed",
           attempt_count: 0,
-          completed_at: completed_at,
-          latency_ms: Support.elapsed_ms(run.started_at, completed_at),
-          error_category: error.category,
-          error_code: error.code,
-          error_message: error.message
+          **Support.completion_clock(run.started_at, completed_at),
+          **Support.result_error_attributes(error)
         )
         RecordingStudioAI::Contracts::GenerationResponse.new(
           operation: operation.to_s,

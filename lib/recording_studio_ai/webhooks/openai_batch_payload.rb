@@ -13,12 +13,10 @@ module RecordingStudioAI
         hash = normalize_hash(payload)
         return nil if hash.nil?
 
-        data = hash[:data] || hash["data"]
-        data = normalize_hash(data)
+        data = normalize_hash(hash_value(hash, :data))
         return nil if data.nil?
 
-        id = data[:id] || data["id"]
-        id = id.to_s.strip
+        id = hash_value(data, :id).to_s.strip
         id.empty? ? nil : id
       end
 
@@ -38,7 +36,7 @@ module RecordingStudioAI
         hash = normalize_hash(payload)
         return false if hash.nil?
 
-        type = (hash[:type] || hash["type"]).to_s
+        type = hash_value(hash, :type).to_s
         type.start_with?(BATCH_EVENT_PREFIX)
       end
 
@@ -46,7 +44,7 @@ module RecordingStudioAI
         hash = normalize_hash(payload)
         return nil if hash.nil?
 
-        id = (hash[:id] || hash["id"]).to_s.strip
+        id = hash_value(hash, :id).to_s.strip
         id.empty? ? nil : id
       end
 
@@ -59,6 +57,11 @@ module RecordingStudioAI
         nil
       end
       module_function :normalize_hash
+
+      def hash_value(hash, key)
+        hash[key] || hash[key.to_s]
+      end
+      module_function :hash_value
     end
   end
 end
