@@ -94,6 +94,7 @@
       <li>Create a registration file. For gem-style catalogs use <span class="font-mono">lib/recording_studio_ai/models/&lt;provider-key&gt;/&lt;model-key&gt;.rb</span> (for example <span class="font-mono">models/openai/gpt-5-mini.rb</span>, <span class="font-mono">models/gemini/gemini-2-5-pro.rb</span>). For a host app, any initializer works.</li>
       <li>The file/key is a lowercase hyphenated slug (dots become hyphens); the <span class="font-mono">model:</span> value is the exact provider API model string used in profiles.</li>
       <li>Call <span class="font-mono">RecordingStudioAI.models.register(...)</span> and declare <span class="font-mono">delivery</span>, <span class="font-mono">parameters</span>, <span class="font-mono">tools</span>, and <span class="font-mono">modalities</span> so the resolver and AI playground know what the model supports.</li>
+      <li>Pass <span class="font-mono">override: true</span> to replace an existing model for the same provider and key.</li>
     </ol>
   </div>
 
@@ -139,6 +140,7 @@
       <li>Provide clear parameter schema and usage guidance.</li>
       <li>Implement a deterministic executor that returns serializable data.</li>
       <li>Pass the tool reference in the request's custom_tools array.</li>
+      <li>Pass <span class="font-mono">override: true</span> to replace an existing tool with the same key and version.</li>
     </ol>
 
     <%= render FlatPack::PageTitle::Component.new(
@@ -188,5 +190,27 @@
     title: "Custom tool registration and usage",
     language: "ruby",
     code: @custom_tools_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Registry overrides",
+      subtitle: "Replace a registered model, tool, or prompt. Prompts can also lock replacement with overridable: false.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li><span class="font-mono">override: true</span> on <span class="font-mono">models.register</span>, <span class="font-mono">tools.register</span>, and <span class="font-mono">prompts.register</span> replaces the existing entry with the same identity.</li>
+      <li>Models are keyed by provider + key. Tools and prompts are keyed by key + version.</li>
+      <li>Prompts also take <span class="font-mono">overridable: true|false</span> (default true). A later <span class="font-mono">override: true</span> only succeeds when the existing prompt is overridable.</li>
+      <li>Call sites keep using the same key — no change to <span class="font-mono">generate</span> or <span class="font-mono">prompt(...).call</span>.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Override models, tools, and prompts",
+    language: "ruby",
+    code: @registry_overrides_example
   ) %>
 </div>
