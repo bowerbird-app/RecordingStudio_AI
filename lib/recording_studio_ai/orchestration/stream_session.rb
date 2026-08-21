@@ -84,8 +84,7 @@ module RecordingStudioAI
         running_attempts.each do |attempt|
           attempt.update!(
             status: "cancelled",
-            completed_at: completed_at,
-            latency_ms: Support.elapsed_ms(attempt.started_at, completed_at),
+            **Support.completion_clock(attempt.started_at, completed_at),
             retryable: false,
             error_category: "cancelled",
             error_code: "stream_cancelled",
@@ -107,8 +106,7 @@ module RecordingStudioAI
 
         active_run.update!(
           status: "cancelled",
-          completed_at: completed_at,
-          latency_ms: Support.elapsed_ms(active_run.started_at, completed_at),
+          **Support.completion_clock(active_run.started_at, completed_at),
           error_category: "cancelled",
           error_code: "stream_cancelled",
           error_message: "Stream consumption was cancelled."

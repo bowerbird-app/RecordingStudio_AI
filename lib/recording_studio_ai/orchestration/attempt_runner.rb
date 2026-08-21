@@ -71,7 +71,9 @@ module RecordingStudioAI
         definition = RecordingStudioAI.models.fetch(candidate.provider, candidate.model)
         known = RecordingStudioAI::Models::Definition::KNOWN_PARAMETERS
         caller_provided = known.index_with { |name| request[name] }.compact
-        overlays = parameter_overrides.to_h.transform_keys(&:to_sym).slice(*known).compact
+        overlays = RecordingStudioAI::FallbackEntries.parameter_overrides_from(
+          parameter_overrides.to_h.transform_keys(&:to_sym)
+        )
         overlays = overlays.reject { |name, _value| caller_provided.key?(name) }
         return request if caller_provided.empty? && overlays.empty?
         return request.merge(caller_provided.merge(overlays)) unless definition

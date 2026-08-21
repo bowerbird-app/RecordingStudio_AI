@@ -3,6 +3,8 @@
 module RecordingStudioAI
   module Prompts
     class Registry
+      include RecordingStudioAI::RegistryLookup
+
       def initialize
         @definitions = {}
       end
@@ -31,14 +33,11 @@ module RecordingStudioAI
       end
 
       def fetch(key, version: nil)
-        key = key.to_s
-        return @definitions[storage_key(key, version)] if version
-
-        @definitions.values.select { |definition| definition.key == key }.max_by(&:version)
+        fetch_by_key_version(key, version: version)
       end
 
       def all
-        @definitions.values.sort_by { |definition| [definition.key, definition.version] }
+        sorted_all
       end
 
       def replace_owner(owner)
@@ -63,12 +62,6 @@ module RecordingStudioAI
         end
 
         @definitions = retained.merge(additions)
-      end
-
-      private
-
-      def storage_key(key, version)
-        "#{key}:#{version}"
       end
     end
   end

@@ -104,11 +104,7 @@ module RecordingStudioAI
       end
 
       def failure(code)
-        RecordingStudioAI::Providers::Result.new(
-          error: RecordingStudioAI::Contracts::NormalizedError.new(
-            category: "custom_tool_failed", code: code, message: "Custom tool execution failed.", retryable: false
-          )
-        )
+        CustomToolSupport.failure(code)
       end
 
       def with_failure(execution, failure_result)
@@ -116,13 +112,7 @@ module RecordingStudioAI
       end
 
       def emit_completed(invocation)
-        @stream_session&.emit("custom_tool_completed", metadata: {
-                                invocation_id: invocation.id,
-                                provider_tool_call_id: invocation.provider_tool_call_id,
-                                tool_key: invocation.tool_key,
-                                tool_version: invocation.tool_version,
-                                status: invocation.status
-                              })
+        @stream_session&.emit("custom_tool_completed", metadata: CustomToolSupport.invocation_metadata(invocation))
       end
     end
   end

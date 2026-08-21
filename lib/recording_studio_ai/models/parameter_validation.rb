@@ -67,32 +67,33 @@ module RecordingStudioAI
       end
 
       def normalize_value!(name, value, spec)
+        apply_parameter_constraints!(name, value, spec, policy: :raise)
+      end
+
+      def adapt_value(name, value, spec)
+        apply_parameter_constraints!(name, value, spec, policy: :adapt)
+      end
+
+      def apply_parameter_constraints!(name, value, spec, policy:)
         coerced = coerce_value!(name, value, spec.fetch(:type))
         if spec[:values]
           allowed = spec[:values].map(&:to_s)
-          unless allowed.include?(coerced.to_s)
-            validation_error!("parameter #{name} must be one of: #{allowed.join(', ')}")
-          end
-          return coerced.to_s
+          return coerced.to_s if allowed.include?(coerced.to_s)
+
+          return nil if policy == :adapt
+
+          validation_error!("parameter #{name} must be one of: #{allowed.join(', ')}")
+        end
+
+        if policy == :adapt
+          coerced = spec[:min] if spec.key?(:min) && coerced < spec[:min]
+          coerced = spec[:max] if spec.key?(:max) && coerced > spec[:max]
+          return coerced
         end
 
         validation_error!("parameter #{name} must be >= #{spec[:min]}") if spec.key?(:min) && coerced < spec[:min]
         validation_error!("parameter #{name} must be <= #{spec[:max]}") if spec.key?(:max) && coerced > spec[:max]
 
-        coerced
-      end
-
-      def adapt_value(name, value, spec)
-        coerced = coerce_value!(name, value, spec.fetch(:type))
-        if spec[:values]
-          allowed = spec[:values].map(&:to_s)
-          return nil unless allowed.include?(coerced.to_s)
-
-          return coerced.to_s
-        end
-
-        coerced = spec[:min] if spec.key?(:min) && coerced < spec[:min]
-        coerced = spec[:max] if spec.key?(:max) && coerced > spec[:max]
         coerced
       end
 

@@ -88,32 +88,26 @@ module RecordingStudioAI
           end
 
           normalized = reference.transform_keys(&:to_sym)
-          key = normalized[:key]
-          version = normalized[:version]
-          definition = RecordingStudioAI.tools.fetch(key, version: version)
-          unless definition
-            raise RecordingStudioAI::Errors::ContractValidationError.new(
-              "registered prompt tool #{key} is not registered",
-              code: "invalid_request"
-            )
-          end
-
-          { key: definition.key, version: definition.version }
+          resolve_tool_ref!(normalized[:key], version: normalized[:version])
         end
       end
 
       def resolved_tools
         @resolved_tools ||= @definition.tools.map do |tool|
-          definition = RecordingStudioAI.tools.fetch(tool.fetch(:key), version: tool[:version])
-          unless definition
-            raise RecordingStudioAI::Errors::ContractValidationError.new(
-              "registered prompt tool #{tool.fetch(:key)} is not registered",
-              code: "invalid_request"
-            )
-          end
-
-          { key: definition.key, version: definition.version }
+          resolve_tool_ref!(tool.fetch(:key), version: tool[:version])
         end
+      end
+
+      def resolve_tool_ref!(key, version:)
+        definition = RecordingStudioAI.tools.fetch(key, version: version)
+        unless definition
+          raise RecordingStudioAI::Errors::ContractValidationError.new(
+            "registered prompt tool #{key} is not registered",
+            code: "invalid_request"
+          )
+        end
+
+        { key: definition.key, version: definition.version }
       end
     end
   end

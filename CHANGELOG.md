@@ -16,6 +16,11 @@ Versioning and Keep a Changelog.
   **Upgrade:** callers that relied on
   `registered prompt custom tools cannot be overridden` will now succeed and
   receive the merged tool list.
+- Internal DRY refactors with no public API or behavior change: shared registry
+  lookup helpers for tools/prompts, shared OpenAI/Gemini model registration
+  templates, shared custom-tool and completion persistence helpers, shared
+  webhook gem/payload helpers, shared tool-key validation, shared parameter
+  constraint application, and tighter request-validation helpers.
 
 ### Added
 

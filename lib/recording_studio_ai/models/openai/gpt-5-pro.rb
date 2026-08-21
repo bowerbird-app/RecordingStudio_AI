@@ -1,25 +1,19 @@
 # frozen_string_literal: true
 
+require_relative "constants"
+
 RecordingStudioAI.models.register(
   provider: :openai,
   key: "gpt-5-pro",
   model: "gpt-5-pro",
   display_name: "GPT-5 Pro",
-  delivery: {
-    streaming: true,
-    structured_output: true,
-    batch: true,
-    batch_cancellation: true
-  },
+  delivery: RecordingStudioAI::Models::Openai::Constants::DELIVERY,
   parameters: {
-    temperature: { type: :number, min: 0.0, max: 2.0, default: 1.0, step: 0.1 },
-    verbosity: { type: :string, values: %w[low medium high], default: "high" },
-    max_output_tokens: { type: :integer, min: 1, max: 128_000, default: 16_384 },
-    reasoning_effort: { type: :string, values: %w[minimal low medium high], default: "high" }
+    temperature: RecordingStudioAI::Models::Openai::Constants::TEMPERATURE,
+    verbosity: RecordingStudioAI::Models::Openai::Constants.verbosity(default: "high"),
+    max_output_tokens: RecordingStudioAI::Models::Openai::Constants.max_output_tokens(default: 16_384),
+    reasoning_effort: RecordingStudioAI::Models::Openai::Constants.reasoning_effort(default: "high")
   },
-  tools: %i[web_search file_search code_execution image_generation custom_tools],
-  modalities: {
-    input: %i[text image file],
-    output: %i[text]
-  }
+  tools: RecordingStudioAI::Models::Openai::Constants::FULL_TOOLS,
+  modalities: RecordingStudioAI::Models::Openai::Constants::MODALITIES
 )
