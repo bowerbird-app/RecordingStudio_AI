@@ -461,10 +461,15 @@ RecordingStudioAI.prompts.register(
 
 RecordingStudioAI.prompt(:customer_reply, version: 1).call(
   inputs: { customer_name: customer.name, message: message.body },
+  custom_tools: [{ key: :lookup_account, version: 1 }],
   root_recording: root_recording,
   initiator: current_user
 )
 ```
+
+Call-site `custom_tools:` are merged into the prompt's registered tools
+(additive by key; same key from the caller replaces the prompt entry). The
+model still decides whether to invoke any offered tool.
 
 The method-style facade is also available for the latest registered version:
 

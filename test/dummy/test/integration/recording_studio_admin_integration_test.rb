@@ -60,6 +60,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "RecordingStudioAI.prompt(:customer_reply)"
     assert_includes response.body, "custom_tools:"
     assert_includes response.body, "lookup_project"
+    assert_includes response.body, "merges with the prompt"
     assert_includes response.body, "RecordingStudioAI.refresh_batch_async"
     assert_includes response.body, "RecordingStudioAI.refresh_batch_from_webhook"
     assert_includes response.body, "RecordingStudioAI.models.fetch"

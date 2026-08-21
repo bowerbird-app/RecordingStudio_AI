@@ -5,6 +5,18 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+### Changed
+
+- `RecordingStudioAI.prompt(...).call` / `stream` merges call-site
+  `custom_tools:` into the prompt's registered tools (additive by key). Prompt
+  tools come first; a caller entry with the same key replaces that prompt tool
+  (including a different version). Omitting `custom_tools:` keeps the prompt
+  list. Listing a tool only offers it to the model — the model still decides
+  whether to call it.
+  **Upgrade:** callers that relied on
+  `registered prompt custom tools cannot be overridden` will now succeed and
+  receive the merged tool list.
+
 ### Added
 
 - `RecordingStudioAI.prompts.register(..., overridable: true|false)` declares

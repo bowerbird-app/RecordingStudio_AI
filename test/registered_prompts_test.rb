@@ -30,6 +30,86 @@ class RegisteredPromptsTest < Minitest::Test
     assert_equal [{ key: "registered_tool", version: 1 }], captured_request.fetch(:custom_tools)
   end
 
+  def test_registered_prompt_merges_caller_custom_tools_additively
+    register_tool
+    register_tool(key: :extra_tool, name: "Extra tool", executor_label: "Tests.extra_tool")
+    register_tool(key: :another_tool, name: "Another tool", executor_label: "Tests.another_tool")
+    register_prompt(tools: [{ key: :registered_tool, version: 1 }, { key: :extra_tool, version: 1 }])
+
+    captured_request = RecordingStudioAI.prompt(:customer_reply).send(
+      :request,
+      { customer_name: "Ada", message: "Where is my order?" },
+      {
+        root_recording: Object.new,
+        initiator: Object.new,
+        custom_tools: [
+          { key: :extra_tool, version: 1 },
+          { key: :another_tool, version: 1 }
+        ]
+      }
+    )
+
+    assert_equal [
+      { key: "registered_tool", version: 1 },
+      { key: "extra_tool", version: 1 },
+      { key: "another_tool", version: 1 }
+    ], captured_request.fetch(:custom_tools)
+  end
+
+  def test_registered_prompt_caller_custom_tools_when_prompt_has_none
+    register_tool(key: :another_tool, name: "Another tool", executor_label: "Tests.another_tool")
+    register_prompt(tools: [])
+
+    captured_request = RecordingStudioAI.prompt(:customer_reply).send(
+      :request,
+      { customer_name: "Ada", message: "Where is my order?" },
+      {
+        root_recording: Object.new,
+        initiator: Object.new,
+        custom_tools: [{ key: :another_tool, version: 1 }]
+      }
+    )
+
+    assert_equal [{ key: "another_tool", version: 1 }], captured_request.fetch(:custom_tools)
+  end
+
+  def test_registered_prompt_caller_tool_replaces_same_key_version
+    register_tool
+    register_tool(key: :registered_tool, version: 2, name: "Registered tool v2", executor_label: "Tests.registered_tool.v2")
+    register_prompt(tools: [{ key: :registered_tool, version: 1 }])
+
+    captured_request = RecordingStudioAI.prompt(:customer_reply).send(
+      :request,
+      { customer_name: "Ada", message: "Where is my order?" },
+      {
+        root_recording: Object.new,
+        initiator: Object.new,
+        custom_tools: [{ key: :registered_tool, version: 2 }]
+      }
+    )
+
+    assert_equal [{ key: "registered_tool", version: 2 }], captured_request.fetch(:custom_tools)
+  end
+
+  def test_registered_prompt_rejects_unknown_caller_custom_tool
+    register_prompt(tools: [])
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI.prompt(:customer_reply).send(
+        :request,
+        { customer_name: "Ada", message: "Where is my order?" },
+        {
+          root_recording: Object.new,
+          initiator: Object.new,
+          custom_tools: [{ key: :missing_tool, version: 1 }]
+        }
+      )
+    end
+
+    assert_equal "invalid_request", error.code
+    assert_match(/not registered/, error.message)
+  end
+
   def test_registered_prompt_rejects_missing_inputs_and_duplicate_versions
     register_prompt
 
@@ -130,11 +210,11 @@ class RegisteredPromptsTest < Minitest::Test
     }.merge(extras)
   end
 
-  def register_tool
+  def register_tool(key: :registered_tool, version: 1, name: "Registered tool", executor_label: "Tests.registered_tool")
     RecordingStudioAI.tools.register(
-      key: :registered_tool,
-      version: 1,
-      name: "Registered tool",
+      key: key,
+      version: version,
+      name: name,
       description: "Tool for prompt tests.",
       use_when: "Testing.",
       do_not_use_when: "Never.",
@@ -146,7 +226,7 @@ class RegisteredPromptsTest < Minitest::Test
       destructive: false,
       requires_confirmation: false,
       idempotent: true,
-      executor_label: "Tests.registered_tool",
+      executor_label: executor_label,
       executor: ->(_arguments, _context) { { ok: true } }
     )
   end
