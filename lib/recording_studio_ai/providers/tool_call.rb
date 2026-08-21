@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 module RecordingStudioAI
   module Providers
     class ToolCall
@@ -15,6 +17,7 @@ module RecordingStudioAI
           arguments,
           path: "provider_tool_call.arguments"
         )
+        enforce_arguments_size!(@arguments)
 
         validate!
       end
@@ -36,6 +39,19 @@ module RecordingStudioAI
 
         raise RecordingStudioAI::Errors::ContractValidationError.new(
           "tool call requires an id, snake_case key, and Hash arguments",
+          code: "invalid_request"
+        )
+      end
+
+      def enforce_arguments_size!(value)
+        limit = RecordingStudioAI.configuration.maximum_custom_tool_arguments_size
+        return if limit.nil? || limit <= 0
+
+        bytes = JSON.generate(value).bytesize
+        return if bytes <= limit
+
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          "provider tool call arguments exceed maximum_custom_tool_arguments_size (#{limit} bytes)",
           code: "invalid_request"
         )
       end

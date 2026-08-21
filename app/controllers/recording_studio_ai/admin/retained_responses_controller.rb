@@ -8,9 +8,12 @@ module RecordingStudioAI
 
       def show
         retained, run = load_retained_response!
-        authorize_engine_sensitive_execution!(retained, run) unless recording_studio_admin_available?
         @response = decrypt_retained_response(retained)
         @run = run
+      rescue RecordingStudioAI::Errors::ContractValidationError => e
+        raise unless e.code == "authorization"
+
+        head :forbidden
       end
 
       private
@@ -42,45 +45,16 @@ module RecordingStudioAI
         RecordingStudioAI::Run.where(root_recording_id: root.id)
       end
 
-      def authorize_engine_sensitive_execution!(retained, run)
-        @admin_access.authorize!(
-          :view_sensitive_execution,
-          root_id: run.root_recording_id,
-          context: { response_id: retained.id, run_id: run.id }
-        )
-      end
-
+      # Always go through ResponseReader so decrypt requires
+      # recording_studio_ai.view_retained_response (Accessible :admin), matching
+      # the public read_retained_response API. Recording Studio Admin's surface
+      # gate alone is not enough to read encrypted content.
       def decrypt_retained_response(retained)
-        return admin_retained_response_payload(retained) if recording_studio_admin_available?
-
         RecordingStudioAI::ResponseReader.new.read(
           response: retained,
           initiator: retained_response_initiator,
           execution_source: :admin
         )
-      end
-
-      def admin_retained_response_payload(retained)
-        if retained.expires_at && retained.expires_at <= Time.current
-          raise ActiveRecord::RecordNotFound, "retained response has expired"
-        end
-
-        {
-          id: retained.id,
-          response_type: retained.response_type,
-          raw_response: parse_retained_json(retained.raw_response),
-          normalized_response: parse_retained_json(retained.normalized_response),
-          content_text: retained.content_text,
-          content_type: retained.content_type,
-          complete: retained.complete,
-          truncated: retained.truncated,
-          byte_size: retained.byte_size,
-          expires_at: retained.expires_at
-        }
-      end
-
-      def parse_retained_json(value)
-        value.nil? ? nil : JSON.parse(value)
       end
 
       def retained_response_initiator

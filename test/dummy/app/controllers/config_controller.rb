@@ -263,6 +263,13 @@ class ConfigController < ApplicationController
       explanation: "Largest result a custom tool may return."
     },
     {
+      key: "maximum_custom_tool_arguments_size",
+      required: "No",
+      accepted_values: "Integer bytes >= 0",
+      default: "64.kilobytes",
+      explanation: "Largest JSON arguments payload a provider tool call may supply before execution."
+    },
+    {
       key: "custom_tool_confirmation_handler",
       required: "Yes, for tools needing approval",
       accepted_values: ":approved, :rejected, :pending, :expired, or a boolean",
@@ -466,6 +473,7 @@ class ConfigController < ApplicationController
       config.maximum_custom_tool_rounds = 5
       config.custom_tool_timeout = 30
       config.maximum_custom_tool_result_size = 256.kilobytes
+      config.maximum_custom_tool_arguments_size = 64.kilobytes
       config.custom_tool_confirmation_handler = ->(**) { false }
 
       # Response/history retention.

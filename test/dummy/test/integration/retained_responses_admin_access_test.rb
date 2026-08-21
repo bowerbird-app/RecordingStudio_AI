@@ -32,7 +32,7 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
-  test "view grant opens the retained body the same way as the AI Responses screen" do
+  test "view grant opens the AI Responses screen but cannot decrypt retained content" do
     grant_accessible!(recording: @root_recording, actor: @user, role: :view)
     retained = create_retained_response!(root: @root_recording, content_text: "viewable retained body")
     sign_in @user
@@ -46,15 +46,26 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Response ##{retained.id}"
 
     get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
+    assert_response :forbidden
+    refute_includes response.body, "viewable retained body"
+  end
+
+  test "admin grant decrypts retained content via view_retained_response" do
+    grant_accessible!(recording: @root_recording, actor: @user, role: :admin)
+    retained = create_retained_response!(root: @root_recording, content_text: "admin retained body")
+    sign_in @user
+    switch_to_root!(@root_recording)
+
+    get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
     assert_response :success
-    assert_includes response.body, "viewable retained body"
+    assert_includes response.body, "admin retained body"
     refute_includes response.body, "Retention metadata"
     assert_includes response.body, "Complete / truncated"
     assert_includes response.body, "Content type"
   end
 
   test "retained response page still authorizes after a code reload" do
-    grant_accessible!(recording: @root_recording, actor: @user, role: :view)
+    grant_accessible!(recording: @root_recording, actor: @user, role: :admin)
     retained = create_retained_response!(root: @root_recording, content_text: "after reload")
     sign_in @user
     switch_to_root!(@root_recording)

@@ -33,6 +33,7 @@ module RecordingStudioAI
       :maximum_attachment_count,
       :maximum_attachment_total_bytes,
       :maximum_custom_tool_rounds,
+      :maximum_custom_tool_arguments_size,
       :maximum_custom_tool_result_size,
       :maximum_provider_fallbacks,
       :maximum_profile_fallbacks,
@@ -116,6 +117,7 @@ module RecordingStudioAI
       @maximum_attachment_count = 10
       @maximum_attachment_total_bytes = 50.megabytes
       @maximum_custom_tool_rounds = 5
+      @maximum_custom_tool_arguments_size = 64.kilobytes
       @maximum_custom_tool_result_size = 256.kilobytes
       @maximum_provider_fallbacks = 1
       @maximum_profile_fallbacks = 1
@@ -162,7 +164,7 @@ module RecordingStudioAI
       validate_integer!(:maximum_attempts, minimum: 1)
       %i[
         maximum_attachment_count maximum_attachment_bytes maximum_attachment_total_bytes
-        maximum_custom_tool_rounds maximum_custom_tool_result_size maximum_provider_fallbacks
+        maximum_custom_tool_rounds maximum_custom_tool_arguments_size maximum_custom_tool_result_size maximum_provider_fallbacks
         maximum_profile_fallbacks maximum_retries_per_candidate maximum_retained_response_size
         admin_slow_call_threshold_ms
       ].each { |name| validate_integer!(name, minimum: 0) }

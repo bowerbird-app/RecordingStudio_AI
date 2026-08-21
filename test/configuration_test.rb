@@ -41,6 +41,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal 5, configuration.maximum_custom_tool_rounds
     assert_equal 30, configuration.custom_tool_timeout
     assert_equal 256.kilobytes, configuration.maximum_custom_tool_result_size
+    assert_equal 64.kilobytes, configuration.maximum_custom_tool_arguments_size
     assert_empty configuration.cost_catalogs
     assert_equal "RecordingStudioAI::BatchSynchronizationJob", configuration.batch_synchronization_job
     assert_equal 1.minute, configuration.batch_synchronization_interval

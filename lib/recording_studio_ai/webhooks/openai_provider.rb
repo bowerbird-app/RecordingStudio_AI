@@ -16,8 +16,9 @@ module RecordingStudioAI
           return false if secret.nil? || secret.to_s.empty?
 
           client = openai_client(secret)
-          client.webhooks.verify_signature(context.raw_payload, context.headers, secret)
-          true
+          outcome = client.webhooks.verify_signature(context.raw_payload, context.headers, secret)
+          # Fail closed on an explicit false. Nil/void success from the SDK is OK.
+          !outcome.equal?(false)
         rescue StandardError
           false
         end

@@ -240,13 +240,12 @@ The host authorization handler receives these independent actions:
 - `recording_studio_ai.view_retained_response` before encrypted content is read
 
 The dedicated retained-response page is linked from the Recording Studio Admin
-AI Responses table. When `recording_studio_admin` is installed, that viewer
-copies the same Accessible gate: `RecordingStudioAdmin::Authorization.authorize!`
-against the access recording and `required_access_role` (default `:view`),
-including the current-root match, then loads only responses for that admin root.
-Without Recording Studio Admin, the engine still requires
-`view_sensitive_execution` and `view_retained_response`. The public
-`read_retained_response` API always authorizes `view_retained_response`.
+AI Responses table. Listing responses still uses the Admin surface gate
+(`required_access_role`, default `:view`) and the current-root match. Decrypting
+retained content always goes through `ResponseReader` and requires
+`recording_studio_ai.view_retained_response` (Accessible `:admin`), matching the
+public `read_retained_response` API. Without Recording Studio Admin, the engine
+admin surface still requires `view_retained_response` the same way.
 Ordinary run and batch pages never read encrypted columns. All screens use only the custom
 tool registry and six infrastructure tables; prompts, messages, complete tool
 payloads, citation URLs, and inferred internal web-search counts are absent.
