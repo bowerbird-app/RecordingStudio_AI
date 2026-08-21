@@ -9,6 +9,7 @@ ENV.delete("GEMINI_API_KEY")
 
 require_relative "simplecov_helper"
 require "minitest/autorun"
+require "minitest/mock"
 require "rails"
 require "recording_studio_ai"
 

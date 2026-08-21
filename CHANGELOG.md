@@ -110,6 +110,8 @@ Versioning and Keep a Changelog.
   Override a Model (under Add a Model), Override a Tool (after Create Custom
   Tools), Register a Prompt (with field table), and Override a Prompt. The
   combined Registry overrides block is gone.
+- Test suite requires `minitest-mock` so `Object#stub` works under Minitest 6
+  (extracted from core minitest).
 - Dummy `/config` keeps `admin_authenticate` and AccessibleAuthorization
   guidance alongside those custom-tool tables.
 - Dummy sign-in works through Cursor Cloud and Codespaces forwarded previews by
