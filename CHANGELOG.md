@@ -5,6 +5,24 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+### Security
+
+- Retained-response admin viewer always decrypts through `ResponseReader`, so
+  `recording_studio_ai.view_retained_response` (Accessible `:admin`) is required
+  even when Recording Studio Admin's surface gate is `:view`. Listing AI
+  Responses stays on the Admin surface role.
+  **Upgrade:** actors with only `:view` on a root can still open the responses
+  table, but opening a retained body now needs `:admin` (same as the public
+  `read_retained_response` API).
+- Cap provider custom-tool argument payloads with
+  `config.maximum_custom_tool_arguments_size` (default 64 KB). Oversized raw
+  JSON is rejected before parse; oversized serializable hashes fail in
+  `Providers::ToolCall`.
+- OpenAI webhook signature verifier treats an explicit `false` from
+  `verify_signature` as invalid (fail closed), not only raised errors.
+- Metadata/retention secret redaction also matches `access_key`, `private_key`,
+  `openai_key`, and `gemini_key` style names.
+
 ### Changed
 
 - `RecordingStudioAI.prompt(...).call` / `stream` merges call-site

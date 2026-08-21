@@ -357,11 +357,15 @@ module RecordingStudioAI
 
           name = read_value(function_call, :name).to_s
           response_id = read_value(response, :response_id, :responseId).to_s
-          RecordingStudioAI::Providers::ToolCall.new(
-            provider_tool_call_id: "#{response_id.empty? ? 'gemini-tool-call' : response_id}:#{index}",
-            key: name,
-            arguments: read_value(function_call, :args) || {}
-          )
+          begin
+            RecordingStudioAI::Providers::ToolCall.new(
+              provider_tool_call_id: "#{response_id.empty? ? 'gemini-tool-call' : response_id}:#{index}",
+              key: name,
+              arguments: read_value(function_call, :args) || {}
+            )
+          rescue RecordingStudioAI::Errors::ContractValidationError => error
+            raise JSON::ParserError, error.message
+          end
         end
       end
 

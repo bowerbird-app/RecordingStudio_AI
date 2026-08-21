@@ -409,12 +409,26 @@ module RecordingStudioAI
         Array(read_value(response, :output)).filter_map do |item|
           next unless read_value(item, :type).to_s == "function_call"
 
-          RecordingStudioAI::Providers::ToolCall.new(
-            provider_tool_call_id: read_value(item, :call_id, :id),
-            key: read_value(item, :name),
-            arguments: JSON.parse(read_value(item, :arguments).to_s)
-          )
+          raw_arguments = read_value(item, :arguments).to_s
+          enforce_raw_tool_arguments_size!(raw_arguments)
+
+          begin
+            RecordingStudioAI::Providers::ToolCall.new(
+              provider_tool_call_id: read_value(item, :call_id, :id),
+              key: read_value(item, :name),
+              arguments: JSON.parse(raw_arguments)
+            )
+          rescue RecordingStudioAI::Errors::ContractValidationError => error
+            raise JSON::ParserError, error.message
+          end
         end
+      end
+
+      def enforce_raw_tool_arguments_size!(raw_arguments)
+        limit = RecordingStudioAI.configuration.maximum_custom_tool_arguments_size
+        return if limit.nil? || limit <= 0 || raw_arguments.bytesize <= limit
+
+        raise JSON::ParserError, "custom tool arguments exceed maximum_custom_tool_arguments_size"
       end
 
       def invalid_tool_arguments_error
