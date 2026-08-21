@@ -94,7 +94,6 @@
       <li>Create a registration file. For gem-style catalogs use <span class="font-mono">lib/recording_studio_ai/models/&lt;provider-key&gt;/&lt;model-key&gt;.rb</span> (for example <span class="font-mono">models/openai/gpt-5-mini.rb</span>, <span class="font-mono">models/gemini/gemini-2-5-pro.rb</span>). For a host app, any initializer works.</li>
       <li>The file/key is a lowercase hyphenated slug (dots become hyphens); the <span class="font-mono">model:</span> value is the exact provider API model string used in profiles.</li>
       <li>Call <span class="font-mono">RecordingStudioAI.models.register(...)</span> and declare <span class="font-mono">delivery</span>, <span class="font-mono">parameters</span>, <span class="font-mono">tools</span>, and <span class="font-mono">modalities</span> so the resolver and AI playground know what the model supports.</li>
-      <li>Pass <span class="font-mono">override: true</span> to replace an existing model for the same provider and key.</li>
     </ol>
   </div>
 
@@ -102,6 +101,27 @@
     title: "Model registration",
     language: "ruby",
     code: @model_registration_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Override a Model",
+      subtitle: "Replace a shipped or previously registered model for the same provider and key.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Register again with the same <span class="font-mono">provider</span> and <span class="font-mono">key</span>.</li>
+      <li>Pass <span class="font-mono">override: true</span> — without it, a duplicate registration raises.</li>
+      <li>Profiles that reference the model string keep working; they resolve to the replaced entry.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Model override",
+    language: "ruby",
+    code: @model_override_example
   ) %>
 
   <div class="space-y-3">
@@ -194,23 +214,67 @@
 
   <div class="space-y-3">
     <%= render FlatPack::PageTitle::Component.new(
-      title: "Registry overrides",
-      subtitle: "Replace a registered model, tool, or prompt. Prompts can also lock replacement with overridable: false.",
+      title: "Register a Prompt",
+      subtitle: "Versioned message templates with inputs, optional tools, and defaults for generate.",
       variant: :h3,
       class: "mb-0 pb-0"
     ) %>
 
     <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
-      <li><span class="font-mono">override: true</span> on <span class="font-mono">models.register</span>, <span class="font-mono">tools.register</span>, and <span class="font-mono">prompts.register</span> replaces the existing entry with the same identity.</li>
-      <li>Models are keyed by provider + key. Tools and prompts are keyed by key + version.</li>
-      <li>Prompts also take <span class="font-mono">overridable: true|false</span> (default true). A later <span class="font-mono">override: true</span> only succeeds when the existing prompt is overridable.</li>
-      <li>Call sites keep using the same key — no change to <span class="font-mono">generate</span> or <span class="font-mono">prompt(...).call</span>.</li>
+      <li>Pick a stable <span class="font-mono">key</span> and <span class="font-mono">version</span>.</li>
+      <li>Set <span class="font-mono">owner</span> to a PascalCase gem or host label (for example <span class="font-mono">Host</span> or <span class="font-mono">SupportGem</span>).</li>
+      <li>Declare <span class="font-mono">inputs</span> and <span class="font-mono">messages</span> with <span class="font-mono">{{snake_case}}</span> placeholders.</li>
+      <li>Optionally allowlist registered tools and set <span class="font-mono">defaults</span> such as profile and purpose.</li>
+      <li>Call with <span class="font-mono">RecordingStudioAI.prompt(:key).call(...)</span>.</li>
+    </ol>
+
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Prompt registration fields",
+      subtitle: "Every argument RecordingStudioAI.prompts.register accepts.",
+      variant: :h4,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::Table::Component.new(data: @prompt_options) do |table| %>
+      <% table.column(
+        title: "Param",
+        html: ->(option) { content_tag(:span, option[:key], class: "font-mono text-xs") }
+      ) %>
+      <% table.column(title: "Required", html: ->(option) { option[:required] }) %>
+      <% table.column(title: "Possible values", html: ->(option) { option[:accepted_values] }) %>
+      <% table.column(
+        title: "Default",
+        html: ->(option) { content_tag(:span, option[:default], class: "font-mono text-xs break-all") }
+      ) %>
+      <% table.column(title: "Description", html: ->(option) { option[:explanation] }) %>
+    <% end %>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Prompt registration and usage",
+    language: "ruby",
+    code: @prompt_registration_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Override a Prompt",
+      subtitle: "Replace the same key and version when the existing prompt allows it.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>The existing prompt must have <span class="font-mono">overridable: true</span> (the default).</li>
+      <li>Register again with the same <span class="font-mono">key</span> and <span class="font-mono">version</span>, and pass <span class="font-mono">override: true</span>.</li>
+      <li>Call sites keep using <span class="font-mono">prompt(:key)</span> — no change needed.</li>
+      <li>Set <span class="font-mono">overridable: false</span> on a gem prompt to lock it against host replacement.</li>
     </ol>
   </div>
 
   <%= render FlatPack::CodeBlock::Component.new(
-    title: "Override models, tools, and prompts",
+    title: "Prompt override",
     language: "ruby",
-    code: @registry_overrides_example
+    code: @prompt_override_example
   ) %>
 </div>

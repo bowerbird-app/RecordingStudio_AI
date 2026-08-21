@@ -677,12 +677,8 @@ class ConfigController < ApplicationController
     )
   RUBY
 
-  REGISTRY_OVERRIDES_EXAMPLE = <<~RUBY.freeze
-    # Models, tools, and prompts all accept override: true to replace an existing
-    # registry entry with the same identity. Prompts also declare overridable:
-    # (default true) so a gem can lock a key/version against host replacement.
-
-    # --- Models (identity: provider + key) ---
+  MODEL_OVERRIDE_EXAMPLE = <<~RUBY.freeze
+    # Same provider + key. Without override: true, a duplicate registration raises.
     RecordingStudioAI.models.register(
       provider: :openai,
       key: "gpt-5",
@@ -691,37 +687,17 @@ class ConfigController < ApplicationController
       display_name: "GPT-5 (host)",
       delivery: { streaming: true, structured_output: true, batch: true, batch_cancellation: true },
       parameters: {
-        temperature: { type: :number, min: 0.0, max: 2.0, default: 1.0, step: 0.1 }
+        temperature: { type: :number, min: 0.0, max: 2.0, default: 1.0, step: 0.1 },
+        max_output_tokens: { type: :integer, min: 1, max: 128_000, default: 4_096 }
       },
       tools: %i[web_search custom_tools],
       modalities: { input: %i[text], output: %i[text] }
     )
+  RUBY
 
-    # --- Tools (identity: key + version) ---
-    RecordingStudioAI.tools.register(
-      key: "account_health_tool",
-      version: 1,
-      override: true, # replace the same key/version
-      name: "Account Health Tool",
-      description: "Host override of the tool definition.",
-      use_when: "You need account-level diagnostics.",
-      do_not_use_when: "No account data is required.",
-      parameters: [
-        { name: "account_id", type: "string", required: true, description: "Account identifier" }
-      ],
-      returns: "A hash with score and status.",
-      cost: "low",
-      latency: "fast",
-      read_only: true,
-      destructive: false,
-      requires_confirmation: false,
-      idempotent: true,
-      executor_label: "Host",
-      executor: ->(arguments, _context) { { account_id: arguments.fetch("account_id"), score: 90 } }
-    )
-
-    # --- Prompts (identity: key + version) ---
-    # Gem registers an open prompt (overridable: true is the default):
+  PROMPT_REGISTRATION_EXAMPLE = <<~RUBY.freeze
+    # owner is who registered the prompt (PascalCase label), not an actor.
+    # overridable: true is the default — later override attempts are allowed.
     RecordingStudioAI.prompts.register(
       owner: "SupportGem",
       key: :customer_reply,
@@ -737,7 +713,32 @@ class ConfigController < ApplicationController
       defaults: { profile: :medium, purpose: "customer_reply" }
     )
 
-    # Host replaces that same key/version later in boot:
+    # Lock a key+version so hosts or later gems cannot replace it:
+    RecordingStudioAI.prompts.register(
+      owner: "RecordingStudioAI",
+      key: :billing_escalation,
+      version: 1,
+      name: "Billing Escalation",
+      description: "Fixed wording for billing escalations.",
+      overridable: false,
+      inputs: %i[account_id],
+      messages: [
+        { role: :system, content: "Escalate billing issues with the required disclaimer." },
+        { role: :user, content: "Account {{account_id}}" }
+      ]
+    )
+
+    # Call with the prompt key — inputs fill {{placeholders}}:
+    RecordingStudioAI.prompt(:customer_reply).call(
+      inputs: { customer_name: customer.name, message: message.body },
+      root_recording: root_recording,
+      initiator: current_user
+    )
+  RUBY
+
+  PROMPT_OVERRIDE_EXAMPLE = <<~RUBY.freeze
+    # Same key + version. Requires override: true, and the existing registration
+    # must have overridable: true (the default).
     RecordingStudioAI.prompts.register(
       owner: "Host",
       key: :customer_reply,
@@ -745,6 +746,7 @@ class ConfigController < ApplicationController
       override: true, # required to replace
       name: "Host Customer Reply",
       description: "Our in-house tone for customer replies.",
+      overridable: true, # whether a later register may replace this host entry
       inputs: %i[customer_name message],
       messages: [
         { role: :system, content: "Be brief, warm, and specific. No filler." },
@@ -752,11 +754,87 @@ class ConfigController < ApplicationController
       ],
       defaults: { profile: :medium, purpose: "customer_reply" }
     )
-
-    # Lock a prompt so hosts cannot replace it:
-    # RecordingStudioAI.prompts.register(..., overridable: false)
-    # Later register(..., override: true) for the same key/version raises.
   RUBY
+
+  PROMPT_OPTIONS = [
+    {
+      key: "owner",
+      required: "No",
+      accepted_values: "PascalCase label (Host, SupportGem, RecordingStudioAI)",
+      default: "nil",
+      explanation: "Who registered the prompt — a gem or host label, not an actor."
+    },
+    {
+      key: "key",
+      required: "Yes",
+      accepted_values: "snake_case symbol or string",
+      default: "—",
+      explanation: "Stable id for the prompt. Used with RecordingStudioAI.prompt(:key)."
+    },
+    {
+      key: "version",
+      required: "Yes",
+      accepted_values: "Positive Integer",
+      default: "—",
+      explanation: "Version of this definition. Register a new version instead of editing an old one."
+    },
+    {
+      key: "name",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "Short label for people and admin screens."
+    },
+    {
+      key: "description",
+      required: "Yes",
+      accepted_values: "Non-empty String",
+      default: "—",
+      explanation: "What the prompt is for."
+    },
+    {
+      key: "inputs",
+      required: "Yes",
+      accepted_values: "Array of snake_case names",
+      default: "—",
+      explanation: "Declared placeholder names. Every {{name}} in messages must appear here."
+    },
+    {
+      key: "messages",
+      required: "Yes",
+      accepted_values: "Non-empty Array of { role:, content: }",
+      default: "—",
+      explanation: "Ordered chat turns. Roles are system, user, or assistant. Content may use {{snake_case}} placeholders."
+    },
+    {
+      key: "tools",
+      required: "No",
+      accepted_values: "Array of tool keys or { key:, version: } hashes",
+      default: "[]",
+      explanation: "Allowlisted registered custom tools for this prompt."
+    },
+    {
+      key: "defaults",
+      required: "No",
+      accepted_values: "Serializable Hash (e.g. profile:, purpose:)",
+      default: "{}",
+      explanation: "Default generate options merged into each call unless the caller overrides them."
+    },
+    {
+      key: "overridable",
+      required: "No",
+      accepted_values: "true or false",
+      default: "true",
+      explanation: "When false, later override: true attempts for this key+version fail."
+    },
+    {
+      key: "override",
+      required: "No",
+      accepted_values: "true or false",
+      default: "false",
+      explanation: "Pass true to replace an existing overridable registration for the same key and version."
+    }
+  ].freeze
 
   CUSTOM_TOOL_OPTIONS = [
     {
@@ -939,9 +1017,12 @@ class ConfigController < ApplicationController
     @provider_initializer_example = RecordingStudioAI::Providers::StarterExample::INITIALIZER_CODE
     @provider_extension_example = PROVIDER_EXTENSION_EXAMPLE
     @model_registration_example = MODEL_REGISTRATION_EXAMPLE
+    @model_override_example = MODEL_OVERRIDE_EXAMPLE
     @profile_example = PROFILE_EXAMPLE
     @custom_tools_example = CUSTOM_TOOLS_EXAMPLE
-    @registry_overrides_example = REGISTRY_OVERRIDES_EXAMPLE
+    @prompt_registration_example = PROMPT_REGISTRATION_EXAMPLE
+    @prompt_override_example = PROMPT_OVERRIDE_EXAMPLE
+    @prompt_options = PROMPT_OPTIONS
     @custom_tool_options = CUSTOM_TOOL_OPTIONS
     @custom_tool_parameter_options = CUSTOM_TOOL_PARAMETER_OPTIONS
   end
