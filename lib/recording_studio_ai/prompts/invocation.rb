@@ -71,9 +71,7 @@ module RecordingStudioAI
 
         (resolved_tools + normalize_tool_refs(supplied_tools)).each do |reference|
           key = reference.fetch(:key)
-          unless by_key.key?(key)
-            order << key
-          end
+          order << key unless by_key.key?(key)
           by_key[key] = reference
         end
 
