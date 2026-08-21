@@ -73,14 +73,15 @@
       code: <<~'RUBY'
         # Skip configured profiles for this call. Hop the list in order.
         # Do not combine fallbacks: with provider: or model:.
-        # temperature: 1 travels to the next hop when that model supports it.
+        # Top-level caller params travel to the next hop when that model supports them.
+        # Entry overlays (e.g. temperature on a hop) apply only when the caller omitted them.
         response = RecordingStudioAI.generate(
           prompt: "Summarize this page for an editor.",
           purpose: "page_summary",
           temperature: 1,
           fallbacks: [
             { provider: :openai, model: "gpt-5-mini" },
-            { provider: :gemini, model: "gemini-2.5-flash" }
+            { provider: :gemini, model: "gemini-2.5-flash", max_output_tokens: 2048 }
           ],
           **attribution
         )
@@ -146,6 +147,21 @@
         RecordingStudioAI.cancel_batch(batch_id: batch.batch.id, **attribution)
       RUBY
     ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Wake refresh from a webhook",
+      language: "ruby",
+      code: <<~'RUBY'
+        # Optional. Requires recording_studio_webhooks plus the OpenAI recipes on /config.
+        # Looks up the batch by provider_batch_id under the root, then runs refresh_batch.
+        # Never trusts webhook payload status or results — always retrieves from the provider.
+        RecordingStudioAI.refresh_batch_from_webhook(
+          provider_batch_id: "batch_abc123",
+          root_recording: root_recording,
+          request_id: "evt_123"
+        )
+      RUBY
+    ) %>
   </section>
 
   <section class="space-y-3">
@@ -189,14 +205,96 @@
         RecordingStudioAI.models.all                    # every registered model
       RUBY
     ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Override a model",
+      language: "ruby",
+      code: <<~'RUBY'
+        # Same provider + key. Without override: true, a duplicate registration raises.
+        RecordingStudioAI.models.register(
+          provider: :openai,
+          key: "gpt-5",
+          model: "gpt-5",
+          override: true,
+          display_name: "GPT-5 (host)",
+          delivery: { streaming: true, structured_output: true, batch: true, batch_cancellation: true },
+          parameters: {
+            temperature: { type: :number, min: 0.0, max: 2.0, default: 1.0, step: 0.1 },
+            max_output_tokens: { type: :integer, min: 1, max: 128_000, default: 4_096 }
+          },
+          tools: %i[web_search custom_tools],
+          modalities: { input: %i[text], output: %i[text] }
+        )
+      RUBY
+    ) %>
   </section>
 
   <section class="space-y-3">
     <%= render FlatPack::PageTitle::Component.new(
       title: "Custom Tools",
-      subtitle: "Pass registered tool references to a generation or stream request. Confirmation and policy checks run before execution.",
+      subtitle: "Register a tool, optionally override the same key and version, then pass the reference to generate. Streaming uses the same call with stream: true.",
       variant: :h3,
       class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Register a tool",
+      language: "ruby",
+      code: <<~'RUBY'
+        RecordingStudioAI.tools.register(
+          key: "lookup_project",
+          version: 1,
+          name: "Lookup Project",
+          description: "Returns the latest status for a project.",
+          use_when: "You need project-level status.",
+          do_not_use_when: "No project id is available.",
+          parameters: [
+            { name: "project_id", type: "string", required: true, description: "Project identifier" }
+          ],
+          returns: "A hash with status and summary.",
+          cost: "low",
+          latency: "fast",
+          read_only: true,
+          destructive: false,
+          requires_confirmation: false,
+          idempotent: true,
+          executor_label: "Host",
+          executor: ->(arguments, _context) do
+            { project_id: arguments.fetch("project_id"), status: "on_track" }
+          end
+        )
+      RUBY
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Override a tool",
+      language: "ruby",
+      code: <<~'RUBY'
+        # Same key + version. Without override: true, a duplicate registration raises.
+        RecordingStudioAI.tools.register(
+          key: "lookup_project",
+          version: 1,
+          override: true,
+          name: "Lookup Project",
+          description: "Host override of the project lookup tool.",
+          use_when: "You need project-level status.",
+          do_not_use_when: "No project id is available.",
+          parameters: [
+            { name: "project_id", type: "string", required: true, description: "Project identifier" }
+          ],
+          returns: "A hash with status and summary.",
+          cost: "low",
+          latency: "fast",
+          read_only: true,
+          destructive: false,
+          requires_confirmation: false,
+          idempotent: true,
+          executor_label: "Host",
+          executor: ->(arguments, _context) do
+            { project_id: arguments.fetch("project_id"), status: "at_risk" }
+          end
+        )
+      RUBY
     ) %>
 
     <%= render FlatPack::CodeBlock::Component.new(
@@ -208,6 +306,88 @@
           purpose: "project_status",
           custom_tools: [{ key: "lookup_project", version: 1 }],
           **attribution
+        )
+      RUBY
+    ) %>
+  </section>
+
+  <section class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Prompts",
+      subtitle: "Register versioned message templates, call them by key, and override the same key and version when the existing prompt allows it.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Register a prompt",
+      language: "ruby",
+      code: <<~'RUBY'
+        # owner is who registered the prompt (PascalCase label), not an actor.
+        # overridable: true is the default — later override attempts are allowed.
+        RecordingStudioAI.prompts.register(
+          owner: "SupportGem",
+          key: :customer_reply,
+          version: 1,
+          name: "Customer Support Reply",
+          description: "Creates a concise response to a customer message.",
+          overridable: true,
+          inputs: %i[customer_name message],
+          messages: [
+            { role: :system, content: "Write a concise, helpful customer response." },
+            { role: :user, content: "{{customer_name}}: {{message}}" }
+          ],
+          defaults: { profile: :medium, purpose: "customer_reply" }
+        )
+
+        # Lock a key+version so hosts or later gems cannot replace it:
+        RecordingStudioAI.prompts.register(
+          owner: "RecordingStudioAI",
+          key: :billing_escalation,
+          version: 1,
+          name: "Billing Escalation",
+          description: "Fixed wording for billing escalations.",
+          overridable: false,
+          inputs: %i[account_id],
+          messages: [
+            { role: :system, content: "Escalate billing issues with the required disclaimer." },
+            { role: :user, content: "Account {{account_id}}" }
+          ]
+        )
+      RUBY
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Call a prompt",
+      language: "ruby",
+      code: <<~'RUBY'
+        RecordingStudioAI.prompt(:customer_reply).call(
+          inputs: { customer_name: customer.name, message: message.body },
+          **attribution
+        )
+      RUBY
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Override a prompt",
+      language: "ruby",
+      code: <<~'RUBY'
+        # Same key + version. Requires override: true, and the existing registration
+        # must have overridable: true (the default).
+        RecordingStudioAI.prompts.register(
+          owner: "Host",
+          key: :customer_reply,
+          version: 1,
+          override: true,
+          name: "Host Customer Reply",
+          description: "Our in-house tone for customer replies.",
+          overridable: true,
+          inputs: %i[customer_name message],
+          messages: [
+            { role: :system, content: "Be brief, warm, and specific. No filler." },
+            { role: :user, content: "{{customer_name}}: {{message}}" }
+          ],
+          defaults: { profile: :medium, purpose: "customer_reply" }
         )
       RUBY
     ) %>

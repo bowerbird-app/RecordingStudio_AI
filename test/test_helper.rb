@@ -9,7 +9,13 @@ ENV.delete("GEMINI_API_KEY")
 
 require_relative "simplecov_helper"
 require "minitest/autorun"
-require "minitest/mock"
+begin
+  require "minitest/mock"
+rescue LoadError
+  # Minitest 6 extracted Object#stub into minitest-mock. Unit tests install it
+  # via the root Gemfile; the dummy app bundle may not. Soft-load so dummy
+  # tests that require this helper still boot.
+end
 require "rails"
 require "recording_studio_ai"
 

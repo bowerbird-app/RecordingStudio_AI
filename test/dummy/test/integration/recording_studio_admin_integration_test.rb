@@ -55,8 +55,17 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Methods"
     assert_includes response.body, "RecordingStudioAI.generate"
     assert_includes response.body, "RecordingStudioAI.refresh_batch_async"
+    assert_includes response.body, "RecordingStudioAI.refresh_batch_from_webhook"
     assert_includes response.body, "RecordingStudioAI.models.register"
     assert_includes response.body, "RecordingStudioAI.models.fetch"
+    assert_includes response.body, "Override a model"
+    assert_includes response.body, "RecordingStudioAI.tools.register"
+    assert_includes response.body, "Override a tool"
+    assert_includes response.body, "RecordingStudioAI.prompts.register"
+    assert_includes response.body, "RecordingStudioAI.prompt(:customer_reply)"
+    assert_includes response.body, "Override a prompt"
+    assert_includes response.body, "overridable: true"
+    assert_includes response.body, "override: true"
     assert_includes response.body, "href=\"/methods\""
   end
 
