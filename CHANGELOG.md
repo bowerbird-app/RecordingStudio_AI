@@ -110,9 +110,10 @@ Versioning and Keep a Changelog.
   Override a Model (under Add a Model), Override a Tool (after Create Custom
   Tools), Register a Prompt (with field table), and Override a Prompt. The
   combined Registry overrides block is gone.
-- Dummy `/methods` mirrors those registry APIs: model/tool/prompt register and
-  override examples, prompt `.call`, hop params on `fallbacks:`, and
-  `refresh_batch_from_webhook`.
+- Dummy `/methods` shows generate call sites for an inline prompt, a registered
+  prompt (`prompt(...).call` / `stream`), and registered custom tools. Register
+  and override examples stay on `/config`. Also documents hop params on
+  `fallbacks:` and `refresh_batch_from_webhook`.
 - Test suite requires `minitest-mock` so `Object#stub` works under Minitest 6
   (extracted from core minitest). The root `test_helper` soft-loads it so the
   dummy app bundle can still boot `recording_studio_v3_test`.
