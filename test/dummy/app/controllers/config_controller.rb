@@ -677,6 +677,33 @@ class ConfigController < ApplicationController
     )
   RUBY
 
+  TOOL_OVERRIDE_EXAMPLE = <<~RUBY.freeze
+    # Same key + version. Without override: true, a duplicate registration raises.
+    RecordingStudioAI.tools.register(
+      key: "account_health_tool",
+      version: 1,
+      override: true, # replace the same key/version
+      name: "Account Health Tool",
+      description: "Host override of the tool definition.",
+      use_when: "You need account-level diagnostics.",
+      do_not_use_when: "No account data is required.",
+      parameters: [
+        { name: "account_id", type: "string", required: true, description: "Account identifier" }
+      ],
+      returns: "A hash with score and status.",
+      cost: "low",
+      latency: "fast",
+      read_only: true,
+      destructive: false,
+      requires_confirmation: false,
+      idempotent: true,
+      executor_label: "Host",
+      executor: ->(arguments, _context) do
+        { account_id: arguments.fetch("account_id"), score: 90, status: "healthy" }
+      end
+    )
+  RUBY
+
   MODEL_OVERRIDE_EXAMPLE = <<~RUBY.freeze
     # Same provider + key. Without override: true, a duplicate registration raises.
     RecordingStudioAI.models.register(
@@ -1020,6 +1047,7 @@ class ConfigController < ApplicationController
     @model_override_example = MODEL_OVERRIDE_EXAMPLE
     @profile_example = PROFILE_EXAMPLE
     @custom_tools_example = CUSTOM_TOOLS_EXAMPLE
+    @tool_override_example = TOOL_OVERRIDE_EXAMPLE
     @prompt_registration_example = PROMPT_REGISTRATION_EXAMPLE
     @prompt_override_example = PROMPT_OVERRIDE_EXAMPLE
     @prompt_options = PROMPT_OPTIONS

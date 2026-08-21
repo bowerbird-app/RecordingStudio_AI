@@ -160,7 +160,6 @@
       <li>Provide clear parameter schema and usage guidance.</li>
       <li>Implement a deterministic executor that returns serializable data.</li>
       <li>Pass the tool reference in the request's custom_tools array.</li>
-      <li>Pass <span class="font-mono">override: true</span> to replace an existing tool with the same key and version.</li>
     </ol>
 
     <%= render FlatPack::PageTitle::Component.new(
@@ -210,6 +209,27 @@
     title: "Custom tool registration and usage",
     language: "ruby",
     code: @custom_tools_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Override a Tool",
+      subtitle: "Replace a previously registered tool for the same key and version.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Register again with the same <span class="font-mono">key</span> and <span class="font-mono">version</span>.</li>
+      <li>Pass <span class="font-mono">override: true</span> — without it, a duplicate registration raises.</li>
+      <li>Call sites that pass <span class="font-mono">custom_tools: [{ key:, version: }]</span> keep working; they resolve to the replaced entry.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Tool override",
+    language: "ruby",
+    code: @tool_override_example
   ) %>
 
   <div class="space-y-3">

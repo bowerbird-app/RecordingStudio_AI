@@ -107,9 +107,9 @@ Versioning and Keep a Changelog.
 - Dummy `/config` Create Custom Tools now includes registration-field and
   argument-field tables for `RecordingStudioAI.tools.register`.
 - Dummy `/config` splits registry override docs into dedicated sections:
-  Override a Model (under Add a Model), Register a Prompt (with field table),
-  and Override a Prompt (after custom tools). The combined Registry overrides
-  block is gone.
+  Override a Model (under Add a Model), Override a Tool (after Create Custom
+  Tools), Register a Prompt (with field table), and Override a Prompt. The
+  combined Registry overrides block is gone.
 - Dummy `/config` keeps `admin_authenticate` and AccessibleAuthorization
   guidance alongside those custom-tool tables.
 - Dummy sign-in works through Cursor Cloud and Codespaces forwarded previews by

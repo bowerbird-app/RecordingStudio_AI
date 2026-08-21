@@ -111,6 +111,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Tool registration fields"
     assert_includes response.body, "Argument fields inside parameters"
     assert_includes response.body, "RecordingStudioAI.tools.register"
+    assert_includes response.body, "Override a Tool"
     assert_includes response.body, "Register a Prompt"
     assert_includes response.body, "Prompt registration fields"
     assert_includes response.body, "RecordingStudioAI.prompts.register"
