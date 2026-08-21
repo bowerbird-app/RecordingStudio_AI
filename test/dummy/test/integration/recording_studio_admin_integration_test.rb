@@ -54,9 +54,18 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Methods"
     assert_includes response.body, "RecordingStudioAI.generate"
+    assert_includes response.body, "Inline prompt"
+    assert_includes response.body, "Registered prompt"
+    assert_includes response.body, "Registered custom tools"
+    assert_includes response.body, "RecordingStudioAI.prompt(:customer_reply)"
+    assert_includes response.body, "custom_tools:"
+    assert_includes response.body, "lookup_project"
     assert_includes response.body, "RecordingStudioAI.refresh_batch_async"
-    assert_includes response.body, "RecordingStudioAI.models.register"
+    assert_includes response.body, "RecordingStudioAI.refresh_batch_from_webhook"
     assert_includes response.body, "RecordingStudioAI.models.fetch"
+    refute_includes response.body, "RecordingStudioAI.models.register"
+    refute_includes response.body, "RecordingStudioAI.tools.register"
+    refute_includes response.body, "RecordingStudioAI.prompts.register"
     assert_includes response.body, "href=\"/methods\""
   end
 
@@ -105,13 +114,22 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "config.#{name}", "expected initializer example to set #{name}"
     end
 
+    assert_includes response.body, "Override a Model"
+    assert_includes response.body, "override: true"
     assert_includes response.body, "Create Custom Tools"
     assert_includes response.body, "Tool registration fields"
     assert_includes response.body, "Argument fields inside parameters"
     assert_includes response.body, "RecordingStudioAI.tools.register"
+    assert_includes response.body, "Override a Tool"
+    assert_includes response.body, "Register a Prompt"
+    assert_includes response.body, "Prompt registration fields"
+    assert_includes response.body, "RecordingStudioAI.prompts.register"
+    assert_includes response.body, "Override a Prompt"
+    assert_includes response.body, "overridable: true"
+    refute_includes response.body, "Registry overrides"
 
     tables = Nokogiri::HTML(response.body).css("table")
-    assert_operator tables.length, :>=, 3
+    assert_operator tables.length, :>=, 4
 
     custom_tool_table = tables[1]
     custom_tool_rows = custom_tool_table.css("tbody tr")
@@ -119,7 +137,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     custom_tool_rows.each { |row| assert_equal 5, row.css("td").length, "expected five cells in #{row.text.squish}" }
     documented_tool_keys = ConfigController::CUSTOM_TOOL_OPTIONS.map { |option| option[:key] }
     assert_equal %w[
-      key version name description use_when do_not_use_when parameters returns cost latency
+      key version override name description use_when do_not_use_when parameters returns cost latency
       read_only destructive requires_confirmation idempotent executor_label executor examples
     ], documented_tool_keys
     documented_tool_keys.each do |name|
@@ -134,6 +152,18 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_equal %w[name type required description allowed_values default], documented_parameter_keys
     documented_parameter_keys.each do |name|
       assert_includes parameter_table.text, name, "expected tool argument table to document #{name}"
+    end
+
+    prompt_table = tables[3]
+    prompt_rows = prompt_table.css("tbody tr")
+    assert_equal ConfigController::PROMPT_OPTIONS.length, prompt_rows.length
+    prompt_rows.each { |row| assert_equal 5, row.css("td").length, "expected five cells in #{row.text.squish}" }
+    documented_prompt_keys = ConfigController::PROMPT_OPTIONS.map { |option| option[:key] }
+    assert_equal %w[
+      owner key version name description inputs messages tools defaults overridable override
+    ], documented_prompt_keys
+    documented_prompt_keys.each do |name|
+      assert_includes prompt_table.text, name, "expected prompt registration table to document #{name}"
     end
   end
 

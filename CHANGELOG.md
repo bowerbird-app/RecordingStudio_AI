@@ -106,6 +106,17 @@ Versioning and Keep a Changelog.
   `retry_random` / `retry_sleeper` test seams.
 - Dummy `/config` Create Custom Tools now includes registration-field and
   argument-field tables for `RecordingStudioAI.tools.register`.
+- Dummy `/config` splits registry override docs into dedicated sections:
+  Override a Model (under Add a Model), Override a Tool (after Create Custom
+  Tools), Register a Prompt (with field table), and Override a Prompt. The
+  combined Registry overrides block is gone.
+- Dummy `/methods` shows generate call sites for an inline prompt, a registered
+  prompt (`prompt(...).call` / `stream`), and registered custom tools. Register
+  and override examples stay on `/config`. Also documents hop params on
+  `fallbacks:` and `refresh_batch_from_webhook`.
+- Test suite requires `minitest-mock` so `Object#stub` works under Minitest 6
+  (extracted from core minitest). The root `test_helper` soft-loads it so the
+  dummy app bundle can still boot `recording_studio_v3_test`.
 - Dummy `/config` keeps `admin_authenticate` and AccessibleAuthorization
   guidance alongside those custom-tool tables.
 - Dummy sign-in works through Cursor Cloud and Codespaces forwarded previews by

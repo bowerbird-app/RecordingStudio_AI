@@ -105,6 +105,27 @@
 
   <div class="space-y-3">
     <%= render FlatPack::PageTitle::Component.new(
+      title: "Override a Model",
+      subtitle: "Replace a shipped or previously registered model for the same provider and key.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Register again with the same <span class="font-mono">provider</span> and <span class="font-mono">key</span>.</li>
+      <li>Pass <span class="font-mono">override: true</span> — without it, a duplicate registration raises.</li>
+      <li>Profiles that reference the model string keep working; they resolve to the replaced entry.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Model override",
+    language: "ruby",
+    code: @model_override_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
       title: "3. Create Profiles",
       subtitle: "Profiles are ordered preference lists of provider/model candidates used by generate (including stream: true) and batch.",
       variant: :h3,
@@ -116,7 +137,7 @@
       <li>Reference each model by its provider API model string (the <span class="font-mono">model:</span> value from registration). Do not repeat capabilities here — they come from the model registry.</li>
       <li>Order candidates by preference; the resolver picks the first configured provider whose model supports the request.</li>
       <li>Set <span class="font-mono">config.default_profile</span> and, optionally, <span class="font-mono">config.profile_fallbacks</span> for tier fallback.</li>
-      <li>For a one-off hop list that skips profiles, pass <span class="font-mono">fallbacks:</span> on <span class="font-mono">generate</span> (see Methods).</li>
+      <li>For a one-off hop list that skips profiles, pass <span class="font-mono">fallbacks:</span> on <span class="font-mono">generate</span>. Each entry needs <span class="font-mono">provider</span> and <span class="font-mono">model</span>; you may also set hop-only params such as <span class="font-mono">temperature</span>, <span class="font-mono">verbosity</span>, <span class="font-mono">max_output_tokens</span>, or <span class="font-mono">reasoning_effort</span>. Top-level caller overrides still win.</li>
     </ol>
   </div>
 
@@ -188,5 +209,92 @@
     title: "Custom tool registration and usage",
     language: "ruby",
     code: @custom_tools_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Override a Tool",
+      subtitle: "Replace a previously registered tool for the same key and version.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Register again with the same <span class="font-mono">key</span> and <span class="font-mono">version</span>.</li>
+      <li>Pass <span class="font-mono">override: true</span> — without it, a duplicate registration raises.</li>
+      <li>Call sites that pass <span class="font-mono">custom_tools: [{ key:, version: }]</span> keep working; they resolve to the replaced entry.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Tool override",
+    language: "ruby",
+    code: @tool_override_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Register a Prompt",
+      subtitle: "Versioned message templates with inputs, optional tools, and defaults for generate.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Pick a stable <span class="font-mono">key</span> and <span class="font-mono">version</span>.</li>
+      <li>Set <span class="font-mono">owner</span> to a PascalCase gem or host label (for example <span class="font-mono">Host</span> or <span class="font-mono">SupportGem</span>).</li>
+      <li>Declare <span class="font-mono">inputs</span> and <span class="font-mono">messages</span> with <span class="font-mono">{{snake_case}}</span> placeholders.</li>
+      <li>Optionally allowlist registered tools and set <span class="font-mono">defaults</span> such as profile and purpose.</li>
+      <li>Call with <span class="font-mono">RecordingStudioAI.prompt(:key).call(...)</span>.</li>
+    </ol>
+
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Prompt registration fields",
+      subtitle: "Every argument RecordingStudioAI.prompts.register accepts.",
+      variant: :h4,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::Table::Component.new(data: @prompt_options) do |table| %>
+      <% table.column(
+        title: "Param",
+        html: ->(option) { content_tag(:span, option[:key], class: "font-mono text-xs") }
+      ) %>
+      <% table.column(title: "Required", html: ->(option) { option[:required] }) %>
+      <% table.column(title: "Possible values", html: ->(option) { option[:accepted_values] }) %>
+      <% table.column(
+        title: "Default",
+        html: ->(option) { content_tag(:span, option[:default], class: "font-mono text-xs break-all") }
+      ) %>
+      <% table.column(title: "Description", html: ->(option) { option[:explanation] }) %>
+    <% end %>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Prompt registration and usage",
+    language: "ruby",
+    code: @prompt_registration_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Override a Prompt",
+      subtitle: "Replace the same key and version when the existing prompt allows it.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>The existing prompt must have <span class="font-mono">overridable: true</span> (the default).</li>
+      <li>Register again with the same <span class="font-mono">key</span> and <span class="font-mono">version</span>, and pass <span class="font-mono">override: true</span>.</li>
+      <li>Call sites keep using <span class="font-mono">prompt(:key)</span> — no change needed.</li>
+      <li>Set <span class="font-mono">overridable: false</span> on a gem prompt to lock it against host replacement.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Prompt override",
+    language: "ruby",
+    code: @prompt_override_example
   ) %>
 </div>
