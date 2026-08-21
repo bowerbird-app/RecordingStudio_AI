@@ -363,8 +363,8 @@ module RecordingStudioAI
               key: name,
               arguments: read_value(function_call, :args) || {}
             )
-          rescue RecordingStudioAI::Errors::ContractValidationError => error
-            raise JSON::ParserError, error.message
+          rescue RecordingStudioAI::Errors::ContractValidationError => e
+            raise JSON::ParserError, e.message
           end
         end
       end
