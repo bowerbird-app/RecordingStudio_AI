@@ -117,7 +117,7 @@
       <li>Reference each model by its provider API model string (the <span class="font-mono">model:</span> value from registration). Do not repeat capabilities here — they come from the model registry.</li>
       <li>Order candidates by preference; the resolver picks the first configured provider whose model supports the request.</li>
       <li>Set <span class="font-mono">config.default_profile</span> and, optionally, <span class="font-mono">config.profile_fallbacks</span> for tier fallback.</li>
-      <li>For a one-off hop list that skips profiles, pass <span class="font-mono">fallbacks:</span> on <span class="font-mono">generate</span> (see Methods).</li>
+      <li>For a one-off hop list that skips profiles, pass <span class="font-mono">fallbacks:</span> on <span class="font-mono">generate</span>. Each entry needs <span class="font-mono">provider</span> and <span class="font-mono">model</span>; you may also set hop-only params such as <span class="font-mono">temperature</span>, <span class="font-mono">verbosity</span>, <span class="font-mono">max_output_tokens</span>, or <span class="font-mono">reasoning_effort</span>. Top-level caller overrides still win.</li>
     </ol>
   </div>
 

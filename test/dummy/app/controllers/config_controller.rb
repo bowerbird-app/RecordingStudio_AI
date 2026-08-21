@@ -594,13 +594,17 @@ class ConfigController < ApplicationController
     # model supports the request's required capabilities. Reference models by their
     # provider API model string; capabilities come from the model registry.
     #
-    # For a one-off hop list that skips these profiles, pass fallbacks: on generate:
+    # For a one-off hop list that skips these profiles, pass fallbacks: on generate.
+    # Each entry needs provider + model. Optional generation params on an entry
+    # (temperature, verbosity, max_output_tokens, reasoning_effort) apply only on
+    # that hop when the caller did not set them; top-level caller overrides still
+    # win and adapt per hop.
     #   RecordingStudioAI.generate(
     #     prompt: "...",
     #     temperature: 1,
     #     fallbacks: [
     #       { provider: :openai, model: "gpt-5-mini" },
-    #       { provider: :gemini, model: "gemini-2.5-flash" }
+    #       { provider: :gemini, model: "gemini-2.5-flash", temperature: 0.7, max_output_tokens: 2048 }
     #     ],
     #     **attribution
     #   )
