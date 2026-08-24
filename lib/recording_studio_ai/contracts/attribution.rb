@@ -92,9 +92,9 @@ module RecordingStudioAI
           root_recording: root_recording,
           context_recording: context_recording
         )
-      rescue ArgumentError => error
+      rescue ArgumentError => e
         raise RecordingStudioAI::Errors::ContractValidationError.new(
-          error.message,
+          e.message,
           code: "invalid_request"
         )
       end
