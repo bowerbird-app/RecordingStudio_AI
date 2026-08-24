@@ -48,10 +48,14 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
 
   def test_weekly_calls_series_aggregates_in_sql_without_loading_all_runs
     root_id = create_recording_id
-    this_week = Time.current.beginning_of_week
+    # Anchor to "now" so this-week fixtures stay inside weekly_*_series ranges
+    # (start_week..Time.current). Fixed offsets like beginning_of_week + 2.hours
+    # fall in the future early on Monday UTC and get excluded.
+    reference = Time.current
+    this_week = reference.beginning_of_week
     last_week = this_week - 1.week
-    create_run(root_id: root_id, status: "completed", tokens: 5, created_at: this_week + 1.hour)
-    create_run(root_id: root_id, status: "completed", tokens: 7, created_at: this_week + 2.hours)
+    create_run(root_id: root_id, status: "completed", tokens: 5, created_at: reference - 1.second)
+    create_run(root_id: root_id, status: "completed", tokens: 7, created_at: reference)
     create_run(root_id: root_id, status: "completed", tokens: 3, created_at: last_week + 1.day)
 
     series = AdminScreens::RecordingStudioAIWidgets.weekly_calls_series(
