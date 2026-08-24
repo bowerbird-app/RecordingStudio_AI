@@ -418,8 +418,8 @@ module RecordingStudioAI
               key: read_value(item, :name),
               arguments: JSON.parse(raw_arguments)
             )
-          rescue RecordingStudioAI::Errors::ContractValidationError => error
-            raise JSON::ParserError, error.message
+          rescue RecordingStudioAI::Errors::ContractValidationError => e
+            raise JSON::ParserError, e.message
           end
         end
       end
