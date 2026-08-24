@@ -1,3 +1,9 @@
+inherit_from: .rubocop_todo.yml
+
+inherit_mode:
+  merge:
+    - Exclude
+
 AllCops:
   TargetRubyVersion: 3.3
   NewCops: enable
@@ -15,22 +21,71 @@ Style/StringLiterals:
 
 Layout/LineLength:
   Max: 120
+  Exclude:
+    - 'lib/recording_studio_ai/admin/**/*'
 
-# Relax metrics for test files and generators
+# Relax metrics for test files, generators, the admin screen catalog, and
+# orchestration collaborators (attribute maps and rescue chains).
 Metrics/ClassLength:
   Exclude:
     - 'test/**/*'
-    - 'lib/gem_template/hooks.rb'
+    - 'lib/recording_studio_ai/admin/**/*'
+    - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/prompts/definition.rb'
+    - 'lib/recording_studio_ai/orchestration/**/*'
+
+Metrics/ModuleLength:
+  Exclude:
+    - 'lib/recording_studio_ai/admin/**/*'
 
 Metrics/MethodLength:
   Exclude:
     - 'test/**/*'
     - 'lib/generators/**/*'
+    - 'lib/recording_studio_ai/admin/**/*'
+    - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/prompts/definition.rb'
+    - 'lib/recording_studio_ai/orchestration/**/*'
+    - 'lib/recording_studio_ai/webhooks/**/*'
 
 Metrics/AbcSize:
   Exclude:
     - 'test/**/*'
     - 'lib/generators/**/*'
+    - 'lib/recording_studio_ai/admin/**/*'
+    - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/orchestration/**/*'
+    - 'lib/recording_studio_ai/webhooks/**/*'
+
+Metrics/BlockLength:
+  Exclude:
+    - 'test/**/*'
+    - 'lib/recording_studio_ai/admin/**/*'
+
+Metrics/CyclomaticComplexity:
+  Exclude:
+    - 'lib/recording_studio_ai/admin/**/*'
+    - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/orchestration/**/*'
+    - 'lib/recording_studio_ai/webhooks/**/*'
+
+Metrics/PerceivedComplexity:
+  Exclude:
+    - 'lib/recording_studio_ai/admin/**/*'
+    - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/orchestration/**/*'
+    - 'lib/recording_studio_ai/webhooks/**/*'
+
+Metrics/ParameterLists:
+  Exclude:
+    - 'lib/recording_studio_ai/models/definition.rb'
+    - 'lib/recording_studio_ai/webhooks/**/*'
+
+# Model catalog files are keyed by the provider model slug (dots become hyphens),
+# so their filenames are intentionally not snake_case.
+Naming/FileName:
+  Exclude:
+    - 'lib/recording_studio_ai/models/*/*.rb'
 
 # Allow empty blocks in tests (common for stubs/mocks)
 Lint/EmptyBlock:
@@ -46,9 +101,3 @@ Lint/NestedMethodDefinition:
 Naming/VariableNumber:
   Exclude:
     - 'test/**/*'
-
-# Don't require super in service initialize methods
-Lint/MissingSuper:
-  Exclude:
-    - 'lib/gem_template/services/**/*'
-    - 'test/services/**/*'

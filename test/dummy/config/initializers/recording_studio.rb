@@ -19,3 +19,9 @@ RecordingStudio.configure do |config|
   # Recordable duplication strategy for revisions
   config.recordable_dup_strategy = :dup
 end
+
+# RecordingStudioAccessible grants require the accessible capability to be enabled
+# on recordable types that can own access child recordings.
+RecordingStudio.enable_capability(:accessible, on: "Workspace")
+RecordingStudio.enable_capability(:accessible, on: "Folder")
+RecordingStudio.enable_capability(:accessible, on: "Page")

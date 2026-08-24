@@ -82,6 +82,39 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
     assert_equal "Page cannot be recorded under Page", error.message
   end
 
+  test "AI attribution accepts a root and context from the same recording tree" do
+    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("AI Workspace")))
+    context_recording = record_child(Folder.new(name: unique_name("AI Folder")), root_recording, root_recording)
+
+    attribution = RecordingStudioAI::Contracts::Attribution.new(
+      root_recording: root_recording,
+      context_recording: context_recording,
+      initiator: User.first || User.create!(email: "ai-#{SecureRandom.hex(4)}@example.test", password: "Password")
+    )
+
+    assert_equal root_recording.id, attribution.to_h.fetch(:root_recording_id)
+    assert_equal context_recording.id, attribution.to_h.fetch(:context_recording_id)
+  end
+
+  test "AI attribution rejects a child root and cross-root context" do
+    first_root = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("First AI Workspace")))
+    second_root = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Second AI Workspace")))
+    child = record_child(Folder.new(name: unique_name("Cross-root Folder")), second_root, second_root)
+    initiator = User.first || User.create!(email: "ai-#{SecureRandom.hex(4)}@example.test", password: "Password")
+
+    assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Contracts::Attribution.new(root_recording: child, initiator: initiator)
+    end
+    assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Contracts::Attribution.new(
+        root_recording: first_root, context_recording: child, initiator: initiator
+      )
+    end
+    assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Contracts::Attribution.new(root_recording: Object.new, initiator: initiator)
+    end
+  end
+
   private
 
   def record_child(recordable, root_recording, parent_recording)

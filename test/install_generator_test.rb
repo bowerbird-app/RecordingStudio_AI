@@ -3,166 +3,109 @@
 require "test_helper"
 require "fileutils"
 require "tmpdir"
-require "generators/gem_template/install/install_generator"
+require "generators/recording_studio_ai/install/install_generator"
 
 class InstallGeneratorTest < Minitest::Test
   INSTALL_TEMPLATE_PATH = File.expand_path(
-    "../lib/generators/gem_template/install/templates/INSTALL.md",
+    "../lib/generators/recording_studio_ai/install/templates/INSTALL.md",
     __dir__
   )
 
-  def with_temp_app
-    Dir.mktmpdir do |dir|
-      FileUtils.mkdir_p(File.join(dir, "app/assets/tailwind"))
-      yield dir
-    end
-  end
-
   def build_generator(destination_root, options = {})
-    GemTemplate::Generators::InstallGenerator.new(
+    RecordingStudioAI::Generators::InstallGenerator.new(
       [],
       options,
       destination_root: destination_root
     )
   end
 
-  def test_mount_engine_uses_configured_mount_path
-    generator = build_generator("/tmp", mount_path: "/addons/recording")
+  def test_mount_engine_uses_default_mount_path
     routes = []
+    generator = build_generator("/tmp")
 
     generator.stub(:route, ->(value) { routes << value }) do
       generator.mount_engine
     end
 
-    assert_equal ["mount GemTemplate::Engine, at: \"/addons/recording\""], routes
+    assert_equal ['mount RecordingStudioAI::Engine, at: "/recording_studio_ai"'], routes
   end
 
-  def test_add_tailwind_source_injects_engine_and_flatpack_sources
-    with_temp_app do |dir|
-      css_path = File.join(dir, "app/assets/tailwind/application.css")
-      File.write(css_path, "@import \"tailwindcss\";\n")
+  def test_mount_engine_uses_configured_mount_path
+    routes = []
+    generator = build_generator("/tmp", mount_path: "/addons/ai")
 
-      generator = build_generator(dir)
+    generator.stub(:route, ->(value) { routes << value }) do
+      generator.mount_engine
+    end
 
-      Rails.stub(:root, Pathname.new(dir)) do
-        generator.stub(:say, nil) do
-          generator.add_tailwind_source
-        end
-      end
+    assert_equal ['mount RecordingStudioAI::Engine, at: "/addons/ai"'], routes
+  end
 
-      css = File.read(css_path)
-      assert_tailwind_sources_present(css)
+  def test_copy_initializer_creates_recording_studio_ai_configuration
+    Dir.mktmpdir do |directory|
+      build_generator(directory).copy_initializer
+      initializer = File.read(File.join(directory, "config/initializers/recording_studio_ai.rb"))
+
+      assert_includes initializer, "RecordingStudioAI.configure"
+      assert_includes initializer, "OPENAI_API_KEY"
+      assert_includes initializer, "openai, :api_key"
+      assert_includes initializer, "GEMINI_API_KEY"
+      assert_includes initializer, "gemini, :api_key"
+      assert_includes initializer, "config.openai_client"
+      assert_includes initializer, "config.gemini_client"
+      assert_includes initializer, "config.default_profile = :medium"
+      assert_includes initializer, "config.profiles = {"
+      assert_includes initializer, "gpt-5-mini"
+      assert_includes initializer, "gpt-5-pro"
+      assert_includes initializer, "config.cost_catalogs = {}"
+      assert_includes initializer, "config.batch_synchronization_interval = 1.minute"
+      assert_includes initializer, "config.allowed_provider_overrides"
+      assert_includes initializer, "config.retain_responses = false"
+      assert_includes initializer, "config.response_retention_period = 7.days"
+      assert_includes initializer, "config.maximum_retained_response_size = 1.megabyte"
+      assert_includes initializer, "config.response_sanitizer = nil"
+      assert_includes initializer, "config.instrumentation_enabled = true"
+      assert_includes initializer, 'config.notification_namespace = "recording_studio_ai"'
+      assert_includes initializer, "config.admin_warning_thresholds"
+      assert_includes initializer, "config.maximum_attempts = 3"
+      assert_includes initializer, "config.maximum_attachment_count = 10"
+      assert_includes initializer, "config.maximum_attachment_bytes = 20.megabytes"
+      assert_includes initializer, "config.maximum_attachment_total_bytes = 50.megabytes"
+      assert_includes initializer, "config.allowed_attachment_content_types"
+      assert_includes initializer, "config.maximum_retries_per_candidate = 1"
+      assert_includes initializer, "config.maximum_provider_fallbacks = 1"
+      assert_includes initializer, "config.maximum_profile_fallbacks = 1"
+      assert_includes initializer, "config.profile_fallbacks = {}"
+      assert_includes initializer, "config.maximum_custom_tool_rounds = 5"
+      assert_includes initializer, "config.custom_tool_timeout = 30"
+      assert_includes initializer, "config.maximum_custom_tool_result_size = 256.kilobytes"
+      assert_includes initializer, "config.custom_tool_confirmation_handler = ->(**) { false }"
+      assert_includes initializer, "config.total_execution_timeout = 300"
+      assert_includes initializer, "config.request_timeout = 120"
+      assert_includes initializer, "config.stream_idle_timeout = 30"
+      assert_includes initializer, "config.authorization_handler"
+      assert_includes initializer, "RecordingStudioAI::AccessibleAuthorization"
+      assert_includes initializer, "config.admin_authenticate"
+      assert_includes initializer, "config.attribution_validator"
     end
   end
 
-  def test_add_tailwind_source_does_not_duplicate_existing_entries
-    with_temp_app do |dir|
-      css_path = File.join(dir, "app/assets/tailwind/application.css")
-      File.write(css_path, <<~CSS)
-        @import "tailwindcss";
-        @source "../../vendor/bundle/**/gem_template/app/views/**/*.erb";
-        @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/gem_template-*/app/views/**/*.erb";
-        @source "../../vendor/bundle/**/flatpack/app/components/**/*.{rb,erb}";
-        @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";
-      CSS
-
-      generator = build_generator(dir)
-
-      Rails.stub(:root, Pathname.new(dir)) do
-        generator.stub(:say, nil) do
-          generator.add_tailwind_source
-        end
-      end
-
-      css = File.read(css_path)
-      assert_tailwind_sources_present(css)
-      assert_tailwind_sources_count(css, 1)
-    end
-  end
-
-  def test_add_tailwind_source_reports_missing_tailwind_config
-    with_temp_app do |dir|
-      FileUtils.rm_rf(File.join(dir, "app/assets/tailwind"))
-      generator = build_generator(dir)
-      messages = []
-
-      Rails.stub(:root, Pathname.new(dir)) do
-        generator.stub(:say, ->(message, color = nil) { messages << [message, color] }) do
-          generator.add_tailwind_source
-        end
-      end
-
-      assert_includes messages, ["Tailwind CSS not detected. Skipping Tailwind configuration.", :yellow]
-      assert_includes messages, ["If you use Tailwind, add these lines to your Tailwind CSS config:", :yellow]
-      tailwind_source_lines.each do |line|
-        assert_includes messages, ["  #{line}", :yellow]
-      end
-    end
-  end
-
-  def test_add_tailwind_source_reports_manual_configuration_when_import_is_missing
-    with_temp_app do |dir|
-      css_path = File.join(dir, "app/assets/tailwind/application.css")
-      File.write(css_path, "@source \"../local/**/*.erb\";\n")
-      generator = build_generator(dir)
-      messages = []
-
-      Rails.stub(:root, Pathname.new(dir)) do
-        generator.stub(:say, ->(message, color = nil) { messages << [message, color] }) do
-          generator.add_tailwind_source
-        end
-      end
-
-      assert_equal "@source \"../local/**/*.erb\";\n", File.read(css_path)
-      assert_includes messages, ["Could not find @import \"tailwindcss\" in your Tailwind config.", :yellow]
-      assert_includes messages, ["Please manually add these lines to your Tailwind CSS config:", :yellow]
-      tailwind_source_lines.each do |line|
-        assert_includes messages, ["  #{line}", :yellow]
-      end
-    end
-  end
-
-  def test_show_readme_displays_install_guide_for_invoke_behavior
-    generator = build_generator("/tmp")
-    shown_templates = []
-
-    generator.stub(:behavior, :invoke) do
-      generator.stub(:readme, ->(template) { shown_templates << template }) do
-        generator.show_readme
-      end
-    end
-
-    assert_equal ["INSTALL.md"], shown_templates
-  end
-
-  def test_install_guide_includes_migration_and_host_setup_steps
+  def test_install_guide_includes_v1_provider_migration_and_operations_steps
     install_guide = File.read(INSTALL_TEMPLATE_PATH)
 
-    assert_includes install_guide, "bin/rails generate gem_template:migrations"
+    assert_includes install_guide, "Confirm Recording Studio is configured"
+    assert_includes install_guide, "recording_studio_ai:install:migrations"
     assert_includes install_guide, "bin/rails db:migrate"
-    assert_includes install_guide, "auth, layout, and current actor integration"
-  end
-
-  private
-
-  def assert_tailwind_sources_present(css)
-    tailwind_source_lines.each do |line|
-      assert_includes css, line
-    end
-  end
-
-  def assert_tailwind_sources_count(css, count)
-    tailwind_source_lines.each do |line|
-      assert_equal count, css.scan(line).size
-    end
-  end
-
-  def tailwind_source_lines
-    [
-      '@source "../../vendor/bundle/**/gem_template/app/views/**/*.erb";',
-      '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/gem_template-*/app/views/**/*.erb";',
-      '@source "../../vendor/bundle/**/flatpack/app/components/**/*.{rb,erb}";',
-      '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";'
-    ]
+    assert_includes install_guide, "Configure at least one OpenAI or Gemini credential"
+    assert_includes install_guide, "authorization handler"
+    assert_includes install_guide, "AccessibleAuthorization"
+    assert_includes install_guide, "admin_authenticate"
+    assert_includes install_guide, "Active Record Encryption"
+    assert_includes install_guide, "ResponseCleanupJob"
+    assert_includes install_guide, "admin_visible_roots_resolver"
+    assert_includes install_guide, "Recording Studio Admin's Accessible check"
+    assert_includes install_guide, "provider-side retention"
+    assert_includes install_guide, "db:rollback"
+    refute_includes install_guide, "does not install migrations"
   end
 end

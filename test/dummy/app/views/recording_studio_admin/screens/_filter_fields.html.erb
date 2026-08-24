@@ -1,0 +1,66 @@
+<% filters.each do |filter| %>
+  <% if filter.key == :token_min %>
+    <% token_max_filter = filters.find { |candidate| candidate.key == :token_max } %>
+    <% token_range_max = filter.options.fetch(:max, 1_000_000) %>
+    <div class="<%= wrapper_class %> space-y-4">
+      <p class="text-sm font-medium text-(--surface-content-color)">Token range</p>
+      <%= render FlatPack::RangeInput::Component.new(
+        name: filter.param_key,
+        id: "min_tokens",
+        value: filter.value.presence || 0,
+        min: 0,
+        max: token_range_max,
+        step: 100,
+        label: "Minimum tokens"
+      ) %>
+      <%= render FlatPack::RangeInput::Component.new(
+        name: token_max_filter.param_key,
+        id: "max_tokens",
+        value: token_max_filter.value.presence || token_range_max,
+        min: 0,
+        max: token_range_max,
+        step: 100,
+        label: "Maximum tokens"
+      ) %>
+    </div>
+  <% elsif filter.key != :token_max %>
+    <div class="<%= wrapper_class %>">
+      <% if filter.type == :date_range %>
+        <%= render FlatPack::DateRangeInput::Component.new(
+          start_name: filter.start_param,
+          end_name: filter.end_param,
+          start_value: filter.value&.start_date,
+          end_value: filter.value&.end_date,
+          label: filter.key.to_s.humanize
+        ) %>
+        <%= hidden_field_tag filter.preset_param, filter.value&.preset_key %>
+      <% elsif filter.options[:control].to_s == "checkbox" %>
+        <%= render FlatPack::Checkbox::Component.new(
+          name: filter.param_key,
+          label: filter.key.to_s.humanize,
+          checked: filter.value.to_s == "1"
+        ) %>
+      <% else %>
+        <% select_options = Array(filter.options[:values] || filter.options[:options]).map { |value| { label: value.to_s.humanize, value: value } } %>
+        <% select_search_options = filter.options.slice(:searchable, :search_mode, :search_param, :search_endpoint).compact %>
+        <% if select_options.any? %>
+          <%= render FlatPack::Select::Component.new(
+            name: filter.param_key,
+            options: select_options,
+            value: filter.value,
+            label: filter.key.to_s.humanize,
+            placeholder: "All",
+            **select_search_options
+          ) %>
+        <% else %>
+          <%= render FlatPack::SearchInput::Component.new(
+            name: filter.param_key,
+            value: filter.value,
+            label: filter.key.to_s.humanize,
+            placeholder: filter.key.to_s.humanize
+          ) %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

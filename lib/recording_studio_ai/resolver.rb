@@ -1,0 +1,105 @@
+# frozen_string_literal: true
+
+module RecordingStudioAI
+  class Resolver
+    Result = Data.define(:candidate, :error) do
+      def success?
+        !candidate.nil?
+      end
+    end
+
+    def initialize(configuration: RecordingStudioAI.configuration)
+      @configuration = configuration
+    end
+
+    def resolve(profile:, required_capabilities:, provider: nil, model: nil)
+      candidates(
+        profile: profile,
+        required_capabilities: required_capabilities,
+        provider: provider,
+        model: model
+      ).first
+    end
+
+    def candidates(profile:, required_capabilities:, provider: nil, model: nil, allow_empty: false)
+      provider_key = validate_override!(provider)
+      model_key = model&.to_s
+      candidates = Array(@configuration.profiles[profile.to_sym]).map { |entry| build_candidate(entry) }
+      candidates.select! { |candidate| candidate.provider == provider_key } if provider_key
+      candidates.select! { |candidate| candidate.model == model_key } if model_key
+      select_configured_capable!(candidates, required_capabilities, allow_empty: allow_empty, model: model_key)
+    end
+
+    # Explicit generate(fallbacks: [...]) list. Same shape as profile entries
+    # ({ provider:, model: }); skips configured profiles and profile_fallbacks.
+    def candidates_from_entries(entries, required_capabilities:, allow_empty: false)
+      candidates = Array(entries).map { |entry| build_candidate(entry) }
+      select_configured_capable!(
+        candidates,
+        required_capabilities,
+        allow_empty: allow_empty,
+        source: :fallbacks
+      )
+    end
+
+    private
+
+    def validate_override!(provider)
+      return nil if provider.nil?
+
+      provider_key = provider.to_sym
+      return provider_key if Array(@configuration.allowed_provider_overrides).map(&:to_sym).include?(provider_key)
+
+      raise RecordingStudioAI::Errors::ContractValidationError.new(
+        "Provider override #{provider_key} is not enabled",
+        code: "configuration"
+      )
+    end
+
+    def select_configured_capable!(candidates, required_capabilities, allow_empty:, model: nil, source: :profile)
+      candidates.select! do |candidate|
+        provider = @configuration.providers[candidate.provider]
+        provider && (!provider.respond_to?(:configured?) || provider.configured?)
+      end
+
+      eligible = candidates.select { |candidate| candidate.supports?(required_capabilities) }
+      return eligible if eligible.any? || allow_empty
+
+      raise_resolution_error!(candidates, required_capabilities, model: model, source: source)
+    end
+
+    def build_candidate(entry)
+      return entry if entry.is_a?(RecordingStudioAI::Candidate)
+
+      attributes = entry.transform_keys(&:to_sym)
+      attributes[:capabilities] ||= registered_capabilities(attributes[:provider], attributes[:model])
+      RecordingStudioAI::Candidate.new(**attributes)
+    end
+
+    # Profiles reference models by their provider API model string. When a
+    # profile entry omits explicit capabilities, derive them from the registered
+    # model definition so capabilities live in one place (the model registry).
+    def registered_capabilities(provider, model)
+      return nil if provider.nil? || model.nil?
+
+      definition = RecordingStudioAI.models.fetch(provider, model)
+      definition&.capabilities
+    end
+
+    def raise_resolution_error!(candidates, required_capabilities, model: nil, source: :profile)
+      category = candidates.empty? ? "configuration" : "unsupported_capability"
+      code = candidates.empty? ? "not_implemented" : "unsupported_capability"
+      message = if candidates.empty? && source == :fallbacks
+                  "No candidates from the requested fallbacks are available."
+                elsif candidates.empty? && model
+                  "No candidates match the requested profile, provider, and model (#{model})."
+                elsif candidates.empty?
+                  "No candidates are configured for the requested profile and provider."
+                else
+                  "No candidate supports all required capabilities: #{required_capabilities.join(', ')}"
+                end
+
+      raise RecordingStudioAI::Errors::ResolutionError.new(category: category, code: code, message: message)
+    end
+  end
+end

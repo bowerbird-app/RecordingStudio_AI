@@ -1,0 +1,715 @@
+# frozen_string_literal: true
+
+require "test_helper"
+
+class PhaseNineCustomToolsTest < RecordingStudioAI::Test::PersistenceCase
+  Actor = Struct.new(:id)
+  OpenAIClient = Struct.new(:responses)
+  GeminiClient = Struct.new(:models)
+
+  class ProviderQueue
+    attr_reader :requests
+
+    def initialize(*responses)
+      @responses = responses
+      @requests = []
+    end
+
+    def create(**request)
+      requests << request
+      @responses.shift || raise("unexpected OpenAI call")
+    end
+
+    def generate_content(**request)
+      requests << request
+      @responses.shift || raise("unexpected Gemini call")
+    end
+  end
+
+  class ToolProvider < RecordingStudioAI::Providers::Base
+    attr_reader :requests
+
+    def initialize(*results)
+      @results = results
+      @requests = []
+    end
+
+    def generate(request:, candidate:)
+      requests << { request: request, candidate: candidate }
+      @results.shift || raise("unexpected provider call")
+    end
+  end
+
+  def setup
+    super
+    @root_recording = Actor.new(create_recording_id)
+    @initiator = Actor.new(51)
+    isolate_allow_all_configuration!
+    isolate_tools_registry!
+  end
+
+  def test_definition_validates_parameters_and_applies_defaults
+    definition = register_tool
+
+    assert_equal({ "format" => "short", "topic" => "Rails" }, definition.validate_arguments!(topic: "Rails"))
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      definition.validate_arguments!(topic: "Rails", unknown: true)
+    end
+    assert_equal "custom_tool_validation", error.code
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      definition.validate_arguments!(topic: "Rails", format: "verbose")
+    end
+    assert_equal "custom_tool_validation", error.code
+  end
+
+  def test_custom_tool_executor_receives_restricted_context_with_cancellation_state
+    received_context = nil
+    provider = ToolProvider.new(
+      tool_result("call-context", "summarize_record", { "topic" => "Rails" }),
+      success_result("continued")
+    )
+    configure_provider(provider)
+    register_tool(executor: lambda { |_arguments, context|
+      received_context = context
+      { value: "ok" }
+    })
+
+    response = generate
+
+    assert response.success?
+    assert_same @root_recording, received_context.root_recording
+    assert_same @initiator, received_context.initiator
+    assert_instance_of RecordingStudioAI::Orchestrator::CancellationState, received_context.cancellation_state
+    refute received_context.cancellation_state.cancelled?
+    refute_respond_to received_context, :provider_client
+  end
+
+  def test_definition_supports_all_parameter_types_and_exposes_json_schema
+    definition = register_tool(parameters: [
+      { name: :label, type: :string, required: true, description: "Label." },
+      { name: :count, type: :integer, required: true, description: "Count." },
+      { name: :ratio, type: :number, required: true, description: "Ratio." },
+      { name: :enabled, type: :boolean, required: true, description: "Enabled." },
+      { name: :options, type: :object, required: true, description: "Options." },
+      { name: :items, type: :array, required: false, description: "Items.", default: [] }
+    ])
+
+    arguments = definition.validate_arguments!(
+      label: "Rails", count: 2, ratio: 1.5, enabled: false, options: { compact: true }
+    )
+
+    assert_equal [], arguments.fetch("items")
+    assert_equal "object", definition.json_schema.fetch("type")
+    assert_equal false, definition.json_schema.fetch("additionalProperties")
+    assert_equal %w[label count ratio enabled options], definition.json_schema.fetch("required")
+    assert_equal "integer", definition.json_schema.dig("properties", "count", "type")
+  end
+
+  def test_unknown_tool_reference_is_rejected_before_provider_contact
+    provider = ToolProvider.new(success_result("must not run"))
+    configure_provider(provider)
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      generate(custom_tools: [{ key: :missing_tool, version: 1 }])
+    end
+
+    assert_equal "custom_tool_validation", error.code
+    assert_empty provider.requests
+    assert_equal 0, RecordingStudioAI::Run.count
+  end
+
+  def test_executes_tool_and_continues_provider_generation
+    executed_context = nil
+    register_tool(executor: lambda do |arguments, context|
+      executed_context = context
+      { summary: "#{arguments.fetch('topic')} summary" }
+    end)
+    provider = ToolProvider.new(
+      tool_result("call-1", "summarize_record", topic: "Rails"),
+      success_result("Final answer")
+    )
+    configure_provider(provider)
+
+    response = generate
+
+    assert response.success?
+    assert_equal "Final answer", response.text
+    assert_equal %w[primary continuation], response.attempts.map(&:kind)
+    assert_equal 2, provider.requests.length
+    assert_equal "call-1", provider.requests.last[:request][:custom_tool_results].first[:provider_tool_call_id]
+    assert_equal "summarize_record", provider.requests.last[:request][:custom_tool_results].first[:tool_key]
+    assert_equal @root_recording, executed_context.root_recording
+    assert_equal @initiator, executed_context.initiator
+    assert_equal 1, response.custom_tool_invocations.length
+
+    invocation = RecordingStudioAI::CustomToolInvocation.first
+    assert_equal "completed", invocation.status
+    assert_equal "summarize_record", invocation.tool_key
+    assert_equal RecordingStudioAI::Attempt.first.id, invocation.requested_by_attempt_id
+    assert_equal RecordingStudioAI::Attempt.second.id, invocation.continued_by_attempt_id
+    refute_includes invocation.attributes.values, "Rails summary"
+    assert_equal 1, response.run.custom_tool_invocation_count
+  end
+
+  def test_confirmation_rejection_stops_before_executor_and_continuation
+    executed = false
+    register_tool(
+      requires_confirmation: true,
+      executor: ->(*) { executed = true }
+    )
+    RecordingStudioAI.configuration.custom_tool_confirmation_handler = ->(**) { false }
+    provider = ToolProvider.new(tool_result("call-1", "summarize_record", topic: "Rails"))
+    configure_provider(provider)
+
+    response = generate
+
+    refute response.success?
+    refute executed
+    assert_equal 1, provider.requests.length
+    assert_equal "custom_tool_rejected", response.error.category
+    invocation = RecordingStudioAI::CustomToolInvocation.first
+    assert_equal "rejected", invocation.status
+    assert_equal "rejected", invocation.confirmation_status
+  end
+
+  def test_pending_confirmation_does_not_execute_or_terminalize_invocation
+    executed = false
+    register_tool(requires_confirmation: true, executor: ->(*) { executed = true })
+    RecordingStudioAI.configuration.custom_tool_confirmation_handler = ->(**) { :pending }
+    configure_provider(ToolProvider.new(tool_result("call-1", "summarize_record", topic: "Rails")))
+
+    response = generate
+
+    refute response.success?
+    refute executed
+    assert_equal "custom_tool_confirmation_required", response.error.category
+    invocation = RecordingStudioAI::CustomToolInvocation.first
+    assert_equal "awaiting_confirmation", invocation.status
+    assert_equal "pending", invocation.confirmation_status
+    assert_nil invocation.completed_at
+  end
+
+  def test_expired_confirmation_is_recorded_without_execution
+    executed = false
+    register_tool(requires_confirmation: true, executor: ->(*) { executed = true })
+    RecordingStudioAI.configuration.custom_tool_confirmation_handler = ->(**) { :expired }
+    configure_provider(ToolProvider.new(tool_result("call-1", "summarize_record", topic: "Rails")))
+
+    response = generate
+
+    refute response.success?
+    refute executed
+    invocation = RecordingStudioAI::CustomToolInvocation.first
+    assert_equal "rejected", invocation.status
+    assert_equal "expired", invocation.confirmation_status
+  end
+
+  def test_custom_tool_cancellation_state_prevents_continuation
+    register_tool(executor: lambda { |_arguments, context|
+      context.cancellation_state.cancel!
+      "discarded result"
+    })
+    provider = ToolProvider.new(tool_result("call-1", "summarize_record", topic: "Rails"))
+    configure_provider(provider)
+
+    response = generate
+
+    refute response.success?
+    assert_equal "cancelled", response.error.category
+    assert_equal 1, provider.requests.length
+    assert_equal "cancelled", RecordingStudioAI::CustomToolInvocation.first.status
+  end
+
+  def test_custom_tool_authorization_denial_stops_before_executor
+    executed = false
+    register_tool(executor: ->(*) { executed = true })
+    RecordingStudioAI.configuration.authorization_handler = lambda do |action:, **|
+      action != "recording_studio_ai.use_custom_tool"
+    end
+    provider = ToolProvider.new(tool_result("call-1", "summarize_record", topic: "Rails"))
+    configure_provider(provider)
+
+    response = generate
+
+    refute response.success?
+    refute executed
+    assert_equal "custom_tool_denied", response.error.category
+    assert_equal "denied", RecordingStudioAI::CustomToolInvocation.first.status
+    assert_equal 1, provider.requests.length
+  end
+
+  def test_destructive_tool_requires_confirmation_and_records_confirmer
+    actions = []
+    register_tool(read_only: false, destructive: true, requires_confirmation: false)
+    RecordingStudioAI.configuration.authorization_handler = lambda do |action:, **|
+      actions << action
+      true
+    end
+    RecordingStudioAI.configuration.custom_tool_confirmation_handler = ->(**) { true }
+    provider = ToolProvider.new(
+      tool_result("call-1", "summarize_record", topic: "Rails"),
+      success_result("confirmed")
+    )
+    configure_provider(provider)
+
+    response = generate
+
+    assert response.success?
+    assert_includes actions, "recording_studio_ai.use_custom_tool"
+    assert_includes actions, "recording_studio_ai.confirm_custom_tool"
+    invocation = RecordingStudioAI::CustomToolInvocation.first
+    assert_equal "confirmed", invocation.confirmation_status
+    assert_equal @initiator.class.name, invocation.confirmed_by_type
+    assert_equal @initiator.id.to_s, invocation.confirmed_by_id
+  end
+
+  def test_custom_tool_round_limit_stops_repeated_requests
+    register_tool
+    RecordingStudioAI.configuration.maximum_custom_tool_rounds = 1
+    provider = ToolProvider.new(
+      tool_result("call-1", "summarize_record", topic: "Rails"),
+      tool_result("call-2", "summarize_record", topic: "Ruby")
+    )
+    configure_provider(provider)
+
+    response = generate
+
+    refute response.success?
+    assert_equal "custom_tool_failed", response.error.category
+    assert_equal %w[primary continuation], response.attempts.map(&:kind)
+    assert_equal 1, RecordingStudioAI::CustomToolInvocation.count
+  end
+
+  def test_multiple_tool_rounds_accumulate_request_scoped_history
+    register_tool
+    provider = ToolProvider.new(
+      tool_result("call-1", "summarize_record", topic: "Rails"),
+      tool_result("call-2", "summarize_record", topic: "Ruby"),
+      success_result("done")
+    )
+    configure_provider(provider)
+
+    response = generate
+
+    assert response.success?
+    assert_equal %w[primary continuation continuation], response.attempts.map(&:kind)
+    assert_equal 2, provider.requests.last[:request][:custom_tool_history].length
+    call_ids = provider.requests.last[:request][:custom_tool_history].map do |round|
+      round.fetch(:calls).first.fetch(:provider_tool_call_id)
+    end
+    assert_equal %w[call-1 call-2], call_ids
+  end
+
+  def test_provider_error_with_tool_calls_does_not_execute_tool
+    executed = false
+    register_tool(executor: ->(*) { executed = true })
+    result = tool_result("call-1", "summarize_record", topic: "Rails").with(
+      error: RecordingStudioAI::Contracts::NormalizedError.new(
+        category: "provider_error",
+        code: "invalid_response",
+        message: "Provider failed.",
+        retryable: false,
+        provider: "test"
+      )
+    )
+    provider = ToolProvider.new(result)
+    configure_provider(provider)
+
+    response = generate
+
+    refute response.success?
+    refute executed
+    assert_equal 0, RecordingStudioAI::CustomToolInvocation.count
+    assert_equal 1, provider.requests.length
+  end
+
+  def test_provider_error_on_final_allowed_round_is_not_masked
+    register_tool
+    RecordingStudioAI.configuration.maximum_custom_tool_rounds = 1
+    provider_error = RecordingStudioAI::Contracts::NormalizedError.new(
+      category: "provider_unavailable",
+      code: "http_503",
+      message: "Provider is unavailable.",
+      retryable: true,
+      provider: "test"
+    )
+    provider = ToolProvider.new(
+      tool_result("call-1", "summarize_record", topic: "Rails"),
+      tool_result("call-2", "summarize_record", topic: "Ruby").with(error: provider_error)
+    )
+    configure_provider(provider)
+
+    response = generate
+
+    refute response.success?
+    assert_equal "provider_unavailable", response.error.category
+    assert_equal "http_503", response.error.code
+    assert_equal 1, RecordingStudioAI::CustomToolInvocation.count
+  end
+
+  def test_provider_tool_identifiers_are_length_bounded
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Providers::ToolCall.new(
+        provider_tool_call_id: "x" * 256,
+        key: "summarize_record",
+        arguments: {}
+      )
+    end
+
+    assert_equal "invalid_request", error.code
+  end
+
+  def test_total_execution_deadline_stops_before_provider_contact
+    register_tool
+    provider = ToolProvider.new(success_result("must not run"))
+    configure_provider(provider)
+    RecordingStudioAI.configuration.total_execution_timeout = 0
+
+    response = generate
+
+    refute response.success?
+    assert_equal "timeout", response.error.category
+    assert_equal "execution_deadline_exceeded", response.error.code
+    assert_empty provider.requests
+  end
+
+  def test_all_invocations_become_terminal_when_one_of_multiple_tool_calls_fails
+    register_tool
+    provider = ToolProvider.new(
+      RecordingStudioAI::Providers::Result.new(
+        tool_calls: [
+          RecordingStudioAI::Providers::ToolCall.new(
+            provider_tool_call_id: "call-1", key: "summarize_record", arguments: { topic: "Rails" }
+          ),
+          RecordingStudioAI::Providers::ToolCall.new(
+            provider_tool_call_id: "call-2", key: "summarize_record", arguments: { "private-value" => true }
+          )
+        ]
+      )
+    )
+    configure_provider(provider)
+
+    response = generate
+
+    refute response.success?
+    assert_equal "custom_tool_validation", response.error.category
+    assert_equal %w[completed failed], RecordingStudioAI::CustomToolInvocation.order(:id).pluck(:status)
+    assert_nil RecordingStudioAI::CustomToolInvocation.first.continued_by_attempt_id
+    refute_includes RecordingStudioAI::CustomToolInvocation.second.attributes.values, "private-value"
+  end
+
+  def test_oversized_result_fails_without_persisting_payload
+    register_tool(executor: ->(*) { "secret" * 100 })
+    RecordingStudioAI.configuration.maximum_custom_tool_result_size = 20
+    provider_result = tool_result("call-1", "summarize_record", topic: "Rails").with(
+      usage: RecordingStudioAI::Contracts::Usage.new(input_tokens: 7, output_tokens: 2, total_tokens: 9)
+    )
+    provider = ToolProvider.new(provider_result)
+    configure_provider(provider)
+
+    response = generate
+
+    refute response.success?
+    assert_equal "custom_tool_failed", response.error.category
+    assert_equal "completed", response.attempts.first.status
+    assert_nil response.attempts.first.error
+    assert_equal 9, response.usage.total_tokens
+    assert_equal 9, response.run.total_tokens
+    invocation = RecordingStudioAI::CustomToolInvocation.first
+    assert_equal "failed", invocation.status
+    refute_includes invocation.attributes.values, "secret" * 100
+  end
+
+  def test_non_idempotent_tool_does_not_retry_or_fallback_failed_continuation
+    register_tool(idempotent: false)
+    retryable_failure = RecordingStudioAI::Providers::Result.new(
+      error: RecordingStudioAI::Contracts::NormalizedError.new(
+        category: "timeout",
+        code: "provider_timeout",
+        message: "Provider timed out.",
+        retryable: true,
+        provider: "test"
+      )
+    )
+    provider = ToolProvider.new(
+      tool_result("call-1", "summarize_record", topic: "Rails"),
+      retryable_failure,
+      success_result("must not retry")
+    )
+    configure_provider(provider)
+    RecordingStudioAI.configuration.maximum_retries_per_candidate = 2
+
+    response = generate
+
+    refute response.success?
+    assert_equal %w[primary continuation], response.attempts.map(&:kind)
+    assert_equal 2, provider.requests.length
+    assert_equal "completed", RecordingStudioAI::CustomToolInvocation.first.status
+  end
+
+  def test_openai_translates_tool_definition_call_and_continuation
+    register_tool
+    responses = ProviderQueue.new(
+      {
+        id: "resp_tool",
+        status: "completed",
+        output: [{ type: "function_call", call_id: "call-1", name: "summarize_record", arguments: '{"topic":"Rails"}' }]
+      },
+      { id: "resp_final", status: "completed", output_text: "OpenAI final", output: [] }
+    )
+    configure_external_provider(:openai, OpenAIClient.new(responses))
+
+    response = generate(provider: :openai)
+
+    assert response.success?
+    assert_equal "OpenAI final", response.text
+    function = responses.requests.first[:tools].find { |tool| tool[:type] == "function" }
+    assert_equal "summarize_record", function[:name]
+    assert_equal false, function.dig(:parameters, "additionalProperties")
+    continuation = responses.requests.second
+    refute continuation.key?(:previous_response_id)
+    assert_equal "Summarize this", continuation[:input].first[:content]
+    assert_equal %w[function_call function_call_output], continuation[:input].drop(1).map { |item| item[:type] }
+    assert_equal %w[call-1 call-1], continuation[:input].drop(1).map { |item| item[:call_id] }
+  end
+
+  def test_gemini_translates_tool_definition_call_and_continuation
+    register_tool
+    models = ProviderQueue.new(
+      {
+        "responseId" => "gem_tool",
+        "candidates" => [{
+          "content" => { "parts" => [{ "functionCall" => { "name" => "summarize_record", "args" => { "topic" => "Rails" } } }] },
+          "finishReason" => "STOP"
+        }]
+      },
+      {
+        "responseId" => "gem_final",
+        "candidates" => [{ "content" => { "parts" => [{ "text" => "Gemini final" }] }, "finishReason" => "STOP" }]
+      }
+    )
+    configure_external_provider(:gemini, GeminiClient.new(models))
+
+    response = generate(provider: :gemini)
+
+    assert response.success?
+    assert_equal "Gemini final", response.text
+    declaration = models.requests.first.dig(:config, :tools).first[:function_declarations].first
+    assert_equal "summarize_record", declaration[:name]
+    refute declaration[:parameters].key?("additionalProperties")
+    continuation_contents = models.requests.second[:contents]
+    assert_equal "summarize_record", continuation_contents[-2].dig(:parts, 0, :function_call, :name)
+    assert_equal "summarize_record", continuation_contents[-1].dig(:parts, 0, :function_response, :name)
+  end
+
+  def test_internal_gemini_transport_camelizes_tool_fields_without_changing_payload_keys
+    client = RecordingStudioAI::ProviderClients::Gemini.new(api_key: "secret-key", timeout: 5)
+    captured_request = nil
+    http = Object.new
+    http.define_singleton_method(:request) do |request|
+      captured_request = request
+      response = Net::HTTPOK.new("1.1", "200", "OK")
+      response.instance_variable_set(:@read, true)
+      response.instance_variable_set(:@body, '{"responseId":"gem-tool-rest"}')
+      response
+    end
+
+    Net::HTTP.stub(:start, ->(*, **, &block) { block.call(http) }) do
+      client.generate_content(
+        model: "gemini-test",
+        contents: [
+          { role: "model", parts: [{ function_call: { name: "summarize_record", args: { "topic_key" => "Rails" } } }] },
+          {
+            role: "user",
+            parts: [{ function_response: { name: "summarize_record", response: { "result_key" => "done" } } }]
+          }
+        ],
+        config: {
+          tools: [{ function_declarations: [{
+            name: "summarize_record",
+            description: "Summarize.",
+            parameters: { "type" => "object", "properties" => { "topic_key" => { "type" => "string" } } }
+          }] }]
+        }
+      )
+    end
+
+    body = JSON.parse(captured_request.body)
+    assert_equal "summarize_record", body.dig("tools", 0, "functionDeclarations", 0, "name")
+    assert_equal "string", body.dig("tools", 0, "functionDeclarations", 0, "parameters", "properties", "topic_key", "type")
+    assert_equal "Rails", body.dig("contents", 0, "parts", 0, "functionCall", "args", "topic_key")
+    assert_equal "done", body.dig("contents", 1, "parts", 0, "functionResponse", "response", "result_key")
+    refute body.key?("toolConfig")
+  end
+
+  def test_internal_gemini_transport_opts_in_when_web_search_and_custom_tools_are_combined
+    client = RecordingStudioAI::ProviderClients::Gemini.new(api_key: "secret-key", timeout: 5)
+    captured_request = nil
+    http = Object.new
+    http.define_singleton_method(:request) do |request|
+      captured_request = request
+      response = Net::HTTPOK.new("1.1", "200", "OK")
+      response.instance_variable_set(:@read, true)
+      response.instance_variable_set(:@body, '{"responseId":"gem-mixed-tools"}')
+      response
+    end
+
+    Net::HTTP.stub(:start, ->(*, **, &block) { block.call(http) }) do
+      client.generate_content(
+        model: "gemini-test",
+        contents: [{ role: "user", parts: [{ text: "Look this up" }] }],
+        config: {
+          tools: [
+            { google_search: {} },
+            { function_declarations: [{
+              name: "dummy_summary_tool",
+              description: "Summarize.",
+              parameters: { "type" => "object", "properties" => { "input" => { "type" => "string" } } }
+            }] }
+          ]
+        }
+      )
+    end
+
+    body = JSON.parse(captured_request.body)
+    assert_equal({}, body.dig("tools", 0, "googleSearch"))
+    assert_equal "dummy_summary_tool", body.dig("tools", 1, "functionDeclarations", 0, "name")
+    assert_equal true, body.dig("toolConfig", "includeServerSideToolInvocations")
+  end
+
+  def test_gemini_http_error_keeps_provider_status_without_leaking_payload_into_the_message
+    client = RecordingStudioAI::ProviderClients::Gemini.new(api_key: "secret-key", timeout: 5)
+    http = Object.new
+    http.define_singleton_method(:request) do |_request|
+      response = Net::HTTPBadRequest.new("1.1", "400", "Bad Request")
+      response.instance_variable_set(:@read, true)
+      response.instance_variable_set(:@body, {
+        error: {
+          status: "INVALID_ARGUMENT",
+          message: "Built-in tools ({google_search}) and Custom tools (Function Calling) cannot be combined in the same request."
+        }
+      }.to_json)
+      response
+    end
+
+    error = assert_raises(RecordingStudioAI::ProviderClients::Gemini::HttpError) do
+      Net::HTTP.stub(:start, ->(*, **, &block) { block.call(http) }) do
+        client.generate_content(
+          model: "gemini-test",
+          contents: [{ role: "user", parts: [{ text: "Look this up" }] }]
+        )
+      end
+    end
+
+    assert_equal 400, error.status
+    assert_equal "INVALID_ARGUMENT", error.code
+    assert_match(/cannot be combined/i, error.provider_message)
+    refute_includes error.message, "google_search"
+
+    normalized = RecordingStudioAI::Providers::ProviderError.normalize(error, provider: :gemini)
+    assert_equal "invalid_request", normalized.category
+    assert_match(/web search and custom tools/i, normalized.message)
+    refute_includes normalized.message, "google_search"
+    refute_includes normalized.message, "Function Calling"
+  end
+
+  def test_duplicate_tool_version_registration_is_rejected
+    register_tool
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { register_tool }
+
+    assert_equal "invalid_request", error.code
+    assert_equal 1, RecordingStudioAI.tools.all.length
+  end
+
+  def test_tool_override_replaces_existing_registration
+    register_tool
+    register_tool(name: "Updated summarize", override: true)
+
+    definition = RecordingStudioAI.tools.fetch(:summarize_record, version: 1)
+    assert_equal "Updated summarize", definition.name
+    assert_equal 1, RecordingStudioAI.tools.all.length
+  end
+
+  private
+
+  def register_tool(executor: ->(arguments, _context) { { topic: arguments.fetch("topic") } },
+                    requires_confirmation: false, idempotent: true, parameters: nil,
+                    read_only: true, destructive: false, name: "Summarize record", override: false)
+    RecordingStudioAI.tools.register(
+      key: :summarize_record,
+      version: 1,
+      name: name,
+      description: "Summarizes a record.",
+      use_when: "A concise summary is needed.",
+      do_not_use_when: "The source is unavailable.",
+      parameters: parameters || [
+        { name: :topic, type: :string, required: true, description: "Topic to summarize." },
+        {
+          name: :format,
+          type: :string,
+          required: false,
+          description: "Summary format.",
+          allowed_values: %w[short bullets],
+          default: "short"
+        }
+      ],
+      returns: "A serializable summary.",
+      cost: :low,
+      latency: :fast,
+      read_only: read_only,
+      destructive: destructive,
+      requires_confirmation: requires_confirmation,
+      idempotent: idempotent,
+      executor_label: "Summarizers.record",
+      executor: executor,
+      override: override
+    )
+  end
+
+  def tool_result(call_id, key, arguments)
+    RecordingStudioAI::Providers::Result.new(
+      tool_calls: [
+        RecordingStudioAI::Providers::ToolCall.new(
+          provider_tool_call_id: call_id,
+          key: key,
+          arguments: arguments
+        )
+      ],
+      finish_reason: "tool_calls"
+    )
+  end
+
+  def success_result(text)
+    RecordingStudioAI::Providers::Result.new(text: text, finish_reason: "stop")
+  end
+
+  def configure_provider(provider)
+    configuration = RecordingStudioAI.configuration
+    configuration.providers = { test: provider }
+    configuration.profiles[:medium] = [
+      { provider: :test, model: "tool-model", capabilities: %i[generation custom_tools] }
+    ]
+  end
+
+  def configure_external_provider(provider, client)
+    configuration = RecordingStudioAI.configuration
+    configuration.public_send("#{provider}_client=", client)
+    configuration.allowed_provider_overrides = [provider]
+    configuration.profiles[:medium] = [
+      { provider: provider, model: "tool-model", capabilities: %i[generation custom_tools] }
+    ]
+  end
+
+  def generate(custom_tools: [{ key: :summarize_record, version: 1 }], provider: nil)
+    RecordingStudioAI.generate(
+      prompt: "Summarize this",
+      custom_tools: custom_tools,
+      provider: provider,
+      root_recording: @root_recording,
+      initiator: @initiator
+    )
+  end
+end

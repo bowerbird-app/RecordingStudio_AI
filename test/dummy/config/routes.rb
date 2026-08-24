@@ -1,11 +1,21 @@
+require "sidekiq/web"
+
 Rails.application.routes.draw do
   devise_for :users
+
+  # Operators only: Accessible admin on at least one root. Do not open Sidekiq
+  # to every signed-in Devise user in a real host.
+  authenticate :user, ->(user) { DummyAccessibleAIAuthorization.admin_operator?(actor: user) } do
+    mount Sidekiq::Web => "/sidekiq"
+  end
 
   # RecordingStudio engine is data/API-focused and has no browser root route.
   # Keep legacy links working by redirecting the base path to the app home.
   get "/recording_studio", to: redirect("/"), as: nil
   mount RecordingStudio::Engine, at: "/recording_studio"
+  mount RecordingStudioAI::Engine, at: "/recording_studio_ai"
   mount RecordingStudioRootSwitchable::Engine, at: "/recording_studio_root_switchable"
+  recording_studio_admin_for :admin, at: "/admin", root_section: :recording_studio_ai
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
@@ -17,13 +27,14 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  get "docs/install", to: "docs#install", as: :docs_install
-  get "docs/config", to: "docs#configuration", as: :docs_config
-  get "docs/recordable_types", to: "docs#recordable_types", as: :docs_recordable_types
-  get "docs/recordings_tree", to: "docs#recordings_tree", as: :docs_recordings_tree
-  get "docs/gem_views", to: "docs#gem_views", as: :docs_gem_views
-  get "docs/methods", to: "docs#methods", as: :docs_methods
-
   # Defines the root path route ("/")
+  get "recording_tree", to: "recording_tree#show"
+  get "install", to: "install#show"
+  get "config", to: "config#show", as: :gem_config
+  get "tables", to: "tables#show", as: :gem_tables
+  get "methods", to: "methods#show", as: :gem_methods
+  get "ai_playground", to: "ai_playground#show"
+  post "ai_playground", to: "ai_playground#create"
+  post "ai_playground/stream", to: "ai_playground/streams#stream", as: :stream_ai_playground
   root "home#index"
 end

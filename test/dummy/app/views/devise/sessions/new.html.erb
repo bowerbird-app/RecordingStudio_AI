@@ -4,12 +4,13 @@
       <% card.body do %>
         <div class="space-y-6">
           <%= render FlatPack::PageTitle::Component.new(
-            title: "Login",
+            title: "Recording Studio AI",
+            subtitle: "Sign in to the addon host.",
             variant: :h2,
             class: "mb-0 pb-0"
           ) %>
 
-          <%= form_for(resource, as: resource_name, url: session_path(resource_name)) do |f| %>
+          <%= form_for(resource, as: resource_name, url: session_path(resource_name), data: { turbo: false }) do |f| %>
             <div class="space-y-4">
             <%= render FlatPack::EmailInput::Component.new(
               name: "user[email]",

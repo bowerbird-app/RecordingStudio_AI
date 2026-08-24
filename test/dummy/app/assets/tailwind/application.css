@@ -1,15 +1,47 @@
 @import "tailwindcss";
 
+/* Bundler gem roots written by rake tailwindcss:enhance_sources */
+@import "./gem_sources.css";
+
 /* Include dummy app views for Tailwind CSS */
 @source "../../views/**/*.erb";
 
+/* Include this engine's views for Tailwind CSS */
+@source "../../../../../app/views/**/*.erb";
+
 /* Include RecordingStudio engine views for Tailwind CSS */
-@source "../../../vendor/bundle/**/recording_studio/app/views/**/*.erb";
-@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/recordingstudio-*/app/views/**/*.erb";
+@source "../../../vendor/bundle/**/RecordingStudio-*/app/views/**/*.erb";
+@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/RecordingStudio-*/app/views/**/*.erb";
 
 /* Scan FlatPack components for classes used by the bundled ViewComponents */
-@source "../../../vendor/bundle/**/flatpack/app/components/**/*.{rb,erb}";
+@source "../../../vendor/bundle/**/flatpack-*/app/components/**/*.{rb,erb}";
 @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";
 
-/* Include the engine's views in the Tailwind build */
-@source "../../../../../app/views/**/*.erb";
+/* Scan RecordingStudioAdmin gem views for widget utility classes */
+@source "../../../vendor/bundle/**/RecordingStudio_admin-*/app/views/**/*.erb";
+@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/RecordingStudio_admin-*/app/views/**/*.erb";
+
+/* Host-level semantic overrides for admin change indicators */
+:root {
+	--color-success-background-color: #16a34a;
+	--color-danger-background-color: #dc2626;
+
+	/* Keep aliases aligned when a widget renderer uses content tokens */
+	--color-success-content-color: var(--color-success-background-color);
+	--color-danger-content-color: var(--color-danger-background-color);
+}
+
+/* Fallback for dynamic admin delta classes that Tailwind may not emit from runtime strings */
+[class~="text-[var(--color-success-background-color)]"] {
+	color: var(--color-success-background-color) !important;
+}
+
+[class~="text-[var(--color-danger-background-color)]"] {
+	color: var(--color-danger-background-color) !important;
+}
+
+/* Table header labels are uppercase; tooltip panels should remain readable sentence case. */
+th [data-flat-pack--tooltip-target] {
+	text-transform: none;
+	letter-spacing: normal;
+}

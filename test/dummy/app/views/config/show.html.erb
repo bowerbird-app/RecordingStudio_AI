@@ -1,0 +1,300 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Config",
+    subtitle: "Set up your initializer after installation.",
+    variant: :h1
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Steps",
+      subtitle: "Follow these steps to configure the gem in your app.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Open <span class="font-mono">config/initializers/recording_studio_ai.rb</span>.</li>
+      <li>Paste the initializer template below and adjust values for your environment.</li>
+      <li>Add provider API keys and choose the profile/fallback strategy you want to support.</li>
+      <li>Restart the app so initializer changes are loaded.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Initializer example",
+    language: "ruby",
+    code: @config_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Configuration parameters",
+      subtitle: "Every setting you can put in the initializer, with defaults.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::Table::Component.new(data: @config_options) do |table| %>
+      <% table.column(
+        title: "Param",
+        html: ->(option) { content_tag(:span, option[:key], class: "font-mono text-xs") }
+      ) %>
+      <% table.column(title: "Required", html: ->(option) { option[:required] }) %>
+      <% table.column(title: "Possible values", html: ->(option) { option[:accepted_values] }) %>
+      <% table.column(
+        title: "Default",
+        html: ->(option) { content_tag(:span, option[:default], class: "font-mono text-xs break-all") }
+      ) %>
+      <% table.column(title: "Description", html: ->(option) { option[:explanation] }) %>
+    <% end %>
+  </div>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "1. Add a Provider",
+      subtitle: "Providers are single adapter classes (for example OpenAI and Gemini). Each provider is one class under lib/recording_studio_ai/providers/<provider>.rb.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Create a provider class under <span class="font-mono">lib/recording_studio_ai/providers/&lt;provider&gt;.rb</span> that inherits <span class="font-mono">RecordingStudioAI::Providers::Base</span> and declares <span class="font-mono">provider_key</span>.</li>
+      <li>Implement <span class="font-mono">#generate</span>. Add <span class="font-mono">#stream</span> only when models stream, and <span class="font-mono">#submit_batch</span> / <span class="font-mono">#refresh_batch</span> / <span class="font-mono">#cancel_batch</span> only when they batch. Apps call <span class="font-mono">RecordingStudioAI.generate</span> (pass <span class="font-mono">stream: true</span> to stream) and the batch methods — not <span class="font-mono">RecordingStudioAI.stream</span>.</li>
+      <li>Add credentials the same way as OpenAI and Gemini: <span class="font-mono">config.&lt;provider_key&gt;_api_key</span> and optional <span class="font-mono">config.&lt;provider_key&gt;_client</span>. <span class="font-mono">configured?</span> is shared on the base class.</li>
+      <li>Register it from the host initializer or another gem's engine initializer with <span class="font-mono">RecordingStudioAI.register_provider(:key, instance)</span>.</li>
+      <li>Optionally set <span class="font-mono">config.discovery_enabled = true</span> to auto-register provider classes found under the providers path.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "my_provider.rb",
+    snippets: [
+      { label: "my_provider.rb", language: "ruby", code: @provider_class_example },
+      { label: "Initializer", language: "ruby", code: @provider_initializer_example }
+    ]
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Provider registration examples",
+    language: "ruby",
+    code: @provider_extension_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "2. Add a Model",
+      subtitle: "Models are declarative registration scripts (no class). Built-ins ship with the gem; add your own the same way.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Pick the provider the model belongs to (it must be registered first).</li>
+      <li>Create a registration file. For gem-style catalogs use <span class="font-mono">lib/recording_studio_ai/models/&lt;provider-key&gt;/&lt;model-key&gt;.rb</span> (for example <span class="font-mono">models/openai/gpt-5-mini.rb</span>, <span class="font-mono">models/gemini/gemini-2-5-pro.rb</span>). For a host app, any initializer works.</li>
+      <li>The file/key is a lowercase hyphenated slug (dots become hyphens); the <span class="font-mono">model:</span> value is the exact provider API model string used in profiles.</li>
+      <li>Call <span class="font-mono">RecordingStudioAI.models.register(...)</span> and declare <span class="font-mono">delivery</span>, <span class="font-mono">parameters</span>, <span class="font-mono">tools</span>, and <span class="font-mono">modalities</span> so the resolver and AI playground know what the model supports.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Model registration",
+    language: "ruby",
+    code: @model_registration_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Override a Model",
+      subtitle: "Replace a shipped or previously registered model for the same provider and key.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Register again with the same <span class="font-mono">provider</span> and <span class="font-mono">key</span>.</li>
+      <li>Pass <span class="font-mono">override: true</span> — without it, a duplicate registration raises.</li>
+      <li>Profiles that reference the model string keep working; they resolve to the replaced entry.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Model override",
+    language: "ruby",
+    code: @model_override_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "3. Create Profiles",
+      subtitle: "Profiles are ordered preference lists of provider/model candidates used by generate (including stream: true) and batch.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Set <span class="font-mono">config.profiles</span> in <span class="font-mono">config/initializers/recording_studio_ai.rb</span>.</li>
+      <li>Reference each model by its provider API model string (the <span class="font-mono">model:</span> value from registration). Do not repeat capabilities here — they come from the model registry.</li>
+      <li>Order candidates by preference; the resolver picks the first configured provider whose model supports the request.</li>
+      <li>Set <span class="font-mono">config.default_profile</span> and, optionally, <span class="font-mono">config.profile_fallbacks</span> for tier fallback.</li>
+      <li>For a one-off hop list that skips profiles, pass <span class="font-mono">fallbacks:</span> on <span class="font-mono">generate</span>. Each entry needs <span class="font-mono">provider</span> and <span class="font-mono">model</span>; you may also set hop-only params such as <span class="font-mono">temperature</span>, <span class="font-mono">verbosity</span>, <span class="font-mono">max_output_tokens</span>, or <span class="font-mono">reasoning_effort</span>. Top-level caller overrides still win.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Profile configuration",
+    language: "ruby",
+    code: @profile_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Create Custom Tools",
+      subtitle: "Register a tool and pass it to generate. Streaming uses the same call with stream: true.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Define a stable key and version for your tool.</li>
+      <li>Provide clear parameter schema and usage guidance.</li>
+      <li>Implement a deterministic executor that returns serializable data.</li>
+      <li>Pass the tool reference in the request's custom_tools array.</li>
+    </ol>
+
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Tool registration fields",
+      subtitle: "Every argument RecordingStudioAI.tools.register accepts.",
+      variant: :h4,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::Table::Component.new(data: @custom_tool_options) do |table| %>
+      <% table.column(
+        title: "Param",
+        html: ->(option) { content_tag(:span, option[:key], class: "font-mono text-xs") }
+      ) %>
+      <% table.column(title: "Required", html: ->(option) { option[:required] }) %>
+      <% table.column(title: "Possible values", html: ->(option) { option[:accepted_values] }) %>
+      <% table.column(
+        title: "Default",
+        html: ->(option) { content_tag(:span, option[:default], class: "font-mono text-xs break-all") }
+      ) %>
+      <% table.column(title: "Description", html: ->(option) { option[:explanation] }) %>
+    <% end %>
+
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Argument fields inside parameters",
+      subtitle: "Each item in the parameters array can set these keys.",
+      variant: :h4,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::Table::Component.new(data: @custom_tool_parameter_options) do |table| %>
+      <% table.column(
+        title: "Param",
+        html: ->(option) { content_tag(:span, option[:key], class: "font-mono text-xs") }
+      ) %>
+      <% table.column(title: "Required", html: ->(option) { option[:required] }) %>
+      <% table.column(title: "Possible values", html: ->(option) { option[:accepted_values] }) %>
+      <% table.column(
+        title: "Default",
+        html: ->(option) { content_tag(:span, option[:default], class: "font-mono text-xs break-all") }
+      ) %>
+      <% table.column(title: "Description", html: ->(option) { option[:explanation] }) %>
+    <% end %>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Custom tool registration and usage",
+    language: "ruby",
+    code: @custom_tools_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Override a Tool",
+      subtitle: "Replace a previously registered tool for the same key and version.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Register again with the same <span class="font-mono">key</span> and <span class="font-mono">version</span>.</li>
+      <li>Pass <span class="font-mono">override: true</span> — without it, a duplicate registration raises.</li>
+      <li>Call sites that pass <span class="font-mono">custom_tools: [{ key:, version: }]</span> keep working; they resolve to the replaced entry.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Tool override",
+    language: "ruby",
+    code: @tool_override_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Register a Prompt",
+      subtitle: "Versioned message templates with inputs, optional tools, and defaults for generate.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>Pick a stable <span class="font-mono">key</span> and <span class="font-mono">version</span>.</li>
+      <li>Set <span class="font-mono">owner</span> to a PascalCase gem or host label (for example <span class="font-mono">Host</span> or <span class="font-mono">SupportGem</span>).</li>
+      <li>Declare <span class="font-mono">inputs</span> and <span class="font-mono">messages</span> with <span class="font-mono">{{snake_case}}</span> placeholders.</li>
+      <li>Optionally allowlist registered tools and set <span class="font-mono">defaults</span> such as profile and purpose.</li>
+      <li>Call with <span class="font-mono">RecordingStudioAI.prompt(:key).call(...)</span>.</li>
+    </ol>
+
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Prompt registration fields",
+      subtitle: "Every argument RecordingStudioAI.prompts.register accepts.",
+      variant: :h4,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::Table::Component.new(data: @prompt_options) do |table| %>
+      <% table.column(
+        title: "Param",
+        html: ->(option) { content_tag(:span, option[:key], class: "font-mono text-xs") }
+      ) %>
+      <% table.column(title: "Required", html: ->(option) { option[:required] }) %>
+      <% table.column(title: "Possible values", html: ->(option) { option[:accepted_values] }) %>
+      <% table.column(
+        title: "Default",
+        html: ->(option) { content_tag(:span, option[:default], class: "font-mono text-xs break-all") }
+      ) %>
+      <% table.column(title: "Description", html: ->(option) { option[:explanation] }) %>
+    <% end %>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Prompt registration and usage",
+    language: "ruby",
+    code: @prompt_registration_example
+  ) %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Override a Prompt",
+      subtitle: "Replace the same key and version when the existing prompt allows it.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <ol class="list-decimal space-y-2 pl-5 text-sm leading-6">
+      <li>The existing prompt must have <span class="font-mono">overridable: true</span> (the default).</li>
+      <li>Register again with the same <span class="font-mono">key</span> and <span class="font-mono">version</span>, and pass <span class="font-mono">override: true</span>.</li>
+      <li>Call sites keep using <span class="font-mono">prompt(:key)</span> — no change needed.</li>
+      <li>Set <span class="font-mono">overridable: false</span> on a gem prompt to lock it against host replacement.</li>
+    </ol>
+  </div>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    title: "Prompt override",
+    language: "ruby",
+    code: @prompt_override_example
+  ) %>
+</div>

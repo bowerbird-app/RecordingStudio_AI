@@ -1,0 +1,77 @@
+<div id="<%= frame_id %>" class="space-y-6">
+  <% if error_message.present? %>
+    <%= render FlatPack::Alert::Component.new(
+      title: "That run didn’t work",
+      description: error_message,
+      style: :danger
+    ) %>
+  <% end %>
+
+  <% if response_payload.present? %>
+    <div class="space-y-3">
+      <%= render FlatPack::PageTitle::Component.new(
+        title: "Execution result",
+        subtitle: request_id.present? ? "Request ID: #{request_id}" : nil,
+        variant: :h3,
+        class: "mb-0 pb-0"
+      ) %>
+
+      <% if stream_text.present? %>
+        <%= render FlatPack::CodeBlock::Component.new(
+          title: "Streamed text",
+          language: "text",
+          code: stream_text,
+          separated: false
+        ) %>
+      <% end %>
+
+      <% if stream_events.present? %>
+        <%= render FlatPack::CodeBlock::Component.new(
+          title: "Stream events",
+          language: "json",
+          code: JSON.pretty_generate(stream_events),
+          separated: false
+        ) %>
+      <% end %>
+
+      <%= render FlatPack::CodeBlock::Component.new(
+        title: "Response JSON",
+        language: "json",
+        code: JSON.pretty_generate(response_payload),
+        separated: false
+      ) %>
+    </div>
+  <% end %>
+
+  <% if created_runs.present? %>
+    <div class="space-y-3">
+      <%= render FlatPack::PageTitle::Component.new(title: "Created runs", variant: :h3, class: "mb-0 pb-0") %>
+      <%= render FlatPack::List::Component.new(divider: true) do %>
+        <% created_runs.each do |run| %>
+          <%= render FlatPack::List::Item.new(icon: :cpu_chip) do %>
+            <div class="flex flex-col gap-1">
+              <span class="text-sm font-medium">Run <%= run.id %> • <%= run.operation %> • <%= run.status %></span>
+              <span class="text-xs text-(--surface-muted-content-color)">Provider: <%= run.resolved_provider || "n/a" %> • Model: <%= run.resolved_model || "n/a" %></span>
+            </div>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if created_attempts.present? %>
+    <div class="space-y-3">
+      <%= render FlatPack::PageTitle::Component.new(title: "Created attempts", variant: :h3, class: "mb-0 pb-0") %>
+      <%= render FlatPack::List::Component.new(divider: true) do %>
+        <% created_attempts.each do |attempt| %>
+          <%= render FlatPack::List::Item.new(icon: :clock) do %>
+            <div class="flex flex-col gap-1">
+              <span class="text-sm font-medium">Attempt <%= attempt.id %> • seq <%= attempt.sequence %> • <%= attempt.status %></span>
+              <span class="text-xs text-(--surface-muted-content-color)">Provider: <%= attempt.provider || "n/a" %> • Model: <%= attempt.model || "n/a" %></span>
+            </div>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

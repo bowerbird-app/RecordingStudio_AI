@@ -1,0 +1,30 @@
+<div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(title: "Retained response #{@response[:id]}", subtitle: "Authorized debugging content for run #{@run.id}.", variant: :h1) %>
+
+  <% retention_rows = [
+       { label: "Type", value: @response[:response_type].humanize },
+       {
+         label: "Complete / truncated",
+         value: "#{@response[:complete] ? 'Complete' : 'Incomplete'} / #{@response[:truncated] ? 'Truncated' : 'Not truncated'}"
+       },
+       {
+         label: "Size / expiry",
+         value: "#{number_to_human_size(@response[:byte_size])} / #{@response[:expires_at]&.to_fs(:long) || 'No expiry'}"
+       },
+       { label: "Content type", value: @response[:content_type].presence || "Unknown" },
+       { label: "Run", value: link_to(@run.id, admin_run_path(@run)) }
+     ] %>
+
+  <%= render FlatPack::Table::Component.new(data: retention_rows) do |table| %>
+    <% table.column(title: "Field") { |row| row[:label] } %>
+    <% table.column(title: "Value", html: ->(row) { row[:value] }) %>
+  <% end %>
+
+  <% if @response[:content_text].present? %>
+    <%= admin_code_block(@response[:content_text], title: "Extracted output", language: "text") %>
+  <% end %>
+
+  <% { "Normalized response" => @response[:normalized_response], "Sanitized provider response" => @response[:raw_response] }.each do |title, value| %>
+    <%= admin_code_block(value.nil? ? "Not retained" : admin_json(value), title: title, language: value.nil? ? "text" : "json") %>
+  <% end %>
+</div>

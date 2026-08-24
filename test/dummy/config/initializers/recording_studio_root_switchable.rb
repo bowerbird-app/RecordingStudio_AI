@@ -19,15 +19,17 @@ RecordingStudioRootSwitchable.configure do |config|
     end
   end
 
+  # Keep the historical scope key so existing bookmarks/tests keep working, but
+  # only list roots the actor can actually view via Accessible.
   config.scope :all_workspaces do |scope|
-    scope.label = "All workspaces"
-    scope.description = "Every workspace root in the dummy app."
-    scope.available_roots = lambda do |**|
-      Workspace.order(:name).filter_map do |workspace|
-        RecordingStudio.root_recording_for(workspace)
-      end
+    scope.label = "Workspaces"
+    scope.description = "Workspace roots you can access."
+    scope.available_roots = lambda do |actor:, **|
+      return [] if actor.blank?
+
+      RecordingStudioAccessible.root_recordings_for(actor: actor, minimum_role: :view)
     end
-    scope.access_check = ->(**) { true }
+    # Default access_check already calls Accessible with :view — leave it.
 
     scope.default_root = lambda do |roots:, **|
       roots.first

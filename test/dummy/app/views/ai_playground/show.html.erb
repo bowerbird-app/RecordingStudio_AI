@@ -1,0 +1,310 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "AI Playground",
+    subtitle: "Run RecordingStudioAI.generate against a profile model. The form adapts to the selected model's registered capabilities.",
+    variant: :h1
+  ) %>
+
+  <div class="flex items-center gap-3">
+    <%= render FlatPack::Button::Component.new(
+      text: "AI Calls",
+      url: "/admin/screens/ai_calls",
+      style: :secondary,
+      size: :sm
+    ) %>
+    <%= render FlatPack::Button::Component.new(
+      text: "AI Responses",
+      url: "/admin/screens/recording_studio_ai_responses",
+      style: :secondary,
+      size: :sm
+    ) %>
+  </div>
+
+  <div class="space-y-8">
+    <section
+      data-controller="ai-playground-form"
+      data-ai-playground-form-stream-url-value="<%= main_app.stream_ai_playground_path %>"
+      data-ai-playground-form-candidates-value="<%= @profile_candidates.to_json %>"
+      data-ai-playground-form-definitions-value="<%= @model_definitions.to_json %>"
+      data-ai-playground-form-tool-descriptions-value="<%= AIPlaygroundController::TOOL_CATALOG.transform_values { |meta| meta.fetch(:description) }.to_json %>"
+      data-ai-playground-form-prompts-value="<%= @prompt_previews.to_json %>"
+      class="space-y-4"
+    >
+      <%= render FlatPack::PageTitle::Component.new(
+        title: "Generate",
+        subtitle: "Provider, profile, and optional model override. Capability fields appear from the model registry.",
+        variant: :h3,
+        class: "mb-0 pb-0"
+      ) %>
+
+      <%= form_with url: main_app.ai_playground_path, method: :post, scope: :ai_playground, local: true,
+          html: { multipart: true },
+          data: { action: "submit->ai-playground-form#submit", ai_playground_form_target: "form" },
+          class: "space-y-4" do %>
+        <%= hidden_field_tag "ai_playground[mode]", "generate" %>
+        <%= hidden_field_tag "ai_playground[web_search]", "0" %>
+        <%= hidden_field_tag "ai_playground[streaming]", "0" %>
+        <%= hidden_field_tag "ai_playground[use_custom_tool]", "0" %>
+
+        <%= render FlatPack::Select::Component.new(
+          name: "ai_playground[provider]",
+          label: "Provider",
+          options: @provider_options,
+          value: @form.fetch("provider"),
+          data: { ai_playground_form_target: "provider", action: "change->ai-playground-form#refresh" }
+        ) %>
+        <%= render FlatPack::Select::Component.new(
+          name: "ai_playground[profile]",
+          label: "Profile",
+          options: @profile_options,
+          value: @form.fetch("profile"),
+          data: { ai_playground_form_target: "profile", action: "change->ai-playground-form#refresh" }
+        ) %>
+        <%= render FlatPack::Select::Component.new(
+          name: "ai_playground[model]",
+          label: "Model",
+          options: @model_options,
+          value: @form.fetch("model"),
+          help_text: "Defaults to the first model in the selected profile (after provider filter).",
+          data: { ai_playground_form_target: "model", action: "change->ai-playground-form#refreshCapabilities" }
+        ) %>
+
+        <%= render FlatPack::Select::Component.new(
+          name: "ai_playground[prompt_key]",
+          label: "Prompt",
+          options: @prompt_options,
+          value: @form.fetch("prompt_key"),
+          required: true,
+          data: { ai_playground_form_target: "promptKey", action: "change->ai-playground-form#refreshPromptPreview" }
+        ) %>
+        <% @prompt_input_names.each do |name| %>
+          <% visible = @selected_prompt_input_names.include?(name) %>
+          <div
+            class="<%= 'hidden' unless visible %>"
+            data-ai-playground-form-target="promptInput"
+            data-prompt-input-name="<%= name %>"
+            data-action="input->ai-playground-form#refreshPromptPreview"
+          >
+            <%= render FlatPack::TextArea::Component.new(
+              name: "ai_playground[prompt_inputs][#{name}]",
+              label: name.humanize,
+              value: @form.dig("prompt_inputs", name).to_s,
+              rows: 4,
+              placeholder: "Paste the text this prompt should use.",
+              required: visible,
+              disabled: !visible
+            ) %>
+          </div>
+        <% end %>
+        <div data-ai-playground-form-target="promptPreview">
+          <%= render FlatPack::TextArea::Component.new(
+            name: "ai_playground[prompt_preview]",
+            label: "Prompt text",
+            value: @selected_prompt_preview,
+            rows: 8,
+            disabled: true
+          ) %>
+        </div>
+
+        <div class="hidden space-y-4" data-ai-playground-form-target="parametersPanel">
+          <div class="hidden" data-ai-playground-form-target="temperatureField">
+            <%= render FlatPack::RangeInput::Component.new(
+              name: "ai_playground[temperature]",
+              label: "Temperature",
+              min: 0,
+              max: 2,
+              step: 0.1,
+              value: @form["temperature"].presence || 1.0
+            ) %>
+          </div>
+          <div class="hidden" data-ai-playground-form-target="verbosityField">
+            <%= render FlatPack::Select::Component.new(
+              name: "ai_playground[verbosity]",
+              label: "Verbosity",
+              options: [
+                { value: "", label: "Default" },
+                { value: "low", label: "Low" },
+                { value: "medium", label: "Medium" },
+                { value: "high", label: "High" }
+              ],
+              value: @form.fetch("verbosity", "")
+            ) %>
+          </div>
+          <div class="hidden" data-ai-playground-form-target="maxOutputTokensField">
+            <%= render FlatPack::NumberInput::Component.new(
+              name: "ai_playground[max_output_tokens]",
+              label: "Max output tokens",
+              value: @form["max_output_tokens"].presence,
+              min: 1,
+              step: 1
+            ) %>
+          </div>
+          <div class="hidden" data-ai-playground-form-target="reasoningEffortField">
+            <%= render FlatPack::Select::Component.new(
+              name: "ai_playground[reasoning_effort]",
+              label: "Reasoning effort",
+              options: [
+                { value: "", label: "Default" },
+                { value: "minimal", label: "Minimal" },
+                { value: "low", label: "Low" },
+                { value: "medium", label: "Medium" },
+                { value: "high", label: "High" }
+              ],
+              value: @form.fetch("reasoning_effort", "")
+            ) %>
+          </div>
+        </div>
+
+        <div class="hidden" data-ai-playground-form-target="streamingField">
+          <%= render FlatPack::Checkbox::Component.new(
+            name: "ai_playground[streaming]",
+            label: "Streaming",
+            checked: @form.fetch("streaming", "0") == "1",
+            data: { ai_playground_form_target: "streaming" }
+          ) %>
+        </div>
+
+        <div class="hidden" data-ai-playground-form-target="webSearchField">
+          <%= render FlatPack::Checkbox::Component.new(
+            name: "ai_playground[web_search]",
+            label: "Web search",
+            checked: @form.fetch("web_search", "0") == "1"
+          ) %>
+        </div>
+
+        <div class="hidden space-y-3" data-ai-playground-form-target="customToolsField">
+          <%= render FlatPack::Checkbox::Component.new(
+            name: "ai_playground[use_custom_tool]",
+            label: "Use custom tool",
+            checked: @form.fetch("use_custom_tool", "0") == "1",
+            data: { ai_playground_form_target: "useCustomTool", action: "change->ai-playground-form#refreshToolDescription" }
+          ) %>
+          <div data-ai-playground-form-target="toolPicker">
+            <%= render FlatPack::Select::Component.new(
+              name: "ai_playground[tool_key]",
+              label: "Custom tool",
+              options: @tool_options,
+              value: @form.fetch("tool_key"),
+              data: { ai_playground_form_target: "toolKey", action: "change->ai-playground-form#refreshToolDescription" }
+            ) %>
+            <%= render FlatPack::Card::Component.new(style: :default, class: "mt-2") do |card| %>
+              <% card.header do %>
+                <%= render FlatPack::PageTitle::Component.new(title: "Selected tool", variant: :h4, class: "mb-0 pb-0") %>
+              <% end %>
+              <% card.body do %>
+                <p class="text-sm" data-ai-playground-form-target="toolDescription"><%= @selected_tool_description %></p>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+
+        <div class="hidden" data-ai-playground-form-target="attachmentField">
+          <%= render FlatPack::FileInput::Component.new(
+            name: "ai_playground[attachment]",
+            label: "Attachment",
+            help_text: "Shown when the selected model accepts image or file input.",
+            accept: "image/*,.pdf,.txt,.md,.csv",
+            preview: true
+          ) %>
+        </div>
+
+        <%= render FlatPack::Button::Component.new(
+          text: "Run generate",
+          style: :primary,
+          type: "submit",
+          data: { ai_playground_form_target: "submit" }
+        ) %>
+      <% end %>
+
+      <div class="hidden" data-ai-playground-form-target="streamPanel" aria-live="polite">
+        <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+          <% card.header do %>
+            <div class="flex items-center justify-between gap-3">
+              <%= render FlatPack::PageTitle::Component.new(title: "Live response", variant: :h4, class: "mb-0 pb-0") %>
+              <span class="text-xs text-(--surface-muted-content-color)" data-ai-playground-form-target="streamStatus">Waiting</span>
+            </div>
+          <% end %>
+          <% card.body do %>
+            <div class="min-h-24 max-h-96 overflow-y-auto whitespace-pre-wrap wrap-break-word text-sm" data-ai-playground-form-target="streamOutput"></div>
+          <% end %>
+        <% end %>
+      </div>
+
+      <%= render "result", **result_locals("generate") %>
+    </section>
+
+    <section
+      data-controller="ai-playground-form"
+      data-ai-playground-form-candidates-value="<%= @profile_candidates.to_json %>"
+      data-ai-playground-form-definitions-value="<%= @model_definitions.to_json %>"
+      data-ai-playground-form-require-batch-value="true"
+      class="space-y-4 border-t border-(--surface-border-color) pt-8"
+    >
+      <%= render FlatPack::PageTitle::Component.new(
+        title: "Batch",
+        subtitle: "Provider batches stay on submit_batch. Items are submitted together with the selected profile/model.",
+        variant: :h3,
+        class: "mb-0 pb-0"
+      ) %>
+
+      <%= form_with url: main_app.ai_playground_path, method: :post, scope: :ai_playground, local: true,
+          data: { turbo: false }, class: "space-y-4" do %>
+        <%= hidden_field_tag "ai_playground[mode]", "batch" %>
+        <%= hidden_field_tag "ai_playground[web_search]", "0" %>
+
+        <%= render FlatPack::Select::Component.new(
+          name: "ai_playground[provider]",
+          label: "Provider",
+          options: @provider_options,
+          value: @form.fetch("provider"),
+          data: { ai_playground_form_target: "provider", action: "change->ai-playground-form#refresh" }
+        ) %>
+        <%= render FlatPack::Select::Component.new(
+          name: "ai_playground[profile]",
+          label: "Profile",
+          options: @profile_options,
+          value: @form.fetch("profile"),
+          data: { ai_playground_form_target: "profile", action: "change->ai-playground-form#refresh" }
+        ) %>
+        <%= render FlatPack::Select::Component.new(
+          name: "ai_playground[model]",
+          label: "Model",
+          options: @model_options,
+          value: @form.fetch("model"),
+          help_text: "Defaults to the first batch-capable model in the selected profile (after provider filter).",
+          data: { ai_playground_form_target: "model" }
+        ) %>
+        <%= render FlatPack::TextArea::Component.new(
+          name: "ai_playground[prompt]",
+          label: "Shared prompt",
+          value: @form.fetch("prompt"),
+          rows: 4
+        ) %>
+        <div class="space-y-3">
+          <p class="text-sm font-semibold">Batch items</p>
+          <% @form.fetch("batch_items").each_with_index do |item_prompt, index| %>
+            <%= render FlatPack::TextArea::Component.new(
+              name: "ai_playground[batch_items][]",
+              label: "Item #{index + 1}",
+              value: item_prompt,
+              rows: 4,
+              required: true
+            ) %>
+          <% end %>
+        </div>
+        <%= render FlatPack::Checkbox::Component.new(
+          name: "ai_playground[web_search]",
+          label: "Web search",
+          checked: @form.fetch("web_search", "0") == "1"
+        ) %>
+        <%= render FlatPack::Button::Component.new(
+          text: "Submit batch",
+          style: :primary,
+          type: "submit"
+        ) %>
+      <% end %>
+
+      <%= render "result", **result_locals("batch") %>
+    </section>
+  </div>
+</div>

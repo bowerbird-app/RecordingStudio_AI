@@ -1,0 +1,20 @@
+<div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Recording tree",
+    subtitle: "Hierarchy for the currently selected root recording.",
+    variant: :h1
+  ) %>
+
+  <% tree_root = recording_tree_node %>
+  <% if tree_root.present? %>
+    <%= render FlatPack::Tree::Component.new do |tree| %>
+      <% render_recording_tree_nodes(tree, tree_root) %>
+    <% end %>
+  <% else %>
+    <%= render FlatPack::EmptyState::Component.new(
+      title: "Nothing selected",
+      description: "Switch to a workspace to see its tree.",
+      icon: :inbox
+    ) %>
+  <% end %>
+</div>

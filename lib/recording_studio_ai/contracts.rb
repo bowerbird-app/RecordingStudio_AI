@@ -1,0 +1,15 @@
+# frozen_string_literal: true
+
+require "recording_studio_ai/contracts/containment"
+require "recording_studio_ai/contracts/attribution"
+require "recording_studio_ai/contracts/request_validation"
+require "recording_studio_ai/contracts/normalized_error"
+require "recording_studio_ai/contracts/usage"
+require "recording_studio_ai/contracts/cost"
+require "recording_studio_ai/contracts/citation"
+require "recording_studio_ai/contracts/attempt_summary"
+require "recording_studio_ai/contracts/response"
+require "recording_studio_ai/contracts/generation_response"
+require "recording_studio_ai/contracts/batch_item_result"
+require "recording_studio_ai/contracts/batch_response"
+require "recording_studio_ai/contracts/streaming_event"

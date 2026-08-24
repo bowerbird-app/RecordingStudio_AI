@@ -1,61 +1,72 @@
 <%= render FlatPack::Sidebar::Component.new(side: sidebar_side) do |sidebar| %>
   <% sidebar.header do %>
-    <%= render FlatPack::Sidebar::Header::Component.new(
-      brand_abbr: "RS",
-      title: "Addon Template",
-      subtitle: "Recording Studio"
+    <%= render SidebarHeaderComponent.new(
+      brand_abbr: "AI",
+      title: "Recording Studio AI",
+      subtitle: "Phase 1 foundation",
+      version: RecordingStudioAI::VERSION
     ) %>
   <% end %>
 
   <% sidebar.items do %>
     <nav class="py-4 space-y-1" aria-label="Main navigation">
       <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Home",
-        href: main_app.root_path,
-        icon: :home
+        label: "AI Admin",
+        href: "/admin",
+        icon: :dashboard
       ) %>
-
       <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Install",
-        href: main_app.docs_install_path,
-        icon: :arrow_down_tray
+        label: "AI Calls",
+        href: "/admin/screens/ai_calls",
+        icon: :cpu_chip
       ) %>
-
       <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Config",
-        href: main_app.docs_config_path,
-        icon: :settings
+        label: "AI Responses",
+        href: "/admin/screens/recording_studio_ai_responses",
+        icon: :table
       ) %>
-
       <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Methods",
-        href: main_app.docs_methods_path,
-        icon: :code_bracket
-      ) %>
-
-      <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Recordable types",
-        href: main_app.docs_recordable_types_path,
-        icon: :queue_list
-      ) %>
-
-      <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Recordings tree",
-        href: main_app.docs_recordings_tree_path,
+        label: "Recording tree",
+        href: main_app.recording_tree_path,
         icon: :folder
       ) %>
-
       <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Gem Views",
-        href: main_app.docs_gem_views_path,
-        icon: :eye
+        label: "Install",
+        href: main_app.install_path,
+        icon: :document_text
       ) %>
-
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Config",
+        href: main_app.gem_config_path,
+        icon: :cog_6_tooth
+      ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Tables",
+        href: main_app.gem_tables_path,
+        icon: :server_stack
+      ) %>
+      <% if recording_studio_sidekiq_accessible? %>
+        <%= render FlatPack::Sidebar::Item::Component.new(
+          label: "Sidekiq",
+          href: main_app.sidekiq_web_path,
+          icon: :queue_list
+        ) %>
+      <% end %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Methods",
+        href: main_app.gem_methods_path,
+        icon: :code_bracket
+      ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "AI playground",
+        href: main_app.ai_playground_path,
+        icon: :cpu_chip
+      ) %>
     </nav>
   <% end %>
 
   <% sidebar.footer do %>
-    <%= render FlatPack::Sidebar::Footer::Component.new(class: "text-sm text-[var(--surface-muted-content-color)]") do %>
+    <%= render FlatPack::Sidebar::Footer::Component.new(class: "text-sm text-(--surface-muted-content-color)") do %>
       <%= render FlatPack::Sidebar::Item::Component.new(
         label: "Sign out",
         href: main_app.destroy_user_session_path,

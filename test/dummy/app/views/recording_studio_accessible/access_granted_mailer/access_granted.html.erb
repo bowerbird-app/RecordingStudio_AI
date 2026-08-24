@@ -1,0 +1,10 @@
+<p>Hello <%%= @actor.respond_to?(:email) ? @actor.email : "there" %>,</p>
+
+<p>
+  <%%= @manager_actor.present? ? @manager_actor.email : "Someone" %>
+  granted you <strong><%%= @role.humanize.downcase %></strong> access.
+</p>
+
+<%% if @access_url.present? %>
+  <p><a href="<%%= @access_url %>">Open the shared item</a></p>
+<%% end %>

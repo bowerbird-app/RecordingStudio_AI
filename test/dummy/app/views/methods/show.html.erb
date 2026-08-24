@@ -1,0 +1,246 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-8">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Methods",
+    subtitle: "Use Recording Studio AI from application services, controllers, jobs, and workflows. Register models, tools, and prompts on /config — this page shows the call sites.",
+    variant: :h1
+  ) %>
+
+  <section class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Shared Attribution",
+      subtitle: "Every operation requires a root recording and initiator. Add context, executor, and request metadata when available.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Request context",
+      language: "ruby",
+      code: <<~'RUBY'
+        root_recording = workspace.root_recording
+
+        attribution = {
+          root_recording: root_recording,
+          context_recording: page.recording,
+          initiator: current_user,
+          initiator_kind: :user,
+          execution_source: :web,
+          request_id: request.request_id
+        }
+      RUBY
+    ) %>
+  </section>
+
+  <section class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Generate",
+      subtitle: "One entry point for sync and streaming generation. Pass stream: true to receive incremental events. Optional model and flat generation parameters are validated against the model registry.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Inline prompt",
+      language: "ruby",
+      code: <<~'RUBY'
+        response = RecordingStudioAI.generate(
+          prompt: "Summarize this page for an editor.",
+          purpose: "page_summary",
+          profile: :medium,
+          provider: :openai,
+          model: "gpt-5",
+          temperature: 0.4,
+          verbosity: "medium",
+          provider_native_tools: [:web_search],
+          metadata: { feature: "page_editor" },
+          **attribution
+        )
+
+        if response.success?
+          response.text
+        else
+          Rails.logger.warn(response.error.message)
+        end
+
+        # Use generate! when a failed generation should raise RecordingStudioAI::Errors::ExecutionError.
+        response = RecordingStudioAI.generate!(prompt: "Draft a title", **attribution)
+      RUBY
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Registered prompt",
+      language: "ruby",
+      code: <<~'RUBY'
+        # prompt(:key).call renders the registered messages, applies defaults, and calls generate.
+        # Register the prompt on /config first.
+        response = RecordingStudioAI.prompt(:customer_reply).call(
+          inputs: { customer_name: customer.name, message: message.body },
+          **attribution
+        )
+
+        # Same path with generate! semantics:
+        response = RecordingStudioAI.prompt(:customer_reply).call!(
+          inputs: { customer_name: customer.name, message: message.body },
+          **attribution
+        )
+
+        # Stream through the registered prompt:
+        RecordingStudioAI.prompt(:customer_reply).stream(
+          inputs: { customer_name: customer.name, message: message.body },
+          **attribution
+        ) do |event|
+          process_event(event)
+        end
+      RUBY
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Registered custom tools",
+      language: "ruby",
+      code: <<~'RUBY'
+        # Pass registered tool references. Register the tool on /config first.
+        response = RecordingStudioAI.generate(
+          prompt: "Find the latest project status.",
+          purpose: "project_status",
+          profile: :medium,
+          custom_tools: [{ key: "lookup_project", version: 1 }],
+          **attribution
+        )
+
+        # On a registered prompt, custom_tools: merges with the prompt's tools
+        # (additive by key; same key from the caller replaces the prompt entry).
+        # Tools are only offered — the model decides whether to call them.
+        response = RecordingStudioAI.prompt(:customer_reply).call(
+          inputs: { customer_name: customer.name, message: message.body },
+          custom_tools: [{ key: "lookup_project", version: 1 }],
+          fallbacks: [
+            { provider: :openai, model: "gpt-5-mini" },
+            { provider: :gemini, model: "gemini-2.5-flash" }
+          ],
+          **attribution
+        )
+      RUBY
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Explicit fallbacks",
+      language: "ruby",
+      code: <<~'RUBY'
+        # Skip configured profiles for this call. Hop the list in order.
+        # Do not combine fallbacks: with provider: or model:.
+        # Top-level caller params travel to the next hop when that model supports them.
+        # Entry overlays (e.g. temperature on a hop) apply only when the caller omitted them.
+        response = RecordingStudioAI.generate(
+          prompt: "Summarize this page for an editor.",
+          purpose: "page_summary",
+          temperature: 1,
+          fallbacks: [
+            { provider: :openai, model: "gpt-5-mini" },
+            { provider: :gemini, model: "gemini-2.5-flash", max_output_tokens: 2048 }
+          ],
+          **attribution
+        )
+      RUBY
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Streaming generation",
+      language: "ruby",
+      code: <<~'RUBY'
+        RecordingStudioAI.generate(
+          prompt: "Explain this report in three bullets.",
+          purpose: "report_explanation",
+          stream: true,
+          **attribution
+        ) do |event|
+          next unless event.type == "content_delta"
+
+          broadcast_append_to("generation_#{current_user.id}", target: "output", html: event.text)
+        end
+
+        # Without a block, stream: true returns an Enumerator.
+        events = RecordingStudioAI.generate(prompt: "Draft an outline", stream: true, **attribution)
+        events.each { |event| process_event(event) }
+      RUBY
+    ) %>
+  </section>
+
+  <section class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Batch",
+      subtitle: "Submit independent items to a provider batch, then refresh synchronously or enqueue polling with Sidekiq through ActiveJob. Batch stays on submit_batch — it is not part of generate.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Submit and poll a batch",
+      language: "ruby",
+      code: <<~'RUBY'
+        batch = RecordingStudioAI.submit_batch(
+          purpose: "nightly_page_summaries",
+          profile: :medium,
+          model: "gpt-5-mini",
+          items: pages.map do |page|
+            {
+              reference: page.id.to_s,
+              prompt: "Summarize #{page.title}.",
+              purpose: "page_summary",
+              metadata: { page_id: page.id }
+            }
+          end,
+          **attribution
+        )
+
+        # Fetch the provider's latest status in the current process.
+        RecordingStudioAI.refresh_batch(batch_id: batch.batch.id, **attribution)
+
+        # Enqueue polling. The configured batch_synchronization_job reschedules
+        # itself until the batch reaches a terminal status.
+        RecordingStudioAI.refresh_batch_async(batch_id: batch.batch.id, **attribution)
+
+        RecordingStudioAI.cancel_batch(batch_id: batch.batch.id, **attribution)
+      RUBY
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Wake refresh from a webhook",
+      language: "ruby",
+      code: <<~'RUBY'
+        # Optional. Requires recording_studio_webhooks plus the OpenAI recipes on /config.
+        # Looks up the batch by provider_batch_id under the root, then runs refresh_batch.
+        # Never trusts webhook payload status or results — always retrieves from the provider.
+        RecordingStudioAI.refresh_batch_from_webhook(
+          provider_batch_id: "batch_abc123",
+          root_recording: root_recording,
+          request_id: "evt_123"
+        )
+      RUBY
+    ) %>
+  </section>
+
+  <section class="space-y-3">
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Models",
+      subtitle: "Query the model registry at call time. Register and override models on /config.",
+      variant: :h3,
+      class: "mb-0 pb-0"
+    ) %>
+
+    <%= render FlatPack::CodeBlock::Component.new(
+      title: "Inspect registered models",
+      language: "ruby",
+      code: <<~'RUBY'
+        model = RecordingStudioAI.models.fetch(:openai, "gpt-5")
+        model.capabilities            # => [:generation, :streaming, :structured_output, ...]
+        model.supports_parameter?(:temperature)   # => true
+        model.parameter(:temperature)             # => { type: :number, min: 0.0, max: 2.0, ... }
+        model.supports_tool?(:web_search)         # => true
+        model.modalities                          # => { input: [:text, :image, :file], output: [:text] }
+
+        RecordingStudioAI.models.for_provider(:openai)  # all OpenAI models
+        RecordingStudioAI.models.all                    # every registered model
+      RUBY
+    ) %>
+  </section>
+</div>

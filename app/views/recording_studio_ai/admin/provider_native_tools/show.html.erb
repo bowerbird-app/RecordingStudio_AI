@@ -1,0 +1,51 @@
+<div class="mx-auto flex w-full max-w-7xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(title: "Provider-native tools", subtitle: "Web-search reporting uses only provider-reported usage and citations; internal search counts are never inferred.", variant: :h1) %>
+
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <% { "Runs requested" => @runs.count, "Attempts requested" => @attempts.count, "Reported citations" => @citation_count, "Average duration" => admin_duration(@average_latency&.round) }.each do |label, value| %>
+      <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+        <% card.body do %>
+          <p class="text-sm opacity-70"><%= label %></p>
+          <p class="mt-2 text-xl font-bold"><%= value %></p>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-3">
+    <% { "Providers" => @providers, "Models" => @models, "Outcomes" => @outcomes }.each do |title, values| %>
+      <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+        <% card.header do %><%= render FlatPack::PageTitle::Component.new(title: title, variant: :h3, class: "mb-0 pb-0") %><% end %>
+        <% card.body do %>
+          <dl class="space-y-2 text-sm">
+            <% values.each do |key, count| %>
+              <div class="flex justify-between gap-4"><dt><%= key.presence || "Unknown" %></dt><dd class="font-semibold"><%= count %></dd></div>
+            <% end %>
+          </dl>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+    <% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Recent web-search runs", variant: :h3, class: "mb-0 pb-0") %><% end %>
+    <% card.body do %>
+      <% if @runs.any? %>
+        <%= render FlatPack::Table::Component.new(data: @runs) do |table| %>
+          <% table.column(title: "Run") do |run| %>
+            <%= link_to run.id, admin_run_path(run) %>
+          <% end %>
+          <% table.column(title: "Provider / model") { |run| [run.resolved_provider, run.resolved_model].compact.join(" / ") } %>
+          <% table.column(title: "Status") do |run| %>
+            <%= render FlatPack::Badge::Component.new(text: run.status.humanize, style: admin_status_style(run.status), size: :sm) %>
+          <% end %>
+          <% table.column(title: "Used") { |run| run.web_search_used? ? "Yes" : "No" } %>
+          <% table.column(title: "Citations") { |run| run.citation_count } %>
+          <% table.column(title: "Duration") { |run| admin_duration(run.latency_ms) } %>
+        <% end %>
+      <% else %>
+        <%= render FlatPack::EmptyState::Component.new(title: "No web-search activity", description: "Runs that request provider-native web search will appear here.") %>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>

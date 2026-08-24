@@ -21,7 +21,7 @@ class AddUniqueActiveAccessBoundaryPerParent < ActiveRecord::Migration[8.1]
   private
 
   def supports_partial_indexes?
-    adapter = connection.adapter_name.to_s.downcase
-    adapter.include?("postgres") || adapter.include?("sqlite")
+    provider = connection.adapter_name.to_s.downcase
+    provider.include?("postgres") || provider.include?("sqlite")
   end
 end
