@@ -79,10 +79,10 @@ module RecordingStudioAI
             validation_error!("missing required custom tool argument: #{name}")
           end
         end
-      rescue RecordingStudioAI::Errors::ContractValidationError => error
-        raise error if error.code == "custom_tool_validation"
+      rescue RecordingStudioAI::Errors::ContractValidationError => e
+        raise e if e.code == "custom_tool_validation"
 
-        validation_error!(error.message)
+        validation_error!(e.message)
       end
 
       def json_schema

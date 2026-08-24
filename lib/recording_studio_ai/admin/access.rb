@@ -29,8 +29,8 @@ module RecordingStudioAI
 
       def allowed?(action, root_id:, context: {})
         authorize!(action, root_id: root_id, context: context)
-      rescue RecordingStudioAI::Errors::ContractValidationError => error
-        raise unless error.code == "authorization"
+      rescue RecordingStudioAI::Errors::ContractValidationError => e
+        raise unless e.code == "authorization"
 
         false
       end

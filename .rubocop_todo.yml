@@ -505,15 +505,6 @@ Metrics/PerceivedComplexity:
     - 'lib/recording_studio_ai/tools/definition.rb'
     - 'test/phase_three_persistence_test.rb'
 
-# Offense count: 3
-# This cop supports safe autocorrection (--autocorrect).
-# Configuration parameters: PreferredName.
-Naming/RescuedExceptionsVariableName:
-  Exclude:
-    - 'lib/recording_studio_ai/admin/access.rb'
-    - 'lib/recording_studio_ai/contracts/attribution.rb'
-    - 'lib/recording_studio_ai/tools/definition.rb'
-
 # Offense count: 2
 # This cop supports safe autocorrection (--autocorrect).
 # Configuration parameters: AllowOnlyRestArgument, UseAnonymousForwarding, RedundantRestArgumentNames, RedundantKeywordRestArgumentNames, RedundantBlockArgumentNames.
