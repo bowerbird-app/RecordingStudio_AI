@@ -4,6 +4,19 @@ RecordingStudioAccessible.configure do |config|
   # Keep this enabled if you want an info-level log when RecordingStudio still owns
   # the built-in access constants and this addon is running in compatibility mode.
   config.warn_on_core_conflict = true
+  config.access_actor_types = [ "User" ]
+
+  config.avatar_resolver = lambda do |access_holder|
+    next unless access_holder.is_a?(User)
+
+    email = access_holder.email.to_s.strip
+    next if email.blank?
+
+    {
+      name: email.split("@").first.tr("._-", " ").squish.titleize,
+      alt: email
+    }
+  end
 
   # Optional: resolve the submitted email to an actor for new access grants.
   # config.access_management_actor_email_resolver = lambda do |controller:, email:|

@@ -29,15 +29,14 @@ class TailwindGemSourcesTest < ActiveSupport::TestCase
     assert_includes entry, '@import "./gem_sources.css"'
   end
 
-  test "compiled dummy tailwind includes Flatpack sidebar layout utilities" do
+  test "compiled dummy tailwind includes default layout utilities" do
     css_path = Rails.root.join("app/assets/builds/tailwind.css")
-    unless css_path.exist? && css_path.read.include?("auto_1fr")
+    unless css_path.exist? && css_path.read.include?("min-h-screen")
       Rake::Task["tailwindcss:build"].reenable
       Rake::Task["tailwindcss:build"].invoke
     end
 
     css = File.read(css_path)
-    assert_includes css, "h-screen"
-    assert_includes css, "auto_1fr"
+    assert_includes css, "min-h-screen"
   end
 end

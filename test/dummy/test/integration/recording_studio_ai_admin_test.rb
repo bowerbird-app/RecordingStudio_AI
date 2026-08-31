@@ -18,8 +18,7 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     RecordingStudioAdmin.configuration.required_access_role = :view
     RecordingStudioAccessible.configuration.access_management_authorizer = ->(**) { true }
 
-    grant_result = RecordingStudioAccessible.grant_access(recording: @root_recording, actor: @user, role: :view)
-    raise grant_result.error unless grant_result.success?
+    grant_accessible!(recording: @root_recording, actor: @user, role: :view)
   end
 
   teardown do

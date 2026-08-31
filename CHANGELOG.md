@@ -5,6 +5,26 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-31
+
+### Changed
+
+- **Breaking dependency floor:** requires Recording Studio `~> 4.2` (tested
+  against `4.2.0`). Dummy and development Gemfiles pin Recording Studio
+  `v4.2.0`, Accessible `v0.7.0`, Admin `2.0.1`, Root Switchable `v0.5.0`, and
+  FlatPack `v0.1.143`. Accessible stays a host/dummy dependency — it is not
+  added to the gemspec.
+- Dummy app uses `RecordingStudio::UsesDefaultLayout` and
+  `recording_studio/default_layout` from Recording Studio 4.2 as-is (no vendored
+  layout copy). Rounded theme is applied on `html` and `body`. The page-nav
+  right slot is Access only — no Sign out, Root Switchable, or admin/root
+  dropdown.
+- Dummy seeds bootstrap the first owner with `bootstrap_owner_access!`, persist
+  actors and recordings before grants, and seed engine-admin batches plus a
+  retained response so those screens are not empty.
+
+See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
+
 ### Security
 
 - Retained-response admin viewer always decrypts through `ResponseReader`, so

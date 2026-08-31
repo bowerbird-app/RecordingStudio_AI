@@ -25,7 +25,7 @@ A template for building **Rails mountable engine gems** with PostgreSQL UUID pri
 - ✓ Install generator for host applications
 - ✓ Migrations generator for database setup
 - ✓ Service object pattern with Result monad
-- ✓ Dummy app sidebar with starter documentation pages and a minimal demo home page
+- ✓ Dummy app uses Recording Studio `default_layout` with starter documentation pages and a minimal demo home page
 
 ---
 
@@ -55,9 +55,7 @@ A template for building **Rails mountable engine gems** with PostgreSQL UUID pri
 
 ## Dummy App Guidance
 
-The dummy app includes a starter authenticated sidebar in `test/dummy/app/views/layouts/flat_pack/_sidebar.html.erb` with linked pages for install, config, recordable types, recordings tree, gem views, and methods. Those pages are intentionally scaffolded examples with a consistent FlatPack style; update their labels, routes, and content so they fit the gem you are building.
-
-The home page in `test/dummy/app/views/home/index.html.erb` is the corresponding starting point for a very minimal demo of the gem's primary behavior. Keep it narrowly focused and use the sidebar pages for the broader explanation of concepts, setup, and API surface.
+The dummy app uses `RecordingStudio::UsesDefaultLayout` from Recording Studio 4.2 (`recording_studio/default_layout`) rather than a vendored sidebar. Documentation pages for install, config, methods, and the playground live as host routes. The home page in `test/dummy/app/views/home/index.html.erb` stays small and links into those screens.
 
 For current UI work, prefer the top-level README plus the live FlatPack demo app at `https://flatpack-c6p8f.ondigitalocean.app/`. Its component table is the quickest way to discover shared components, user-provided FlatPack demo URLs should be treated as task context, and if the demo is blocked in Codespaces or another restricted environment, ask for access or request sanitized screenshots, copied markup, or component details instead of guessing.
 

@@ -2,7 +2,6 @@
 
 RecordingStudioAdmin.configure do |config|
   config.default_mount_path = "/admin"
-  config.engine_layout = "recording_studio_admin_blank"
   config.async_widgets.enabled = false
   config.authentication_method = :authenticate_user!
   config.current_actor_method = :current_user
