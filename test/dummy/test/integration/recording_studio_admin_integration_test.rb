@@ -44,6 +44,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "href=\"/admin\""
     refute_includes response.body, "Recording tree"
     refute_includes response.body, "AI Admin"
+    assert_select "body[data-recording-studio-default-layout='true']", count: 1
+    refute_includes response.body, "flat-pack--sidebar-layout"
+    refute_includes response.body, "recording-studio-root-switchable--root-switch-dropdown"
   end
 
   test "methods guide documents the Recording Studio AI APIs" do
@@ -67,7 +70,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "RecordingStudioAI.models.register"
     refute_includes response.body, "RecordingStudioAI.tools.register"
     refute_includes response.body, "RecordingStudioAI.prompts.register"
-    assert_includes response.body, "href=\"/methods\""
+    assert_includes response.body, "flat-pack--sidebar-layout"
+    assert_select "body[data-recording-studio-default-layout='true']", count: 0
   end
 
   test "config guide documents providers models and profiles" do
@@ -1725,8 +1729,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
   private
 
   def authenticate_for_admin!
-    grant_result = RecordingStudioAccessible.grant_access(recording: @root_recording, actor: @user, role: :view)
-    assert grant_result.success?, grant_result.error
+    grant_accessible!(recording: @root_recording, actor: @user, role: :view)
     sign_in @user
     patch "/recording_studio_root_switchable/v1/root_switch", params: {
       scope: "all_workspaces",

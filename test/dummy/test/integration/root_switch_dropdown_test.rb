@@ -13,7 +13,7 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Recording Studio AI"
   end
 
-  test "home page renders only workspaces the actor can access" do
+  test "root switcher lists only workspaces the actor can access" do
     user = User.find_or_create_by!(email: "root-switch-test@example.com") do |record|
       record.password = "Password123!"
       record.password_confirmation = "Password123!"
@@ -27,7 +27,7 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     RecordingStudio.root_recording_for(hidden)
     grant_accessible!(recording: granted_root, actor: user, role: :view)
 
-    get root_path
+    get "/recording_studio_root_switchable/v1/root_switch?scope=all_workspaces"
 
     assert_response :success
     assert_includes response.body, granted.name
@@ -49,9 +49,11 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     get "/recording_studio_root_switchable/v1/root_switch?scope=all_workspaces"
 
     assert_response :success
+    assert_includes response.body, workspace.name
     assert_includes response.body, "AI Admin"
     assert_includes response.body, "Recording tree"
-    assert_includes response.body, workspace.name
+    assert_includes response.body, "flat-pack--sidebar-layout"
+    assert_select "body[data-recording-studio-default-layout='true']", count: 0
   end
 
   test "switching returns to the current page when it is a valid internal route" do

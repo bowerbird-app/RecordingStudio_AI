@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.2.21", RecordingStudioAI::VERSION
+    assert_equal "0.3.0", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -41,6 +41,8 @@ class RecordingStudioAITest < Minitest::Test
     dependencies = specification.runtime_dependencies.to_h { |dependency| [dependency.name, dependency.requirement] }
 
     assert_equal %w[csv flat_pack json_schemer openai rails recording_studio], dependencies.keys.sort
+    assert_equal "~> 4.2", dependencies.fetch("recording_studio").to_s
+    refute_includes dependencies.keys, "recording_studio_accessible"
   end
 
   def test_phase_six_ships_concrete_providers_without_example_surfaces
@@ -69,17 +71,20 @@ class RecordingStudioAITest < Minitest::Test
       File.read(File.expand_path("dummy/config/initializers/recording_studio.rb", __dir__))
 
     assert_includes routes, 'mount RecordingStudioAI::Engine, at: "/recording_studio_ai"'
-    assert_includes routes, 'mount RecordingStudio::Engine, at: "/recording_studio"'
+    assert_includes routes, 'mount RecordingStudioAccessible::Engine, at: "/recording_studio_accessible"'
     assert_includes recording_studio_initializer, "config.require_recordable_declarations = true"
   end
 
-  def test_dummy_home_describes_foundation_scope
+  def test_dummy_home_links_to_addon_screens
     home = File.read(File.expand_path("dummy/app/views/home/index.html.erb", __dir__))
 
     assert_includes home, 'title: "Recording Studio AI"'
-    assert_includes home, "OpenAI or Gemini credentials can be supplied without selecting a provider."
-    assert_includes home, "Addon migrations install six execution infrastructure tables."
-    assert_includes home, "Synchronous generation resolves OpenAI or Gemini"
+    assert_includes home, "Playground"
+    assert_includes home, "Config"
+    assert_includes home, "Methods"
+    assert_includes home, "/recording_studio_ai/admin"
+    assert_includes home, "/admin/screens/ai_calls"
+    refute_includes home, "Foundation ready"
   end
 
   def test_persistence_models_are_non_recordable_infrastructure

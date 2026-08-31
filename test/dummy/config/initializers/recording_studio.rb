@@ -3,9 +3,8 @@
 RecordingStudio.configure do |config|
   # Registered delegated_type recordables (strings or classes)
   config.recordable_types = [ "Workspace", "Folder", "Page" ]
-
-  # Require each configured ActiveRecord type to call recording_studio_recordable.
   config.require_recordable_declarations = true
+  config.app_name = "Recording Studio AI"
 
   # Actor resolver for events when no actor is explicitly supplied
   config.actor = -> { Current.actor }
@@ -18,10 +17,8 @@ RecordingStudio.configure do |config|
 
   # Recordable duplication strategy for revisions
   config.recordable_dup_strategy = :dup
-end
 
-# RecordingStudioAccessible grants require the accessible capability to be enabled
-# on recordable types that can own access child recordings.
-RecordingStudio.enable_capability(:accessible, on: "Workspace")
-RecordingStudio.enable_capability(:accessible, on: "Folder")
-RecordingStudio.enable_capability(:accessible, on: "Page")
+  config.enable_capability(:accessible, on: "Workspace")
+  config.enable_capability(:accessible, on: "Folder")
+  config.enable_capability(:accessible, on: "Page")
+end

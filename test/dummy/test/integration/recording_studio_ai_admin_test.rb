@@ -18,8 +18,7 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     RecordingStudioAdmin.configuration.required_access_role = :view
     RecordingStudioAccessible.configuration.access_management_authorizer = ->(**) { true }
 
-    grant_result = RecordingStudioAccessible.grant_access(recording: @root_recording, actor: @user, role: :view)
-    raise grant_result.error unless grant_result.success?
+    grant_accessible!(recording: @root_recording, actor: @user, role: :view)
   end
 
   teardown do
@@ -42,7 +41,12 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Recording Studio AI"
     assert_includes response.body, "flat_pack/variables"
+    assert_includes response.body, "flat_pack/rich_text"
     assert_includes response.body, "tailwind-"
+    assert_includes response.body, "importmap"
+    assert_select "body[data-recording-studio-default-layout='true']", count: 1
+    refute_includes response.body, "flat-pack--sidebar-layout"
+    refute_includes response.body, "recording-studio-root-switchable--root-switch-dropdown"
   end
 
   test "legacy AI engine admin path is not routable" do
@@ -51,5 +55,25 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     get "/admin/recording_studio_ai/admin/runs"
 
     assert_response :not_found
+  end
+
+  test "engine admin custom tools index renders registered tools" do
+    sign_in @user
+
+    get "/recording_studio_ai/admin/custom_tools"
+
+    assert_response :success
+    assert_includes response.body, "Dummy Echo Tool"
+    refute_includes response.body, "version_admin_custom_tool"
+    assert_select "body[data-recording-studio-default-layout='true']", count: 1
+    refute_includes response.body, "flat-pack--sidebar-layout"
+    refute_includes response.body, "recording-studio-root-switchable--root-switch-dropdown"
+    assert_select "table", minimum: 1
+    assert_select "table td", text: /Dummy Echo Tool/
+    assert_select "[class*='card-border-color'] table", count: 0
+    assert_includes response.body, "overflow-x-auto"
+    assert_includes response.body, "stylesheet"
+    assert_includes response.body, "flat_pack/variables"
+    assert_includes response.body, "tailwind-"
   end
 end

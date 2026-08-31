@@ -2,7 +2,6 @@
 
 RecordingStudioAdmin.configure do |config|
   config.default_mount_path = "/admin"
-  config.engine_layout = "recording_studio_admin_blank"
   config.async_widgets.enabled = false
   config.authentication_method = :authenticate_user!
   config.current_actor_method = :current_user
@@ -45,6 +44,21 @@ end
 
 RecordingStudioAdmin::Period.singleton_class.prepend(RecordingStudioAdminLastFourWeeksPreset)
 
+module RecordingStudioAdminDiscardLayoutNotice
+  extend ActiveSupport::Concern
+
+  included do
+    before_action :discard_default_layout_notice
+  end
+
+  private
+
+  # default_layout renders leftover Devise "Signed in successfully." on /admin.
+  def discard_default_layout_notice
+    flash.delete(:notice)
+  end
+end
+
 module RecordingStudioAdminRootAnchorDefault
   private
 
@@ -62,8 +76,17 @@ module RecordingStudioAdminRootAnchorDefault
 end
 
 Rails.application.config.to_prepare do
-  if defined?(RecordingStudioAdmin::ApplicationController) &&
-      !RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudioAdminRootAnchorDefault)
+  next unless defined?(RecordingStudioAdmin::ApplicationController)
+
+  unless RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudio::UsesDefaultLayout)
+    RecordingStudioAdmin::ApplicationController.include(RecordingStudio::UsesDefaultLayout)
+  end
+
+  unless RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudioAdminRootAnchorDefault)
     RecordingStudioAdmin::ApplicationController.prepend(RecordingStudioAdminRootAnchorDefault)
+  end
+
+  unless RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudioAdminDiscardLayoutNotice)
+    RecordingStudioAdmin::ApplicationController.include(RecordingStudioAdminDiscardLayoutNotice)
   end
 end

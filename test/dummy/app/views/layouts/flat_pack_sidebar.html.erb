@@ -22,7 +22,7 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="m-0 min-h-screen bg-(--surface-page-background-color) text-(--surface-content-color)">
+  <body class="m-0 min-h-screen bg-(--surface-page-background-color) text-(--surface-content-color)" data-theme="rounded">
     <%= render FlatPack::SidebarLayout::Component.new(side: :left, storage_key: "flat-pack-sidebar-layout") do |layout| %>
       <% layout.sidebar do %>
         <%= render "layouts/flat_pack/sidebar", sidebar_side: :left %>

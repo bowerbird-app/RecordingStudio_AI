@@ -46,13 +46,14 @@ begin
   RecordingStudioAccessible.configuration.access_management_authorizer = ->(**) { true }
 
   [root_recording, accessible_root_recording, private_root_recording].each do |seed_root|
-    grant_result = RecordingStudioAccessible.grant_access(
+    current_role = RecordingStudioAccessible.role_for(actor: user, recording: seed_root)
+    next if current_role == :admin
+
+    bootstrap_result = RecordingStudioAccessible.bootstrap_owner_access!(
       recording: seed_root,
-      actor: user,
-      role: :admin,
-      manager_actor: user
+      actor: user
     )
-    raise("Failed to seed admin access for root #{seed_root.id}: #{grant_result.error}") unless grant_result.success?
+    raise("Failed to bootstrap owner access for root #{seed_root.id}: #{bootstrap_result.error}") unless bootstrap_result.success?
   end
 
   srand(42)
@@ -399,6 +400,162 @@ begin
         prompt_definition: registered_prompts.fetch((index + 2) % registered_prompts.length)
       )
     end
+  end
+
+  seed_batch_request_id = "seed-rsai-batch-v1"
+  unless RecordingStudioAI::Batch.exists?(request_id: seed_batch_request_id)
+    batch_started_at = 2.hours.ago
+    batch_run = RecordingStudioAI::Run.create!(
+      operation: "batch",
+      status: "completed",
+      request_id: "#{seed_batch_request_id}-run",
+      profile_key: "medium",
+      requested_provider: "openai",
+      resolved_provider: "openai",
+      resolved_model: "gpt-4.1-mini",
+      root_recording_id: root_recording.id,
+      initiator_type: "User",
+      initiator_id: user.id,
+      initiator_kind: "human",
+      executor_type: "User",
+      executor_id: user.id,
+      executor_kind: "manual",
+      execution_source: "sync",
+      started_at: batch_started_at,
+      completed_at: batch_started_at + 45.seconds,
+      latency_ms: 45_000,
+      input_tokens: 420,
+      output_tokens: 180,
+      total_tokens: 600,
+      attempt_count: 1,
+      retry_count: 0,
+      fallback_count: 0,
+      custom_tool_invocation_count: 0,
+      citation_count: 0,
+      web_search_requested: false,
+      web_search_used: false,
+      purpose: "nightly_summary",
+      **prompt_attributes.call(registered_prompts.first),
+      created_at: batch_started_at,
+      updated_at: batch_started_at + 45.seconds
+    )
+
+    batch = RecordingStudioAI::Batch.create!(
+      status: "completed",
+      request_id: seed_batch_request_id,
+      profile_key: "medium",
+      provider: "openai",
+      model: "gpt-4.1-mini",
+      provider_batch_id: "seed-provider-batch-1",
+      root_recording_id: root_recording.id,
+      initiator_type: "User",
+      initiator_id: user.id,
+      initiator_kind: "human",
+      executor_type: "User",
+      executor_id: user.id,
+      executor_kind: "manual",
+      execution_source: "sync",
+      submitted_at: batch_started_at,
+      completed_at: batch_started_at + 45.seconds,
+      item_count: 1,
+      completed_item_count: 1,
+      failed_item_count: 0,
+      cancelled_item_count: 0,
+      input_tokens: 420,
+      output_tokens: 180,
+      total_tokens: 600,
+      created_at: batch_started_at,
+      updated_at: batch_started_at + 45.seconds
+    )
+
+    batch_item = batch.batch_items.create!(
+      run: batch_run,
+      position: 0,
+      reference: "seed-batch-item-1",
+      status: "completed",
+      started_at: batch_started_at,
+      completed_at: batch_started_at + 45.seconds,
+      input_tokens: 420,
+      output_tokens: 180,
+      total_tokens: 600
+    )
+
+    retained_text = "Seeded retained response for the AI administration screens."
+    RecordingStudioAI::Response.create!(
+      batch_item: batch_item,
+      response_type: "batch_item",
+      provider: "openai",
+      model: "gpt-4.1-mini",
+      complete: true,
+      byte_size: retained_text.bytesize,
+      content_text: retained_text,
+      expires_at: 7.days.from_now
+    )
+  end
+
+  retained_run_request_id = "seed-rsai-retained-v1"
+  unless RecordingStudioAI::Run.exists?(request_id: retained_run_request_id)
+    retained_started_at = 90.minutes.ago
+    retained_run = RecordingStudioAI::Run.create!(
+      operation: "generation",
+      status: "completed",
+      request_id: retained_run_request_id,
+      profile_key: "medium",
+      requested_provider: "openai",
+      resolved_provider: "openai",
+      resolved_model: "gpt-4.1-mini",
+      root_recording_id: root_recording.id,
+      initiator_type: "User",
+      initiator_id: user.id,
+      initiator_kind: "human",
+      executor_type: "User",
+      executor_id: user.id,
+      executor_kind: "manual",
+      execution_source: "sync",
+      started_at: retained_started_at,
+      completed_at: retained_started_at + 3.seconds,
+      latency_ms: 3_200,
+      input_tokens: 210,
+      output_tokens: 90,
+      total_tokens: 300,
+      attempt_count: 1,
+      retry_count: 0,
+      fallback_count: 0,
+      custom_tool_invocation_count: 0,
+      citation_count: 0,
+      web_search_requested: false,
+      web_search_used: false,
+      purpose: "playground_preview",
+      **prompt_attributes.call(registered_prompts.first),
+      created_at: retained_started_at,
+      updated_at: retained_started_at + 3.seconds
+    )
+    retained_attempt = retained_run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      profile_key: retained_run.profile_key,
+      provider: "openai",
+      model: "gpt-4.1-mini",
+      started_at: retained_started_at,
+      completed_at: retained_started_at + 3.seconds,
+      latency_ms: 3_200,
+      input_tokens: 210,
+      output_tokens: 90,
+      total_tokens: 300,
+      finish_reason: "stop"
+    )
+    retained_text = "Seeded generation body for the retained-response screen."
+    RecordingStudioAI::Response.create!(
+      attempt: retained_attempt,
+      response_type: "generation",
+      provider: "openai",
+      model: "gpt-4.1-mini",
+      complete: true,
+      byte_size: retained_text.bytesize,
+      content_text: retained_text,
+      expires_at: 7.days.from_now
+    )
   end
 
   RecordingStudioAccessible.configuration.access_management_authorizer = previous_access_authorizer

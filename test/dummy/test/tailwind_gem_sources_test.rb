@@ -20,7 +20,11 @@ class TailwindGemSourcesTest < ActiveSupport::TestCase
     assert_includes sources, "#{engine}/app/views/**/*.erb"
     assert_includes sources, "#{engine}/lib/recording_studio_ai/admin/**/*.{rb,erb}"
     accessible = Gem.loaded_specs.fetch("recording_studio_accessible").full_gem_path
-    assert_includes sources, "#{accessible}/app/components/**/*.{rb,erb}"
+    assert_includes sources, "#{accessible}/app/views/**/*.erb"
+    accessible_components = File.join(accessible, "app/components")
+    if File.directory?(accessible_components)
+      assert_includes sources, "#{accessible_components}/**/*.{rb,erb}"
+    end
   end
 
   test "dummy tailwind entry imports generated gem sources" do
@@ -29,15 +33,14 @@ class TailwindGemSourcesTest < ActiveSupport::TestCase
     assert_includes entry, '@import "./gem_sources.css"'
   end
 
-  test "compiled dummy tailwind includes Flatpack sidebar layout utilities" do
+  test "compiled dummy tailwind includes default layout utilities" do
     css_path = Rails.root.join("app/assets/builds/tailwind.css")
-    unless css_path.exist? && css_path.read.include?("auto_1fr")
+    unless css_path.exist? && css_path.read.include?("min-h-screen")
       Rake::Task["tailwindcss:build"].reenable
       Rake::Task["tailwindcss:build"].invoke
     end
 
     css = File.read(css_path)
-    assert_includes css, "h-screen"
-    assert_includes css, "auto_1fr"
+    assert_includes css, "min-h-screen"
   end
 end

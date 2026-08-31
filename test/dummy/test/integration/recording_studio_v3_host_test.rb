@@ -3,10 +3,12 @@
 require "test_helper"
 
 class RecordingStudioV3HostTest < ActiveSupport::TestCase
-  test "dummy app loads root switchable config and controller support" do
+  test "dummy app loads root switchable config and host sidebar layout" do
     assert_equal [ "all_workspaces" ], RecordingStudioRootSwitchable.configuration.scopes.keys
     assert_equal :application_layout, RecordingStudioRootSwitchable.configuration.layout
     assert_includes ApplicationController.ancestors, RecordingStudio::RootSwitchable::ControllerSupport
+    refute_includes ApplicationController.ancestors, RecordingStudio::UsesDefaultLayout
+    assert_includes RecordingStudioAI::Admin::ApplicationController.ancestors, RecordingStudio::UsesDefaultLayout
   end
 
   test "dummy app validates v3 recordable declarations" do

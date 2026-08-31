@@ -1,57 +1,72 @@
 <div class="mx-auto flex w-full max-w-7xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(title: "AI runs", subtitle: "Review recorded AI execution runs.") %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
-    <% card.body do %>
-      <% if @runs.any? %>
-        <%= render FlatPack::Table::Component.new(data: @runs) do |table| %>
-          <% table.column(title: "Time / ID") do |run| %>
-            <div>
-              <%= link_to run.created_at.to_fs(:short), admin_run_path(run), class: "font-semibold" %>
-              <div class="mt-1 text-xs opacity-70">Run <%= run.id %></div>
-            </div>
-          <% end %>
-          <% table.column(title: "Attribution") do |run| %>
-            <div>
-              Root <%= run.root_recording_id %>
-              <% if @sensitive_roots[run.root_recording_id] %>
-                <div class="text-xs opacity-70">
-                  Context <%= run.context_recording_id || "none" %><br>
-                  Initiator <%= [run.initiator_type, run.initiator_id].compact.join(" ") %><br>
-                  Executor <%= [run.executor_type, run.executor_id].compact.join(" ").presence || "none" %>
-                </div>
-              <% end %>
-            </div>
-          <% end %>
-          <% table.column(title: "Operation") do |run| %>
-            <div>
-              <%= run.operation %>
-              <div class="text-xs opacity-70"><%= run.purpose.presence || "No purpose" %> / <%= run.profile_key.presence || "No profile" %></div>
-            </div>
-          <% end %>
-          <% table.column(title: "Provider / model") { |run| [run.resolved_provider, run.resolved_model].compact.join(" / ").presence || "Unknown" } %>
-          <% table.column(title: "Status") do |run| %>
-            <%= render FlatPack::Badge::Component.new(text: run.status.humanize, style: admin_status_style(run.status), size: :sm) %>
-          <% end %>
-          <% table.column(title: "Duration") { |run| admin_duration(run.latency_ms) } %>
-          <% table.column(title: "Tokens / cost") do |run| %>
-            <div>
-              <%= admin_tokens(run.input_tokens) %> / <%= admin_tokens(run.output_tokens) %> / <%= admin_tokens(run.total_tokens) %>
-              <div class="text-xs opacity-70">Input / output / total</div>
-            </div>
-          <% end %>
-          <% table.column(title: "Activity") do |run| %>
-            <div>
-              <%= run.attempt_count %> attempts / <%= run.retry_count %> retries / <%= run.fallback_count %> fallbacks<br>
-              <%= run.custom_tool_invocation_count %> tools / <%= run.attachment_count %> attachments
-              <div class="text-xs opacity-70"><%= run.citation_count %> citations / search <%= run.web_search_requested? ? "requested" : "not requested" %>, <%= run.web_search_used? ? "used" : "not used" %></div>
-            </div>
-          <% end %>
-          <% table.column(title: "Source") { |run| run.execution_source.presence || "Unknown" } %>
-        <% end %>
-      <% else %>
-        <%= render FlatPack::EmptyState::Component.new(title: "No runs found", description: "Adjust the filters or wait for new AI activity.") %>
-      <% end %>
+  <% if @runs.any? %>
+    <%= render FlatPack::Table::Component.new(data: @runs) do |table| %>
+      <% table.column(
+        title: "Time / ID",
+        html: ->(run) {
+          safe_join([
+            link_to(run.created_at.to_fs(:short), admin_run_path(run), class: "font-semibold"),
+            content_tag(:div, "Run #{run.id}", class: "mt-1 text-xs opacity-70")
+          ])
+        }
+      ) %>
+      <% table.column(
+        title: "Attribution",
+        html: ->(run) {
+          details = if @sensitive_roots[run.root_recording_id]
+            content_tag(:div, class: "text-xs opacity-70") do
+              safe_join([
+                "Context #{run.context_recording_id || 'none'}",
+                tag.br,
+                "Initiator #{[run.initiator_type, run.initiator_id].compact.join(' ')}",
+                tag.br,
+                "Executor #{[run.executor_type, run.executor_id].compact.join(' ').presence || 'none'}"
+              ])
+            end
+          end
+          safe_join(["Root #{run.root_recording_id}", details].compact)
+        }
+      ) %>
+      <% table.column(
+        title: "Operation",
+        html: ->(run) {
+          safe_join([
+            run.operation,
+            content_tag(:div, "#{run.purpose.presence || 'No purpose'} / #{run.profile_key.presence || 'No profile'}", class: "text-xs opacity-70")
+          ])
+        }
+      ) %>
+      <% table.column(title: "Provider / model", html: ->(run) { [run.resolved_provider, run.resolved_model].compact.join(" / ").presence || "Unknown" }) %>
+      <% table.column(
+        title: "Status",
+        html: ->(run) { render FlatPack::Badge::Component.new(text: run.status.humanize, style: admin_status_style(run.status), size: :sm) }
+      ) %>
+      <% table.column(title: "Duration", html: ->(run) { admin_duration(run.latency_ms) }) %>
+      <% table.column(
+        title: "Tokens / cost",
+        html: ->(run) {
+          safe_join([
+            "#{admin_tokens(run.input_tokens)} / #{admin_tokens(run.output_tokens)} / #{admin_tokens(run.total_tokens)}",
+            content_tag(:div, "Input / output / total", class: "text-xs opacity-70")
+          ])
+        }
+      ) %>
+      <% table.column(
+        title: "Activity",
+        html: ->(run) {
+          safe_join([
+            "#{run.attempt_count} attempts / #{run.retry_count} retries / #{run.fallback_count} fallbacks",
+            tag.br,
+            "#{run.custom_tool_invocation_count} tools / #{run.attachment_count} attachments",
+            content_tag(:div, "#{run.citation_count} citations / search #{run.web_search_requested? ? 'requested' : 'not requested'}, #{run.web_search_used? ? 'used' : 'not used'}", class: "text-xs opacity-70")
+          ])
+        }
+      ) %>
+      <% table.column(title: "Source", html: ->(run) { run.execution_source.presence || "Unknown" }) %>
     <% end %>
+  <% else %>
+    <%= render FlatPack::EmptyState::Component.new(title: "No runs found", description: "Adjust the filters or wait for new AI activity.") %>
   <% end %>
 </div>

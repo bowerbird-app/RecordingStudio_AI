@@ -16,7 +16,7 @@
      ] %>
 
   <%= render FlatPack::Table::Component.new(data: retention_rows) do |table| %>
-    <% table.column(title: "Field") { |row| row[:label] } %>
+    <% table.column(title: "Field", html: ->(row) { row[:label] }) %>
     <% table.column(title: "Value", html: ->(row) { row[:value] }) %>
   <% end %>
 

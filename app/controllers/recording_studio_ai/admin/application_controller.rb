@@ -3,8 +3,12 @@
 module RecordingStudioAI
   module Admin
     class ApplicationController < ::ApplicationController
+      include RecordingStudio::UsesDefaultLayout
+
       before_action :run_admin_authenticate
       before_action :establish_admin_access
+      before_action :assign_access_page_actions
+      before_action :discard_default_layout_notice
 
       rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
       rescue_from RecordingStudioAI::Errors::ContractValidationError, with: :render_authorization_failure
@@ -26,6 +30,27 @@ module RecordingStudioAI
 
       def establish_admin_access
         @admin_access = RecordingStudioAI::Admin::Access.new(controller: self)
+      end
+
+      # default_layout renders flash[:notice]. Gem admin is GET-only and should
+      # not surface leftover Devise "Signed in successfully." banners.
+      def discard_default_layout_notice
+        flash.delete(:notice)
+      end
+
+      # default_layout page-nav right slot is Access only — no Sign out, root
+      # switcher, or admin/root dropdown.
+      def assign_access_page_actions
+        recording = current_root_recording
+        return if recording.blank?
+
+        helpers.recording_studio_page_nav_right do
+          helpers.recording_studio_accessible_avatars(
+            recording,
+            button_style: :ghost,
+            button_size: :md
+          )
+        end
       end
 
       def visible_runs

@@ -16,5 +16,6 @@ class SidebarVersionTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Recording Studio AI"
     assert_includes response.body, "v#{RecordingStudioAI::VERSION}"
     refute_includes response.body, "v#{FlatPack::VERSION}"
+    assert File.exist?(Rails.root.join("app/components/sidebar_header_component.rb"))
   end
 end

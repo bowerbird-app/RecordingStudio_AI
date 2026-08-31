@@ -1,3 +1,5 @@
+<% recording_studio_page_nav(title: "AI Playground", page_nav_anchor_url: root_path) %>
+
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "AI Playground",
@@ -8,13 +10,13 @@
   <div class="flex items-center gap-3">
     <%= render FlatPack::Button::Component.new(
       text: "AI Calls",
-      url: "/admin/screens/ai_calls",
+      href: "/admin/screens/ai_calls",
       style: :secondary,
       size: :sm
     ) %>
     <%= render FlatPack::Button::Component.new(
       text: "AI Responses",
-      url: "/admin/screens/recording_studio_ai_responses",
+      href: "/admin/screens/recording_studio_ai_responses",
       style: :secondary,
       size: :sm
     ) %>

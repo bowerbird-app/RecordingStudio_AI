@@ -77,7 +77,7 @@ RecordingStudioAI.configure do |config|
   # config.admin_visible_roots_resolver = ->(actor:, controller:) {
   #   RecordingStudioAI::AccessibleAuthorization.accessible_root_ids(actor: actor, minimum_role: :view)
   # }
-  # config.admin_layout = "flat_pack_sidebar"
+  # config.admin_layout = "recording_studio/default_layout"
   config.maximum_attempts = 3
   config.maximum_attachment_count = 10
   config.maximum_attachment_bytes = 20.megabytes

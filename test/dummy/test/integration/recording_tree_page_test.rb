@@ -54,5 +54,6 @@ class RecordingTreePageTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "flat_pack/variables"
     assert_includes response.body, "tailwind-"
     assert_includes response.body, "flat-pack--sidebar-layout"
+    assert_select "body[data-recording-studio-default-layout='true']", count: 0
   end
 end

@@ -12,7 +12,7 @@ six execution infrastructure tables, and a read-only FlatPack admin surface.
 
 - Ruby 3.3 or newer
 - Rails 8.1
-- Recording Studio 3.x
+- Recording Studio 4.2
 
 The OpenAI provider uses the official `openai` Ruby SDK. Gemini uses its REST API
 behind an internal client because Google does not publish an official Gemini
@@ -20,12 +20,12 @@ Ruby SDK. Both providers support injected clients.
 
 ## Installation
 
-Add the addon and Recording Studio v3 to the host application's `Gemfile`:
+Add the addon and Recording Studio 4.2 to the host application's `Gemfile`:
 
 ```ruby
 gem "recording_studio",
     github: "bowerbird-app/RecordingStudio",
-    tag: "recording_studio/v3.0.0"
+    tag: "v4.2.0"
 gem "recording_studio_ai",
     github: "bowerbird-app/RecordingStudio_AI"
 ```
@@ -106,7 +106,7 @@ RecordingStudioAI.configure do |config|
   config.admin_visible_roots_resolver = lambda do |actor:, controller:|
     actor.visible_recording_root_ids
   end
-  config.admin_layout = "flat_pack_sidebar"
+  config.admin_layout = "recording_studio/default_layout"
   config.maximum_attempts = 3
   config.maximum_retries_per_candidate = 1
   config.retry_backoff_base = 0.25 # seconds
@@ -636,8 +636,10 @@ cd test/dummy
 bin/dev
 ```
 
-The dummy app preserves Recording Studio v3 declarations, actor wiring, root
-recordings, authentication, and the mounted addon route.
+The dummy app preserves Recording Studio 4.2 declarations, actor wiring, root
+recordings, authentication, the host sidebar shell, `UsesDefaultLayout` on gem
+admin screens, and the mounted addon route. See [UPGRADING.md](UPGRADING.md)
+for the 4.2 host pin.
 
 The original template documentation remains under `docs/gem_template/` as
 architectural reference only.

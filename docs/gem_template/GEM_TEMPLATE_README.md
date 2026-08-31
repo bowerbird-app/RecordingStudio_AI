@@ -1,6 +1,6 @@
 > **Architecture Documentation**
 > *   **Canonical Source:** [bowerbird-app/gem_template](https://github.com/bowerbird-app/gem_template/tree/main/docs/gem_template)
-> *   **Last Updated:** May 5, 2026
+> *   **Last Updated:** August 31, 2026
 >
 > *Maintainers: Please update the date above when modifying this file.*
 
@@ -25,7 +25,7 @@ A template for building **Rails mountable engine gems** with PostgreSQL UUID pri
 - ✓ Install generator for host applications
 - ✓ Migrations generator for database setup
 - ✓ Service object pattern with Result monad
-- ✓ Dummy app sidebar with starter documentation pages and a minimal demo home page
+- ✓ Dummy app uses a host sidebar shell for playground/docs and Recording Studio `default_layout` for gem admin screens
 
 ---
 
@@ -55,9 +55,7 @@ A template for building **Rails mountable engine gems** with PostgreSQL UUID pri
 
 ## Dummy App Guidance
 
-The dummy app includes a starter authenticated sidebar in `test/dummy/app/views/layouts/flat_pack/_sidebar.html.erb` with linked pages for install, config, recordable types, recordings tree, gem views, and methods. Those pages are intentionally scaffolded examples with a consistent FlatPack style; update their labels, routes, and content so they fit the gem you are building.
-
-The home page in `test/dummy/app/views/home/index.html.erb` is the corresponding starting point for a very minimal demo of the gem's primary behavior. Keep it narrowly focused and use the sidebar pages for the broader explanation of concepts, setup, and API surface.
+The dummy app keeps a host `flat_pack_sidebar` shell for home, playground, config, and methods. Engine admin and Recording Studio Admin AI screens use `RecordingStudio::UsesDefaultLayout` (`recording_studio/default_layout`) rather than a vendored layout copy. Dummy `_default_layout_head` loads application, FlatPack, Tailwind, and importmap. Engine admin tables pass FlatPack column `html:` lambdas so cells land under headers, and those tables are not wrapped in a Card. The home page in `test/dummy/app/views/home/index.html.erb` stays small and links into those screens.
 
 For current UI work, prefer the top-level README plus the live FlatPack demo app at `https://flatpack-c6p8f.ondigitalocean.app/`. Its component table is the quickest way to discover shared components, user-provided FlatPack demo URLs should be treated as task context, and if the demo is blocked in Codespaces or another restricted environment, ask for access or request sanitized screenshots, copied markup, or component details instead of guessing.
 

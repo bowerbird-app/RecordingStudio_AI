@@ -21,6 +21,22 @@ module RecordingStudioAI
         value.nil? ? "Unknown" : number_with_delimiter(value)
       end
 
+      RATE_METRICS = %i[error_rate provider_error_rate].freeze
+
+      def admin_metric_value(key, value)
+        return "Unknown" if value.nil?
+
+        if RATE_METRICS.include?(key.to_sym)
+          number_to_percentage(value.to_f * 100, precision: 1)
+        elsif key.to_s.end_with?("_ms")
+          admin_duration(value.respond_to?(:round) ? value.round : value)
+        elsif value.is_a?(Float)
+          number_with_delimiter(value.round(2))
+        else
+          number_with_delimiter(value)
+        end
+      end
+
       def admin_identity(type, id, snapshot = nil)
         snapshot.presence || [type, id].compact.join(" #").presence || "Unknown"
       end
