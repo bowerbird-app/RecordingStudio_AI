@@ -48,6 +48,56 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     assert_select "table", minimum: 1
   end
 
+  test "gem admin does not show leftover Devise signed-in flash" do
+    sign_out @user
+    post user_session_path, params: { user: { email: @user.email, password: "Password123!" } }
+    follow_redirect! while response.redirect?
+
+    retained = create_overview_retained_response!
+
+    get "/recording_studio_ai/admin"
+    assert_response :success
+    refute_includes response.body, "Signed in successfully"
+
+    get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
+    assert_response :success
+    refute_includes response.body, "Signed in successfully"
+
+    get "/admin"
+    assert_response :success
+    refute_includes response.body, "Signed in successfully"
+  end
+
+  test "engine admin overview formats provider error rate instead of dumping a raw float" do
+    run = RecordingStudioAI::Run.create!(
+      operation: "generation",
+      status: "completed",
+      root_recording_id: @root.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      started_at: Time.current,
+      completed_at: Time.current
+    )
+    %w[completed completed failed].each_with_index do |status, index|
+      run.attempts.create!(
+        sequence: index + 1,
+        kind: index.zero? ? "primary" : "retry",
+        status: status,
+        provider: "openai",
+        model: "gpt-test",
+        started_at: Time.current,
+        completed_at: Time.current
+      )
+    end
+
+    get "/recording_studio_ai/admin"
+
+    assert_response :success
+    refute_includes response.body, "0.3333333333333333"
+    assert_includes response.body, "33.3%"
+  end
+
   test "engine admin custom tools render Flatpack table cells not a text dump" do
     get "/recording_studio_ai/admin/custom_tools"
 
@@ -104,5 +154,37 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     HOST_ASSET_MARKERS.each do |marker|
       assert_includes response.body, marker, "gem admin missing #{marker}"
     end
+  end
+
+  def create_overview_retained_response!
+    run = RecordingStudioAI::Run.create!(
+      operation: "generation",
+      status: "completed",
+      root_recording_id: @root.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      started_at: Time.current,
+      completed_at: Time.current
+    )
+    attempt = run.attempts.create!(
+      sequence: 1,
+      kind: "primary",
+      status: "completed",
+      provider: "test",
+      model: "test-model",
+      started_at: Time.current,
+      completed_at: Time.current
+    )
+    RecordingStudioAI::Response.create!(
+      attempt: attempt,
+      response_type: "generation",
+      provider: "test",
+      model: "test-model",
+      complete: true,
+      byte_size: 12,
+      content_text: "retained body",
+      expires_at: 7.days.from_now
+    )
   end
 end

@@ -44,6 +44,21 @@ end
 
 RecordingStudioAdmin::Period.singleton_class.prepend(RecordingStudioAdminLastFourWeeksPreset)
 
+module RecordingStudioAdminDiscardLayoutNotice
+  extend ActiveSupport::Concern
+
+  included do
+    before_action :discard_default_layout_notice
+  end
+
+  private
+
+  # default_layout renders leftover Devise "Signed in successfully." on /admin.
+  def discard_default_layout_notice
+    flash.delete(:notice)
+  end
+end
+
 module RecordingStudioAdminRootAnchorDefault
   private
 
@@ -69,5 +84,9 @@ Rails.application.config.to_prepare do
 
   unless RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudioAdminRootAnchorDefault)
     RecordingStudioAdmin::ApplicationController.prepend(RecordingStudioAdminRootAnchorDefault)
+  end
+
+  unless RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudioAdminDiscardLayoutNotice)
+    RecordingStudioAdmin::ApplicationController.include(RecordingStudioAdminDiscardLayoutNotice)
   end
 end

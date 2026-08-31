@@ -59,4 +59,5 @@ cells land under headers. The gem page-nav right slot is Access only — no Sign
 Switchable, or admin/root dropdown. Devise sign-in keeps `layouts/application`.
 Dummy-only FlatPack aliases map PageNav `anchor_url:` to `anchor_href:` and
 Button `url:` to `href:` so Recording Studio 4.2 and Admin 2.0.1 keep working
-against FlatPack 0.1.143 without forking the layout.
+against FlatPack 0.1.143 without forking the layout. Gem admin discards leftover
+Devise sign-in notices. Overview formats warning rates as percentages.

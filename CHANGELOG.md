@@ -23,7 +23,10 @@ Versioning and Keep a Changelog.
   and importmap so gem tables render as FlatPack Tables. Engine admin tables
   (custom tools, provider batches, runs, overview) pass FlatPack column `html:`
   lambdas so cells land under headers instead of dumping as text above an empty
-  table.
+  table. Engine admin and Recording Studio Admin screens discard leftover Devise
+  `notice` flash so "Signed in successfully." does not appear on those shells.
+  Overview warning rates (`error_rate`, `provider_error_rate`) render as
+  percentages (for example `33.3%`) instead of a raw float dump.
 - Dummy seeds bootstrap the first owner with `bootstrap_owner_access!`, persist
   actors and recordings before grants, and seed engine-admin batches plus a
   retained response so those screens are not empty.

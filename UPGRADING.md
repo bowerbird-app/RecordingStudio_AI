@@ -27,7 +27,10 @@
    importmap so FlatPack Tables render. Engine admin screens in this gem pass
    FlatPack column `html:` lambdas (returning a string) so table cells land
    under headers; ERB `<% table.column do |row| %>` blocks dump cell HTML
-   above an empty table on FlatPack 0.1.143.
+   above an empty table on FlatPack 0.1.143. Engine admin discards leftover
+   Devise `notice` flash (hosts that include `UsesDefaultLayout` on Recording
+   Studio Admin can do the same). Overview formats `error_rate` and
+   `provider_error_rate` as percentages.
 5. First owner grants: `RecordingStudioAccessible.bootstrap_owner_access!` on an
    empty owned root. Later members: `grant_access`. Persist the actor and
    recording before either call. Set `access_actor_types` so `User` can hold

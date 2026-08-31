@@ -6,7 +6,7 @@
       <% @metrics[:breaches].each do |breach| %>
         <%= render FlatPack::Alert::Component.new(
           title: "Threshold crossed",
-          description: "#{breach[:metric].to_s.humanize}: #{breach[:value]}",
+          description: "#{breach[:metric].to_s.humanize}: #{admin_metric_value(breach[:metric], breach[:value])}",
           style: :warning
         ) %>
       <% end %>
@@ -53,7 +53,7 @@
       <% card.body do %>
         <dl class="grid grid-cols-2 gap-4 text-sm">
           <% @metrics[:values].each do |key, value| %>
-            <div><dt class="opacity-70"><%= key.to_s.humanize %></dt><dd class="mt-1 font-semibold"><%= value.nil? ? "Unknown" : value %></dd></div>
+            <div><dt class="opacity-70"><%= key.to_s.humanize %></dt><dd class="mt-1 font-semibold"><%= admin_metric_value(key, value) %></dd></div>
           <% end %>
         </dl>
       <% end %>
