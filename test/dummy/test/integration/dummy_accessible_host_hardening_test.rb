@@ -94,10 +94,12 @@ class DummyAccessibleHostHardeningTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "/sidekiq"
     get "/sidekiq"
     assert_response :not_found
+    refute DummyAccessibleAIAuthorization.admin_operator?(actor: viewer)
 
     sign_in operator
     get "/"
     assert_response :success
-    assert_includes response.body, "/sidekiq"
+    refute_includes response.body, "/sidekiq"
+    assert DummyAccessibleAIAuthorization.admin_operator?(actor: operator)
   end
 end
