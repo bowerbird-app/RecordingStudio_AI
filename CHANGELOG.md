@@ -23,7 +23,8 @@ Versioning and Keep a Changelog.
   and importmap so gem tables render as FlatPack Tables. Engine admin tables
   (custom tools, provider batches, runs, overview) pass FlatPack column `html:`
   lambdas so cells land under headers instead of dumping as text above an empty
-  table. Engine admin and Recording Studio Admin screens discard leftover Devise
+  table. Engine admin tables are the container — they are not wrapped in a
+  FlatPack Card. Metric/stat cards (for example Runs today) stay as cards. Engine admin and Recording Studio Admin screens discard leftover Devise
   `notice` flash so "Signed in successfully." does not appear on those shells.
   Overview warning rates (`error_rate`, `provider_error_rate`) render as
   percentages (for example `33.3%`) instead of a raw float dump.

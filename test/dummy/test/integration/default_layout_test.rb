@@ -96,6 +96,8 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     assert_response :success
     refute_includes response.body, "0.3333333333333333"
     assert_includes response.body, "33.3%"
+    assert_select "table", minimum: 1
+    assert_select "[class*='card-border-color'] table", count: 0
   end
 
   test "engine admin custom tools render Flatpack table cells not a text dump" do
@@ -104,6 +106,7 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_gem_admin_shell
     assert_select "table tbody td", text: /Dummy Echo Tool/
+    assert_select "[class*='card-border-color'] table", count: 0
   end
 
   test "engine admin provider batches render Flatpack table cells not a text dump" do
@@ -122,6 +125,7 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_gem_admin_shell
     assert_select "table tbody td", text: /dummy-batch-model/
+    assert_select "[class*='card-border-color'] table", count: 0
   end
 
   test "recording studio admin uses default_layout with Access-only page-nav and Flatpack assets" do
