@@ -36,13 +36,13 @@
       <% card.header do %><%= render FlatPack::PageTitle::Component.new(title: "Last 7 days", subtitle: "Runs, errors, tokens, spend, tools, and batch items", variant: :h3, class: "mb-0 pb-0") %><% end %>
       <% card.body do %>
         <%= render FlatPack::Table::Component.new(data: @daily_activity.map { |date, values| values.merge(day: date) }) do |table| %>
-          <% table.column(title: "Day") { |row| row[:day].strftime("%a %d") } %>
-          <% table.column(title: "Runs") { |row| row[:runs] } %>
-          <% table.column(title: "Errors") { |row| row[:errors] } %>
-          <% table.column(title: "Tokens") { |row| row[:tokens].nil? ? "Unknown" : row[:tokens] } %>
-          <% table.column(title: "Spend μ") { |row| row[:spend].nil? ? "Unknown" : row[:spend] } %>
-          <% table.column(title: "Tools") { |row| row[:tools] } %>
-          <% table.column(title: "Batch items") { |row| row[:batch_items] } %>
+          <% table.column(title: "Day", html: ->(row) { row[:day].strftime("%a %d") }) %>
+          <% table.column(title: "Runs", html: ->(row) { row[:runs].to_s }) %>
+          <% table.column(title: "Errors", html: ->(row) { row[:errors].to_s }) %>
+          <% table.column(title: "Tokens", html: ->(row) { row[:tokens].nil? ? "Unknown" : row[:tokens].to_s }) %>
+          <% table.column(title: "Spend μ", html: ->(row) { row[:spend].nil? ? "Unknown" : row[:spend].to_s }) %>
+          <% table.column(title: "Tools", html: ->(row) { row[:tools].to_s }) %>
+          <% table.column(title: "Batch items", html: ->(row) { row[:batch_items].to_s }) %>
         <% end %>
         <p class="mt-3 text-sm opacity-70">30-day p95 duration: <%= admin_duration(@p95_latency) %></p>
       <% end %>
@@ -78,12 +78,10 @@
     <% card.body do %>
       <% if @slow_runs.any? %>
         <%= render FlatPack::Table::Component.new(data: @slow_runs) do |table| %>
-          <% table.column(title: "Run") do |run| %>
-            <%= link_to run.id, admin_run_path(run) %>
-          <% end %>
-          <% table.column(title: "Operation") { |run| run.operation } %>
-          <% table.column(title: "Provider / model") { |run| [run.resolved_provider, run.resolved_model].compact.join(" / ").presence || "Unknown" } %>
-          <% table.column(title: "Duration") { |run| admin_duration(run.latency_ms) } %>
+          <% table.column(title: "Run", html: ->(run) { link_to(run.id, admin_run_path(run)) }) %>
+          <% table.column(title: "Operation", html: ->(run) { run.operation }) %>
+          <% table.column(title: "Provider / model", html: ->(run) { [run.resolved_provider, run.resolved_model].compact.join(" / ").presence || "Unknown" }) %>
+          <% table.column(title: "Duration", html: ->(run) { admin_duration(run.latency_ms) }) %>
         <% end %>
       <% else %>
         <p class="text-sm opacity-70">No duration data is available.</p>

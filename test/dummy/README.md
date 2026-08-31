@@ -54,7 +54,8 @@ and Recording Studio Admin (`/admin`) include `RecordingStudio::UsesDefaultLayou
 and render the gem's `recording_studio/default_layout`. Dummy
 `app/views/recording_studio/_default_layout_head.html.erb` loads application,
 `flat_pack/variables`, `flat_pack/rich_text`, Tailwind, and importmap so FlatPack
-Tables render. The gem page-nav right slot is Access only — no Sign out, Root
+Tables render. Engine admin tables pass FlatPack column `html:` lambdas so
+cells land under headers. The gem page-nav right slot is Access only — no Sign out, Root
 Switchable, or admin/root dropdown. Devise sign-in keeps `layouts/application`.
 Dummy-only FlatPack aliases map PageNav `anchor_url:` to `anchor_href:` and
 Button `url:` to `href:` so Recording Studio 4.2 and Admin 2.0.1 keep working

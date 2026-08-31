@@ -69,6 +69,7 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "flat-pack--sidebar-layout"
     refute_includes response.body, "recording-studio-root-switchable--root-switch-dropdown"
     assert_select "table", minimum: 1
+    assert_select "table td", text: /Dummy Echo Tool/
     assert_includes response.body, "overflow-x-auto"
     assert_includes response.body, "stylesheet"
     assert_includes response.body, "flat_pack/variables"

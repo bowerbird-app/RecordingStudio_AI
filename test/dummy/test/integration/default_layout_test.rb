@@ -48,6 +48,32 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     assert_select "table", minimum: 1
   end
 
+  test "engine admin custom tools render Flatpack table cells not a text dump" do
+    get "/recording_studio_ai/admin/custom_tools"
+
+    assert_response :success
+    assert_gem_admin_shell
+    assert_select "table tbody td", text: /Dummy Echo Tool/
+  end
+
+  test "engine admin provider batches render Flatpack table cells not a text dump" do
+    RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "dummy-batch-model",
+      root_recording_id: @root.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user"
+    )
+
+    get "/recording_studio_ai/admin/batches"
+
+    assert_response :success
+    assert_gem_admin_shell
+    assert_select "table tbody td", text: /dummy-batch-model/
+  end
+
   test "recording studio admin uses default_layout with Access-only page-nav and Flatpack assets" do
     get "/admin"
 

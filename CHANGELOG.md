@@ -20,7 +20,10 @@ Versioning and Keep a Changelog.
   from Recording Studio 4.2 as-is (no vendored layout copy). The gem page-nav
   right slot is Access only — no Sign out, Root Switchable, or admin/root
   dropdown. Dummy `_default_layout_head` loads application, FlatPack, Tailwind,
-  and importmap so gem tables render as FlatPack Tables.
+  and importmap so gem tables render as FlatPack Tables. Engine admin tables
+  (custom tools, provider batches, runs, overview) pass FlatPack column `html:`
+  lambdas so cells land under headers instead of dumping as text above an empty
+  table.
 - Dummy seeds bootstrap the first owner with `bootstrap_owner_access!`, persist
   actors and recordings before grants, and seed engine-admin batches plus a
   retained response so those screens are not empty.

@@ -30,32 +30,36 @@
     <% card.body do %>
       <% if @items.any? %>
         <%= render FlatPack::Table::Component.new(data: @items) do |table| %>
-          <% table.column(title: "Position / reference") { |item| "#{item.position} / #{item.reference}" } %>
-          <% table.column(title: "Run / provider item") do |item| %>
-            <%= link_to "Run #{item.run_id}", admin_run_path(item.run_id) %>
-          <% end %>
-          <% table.column(title: "Status") do |item| %>
-            <%= render FlatPack::Badge::Component.new(text: item.status.humanize, style: admin_status_style(item.status), size: :sm) %>
-          <% end %>
-          <% table.column(title: "Timing") { |item| "#{item.started_at&.to_fs(:short) || 'Unknown'} to #{item.completed_at&.to_fs(:short) || 'In progress'}" } %>
-          <% table.column(title: "Usage") { |item| admin_tokens(item.total_tokens) } %>
-          <% table.column(title: "Finish / error") do |item| %>
-            <div>
-              <%= item.finish_reason.presence || "Unknown" %>
-              <% if @sensitive && item.error_code.present? %>
-                <div class="text-xs"><%= [item.error_code, item.error_message].compact.join(": ") %></div>
-              <% end %>
-            </div>
-          <% end %>
-          <% table.column(title: "Response") do |item| %>
-            <% if item.response.nil? %>
-              Response content was not retained for this execution.
-            <% elsif @sensitive %>
-              <%= link_to "View retained response", admin_retained_response_path(item.response) %>
-            <% else %>
-              Retained response is restricted.
-            <% end %>
-          <% end %>
+          <% table.column(title: "Position / reference", html: ->(item) { "#{item.position} / #{item.reference}" }) %>
+          <% table.column(
+            title: "Run / provider item",
+            html: ->(item) { link_to("Run #{item.run_id}", admin_run_path(item.run_id)) }
+          ) %>
+          <% table.column(
+            title: "Status",
+            html: ->(item) { render FlatPack::Badge::Component.new(text: item.status.humanize, style: admin_status_style(item.status), size: :sm) }
+          ) %>
+          <% table.column(title: "Timing", html: ->(item) { "#{item.started_at&.to_fs(:short) || 'Unknown'} to #{item.completed_at&.to_fs(:short) || 'In progress'}" }) %>
+          <% table.column(title: "Usage", html: ->(item) { admin_tokens(item.total_tokens) }) %>
+          <% table.column(
+            title: "Finish / error",
+            html: ->(item) {
+              error_line = @sensitive && item.error_code.present? ? content_tag(:div, [item.error_code, item.error_message].compact.join(": "), class: "text-xs") : nil
+              safe_join([item.finish_reason.presence || "Unknown", error_line].compact)
+            }
+          ) %>
+          <% table.column(
+            title: "Response",
+            html: ->(item) {
+              if item.response.nil?
+                "Response content was not retained for this execution."
+              elsif @sensitive
+                link_to("View retained response", admin_retained_response_path(item.response))
+              else
+                "Retained response is restricted."
+              end
+            }
+          ) %>
         <% end %>
       <% else %>
         <p class="text-sm opacity-70">No batch items were recorded.</p>

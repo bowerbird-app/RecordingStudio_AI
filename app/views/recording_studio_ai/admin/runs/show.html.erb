@@ -32,26 +32,29 @@
     <% card.body do %>
       <% if @attempts.any? %>
         <%= render FlatPack::Table::Component.new(data: @attempts) do |table| %>
-          <% table.column(title: "Sequence / kind") { |attempt| "#{attempt.sequence} / #{attempt.kind}" } %>
-          <% table.column(title: "Provider / model") { |attempt| [attempt.provider, attempt.model].compact.join(" / ").presence || "Unknown" } %>
-          <% table.column(title: "Status") do |attempt| %>
-            <%= render FlatPack::Badge::Component.new(text: attempt.status.humanize, style: admin_status_style(attempt.status), size: :sm) %>
-          <% end %>
-          <% table.column(title: "Timing") do |attempt| %>
-            <div>
-              <%= admin_duration(attempt.latency_ms) %>
-              <div class="text-xs opacity-70"><%= [attempt.started_at, attempt.completed_at].map { |time| time&.to_fs(:long) || "Unknown" }.join(" / ") %></div>
-            </div>
-          <% end %>
-          <% table.column(title: "Usage") { |attempt| admin_tokens(attempt.total_tokens) } %>
-          <% table.column(title: "Outcome") do |attempt| %>
-            <div>
-              <%= attempt.finish_reason.presence || "Unknown" %>
-              <% if attempt.error_code.present? %>
-                <div class="text-xs"><%= [attempt.error_category, attempt.error_code, attempt.error_message].compact.join(": ") %></div>
-              <% end %>
-            </div>
-          <% end %>
+          <% table.column(title: "Sequence / kind", html: ->(attempt) { "#{attempt.sequence} / #{attempt.kind}" }) %>
+          <% table.column(title: "Provider / model", html: ->(attempt) { [attempt.provider, attempt.model].compact.join(" / ").presence || "Unknown" }) %>
+          <% table.column(
+            title: "Status",
+            html: ->(attempt) { render FlatPack::Badge::Component.new(text: attempt.status.humanize, style: admin_status_style(attempt.status), size: :sm) }
+          ) %>
+          <% table.column(
+            title: "Timing",
+            html: ->(attempt) {
+              safe_join([
+                admin_duration(attempt.latency_ms),
+                content_tag(:div, [attempt.started_at, attempt.completed_at].map { |time| time&.to_fs(:long) || "Unknown" }.join(" / "), class: "text-xs opacity-70")
+              ])
+            }
+          ) %>
+          <% table.column(title: "Usage", html: ->(attempt) { admin_tokens(attempt.total_tokens) }) %>
+          <% table.column(
+            title: "Outcome",
+            html: ->(attempt) {
+              error_line = attempt.error_code.present? ? content_tag(:div, [attempt.error_category, attempt.error_code, attempt.error_message].compact.join(": "), class: "text-xs") : nil
+              safe_join([attempt.finish_reason.presence || "Unknown", error_line].compact)
+            }
+          ) %>
         <% end %>
       <% else %>
         <p class="text-sm opacity-70">No attempts were recorded.</p>
@@ -64,21 +67,28 @@
     <% card.body do %>
       <% if @tool_invocations.any? %>
         <%= render FlatPack::Table::Component.new(data: @tool_invocations) do |table| %>
-          <% table.column(title: "Tool") do |invocation| %>
-            <div>
-              <span class="font-semibold"><%= invocation.tool_key %> v<%= invocation.tool_version %></span>
-              <div class="text-xs opacity-70"><%= invocation.tool_name_snapshot %></div>
-            </div>
-          <% end %>
-          <% table.column(title: "Status / safety") do |invocation| %>
-            <div>
-              <%= render FlatPack::Badge::Component.new(text: invocation.status.humanize, style: admin_status_style(invocation.status), size: :sm) %>
-              <div class="text-xs opacity-70"><%= invocation.read_only? ? "Read only" : "Writes" %><%= ", destructive" if invocation.destructive? %>; confirmation <%= invocation.requires_confirmation? ? "required" : "not required" %>; <%= invocation.idempotent? ? "idempotent" : "non-idempotent" %>; <%= invocation.latency_category.presence || "Unclassified" %></div>
-            </div>
-          <% end %>
-          <% table.column(title: "Confirmation") { |invocation| invocation.confirmation_status.presence || "Not required" } %>
-          <% table.column(title: "Timing") { |invocation| admin_duration(invocation.latency_ms) } %>
-          <% table.column(title: "Summary") { |invocation| @sensitive ? (invocation.result_summary.presence || "No summary") : "Restricted" } %>
+          <% table.column(
+            title: "Tool",
+            html: ->(invocation) {
+              safe_join([
+                content_tag(:span, "#{invocation.tool_key} v#{invocation.tool_version}", class: "font-semibold"),
+                content_tag(:div, invocation.tool_name_snapshot, class: "text-xs opacity-70")
+              ])
+            }
+          ) %>
+          <% table.column(
+            title: "Status / safety",
+            html: ->(invocation) {
+              safety = "#{invocation.read_only? ? 'Read only' : 'Writes'}#{', destructive' if invocation.destructive?}; confirmation #{invocation.requires_confirmation? ? 'required' : 'not required'}; #{invocation.idempotent? ? 'idempotent' : 'non-idempotent'}; #{invocation.latency_category.presence || 'Unclassified'}"
+              safe_join([
+                render(FlatPack::Badge::Component.new(text: invocation.status.humanize, style: admin_status_style(invocation.status), size: :sm)),
+                content_tag(:div, safety, class: "text-xs opacity-70")
+              ])
+            }
+          ) %>
+          <% table.column(title: "Confirmation", html: ->(invocation) { invocation.confirmation_status.presence || "Not required" }) %>
+          <% table.column(title: "Timing", html: ->(invocation) { admin_duration(invocation.latency_ms) }) %>
+          <% table.column(title: "Summary", html: ->(invocation) { @sensitive ? (invocation.result_summary.presence || "No summary") : "Restricted" }) %>
         <% end %>
       <% else %>
         <p class="text-sm opacity-70">No custom tools were invoked.</p>

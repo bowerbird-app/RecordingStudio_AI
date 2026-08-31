@@ -55,7 +55,7 @@ A template for building **Rails mountable engine gems** with PostgreSQL UUID pri
 
 ## Dummy App Guidance
 
-The dummy app keeps a host `flat_pack_sidebar` shell for home, playground, config, and methods. Engine admin and Recording Studio Admin AI screens use `RecordingStudio::UsesDefaultLayout` (`recording_studio/default_layout`) rather than a vendored layout copy. Dummy `_default_layout_head` loads application, FlatPack, Tailwind, and importmap. The home page in `test/dummy/app/views/home/index.html.erb` stays small and links into those screens.
+The dummy app keeps a host `flat_pack_sidebar` shell for home, playground, config, and methods. Engine admin and Recording Studio Admin AI screens use `RecordingStudio::UsesDefaultLayout` (`recording_studio/default_layout`) rather than a vendored layout copy. Dummy `_default_layout_head` loads application, FlatPack, Tailwind, and importmap. Engine admin tables pass FlatPack column `html:` lambdas so cells land under headers. The home page in `test/dummy/app/views/home/index.html.erb` stays small and links into those screens.
 
 For current UI work, prefer the top-level README plus the live FlatPack demo app at `https://flatpack-c6p8f.ondigitalocean.app/`. Its component table is the quickest way to discover shared components, user-provided FlatPack demo URLs should be treated as task context, and if the demo is blocked in Codespaces or another restricted environment, ask for access or request sanitized screenshots, copied markup, or component details instead of guessing.
 
