@@ -41,7 +41,12 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Recording Studio AI"
     assert_includes response.body, "flat_pack/variables"
+    assert_includes response.body, "flat_pack/rich_text"
     assert_includes response.body, "tailwind-"
+    assert_includes response.body, "importmap"
+    assert_select "body[data-recording-studio-default-layout='true']", count: 1
+    refute_includes response.body, "flat-pack--sidebar-layout"
+    refute_includes response.body, "recording-studio-root-switchable--root-switch-dropdown"
   end
 
   test "legacy AI engine admin path is not routable" do
@@ -60,5 +65,13 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Dummy Echo Tool"
     refute_includes response.body, "version_admin_custom_tool"
+    assert_select "body[data-recording-studio-default-layout='true']", count: 1
+    refute_includes response.body, "flat-pack--sidebar-layout"
+    refute_includes response.body, "recording-studio-root-switchable--root-switch-dropdown"
+    assert_select "table", minimum: 1
+    assert_includes response.body, "overflow-x-auto"
+    assert_includes response.body, "stylesheet"
+    assert_includes response.body, "flat_pack/variables"
+    assert_includes response.body, "tailwind-"
   end
 end

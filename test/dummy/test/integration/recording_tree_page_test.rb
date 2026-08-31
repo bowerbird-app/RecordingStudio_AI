@@ -40,7 +40,7 @@ class RecordingTreePageTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Switch to a workspace to see its tree."
   end
 
-  test "home page does not vendor a sidebar recording tree link" do
+  test "sidebar includes a link to recording tree page" do
     user = User.create!(email: "recording-tree-sidebar-#{SecureRandom.hex(4)}@example.com", password: "Password123!")
     sign_in user
 
@@ -49,9 +49,11 @@ class RecordingTreePageTest < ActionDispatch::IntegrationTest
     get "/"
 
     assert_response :success
+    assert_includes response.body, "Recording tree"
+    assert_includes response.body, "/recording_tree"
     assert_includes response.body, "flat_pack/variables"
     assert_includes response.body, "tailwind-"
-    assert_select "body[data-recording-studio-default-layout='true']", count: 1
-    refute_includes response.body, "flat-pack--sidebar-layout"
+    assert_includes response.body, "flat-pack--sidebar-layout"
+    assert_select "body[data-recording-studio-default-layout='true']", count: 0
   end
 end

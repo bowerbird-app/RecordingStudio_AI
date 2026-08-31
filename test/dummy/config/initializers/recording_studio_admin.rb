@@ -61,8 +61,13 @@ module RecordingStudioAdminRootAnchorDefault
 end
 
 Rails.application.config.to_prepare do
-  if defined?(RecordingStudioAdmin::ApplicationController) &&
-      !RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudioAdminRootAnchorDefault)
+  next unless defined?(RecordingStudioAdmin::ApplicationController)
+
+  unless RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudio::UsesDefaultLayout)
+    RecordingStudioAdmin::ApplicationController.include(RecordingStudio::UsesDefaultLayout)
+  end
+
+  unless RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudioAdminRootAnchorDefault)
     RecordingStudioAdmin::ApplicationController.prepend(RecordingStudioAdminRootAnchorDefault)
   end
 end

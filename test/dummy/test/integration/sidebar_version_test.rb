@@ -6,7 +6,7 @@ require "devise/test/integration_helpers"
 class SidebarVersionTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
 
-  test "authenticated pages show the Recording Studio AI title without a vendored sidebar header" do
+  test "sidebar header shows the Recording Studio AI gem version instead of Flatpack" do
     user = User.create!(email: "sidebar-version-#{SecureRandom.hex(4)}@example.com", password: "Password123!")
     sign_in user
 
@@ -14,8 +14,8 @@ class SidebarVersionTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "Recording Studio AI"
-    assert_select "body[data-recording-studio-default-layout='true']", count: 1
+    assert_includes response.body, "v#{RecordingStudioAI::VERSION}"
     refute_includes response.body, "v#{FlatPack::VERSION}"
-    refute File.exist?(Rails.root.join("app/components/sidebar_header_component.rb"))
+    assert File.exist?(Rails.root.join("app/components/sidebar_header_component.rb"))
   end
 end

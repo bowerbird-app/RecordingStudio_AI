@@ -34,7 +34,7 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     refute_includes response.body, hidden.name
   end
 
-  test "root switch page uses default layout without a host sidebar" do
+  test "root switch page renders with the host sidebar" do
     user = User.find_or_create_by!(email: "root-switch-page-test@example.com") do |record|
       record.password = "Password123!"
       record.password_confirmation = "Password123!"
@@ -50,10 +50,10 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, workspace.name
-    assert_select "body[data-recording-studio-default-layout='true']", count: 1
-    refute_includes response.body, "AI Admin"
-    refute_includes response.body, "Recording tree"
-    assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
+    assert_includes response.body, "AI Admin"
+    assert_includes response.body, "Recording tree"
+    assert_includes response.body, "flat-pack--sidebar-layout"
+    assert_select "body[data-recording-studio-default-layout='true']", count: 0
   end
 
   test "switching returns to the current page when it is a valid internal route" do

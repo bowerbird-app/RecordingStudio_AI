@@ -99,7 +99,7 @@ class DummyAccessibleHostHardeningTest < ActionDispatch::IntegrationTest
     sign_in operator
     get "/"
     assert_response :success
-    refute_includes response.body, "/sidekiq"
+    assert_includes response.body, "/sidekiq"
     assert DummyAccessibleAIAuthorization.admin_operator?(actor: operator)
   end
 end

@@ -8,8 +8,10 @@ It covers:
 - the generated addon initializer
 - Devise authentication and `Current.actor` wiring
 - Recording Studio 4.2 recordable declarations and root recordings
-- `RecordingStudio::UsesDefaultLayout` from the Recording Studio gem (rounded
-  theme on `html` / `body`; no vendored layout copy)
+- the dummy host `flat_pack_sidebar` shell for host pages (rounded `html` /
+  `body`)
+- `RecordingStudio::UsesDefaultLayout` on engine admin and Recording Studio
+  Admin AI screens only (`recording_studio/default_layout`, no vendored copy)
 - Accessible first-owner bootstrap and later grants
 - all six non-recordable addon infrastructure tables
 - the mounted, GET-only addon administration screens
@@ -46,10 +48,14 @@ Useful routes:
 - `/users/sign_in` — Devise sign in
 - `/up` — Rails health check
 
-Authenticated pages include `RecordingStudio::UsesDefaultLayout` and render the
-gem's `recording_studio/default_layout` (theme `rounded` on `body`; dummy also
-stamps `data-theme="rounded"` on `html`). The page-nav right slot is Access
-only. Devise sign-in keeps `layouts/application`. Dummy-only FlatPack aliases
-map PageNav `anchor_url:` to `anchor_href:` and Button `url:` to `href:` so
-Recording Studio 4.2 and Admin 2.0.1 keep working against FlatPack 0.1.143
-without forking the layout.
+Authenticated host pages use `layouts/flat_pack_sidebar` (sidebar + top nav,
+theme `rounded` on `html` and `body`). Engine admin (`/recording_studio_ai/admin`)
+and Recording Studio Admin (`/admin`) include `RecordingStudio::UsesDefaultLayout`
+and render the gem's `recording_studio/default_layout`. Dummy
+`app/views/recording_studio/_default_layout_head.html.erb` loads application,
+`flat_pack/variables`, `flat_pack/rich_text`, Tailwind, and importmap so FlatPack
+Tables render. The gem page-nav right slot is Access only — no Sign out, Root
+Switchable, or admin/root dropdown. Devise sign-in keeps `layouts/application`.
+Dummy-only FlatPack aliases map PageNav `anchor_url:` to `anchor_href:` and
+Button `url:` to `href:` so Recording Studio 4.2 and Admin 2.0.1 keep working
+against FlatPack 0.1.143 without forking the layout.

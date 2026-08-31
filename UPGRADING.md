@@ -15,12 +15,16 @@
    `harden_recording_studio_indexes_and_constraints`) and `bin/rails db:migrate`.
 3. Enable Accessible with `RecordingStudio.enable_capability(:accessible, on: Type)`
    (or `config.enable_capability`) on each recordable that should hold grants.
-4. Include `RecordingStudio::UsesDefaultLayout` on authenticated host controllers
-   (or keep `layout "recording_studio/default_layout"`). Recording Studio 4.2
-   applies `data-theme="rounded"` on `body`; hosts that still key FlatPack off
-   `html` can stamp `html data-theme="rounded"` without copying the layout. Do
-   not vendor `recording_studio/default_layout`. Put Access in the page-nav right
-   slot; do not put Sign out, Root Switchable, or an admin/root dropdown there.
+4. Keep the host app's own sidebar (or other shell) for host pages. Include
+   `RecordingStudio::UsesDefaultLayout` on this gem's engine admin and on
+   Recording Studio Admin screens so those use `recording_studio/default_layout`.
+   Recording Studio 4.2 applies `data-theme="rounded"` on `body`; hosts that
+   still key FlatPack off `html` can stamp `html data-theme="rounded"` without
+   copying the layout. Do not vendor `recording_studio/default_layout`. Put
+   Access in the gem page-nav right slot; do not put Sign out, Root Switchable,
+   or an admin/root dropdown there. Host `_default_layout_head` should load
+   application, `flat_pack/variables`, `flat_pack/rich_text`, Tailwind, and
+   importmap so FlatPack Tables render.
 5. First owner grants: `RecordingStudioAccessible.bootstrap_owner_access!` on an
    empty owned root. Later members: `grant_access`. Persist the actor and
    recording before either call. Set `access_actor_types` so `User` can hold
@@ -29,5 +33,5 @@
    still passes PageNav `anchor_url:`, alias it to `anchor_href:` in the host —
    do not fork the layout. Admin 2.0.1 section views still pass Button `url:`;
    hosts can alias that to `href:` the same way.
-7. Point `config.admin_layout` at `recording_studio/default_layout` (or leave it
-   nil so authenticated controllers inherit the default layout).
+7. Point `config.admin_layout` at `recording_studio/default_layout` so engine
+   admin uses the gem shell instead of the host sidebar.

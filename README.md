@@ -637,8 +637,9 @@ bin/dev
 ```
 
 The dummy app preserves Recording Studio 4.2 declarations, actor wiring, root
-recordings, authentication, `RecordingStudio::UsesDefaultLayout`, and the mounted
-addon route. See [UPGRADING.md](UPGRADING.md) for the 4.2 host pin.
+recordings, authentication, the host sidebar shell, `UsesDefaultLayout` on gem
+admin screens, and the mounted addon route. See [UPGRADING.md](UPGRADING.md)
+for the 4.2 host pin.
 
 The original template documentation remains under `docs/gem_template/` as
 architectural reference only.

@@ -14,11 +14,13 @@ Versioning and Keep a Changelog.
   `v4.2.0`, Accessible `v0.7.0`, Admin `2.0.1`, Root Switchable `v0.5.0`, and
   FlatPack `v0.1.143`. Accessible stays a host/dummy dependency — it is not
   added to the gemspec.
-- Dummy app uses `RecordingStudio::UsesDefaultLayout` and
-  `recording_studio/default_layout` from Recording Studio 4.2 as-is (no vendored
-  layout copy). Rounded theme is applied on `html` and `body`. The page-nav
+- Dummy host pages keep the dummy `flat_pack_sidebar` shell (rounded `html` /
+  `body`). Engine admin and Recording Studio Admin AI screens use
+  `RecordingStudio::UsesDefaultLayout` and `recording_studio/default_layout`
+  from Recording Studio 4.2 as-is (no vendored layout copy). The gem page-nav
   right slot is Access only — no Sign out, Root Switchable, or admin/root
-  dropdown.
+  dropdown. Dummy `_default_layout_head` loads application, FlatPack, Tailwind,
+  and importmap so gem tables render as FlatPack Tables.
 - Dummy seeds bootstrap the first owner with `bootstrap_owner_access!`, persist
   actors and recordings before grants, and seed engine-admin batches plus a
   retained response so those screens are not empty.

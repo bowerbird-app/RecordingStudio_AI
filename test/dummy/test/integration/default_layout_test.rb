@@ -6,6 +6,14 @@ require "devise/test/integration_helpers"
 class DefaultLayoutTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
 
+  HOST_ASSET_MARKERS = [
+    "application",
+    "flat_pack/variables",
+    "flat_pack/rich_text",
+    "tailwind-",
+    "importmap"
+  ].freeze
+
   setup do
     @user = User.create!(email: "default-layout-#{SecureRandom.hex(4)}@example.com", password: "Password123!")
     workspace = Workspace.create!(name: "Default layout workspace")
@@ -16,27 +24,35 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     follow_redirect! if response.redirect?
   end
 
-  test "authenticated pages use recording studio default layout with rounded theme" do
-    get root_path
-
-    assert_response :success
-    assert_select "html[data-theme='rounded']", count: 1
-    assert_select "body[data-theme='rounded']", count: 1
-    assert_select "body[data-recording-studio-default-layout='true']", count: 1
-    assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
-    refute_includes response.body, "recording-studio-root-switchable--root-switch-dropdown"
-  end
-
-  test "playground config and methods keep default layout without a root switch dropdown" do
-    [ ai_playground_path, gem_config_path, gem_methods_path ].each do |path|
+  test "host pages use the dummy sidebar shell with rounded theme and Flatpack assets" do
+    [ root_path, ai_playground_path, gem_config_path, gem_methods_path ].each do |path|
       get path
 
       assert_response :success, path
-      assert_select "body[data-recording-studio-default-layout='true']", count: 1
       assert_select "html[data-theme='rounded']", count: 1
       assert_select "body[data-theme='rounded']", count: 1
-      assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
+      assert_select "body[data-recording-studio-default-layout='true']", count: 0
+      assert_includes response.body, "flat-pack--sidebar-layout"
+      assert_includes response.body, "AI Admin"
+      HOST_ASSET_MARKERS.each do |marker|
+        assert_includes response.body, marker, "#{path} missing #{marker}"
+      end
     end
+  end
+
+  test "engine admin uses default_layout with Access-only page-nav and Flatpack assets" do
+    get "/recording_studio_ai/admin"
+
+    assert_response :success
+    assert_gem_admin_shell
+    assert_select "table", minimum: 1
+  end
+
+  test "recording studio admin uses default_layout with Access-only page-nav and Flatpack assets" do
+    get "/admin"
+
+    assert_response :success
+    assert_gem_admin_shell
   end
 
   test "devise sign in keeps the application layout" do
@@ -46,6 +62,21 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "html[data-theme='rounded']", count: 1
     assert_select "body[data-recording-studio-default-layout='true']", count: 0
+    refute_includes response.body, "flat-pack--sidebar-layout"
     assert_includes response.body, "Sign In"
+  end
+
+  private
+
+  def assert_gem_admin_shell
+    assert_select "html[data-theme='rounded']", count: 1
+    assert_select "body[data-theme='rounded']", count: 1
+    assert_select "body[data-recording-studio-default-layout='true']", count: 1
+    refute_includes response.body, "flat-pack--sidebar-layout"
+    assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
+    refute_includes response.body, "recording-studio-root-switchable--root-switch-dropdown"
+    HOST_ASSET_MARKERS.each do |marker|
+      assert_includes response.body, marker, "gem admin missing #{marker}"
+    end
   end
 end
