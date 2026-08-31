@@ -66,7 +66,7 @@
         <%= render FlatPack::Table::Component.new(data: @tool_invocations) do |table| %>
           <% table.column(title: "Tool") do |invocation| %>
             <div>
-              <%= link_to "#{invocation.tool_key} v#{invocation.tool_version}", version_admin_custom_tool_path(invocation.tool_key, invocation.tool_version) %>
+              <span class="font-semibold"><%= invocation.tool_key %> v<%= invocation.tool_version %></span>
               <div class="text-xs opacity-70"><%= invocation.tool_name_snapshot %></div>
             </div>
           <% end %>

@@ -7,7 +7,7 @@
         <%= render FlatPack::Table::Component.new(data: @definitions) do |table| %>
           <% table.column(title: "Tool") do |definition| %>
             <div>
-              <%= link_to "#{definition.name} v#{definition.version}", version_admin_custom_tool_path(definition.key, definition.version), class: "font-semibold" %>
+              <span class="font-semibold"><%= definition.name %> v<%= definition.version %></span>
               <div class="text-xs opacity-70"><%= definition.key %></div>
             </div>
           <% end %>

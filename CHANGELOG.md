@@ -22,6 +22,8 @@ Versioning and Keep a Changelog.
 - Dummy seeds bootstrap the first owner with `bootstrap_owner_access!`, persist
   actors and recordings before grants, and seed engine-admin batches plus a
   retained response so those screens are not empty.
+- Engine admin custom-tools index and run show no longer link to the removed
+  per-version tool route (`/custom_tools/:key/versions/:version`).
 
 See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 

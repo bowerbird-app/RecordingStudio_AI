@@ -51,4 +51,14 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
 
     assert_response :not_found
   end
+
+  test "engine admin custom tools index renders registered tools" do
+    sign_in @user
+
+    get "/recording_studio_ai/admin/custom_tools"
+
+    assert_response :success
+    assert_includes response.body, "Dummy Echo Tool"
+    refute_includes response.body, "version_admin_custom_tool"
+  end
 end
