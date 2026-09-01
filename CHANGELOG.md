@@ -16,8 +16,9 @@ Versioning and Keep a Changelog.
   - Batches index → new `provider_batches` screen (section link + dashboard
     widget). Batch rows link to the engine show page.
 - Engine routes keep **show-only** drill-downs that Recording Studio Admin does
-  not render as screens: overview, run show, batch show, provider-native tools
-  report, and retained-response viewer. Removed `GET .../admin/runs`,
+  not render as screens: run show, batch show, provider-native tools report,
+  and retained-response viewer. Removed the engine overview at
+  `GET /recording_studio_ai/admin`, plus `GET .../admin/runs`,
   `GET .../admin/batches`, and `GET .../admin/custom_tools` (and the custom
   tools controller).
 - Registered custom tools dashboard widget no longer links to the removed

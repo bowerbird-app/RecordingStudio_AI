@@ -206,11 +206,11 @@ the host, typically at `/admin`) under section `recording_studio_ai`: AI Calls,
 Attempts, Custom Tool Calls, Registered Tools/Prompts/Providers/Models,
 Provider Batches, latency and spend screens, and AI Responses.
 
-The engine still exposes GET-only FlatPack **detail / overview** pages at
-`/recording_studio_ai/admin` for surfaces Recording Studio Admin does not
-render as show pages: overview metrics, run show, batch show, provider-native
-web-search reporting, and the retained-response viewer. There are no replay,
-refresh, cancellation, confirmation, or other mutation routes.
+The engine still exposes GET-only Flatpack **detail** pages under
+`/recording_studio_ai/admin/*` for surfaces Recording Studio Admin does not
+render as show pages: run show, batch show, provider-native web-search
+reporting, and the retained-response viewer. Use `/admin` (Recording Studio
+Admin section `recording_studio_ai`) for list and analytics screens.
 
 Administration fails closed until the host configures both
 `admin_actor_resolver` and `admin_visible_roots_resolver`. Root IDs returned by

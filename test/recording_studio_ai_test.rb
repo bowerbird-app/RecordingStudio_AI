@@ -82,8 +82,8 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes home, "Playground"
     assert_includes home, "Config"
     assert_includes home, "Methods"
-    assert_includes home, "/recording_studio_ai/admin"
     assert_includes home, "/admin/screens/ai_calls"
+    refute_includes home, "/recording_studio_ai/admin"
     refute_includes home, "Foundation ready"
   end
 

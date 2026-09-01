@@ -16,7 +16,6 @@ module AdminScreens
     latency_by_model/widgets/slow_calls
     latency_by_prompt/widgets/prompt_p90_latency
     provider_batches/widgets/provider_batches
-    recording_studio_ai_overview/screen
     recording_studio_ai_responses/screen
     ai_calls/screen
     attempts/screen
@@ -57,7 +56,6 @@ module AdminScreens
     return unless defined?(RecordingStudioAdmin)
 
     REGISTERABLE_WIDGETS.each { |widget| RecordingStudioAdmin.register_widget(widget) }
-    RecordingStudioAdmin.register_screen(RecordingStudioAIOverviewScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAICallsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIAttemptsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIToolCallsScreen)

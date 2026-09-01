@@ -15,10 +15,10 @@ covers (or now covers via `provider_batches`). Update the host dependency to
 2. Keep engine show URLs for drill-down:
    `/recording_studio_ai/admin/runs/:id`,
    `/recording_studio_ai/admin/batches/:id`,
-   `/recording_studio_ai/admin/retained_responses/:id`,
-   `/recording_studio_ai/admin/provider_native_tools`, and
-   `/recording_studio_ai/admin` (overview).
-3. Remove host links to `/recording_studio_ai/admin/runs`,
+   `/recording_studio_ai/admin/retained_responses/:id`, and
+   `/recording_studio_ai/admin/provider_native_tools`.
+3. Remove host links to `/recording_studio_ai/admin` (overview),
+   `/recording_studio_ai/admin/runs`,
    `/recording_studio_ai/admin/batches`, `/recording_studio_ai/admin/custom_tools`,
    and any remaining `/custom_tools/:key/versions/:version` URLs.
 
