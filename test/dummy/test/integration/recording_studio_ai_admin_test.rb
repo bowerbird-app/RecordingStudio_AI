@@ -57,23 +57,27 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "engine admin custom tools index renders registered tools" do
+  test "engine admin custom tools index is retired in favor of Recording Studio Admin" do
     sign_in @user
 
     get "/recording_studio_ai/admin/custom_tools"
 
-    assert_response :success
-    assert_includes response.body, "Dummy Echo Tool"
-    refute_includes response.body, "version_admin_custom_tool"
-    assert_select "body[data-recording-studio-default-layout='true']", count: 1
-    refute_includes response.body, "flat-pack--sidebar-layout"
-    refute_includes response.body, "recording-studio-root-switchable--root-switch-dropdown"
-    assert_select "table", minimum: 1
-    assert_select "table td", text: /Dummy Echo Tool/
-    assert_select "[class*='card-border-color'] table", count: 0
-    assert_includes response.body, "overflow-x-auto"
-    assert_includes response.body, "stylesheet"
-    assert_includes response.body, "flat_pack/variables"
-    assert_includes response.body, "tailwind-"
+    assert_response :not_found
+  end
+
+  test "engine admin runs index is retired in favor of Recording Studio Admin" do
+    sign_in @user
+
+    get "/recording_studio_ai/admin/runs"
+
+    assert_response :not_found
+  end
+
+  test "engine admin batches index is retired in favor of Recording Studio Admin" do
+    sign_in @user
+
+    get "/recording_studio_ai/admin/batches"
+
+    assert_response :not_found
   end
 end

@@ -111,6 +111,18 @@ module AdminScreens
       }
 
       column :created_at, title: "Created", header_tooltip: "When this call started."
+      column :run,
+             title: "Run",
+             sortable: false,
+             header_tooltip: "Open the run detail page.",
+             value: lambda { |run, _context|
+               ActionController::Base.helpers.link_to(
+                 "Run ##{run.id}",
+                 "/recording_studio_ai/admin/runs/#{run.id}",
+                 class: "text-(--color-primary-background-color) underline",
+                 data: { turbo_frame: "_top" }
+               )
+             }
       column :status,
              header_tooltip: "How the call ended.",
              display: :badge,

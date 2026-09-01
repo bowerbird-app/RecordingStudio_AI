@@ -131,6 +131,22 @@ module AdminScreens
       RecordingStudioAI::CustomToolInvocation.joins(:run).merge(runs_scope(context))
     end
 
+    def batches_scope(context = admin_context)
+      bind_admin_context!(context) if context
+      root_id = context&.root_recording&.id
+      return RecordingStudioAI::Batch.none if root_id.blank?
+
+      RecordingStudioAI::Batch.where(root_recording_id: root_id)
+    end
+
+    def batch_distinct_values(column)
+      batches_scope.distinct.order(column).pluck(column).compact_blank
+    end
+
+    def batch_present_distinct_values(column)
+      batches_scope.where.not(column => [nil, ""]).distinct.order(column).pluck(column).compact_blank
+    end
+
     def attempts_scope(context = admin_context)
       RecordingStudioAI::Attempt.joins(:run).merge(runs_scope(context))
     end

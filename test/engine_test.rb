@@ -8,10 +8,13 @@ class EngineTest < Minitest::Test
     assert_equal "recording_studio_ai", RecordingStudioAI::Engine.engine_name
   end
 
-  def test_engine_recognizes_admin_runs_route
+  def test_engine_recognizes_admin_run_show_route
     load RecordingStudioAI::Engine.root.join("config/routes.rb")
 
-    assert_includes RecordingStudioAI::Engine.routes.routes.map(&:name), "admin_runs"
+    assert_includes RecordingStudioAI::Engine.routes.routes.map(&:name), "admin_run"
+    refute_includes RecordingStudioAI::Engine.routes.routes.map(&:name), "admin_runs"
+    refute_includes RecordingStudioAI::Engine.routes.routes.map(&:name), "admin_batches"
+    refute_includes RecordingStudioAI::Engine.routes.routes.map(&:name), "admin_custom_tools"
   end
 
   def test_recording_studio_dependency_is_loaded

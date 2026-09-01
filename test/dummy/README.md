@@ -14,7 +14,8 @@ It covers:
   Admin AI screens only (`recording_studio/default_layout`, no vendored copy)
 - Accessible first-owner bootstrap and later grants
 - all six non-recordable addon infrastructure tables
-- the mounted, GET-only addon administration screens
+- the mounted Recording Studio Admin AI screens plus engine admin show/overview
+  drill-downs
 - fail-closed production configuration with an explicit demo-only authorization policy
 
 Tests use injected provider clients; live generation requires provider credentials.
@@ -42,8 +43,9 @@ Useful routes:
 - `/ai_playground` — generate against a profile model
 - `/config` — initializer and registry guide
 - `/methods` — call-site examples
-- `/recording_studio_ai/admin` — engine administration
-- `/admin` — Recording Studio Admin AI screens
+- `/recording_studio_ai/admin` — engine admin overview and show drill-downs
+- `/admin` — Recording Studio Admin AI list/analytics screens
+- `/admin/screens/provider_batches` — provider batches index
 - `/recording_studio` — Recording Studio host integration
 - `/users/sign_in` — Devise sign in
 - `/up` — Rails health check

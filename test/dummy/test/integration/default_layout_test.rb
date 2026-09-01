@@ -100,16 +100,32 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     assert_select "[class*='card-border-color'] table", count: 0
   end
 
-  test "engine admin custom tools render Flatpack table cells not a text dump" do
+  test "engine admin custom tools index is retired" do
     get "/recording_studio_ai/admin/custom_tools"
+
+    assert_response :not_found
+  end
+
+  test "engine admin provider batch show still uses default_layout Flatpack shell" do
+    batch = RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "dummy-batch-model",
+      root_recording_id: @root.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user"
+    )
+
+    get "/recording_studio_ai/admin/batches/#{batch.id}"
 
     assert_response :success
     assert_gem_admin_shell
-    assert_select "table tbody td", text: /Dummy Echo Tool/
-    assert_select "[class*='card-border-color'] table", count: 0
+    assert_includes response.body, "dummy-batch-model"
+    assert_includes response.body, "Batch #{batch.id}"
   end
 
-  test "engine admin provider batches render Flatpack table cells not a text dump" do
+  test "recording studio admin provider batches screen uses default_layout" do
     RecordingStudioAI::Batch.create!(
       status: "completed",
       provider: "openai",
@@ -120,12 +136,10 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
       initiator_kind: "user"
     )
 
-    get "/recording_studio_ai/admin/batches"
+    get "/admin/screens/provider_batches"
 
     assert_response :success
     assert_gem_admin_shell
-    assert_select "table tbody td", text: /dummy-batch-model/
-    assert_select "[class*='card-border-color'] table", count: 0
   end
 
   test "recording studio admin uses default_layout with Access-only page-nav and Flatpack assets" do
