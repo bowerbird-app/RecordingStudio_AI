@@ -1,5 +1,27 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.3.1
+
+`0.3.1` retires engine admin index routes that Recording Studio Admin already
+covers (or now covers via `provider_batches`). Update the host dependency to
+`recording_studio_ai`, `~> 0.3.1`, then:
+
+1. Prefer `/admin` (Recording Studio Admin section `recording_studio_ai`) for
+   AI Calls, Registered Tools, and Provider Batches. Bookmark or deep-link
+   changes:
+   - Runs list → `/admin/screens/ai_calls`
+   - Custom tools list → `/admin/screens/registered_custom_tools`
+   - Batches list → `/admin/screens/provider_batches`
+2. Keep engine show URLs for drill-down:
+   `/recording_studio_ai/admin/runs/:id`,
+   `/recording_studio_ai/admin/batches/:id`,
+   `/recording_studio_ai/admin/retained_responses/:id`, and
+   `/recording_studio_ai/admin/provider_native_tools`.
+3. Remove host links to `/recording_studio_ai/admin` (overview),
+   `/recording_studio_ai/admin/runs`,
+   `/recording_studio_ai/admin/batches`, `/recording_studio_ai/admin/custom_tools`,
+   and any remaining `/custom_tools/:key/versions/:version` URLs.
+
 ## Upgrading to 0.3.0
 
 `0.3.0` pins this engine onto Recording Studio 4.2. Update the host dependency to

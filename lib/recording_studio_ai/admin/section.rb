@@ -17,6 +17,11 @@ module AdminScreens
          url: ->(context) { context.admin_screen_path("tool_calls") },
          style: :secondary
 
+    link :provider_batches,
+         text: "Provider Batches",
+         url: ->(context) { context.admin_screen_path("provider_batches") },
+         style: :secondary
+
     link :attempts,
          text: "Attempts",
          url: ->(context) { context.admin_screen_path("attempts") },
@@ -69,6 +74,7 @@ module AdminScreens
 
     widget "widgets.recording_studio_ai.ai_calls_windows"
     widget "widgets.recording_studio_ai.tool_calls"
+    widget "widgets.recording_studio_ai.provider_batches"
     widget "widgets.recording_studio_ai.registered_custom_tools"
     widget "widgets.recording_studio_ai.registered_prompts"
     widget "widgets.recording_studio_ai.retry_rate_by_model"

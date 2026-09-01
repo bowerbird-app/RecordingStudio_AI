@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.3.0", RecordingStudioAI::VERSION
+    assert_equal "0.3.1", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -82,8 +82,8 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes home, "Playground"
     assert_includes home, "Config"
     assert_includes home, "Methods"
-    assert_includes home, "/recording_studio_ai/admin"
     assert_includes home, "/admin/screens/ai_calls"
+    refute_includes home, "/recording_studio_ai/admin"
     refute_includes home, "Foundation ready"
   end
 

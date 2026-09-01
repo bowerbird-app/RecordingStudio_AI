@@ -147,6 +147,24 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     assert_empty result[:breaches]
   end
 
+  def test_admin_batches_scope_fails_closed_without_a_root
+    visible_root = create_recording_id
+    RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "gpt-test",
+      root_recording_id: visible_root,
+      initiator_type: "User",
+      initiator_id: "1",
+      initiator_kind: "user"
+    )
+    context = Struct.new(:root_recording).new(nil)
+
+    assert_empty AdminScreens::RecordingStudioAIWidgets.batches_scope(context)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
   def test_admin_runs_scope_fails_closed_without_a_root
     visible_root = create_recording_id
     create_run(root_id: visible_root, status: "completed", tokens: 10)
@@ -198,6 +216,7 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal [visible_attempt.id], widgets.attempts_scope(context).pluck(:id)
     assert_equal ["visible-tool"], widgets.tool_scope(context).pluck(:tool_key)
     assert_equal ["openai"], widgets.responses_scope(context).pluck(:provider)
+    assert_empty widgets.batches_scope(context)
     assert_equal %w[completed], widgets.run_distinct_values(:status)
     assert_equal %w[visible-prompt], widgets.run_present_distinct_values(:prompt_key)
     assert_equal %w[openai], widgets.run_distinct_values(:resolved_provider)

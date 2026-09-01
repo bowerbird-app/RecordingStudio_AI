@@ -40,12 +40,12 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "engine admin uses default_layout with Access-only page-nav and Flatpack assets" do
-    get "/recording_studio_ai/admin"
+  test "engine admin show uses default_layout with Access-only page-nav and Flatpack assets" do
+    get "/recording_studio_ai/admin/provider_native_tools"
 
     assert_response :success
     assert_gem_admin_shell
-    assert_select "table", minimum: 1
+    assert_includes response.body, "Provider-native tools"
   end
 
   test "gem admin does not show leftover Devise signed-in flash" do
@@ -53,11 +53,7 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     post user_session_path, params: { user: { email: @user.email, password: "Password123!" } }
     follow_redirect! while response.redirect?
 
-    retained = create_overview_retained_response!
-
-    get "/recording_studio_ai/admin"
-    assert_response :success
-    refute_includes response.body, "Signed in successfully"
+    retained = create_retained_response!
 
     get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
     assert_response :success
@@ -68,48 +64,38 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "Signed in successfully"
   end
 
-  test "engine admin overview formats provider error rate instead of dumping a raw float" do
-    run = RecordingStudioAI::Run.create!(
-      operation: "generation",
+  test "engine admin root is not routable" do
+    get "/recording_studio_ai/admin"
+
+    assert_response :not_found
+  end
+
+  test "engine admin custom tools index is retired" do
+    get "/recording_studio_ai/admin/custom_tools"
+
+    assert_response :not_found
+  end
+
+  test "engine admin provider batch show still uses default_layout Flatpack shell" do
+    batch = RecordingStudioAI::Batch.create!(
       status: "completed",
+      provider: "openai",
+      model: "dummy-batch-model",
       root_recording_id: @root.id,
       initiator_type: "User",
       initiator_id: @user.id,
-      initiator_kind: "user",
-      started_at: Time.current,
-      completed_at: Time.current
+      initiator_kind: "user"
     )
-    %w[completed completed failed].each_with_index do |status, index|
-      run.attempts.create!(
-        sequence: index + 1,
-        kind: index.zero? ? "primary" : "retry",
-        status: status,
-        provider: "openai",
-        model: "gpt-test",
-        started_at: Time.current,
-        completed_at: Time.current
-      )
-    end
 
-    get "/recording_studio_ai/admin"
-
-    assert_response :success
-    refute_includes response.body, "0.3333333333333333"
-    assert_includes response.body, "33.3%"
-    assert_select "table", minimum: 1
-    assert_select "[class*='card-border-color'] table", count: 0
-  end
-
-  test "engine admin custom tools render Flatpack table cells not a text dump" do
-    get "/recording_studio_ai/admin/custom_tools"
+    get "/recording_studio_ai/admin/batches/#{batch.id}"
 
     assert_response :success
     assert_gem_admin_shell
-    assert_select "table tbody td", text: /Dummy Echo Tool/
-    assert_select "[class*='card-border-color'] table", count: 0
+    assert_includes response.body, "dummy-batch-model"
+    assert_includes response.body, "Batch #{batch.id}"
   end
 
-  test "engine admin provider batches render Flatpack table cells not a text dump" do
+  test "recording studio admin provider batches screen uses default_layout" do
     RecordingStudioAI::Batch.create!(
       status: "completed",
       provider: "openai",
@@ -120,12 +106,10 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
       initiator_kind: "user"
     )
 
-    get "/recording_studio_ai/admin/batches"
+    get "/admin/screens/provider_batches"
 
     assert_response :success
     assert_gem_admin_shell
-    assert_select "table tbody td", text: /dummy-batch-model/
-    assert_select "[class*='card-border-color'] table", count: 0
   end
 
   test "recording studio admin uses default_layout with Access-only page-nav and Flatpack assets" do
@@ -160,7 +144,7 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     end
   end
 
-  def create_overview_retained_response!
+  def create_retained_response!
     run = RecordingStudioAI::Run.create!(
       operation: "generation",
       status: "completed",

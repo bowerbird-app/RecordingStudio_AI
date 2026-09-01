@@ -228,9 +228,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "run_status=failed"
-    refute_includes response.body, ">Run<"
     assert_includes response.body, ">Failed<"
     refute_includes response.body, ">Completed<"
+    assert_match %r{href="/recording_studio_ai/admin/runs/\d+"}, response.body
   end
 
   test "ai calls chart plots a line of volume over time" do
@@ -660,6 +660,62 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "registered custom tools widget links to tool calls instead of the removed version route" do
+    authenticate_for_admin!
+    create_run!(status: "completed", operation: "generation").tap do |run|
+      run.custom_tool_invocations.create!(
+        tool_key: "dummy_echo_tool",
+        tool_version: 1,
+        status: "completed",
+        read_only: true,
+        destructive: false,
+        requires_confirmation: false,
+        idempotent: true
+      )
+    end
+
+    get "/admin"
+
+    assert_response :success
+    assert_includes response.body, "tool_key=dummy_echo_tool"
+    refute_includes response.body, "/recording_studio_ai/admin/custom_tools/dummy_echo_tool/versions/"
+  end
+
+  test "provider batches screen lists batches and links to engine show pages" do
+    authenticate_for_admin!
+    batch = RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "batch-screen-model",
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 2,
+      completed_item_count: 2
+    )
+
+    get "/admin"
+
+    assert_response :success
+    assert_includes response.body, "href=\"/admin/screens/provider_batches\""
+    assert_includes response.body, "Provider Batches"
+
+    get "/admin/screens/provider_batches"
+
+    assert_response :success
+    assert_includes response.body, "Provider batches"
+    assert_includes response.body, "src=\"/admin/screens/provider_batches/chart\""
+    assert_includes response.body, "value=\"last_4_weeks\""
+
+    get "/admin/screens/provider_batches/table"
+
+    assert_response :success
+    assert_includes response.body, "batch-screen-model"
+    assert_includes response.body, "href=\"/recording_studio_ai/admin/batches/#{batch.id}\""
+    assert_includes response.body, "Batch ##{batch.id}"
+  end
+
   test "registered custom tools default reliability metrics to the last four weeks" do
     authenticate_for_admin!
 
@@ -702,7 +758,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       AdminScreens::RecordingStudioAIEstimatedSpendScreen,
       AdminScreens::RecordingStudioAICallsByProviderModelScreen,
       AdminScreens::RecordingStudioAIRegisteredProvidersScreen,
-      AdminScreens::RecordingStudioAIRegisteredModelsScreen
+      AdminScreens::RecordingStudioAIRegisteredModelsScreen,
+      AdminScreens::RecordingStudioAIProviderBatchesScreen
     ]
 
     screens.each do |screen|
@@ -724,7 +781,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       "estimated_spend" => "Size of what we sent.",
       "calls_by_provider_model" => "Who we asked.",
       "registered_providers" => "Whether keys are set so it can run.",
-      "registered_models" => "How wild the answers can get."
+      "registered_models" => "How wild the answers can get.",
+      "provider_batches" => "When this batch was recorded."
     }.each do |key, phrase|
       get "/admin/screens/#{key}/table"
 

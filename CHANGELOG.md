@@ -5,6 +5,28 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-01
+
+### Changed
+
+- Engine admin **index** pages move onto Recording Studio Admin screens:
+  - Runs index → existing `ai_calls` screen (AI Calls table now links to
+    `/recording_studio_ai/admin/runs/:id` for detail).
+  - Custom tools index → existing `registered_custom_tools` screen.
+  - Batches index → new `provider_batches` screen (section link + dashboard
+    widget). Batch rows link to the engine show page.
+- Engine routes keep **show-only** drill-downs that Recording Studio Admin does
+  not render as screens: run show, batch show, provider-native tools report,
+  and retained-response viewer. Removed the engine overview at
+  `GET /recording_studio_ai/admin`, plus `GET .../admin/runs`,
+  `GET .../admin/batches`, and `GET .../admin/custom_tools` (and the custom
+  tools controller).
+- Registered custom tools dashboard widget no longer links to the removed
+  `/custom_tools/:key/versions/:version` route; it opens the tool calls screen
+  filtered by tool key instead.
+
+See [UPGRADING.md](UPGRADING.md) for host checklist items.
+
 ## [0.3.0] - 2026-08-31
 
 ### Changed

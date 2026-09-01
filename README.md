@@ -201,11 +201,16 @@ roots. Omitting `root_ids` fails closed (empty metrics).
 
 ## Administration (Phase 13)
 
-The engine exposes a GET-only FlatPack administration surface at
-`/recording_studio_ai/admin`. It includes an overview, run and attempt history,
-custom-tool definitions and invocation aggregates, provider-native web-search
-reporting, provider batches, and a dedicated retained-response viewer. There
-are no replay, refresh, cancellation, confirmation, or other mutation routes.
+List and analytics surfaces register with Recording Studio Admin (mounted by
+the host, typically at `/admin`) under section `recording_studio_ai`: AI Calls,
+Attempts, Custom Tool Calls, Registered Tools/Prompts/Providers/Models,
+Provider Batches, latency and spend screens, and AI Responses.
+
+The engine still exposes GET-only Flatpack **detail** pages under
+`/recording_studio_ai/admin/*` for surfaces Recording Studio Admin does not
+render as show pages: run show, batch show, provider-native web-search
+reporting, and the retained-response viewer. Use `/admin` (Recording Studio
+Admin section `recording_studio_ai`) for list and analytics screens.
 
 Administration fails closed until the host configures both
 `admin_actor_resolver` and `admin_visible_roots_resolver`. Root IDs returned by

@@ -22,7 +22,9 @@ module AdminScreens
           icon: :wrench_screwdriver,
           text: definition.name,
           trailing: "#{AdminScreens::RecordingStudioAIWidgets.number(calls)} calls",
-          href: "/recording_studio_ai/admin/custom_tools/#{definition.key}/versions/#{definition.version}"
+          href: "#{context.admin_screen_path('tool_calls')}?#{{
+            tool_key: definition.key
+          }.compact.to_query}"
         }
       end.compact.presence || [{ text: "No custom tool calls in the last 30 days." }]
     end
