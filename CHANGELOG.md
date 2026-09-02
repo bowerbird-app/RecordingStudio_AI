@@ -5,6 +5,31 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-02
+
+Cloud Agent install no longer fails a warm environment rebuild. Skills still
+fetch at Build.
+
+### Added
+
+- Track `.cursor/environment.json`, `.cursor/install.sh`,
+  `.cursor/fetch-skills.sh`, and `.cursor/start.sh`. Builds run
+  `.cursor/install.sh`, which always runs `.cursor/fetch-skills.sh` last.
+  `.cursor/skills/` and `.cursor/rules/` stay gitignored Build output. The
+  gemspec still packages only `app`, `config`, `db`, `lib`, CHANGELOG,
+  license, README, and UPGRADING.
+
+### Fixed
+
+- `.cursor/install.sh` skips apt, ruby-build, db:prepare, and tailwind when
+  Ruby, bundle, and Postgres are already usable. A skippable provision
+  failure no longer fails the Build. Fetch-skills always runs last.
+
+### Upgrade notes
+
+- No host or schema changes. Rebuild the Cloud Agent environment with Draft
+  off so Build loads the pack.
+
 ## [0.3.0] - 2026-08-31
 
 ### Changed
@@ -600,6 +625,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bowerbird-app/RecordingStudio_AI/releases/tag/v0.1.0
