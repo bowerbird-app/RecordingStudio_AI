@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.3.1
+
+`0.3.1` only changes Cloud Agent boot. There is no host, schema, or in-app AI
+product change. Update the host dependency to `recording_studio_ai`, `~> 0.3.1`
+when you want this boot pack. Rebuild the Cloud Agent environment with Draft
+off so Build loads the fetched skills.
+
+Actors still go through Accessible and API. The public contracts from `0.3.0`
+are unchanged.
+
 ## Upgrading to 0.3.0
 
 `0.3.0` pins this engine onto Recording Studio 4.2. Update the host dependency to

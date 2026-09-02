@@ -641,5 +641,14 @@ recordings, authentication, the host sidebar shell, `UsesDefaultLayout` on gem
 admin screens, and the mounted addon route. See [UPGRADING.md](UPGRADING.md)
 for the 4.2 host pin.
 
+## Cloud Agent boot
+
+Cloud Agent Builds run `.cursor/install.sh`, then `.cursor/fetch-skills.sh`.
+The install hook provisions a cold image. On a warm snapshot it skips apt,
+ruby-build, db:prepare, and tailwind when Ruby, bundle, and Postgres are
+already usable. Fetch-skills always runs last. `.cursor/start.sh` starts
+PostgreSQL on each boot. Rebuild with Draft off to load a new pack. See
+[Cursor skills in Cloud Agents](docs/cursor-skills.md).
+
 The original template documentation remains under `docs/gem_template/` as
 architectural reference only.
