@@ -11,39 +11,6 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     @configuration = isolate_configuration!
     @configuration.attribution_validator = ->(**) {}
     @actor = Actor.new(id: 42)
-    install_recording_lookup_double
-  end
-
-  def build_recording_lookup(id)
-    @find_count = (@find_count || 0) + 1 if instance_variable_defined?(:@find_count)
-    Actor.new(id:)
-  end
-
-  def test_admin_access_fails_closed_without_host_resolvers
-    assert_raises(ActiveRecord::RecordNotFound) do
-      RecordingStudioAI::Admin::Access.new(controller: Object.new, configuration: @configuration)
-    end
-  end
-
-  def test_admin_access_authorizes_each_visible_root_and_keeps_sensitive_permission_separate
-    root_ids = [create_recording_id, create_recording_id]
-    calls = []
-    @find_count = 0
-    @configuration.admin_actor_resolver = ->(controller:) { @actor }
-    @configuration.admin_visible_roots_resolver = ->(actor:, controller:) { root_ids }
-    @configuration.authorization_handler = lambda do |action:, attribution:, context:|
-      calls << [action, attribution.root_recording.id, context]
-      action != "recording_studio_ai.view_sensitive_execution"
-    end
-
-    access = RecordingStudioAI::Admin::Access.new(controller: Object.new, configuration: @configuration)
-
-    assert_equal root_ids, access.root_ids
-    assert_equal(2, calls.count { |action, _, _| action == "recording_studio_ai.view_execution" })
-    assert_equal 2, @find_count
-    refute access.allowed?(:view_sensitive_execution, root_id: root_ids.first, context: { record_id: 1 })
-    assert_equal "recording_studio_ai.view_sensitive_execution", calls.last.first
-    assert_equal 2, @find_count, "sensitive checks must reuse cached root recordings"
   end
 
   def test_weekly_calls_series_aggregates_in_sql_without_loading_all_runs
@@ -157,6 +124,24 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
+  def test_admin_batches_scope_fails_closed_without_a_root
+    visible_root = create_recording_id
+    RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "gpt-visible",
+      root_recording_id: visible_root,
+      initiator_type: "User",
+      initiator_id: @actor.id,
+      initiator_kind: "user"
+    )
+    context = Struct.new(:root_recording).new(nil)
+
+    assert_empty AdminScreens::RecordingStudioAIWidgets.batches_scope(context)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
   def test_admin_screens_and_filters_stay_inside_the_current_root
     visible_root = create_recording_id
     hidden_root = create_recording_id
@@ -190,6 +175,24 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
       attempt: hidden_attempt, response_type: "error", provider: "gemini", model: "gemini-hidden",
       complete: false, byte_size: 34
     )
+    RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "gpt-visible",
+      root_recording_id: visible_root,
+      initiator_type: "User",
+      initiator_id: @actor.id,
+      initiator_kind: "user"
+    )
+    RecordingStudioAI::Batch.create!(
+      status: "failed",
+      provider: "gemini",
+      model: "gemini-hidden",
+      root_recording_id: hidden_root,
+      initiator_type: "User",
+      initiator_id: @actor.id,
+      initiator_kind: "user"
+    )
 
     context = Struct.new(:root_recording).new(Actor.new(id: visible_root))
     widgets = AdminScreens::RecordingStudioAIWidgets
@@ -198,6 +201,8 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal [visible_attempt.id], widgets.attempts_scope(context).pluck(:id)
     assert_equal ["visible-tool"], widgets.tool_scope(context).pluck(:tool_key)
     assert_equal ["openai"], widgets.responses_scope(context).pluck(:provider)
+    assert_equal %w[openai], widgets.batches_scope(context).pluck(:provider)
+    assert_equal %w[openai], widgets.batch_distinct_values(:provider)
     assert_equal %w[completed], widgets.run_distinct_values(:status)
     assert_equal %w[visible-prompt], widgets.run_present_distinct_values(:prompt_key)
     assert_equal %w[openai], widgets.run_distinct_values(:resolved_provider)
@@ -249,12 +254,21 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
   end
 
   def test_admin_routes_are_read_only
+    routes_source = File.read(RecordingStudioAI::Engine.root.join("config/routes.rb"))
+    refute_includes routes_source, "namespace :admin"
+    refute_includes routes_source, "/admin"
+
     load RecordingStudioAI::Engine.root.join("config/routes.rb")
 
-    verbs = RecordingStudioAI::Engine.routes.routes.map(&:verb).compact.uniq
+    routes = RecordingStudioAI::Engine.routes.routes
+    verbs = routes.map(&:verb).compact.uniq
     assert_equal ["GET"], verbs
-    refute(RecordingStudioAI::Engine.routes.routes.any? do |route|
-      route.defaults[:action].match?(/create|update|destroy|replay|cancel|refresh/)
+    names = routes.map(&:name)
+    assert_includes names, "retained_response"
+    refute_includes names, "admin_runs"
+    refute(routes.any? { |route| route.path.spec.to_s.include?("/admin") })
+    refute(routes.any? do |route|
+      route.defaults[:action].to_s.match?(/create|update|destroy|replay|cancel|refresh/)
     end)
   end
 

@@ -36,13 +36,6 @@ RecordingStudioAI.configure do |config|
   config.retain_responses = true
   config.response_retention_period = 7.days
   config.maximum_retained_response_size = 1.megabyte
-  config.admin_actor_resolver = ->(controller:) { Current.actor }
-  # Defense in depth: engine admin also runs Devise even though ApplicationController already does.
-  config.admin_authenticate = ->(controller:) { controller.authenticate_user! }
-  config.admin_visible_roots_resolver = lambda do |actor:, controller:|
-    DummyAccessibleAIAuthorization.accessible_root_ids(actor: actor, minimum_role: :view)
-  end
-  config.admin_layout = "recording_studio/default_layout"
   config.maximum_attempts = 3
   config.maximum_retries_per_candidate = 1
   config.maximum_provider_fallbacks = 1

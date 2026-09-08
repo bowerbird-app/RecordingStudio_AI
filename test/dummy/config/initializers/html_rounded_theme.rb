@@ -26,7 +26,7 @@ end
 Rails.application.config.to_prepare do
   [
     ApplicationController,
-    (RecordingStudioAI::Admin::ApplicationController if defined?(RecordingStudioAI::Admin::ApplicationController)),
+    (RecordingStudioAI::RetainedResponsesController if defined?(RecordingStudioAI::RetainedResponsesController)),
     (RecordingStudioAdmin::ApplicationController if defined?(RecordingStudioAdmin::ApplicationController))
   ].compact.each do |controller|
     next if controller < DummyHtmlRoundedTheme

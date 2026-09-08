@@ -69,15 +69,8 @@ RecordingStudioAI.configure do |config|
   config.notification_namespace = "recording_studio_ai"
   config.admin_warning_thresholds = RecordingStudioAI::Configuration.new.admin_warning_thresholds
   config.admin_slow_call_threshold_ms = 10_000
-  # Admin access fails closed until the host resolves an authenticated actor and visible roots.
-  # The engine does not authenticate by itself — authenticate in ApplicationController and/or set:
-  # config.admin_authenticate = ->(controller:) { controller.authenticate_user! }
-  # config.admin_actor_resolver = ->(controller:) { controller.current_user }
-  # Prefer Accessible-granted roots only:
-  # config.admin_visible_roots_resolver = ->(actor:, controller:) {
-  #   RecordingStudioAI::AccessibleAuthorization.accessible_root_ids(actor: actor, minimum_role: :view)
-  # }
-  # config.admin_layout = "recording_studio/default_layout"
+  # Staff lists and saved-reply decrypt live on Recording Studio Admin. Install
+  # that gem, mount it, and grant Accessible access. There is no engine /admin.
   config.maximum_attempts = 3
   config.maximum_attachment_count = 10
   config.maximum_attachment_bytes = 20.megabytes

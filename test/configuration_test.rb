@@ -23,10 +23,10 @@ class ConfigurationTest < Minitest::Test
     assert_nil configuration.response_sanitizer
     assert configuration.instrumentation_enabled
     assert_equal "recording_studio_ai", configuration.notification_namespace
-    assert_nil configuration.admin_actor_resolver
-    assert_nil configuration.admin_authenticate
-    assert_nil configuration.admin_visible_roots_resolver
-    assert_nil configuration.admin_layout
+    refute_respond_to configuration, :admin_actor_resolver
+    refute_respond_to configuration, :admin_authenticate
+    refute_respond_to configuration, :admin_visible_roots_resolver
+    refute_respond_to configuration, :admin_layout
     assert_equal 0.1, configuration.admin_warning_thresholds[:error_rate]
     assert_equal 100_000_000, configuration.admin_warning_thresholds[:spend_microunits]
     assert_equal 3, configuration.maximum_attempts

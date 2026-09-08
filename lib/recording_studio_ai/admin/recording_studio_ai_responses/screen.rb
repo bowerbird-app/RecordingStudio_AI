@@ -5,7 +5,7 @@ module AdminScreens
     key "recording_studio_ai_responses"
     icon :table
     title "AI Responses"
-    subtitle "Persisted response records from Recording Studio AI executions."
+    subtitle "What came back from each call."
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.responses_scope(context).order(created_at: :desc)
@@ -46,12 +46,15 @@ module AdminScreens
 
       column :created_at, title: "Created"
       column :response,
-             title: "Response",
+             title: "Reply",
              sortable: false,
-             value: lambda { |row, _context|
+             value: lambda { |row, context|
+               url = context.admin_action_path("recording_studio_ai_retained_responses", :show, row)
+               next "Saved reply ##{row.id}" if url.blank?
+
                ActionController::Base.helpers.link_to(
-                 "Response ##{row.id}",
-                 "/recording_studio_ai/admin/retained_responses/#{row.id}",
+                 "Saved reply ##{row.id}",
+                 url,
                  class: "text-(--color-primary-background-color) underline",
                  data: { turbo_frame: "_top" }
                )
@@ -62,7 +65,7 @@ module AdminScreens
                row.attempt_id.present? ? "Attempt ##{row.attempt_id}" : "Batch item ##{row.batch_item_id}"
              }
       column :run_id,
-             title: "Run",
+             title: "Call",
              sortable: false,
              value: lambda { |row, _context|
                run_id = AdminScreens::RecordingStudioAIWidgets.response_run(row)&.id

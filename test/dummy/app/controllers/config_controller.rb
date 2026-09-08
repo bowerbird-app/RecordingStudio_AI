@@ -345,34 +345,6 @@ class ConfigController < ApplicationController
       accepted_values: "Array of model name strings",
       default: "[]",
       explanation: "Models treated as expensive in admin warnings."
-    },
-    {
-      key: "admin_actor_resolver",
-      required: "Yes, to open admin",
-      accepted_values: "Callable(controller:) or nil",
-      default: "nil",
-      explanation: "Who is looking at admin. Admin screens stay shut until you set this."
-    },
-    {
-      key: "admin_authenticate",
-      required: "Recommended for admin",
-      accepted_values: "Callable(controller:) or nil",
-      default: "nil",
-      explanation: "Optional extra authenticate step on engine admin. The engine does not authenticate by itself — also authenticate ApplicationController."
-    },
-    {
-      key: "admin_visible_roots_resolver",
-      required: "Yes, to open admin",
-      accepted_values: "Callable(actor:, controller:) or nil",
-      default: "nil",
-      explanation: "Which workspaces that person may see. Dummy uses Accessible root ids; admin stays closed until you set this."
-    },
-    {
-      key: "admin_layout",
-      required: "No",
-      accepted_values: "Layout name String or nil",
-      default: "nil",
-      explanation: "Host layout for admin screens. nil uses the app layout."
     }
   ].freeze
 
@@ -491,12 +463,6 @@ class ConfigController < ApplicationController
       # config.admin_warning_thresholds = config.admin_warning_thresholds.merge(error_rate: 0.05)
       config.admin_slow_call_threshold_ms = 10_000
       config.admin_expensive_models = []
-
-      # Admin screens stay shut until both resolvers are set.
-      config.admin_actor_resolver = ->(controller:) { controller.current_user }
-      config.admin_authenticate = nil
-      config.admin_visible_roots_resolver = ->(actor:, controller:) { actor.visible_recording_root_ids }
-      config.admin_layout = nil
     end
   RUBY
 

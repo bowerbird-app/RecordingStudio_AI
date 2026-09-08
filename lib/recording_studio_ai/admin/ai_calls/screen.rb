@@ -50,6 +50,15 @@ module AdminScreens
            apply: lambda { |relation, _value, _context|
              relation.where.not(latency_ms: nil).reorder(latency_ms: :desc)
            }
+    filter :web_search,
+           title: "Used web search",
+           values: [ "1" ],
+           control: :checkbox,
+           apply: ->(relation, _value, _context) { relation.where(web_search_used: true) }
+    filter :batch_id,
+           apply: lambda { |relation, value, _context|
+             relation.where(id: RecordingStudioAI::BatchItem.where(batch_id: value).select(:run_id))
+           }
 
     summary do
       change_good_when do |context|

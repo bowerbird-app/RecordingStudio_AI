@@ -15,10 +15,11 @@ module AdminScreens
     estimated_spend/widgets/estimated_spend
     latency_by_model/widgets/slow_calls
     latency_by_prompt/widgets/prompt_p90_latency
-    recording_studio_ai_overview/screen
+    recording_studio_ai_retained_responses/resource
     recording_studio_ai_responses/screen
     ai_calls/screen
     attempts/screen
+    provider_batches/screen
     tool_calls/screen
     registered_custom_tools/screen
     registered_prompts/screen
@@ -54,9 +55,9 @@ module AdminScreens
     return unless defined?(RecordingStudioAdmin)
 
     REGISTERABLE_WIDGETS.each { |widget| RecordingStudioAdmin.register_widget(widget) }
-    RecordingStudioAdmin.register_screen(RecordingStudioAIOverviewScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAICallsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIAttemptsScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAIProviderBatchesScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIToolCallsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredCustomToolsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredPromptsScreen)
@@ -67,6 +68,7 @@ module AdminScreens
     RecordingStudioAdmin.register_screen(RecordingStudioAILatencyByModelScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAILatencyByPromptScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIResponsesScreen)
+    RecordingStudioAdmin.register_resource(RecordingStudioAIRetainedResponsesResource)
     RecordingStudioAdmin.register_section(RecordingStudioAISection)
   end
 

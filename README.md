@@ -102,11 +102,6 @@ RecordingStudioAI.configure do |config|
   config.notification_namespace = "recording_studio_ai"
   config.admin_warning_thresholds = RecordingStudioAI::Configuration.new.admin_warning_thresholds
   config.admin_slow_call_threshold_ms = 10_000
-  config.admin_actor_resolver = ->(controller:) { Current.actor }
-  config.admin_visible_roots_resolver = lambda do |actor:, controller:|
-    actor.visible_recording_root_ids
-  end
-  config.admin_layout = "recording_studio/default_layout"
   config.maximum_attempts = 3
   config.maximum_retries_per_candidate = 1
   config.retry_backoff_base = 0.25 # seconds
@@ -199,30 +194,30 @@ timings, usage, cost, counts, and normalized error codes only.
 returns canonical metric values and deterministic threshold breaches for those
 roots. Omitting `root_ids` fails closed (empty metrics).
 
-## Administration (Phase 13)
+## Administration
 
-The engine exposes a GET-only FlatPack administration surface at
-`/recording_studio_ai/admin`. It includes an overview, run and attempt history,
-custom-tool definitions and invocation aggregates, provider-native web-search
-reporting, provider batches, and a dedicated retained-response viewer. There
-are no replay, refresh, cancellation, confirmation, or other mutation routes.
-
-Administration fails closed until the host configures both
-`admin_actor_resolver` and `admin_visible_roots_resolver`. Root IDs returned by
-the latter scope every query before record lookup. Set `admin_layout` when the
-host supplies FlatPack chrome; otherwise the inherited application-controller
-layout remains in effect.
-
-The engine admin controllers do **not** authenticate by themselves. They inherit
-`::ApplicationController` and optionally run `admin_authenticate` when set.
-Hosts must authenticate operators (for example Devise on `ApplicationController`)
-and/or set:
+Staff use Recording Studio Admin only. Mount Admin, enable the
+`recording_studio_ai` section, and grant Accessible access on that admin root.
+There is no `/recording_studio_ai/admin` surface.
 
 ```ruby
-config.admin_authenticate = ->(controller:) { controller.authenticate_user! }
+mount RecordingStudioAI::Engine, at: "/recording_studio_ai"
+recording_studio_admin_for :admin, at: "/admin", root_section: :recording_studio_ai
 ```
 
-Prefer Accessible-granted roots for `admin_visible_roots_resolver`.
+Lists (calls, attempts, tool calls, saved replies, provider batches) are Admin
+screens scoped to the current Admin root. They fail closed without a root.
+
+Saved replies open at `/recording_studio_ai/retained_responses/:id`. Listing
+uses the Admin surface role (default `:view`) and the current-root match.
+Decrypting still goes through `RecordingStudioAI.read_retained_response` and
+requires `recording_studio_ai.view_retained_response` (Accessible `:admin`).
+
+Keep `admin_warning_thresholds`, `admin_slow_call_threshold_ms`, and
+`admin_expensive_models` for widget warnings. Engine-admin resolvers
+(`admin_layout`, `admin_authenticate`, `admin_actor_resolver`,
+`admin_visible_roots_resolver`) are gone.
+
 `RecordingStudioAI::AccessibleAuthorization` maps AI actions onto Accessible
 roles (`:view` / `:edit` / `:admin`) for `attribution.root_recording`:
 
@@ -239,14 +234,7 @@ The host authorization handler receives these independent actions:
   request identifiers, errors, metadata, digests, and summaries
 - `recording_studio_ai.view_retained_response` before encrypted content is read
 
-The dedicated retained-response page is linked from the Recording Studio Admin
-AI Responses table. Listing responses still uses the Admin surface gate
-(`required_access_role`, default `:view`) and the current-root match. Decrypting
-retained content always goes through `ResponseReader` and requires
-`recording_studio_ai.view_retained_response` (Accessible `:admin`), matching the
-public `read_retained_response` API. Without Recording Studio Admin, the engine
-admin surface still requires `view_retained_response` the same way.
-Ordinary run and batch pages never read encrypted columns. All screens use only the custom
+Ordinary list screens never read encrypted columns. Screens use only the custom
 tool registry and six infrastructure tables; prompts, messages, complete tool
 payloads, citation URLs, and inferred internal web-search counts are absent.
 

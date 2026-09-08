@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.3.1", RecordingStudioAI::VERSION
+    assert_equal "0.3.2", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -17,7 +17,14 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes manifest, "def self.load!"
     assert_includes manifest, "RecordingStudioAdmin.register_widget"
     assert_includes manifest, "RecordingStudioAdmin.register_screen"
+    assert_includes manifest, "RecordingStudioAdmin.register_resource"
     assert_includes manifest, "RecordingStudioAdmin.register_section"
+    assert File.exist?(File.join(admin_root, "provider_batches/screen.rb"))
+    resource = File.read(File.join(admin_root, "recording_studio_ai_retained_responses/resource.rb"))
+    assert_includes resource, "Engine.routes.url_helpers.retained_response_path"
+    refute_includes resource, "main_app.recording_studio_ai"
+    refute_includes resource, "required_role: :admin"
+    refute File.exist?(File.join(admin_root, "recording_studio_ai_overview/screen.rb"))
     refute_includes File.read(File.join(admin_root, "section.rb")), "class_eval"
     refute_includes manifest, "prepend"
   end
@@ -43,6 +50,7 @@ class RecordingStudioAITest < Minitest::Test
     assert_equal %w[csv flat_pack json_schemer openai rails recording_studio], dependencies.keys.sort
     assert_equal "~> 4.2", dependencies.fetch("recording_studio").to_s
     refute_includes dependencies.keys, "recording_studio_accessible"
+    refute_includes dependencies.keys, "recording_studio_admin"
   end
 
   def test_phase_six_ships_concrete_providers_without_example_surfaces
@@ -82,7 +90,8 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes home, "Playground"
     assert_includes home, "Config"
     assert_includes home, "Methods"
-    assert_includes home, "/recording_studio_ai/admin"
+    assert_includes home, 'href: "/admin"'
+    refute_includes home, "/recording_studio_ai/admin"
     assert_includes home, "/admin/screens/ai_calls"
     refute_includes home, "Foundation ready"
   end
@@ -97,13 +106,23 @@ class RecordingStudioAITest < Minitest::Test
     assert File.exist?(File.expand_path("../app/models/recording_studio_ai/response.rb", __dir__))
   end
 
-  def test_engine_admin_uses_flatpack_tables_modals_and_charts
-    views_root = File.expand_path("../app/views/recording_studio_ai/admin", __dir__)
-    Dir[File.join(views_root, "**/*.erb")].each do |path|
-      contents = File.read(path)
-      refute_match(/<table[\s>]/, contents, "#{path} still has a raw table")
-      refute_match(/<pre[\s>]/, contents, "#{path} still has a raw pre")
-    end
+  def test_saved_reply_and_admin_widgets_use_flatpack_tables_modals_and_charts
+    path = File.expand_path("../app/views/recording_studio_ai/retained_responses/show.html.erb", __dir__)
+    contents = File.read(path)
+    refute_match(/<table[\s>]/, contents, "#{path} still has a raw table")
+    refute_match(/<pre[\s>]/, contents, "#{path} still has a raw pre")
+    refute_includes contents, "FlatPack::Table::Component"
+    assert_includes contents, "FlatPack::Grid::Component"
+    assert_includes contents, "FlatPack::Card::Component"
+    assert_includes contents, "FlatPack::List::Component"
+    assert_includes contents, "FlatPack::Link::Component"
+    assert_includes contents, "simple_format"
+    assert_includes contents, "FlatPack::Collapse::Component"
+    assert_includes contents, "FlatPack::CodeBlock::Component"
+    refute_includes contents, "Not kept."
+    assert_includes contents, "Saved reply"
+    assert_includes contents, "recording_studio_page_nav"
+    assert_includes contents, "page_nav_anchor_url"
 
     widgets = File.read(File.expand_path("../lib/recording_studio_ai/admin/recording_studio_ai_widgets.rb", __dir__))
     assert_includes widgets, "FlatPack::Modal::Component"

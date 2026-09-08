@@ -18,11 +18,12 @@ module AdminScreens
         definition = RecordingStudioAI.tools.fetch(tool_key)
         next unless definition
 
+        query = { tool_key: definition.key }.to_query
         {
           icon: :wrench_screwdriver,
           text: definition.name,
           trailing: "#{AdminScreens::RecordingStudioAIWidgets.number(calls)} calls",
-          href: "/recording_studio_ai/admin/custom_tools/#{definition.key}/versions/#{definition.version}"
+          href: "#{context.admin_screen_path('tool_calls')}?#{query}"
         }
       end.compact.presence || [{ text: "No custom tool calls in the last 30 days." }]
     end

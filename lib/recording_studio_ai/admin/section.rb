@@ -5,7 +5,7 @@ module AdminScreens
     key "recording_studio_ai"
     icon :cpu_chip
     title "Recording Studio AI"
-    subtitle "Runs, custom tools, provider batches, and retained responses"
+    subtitle "Calls, tools, batches, and saved replies"
 
     link :calls,
          text: "AI Calls",
@@ -20,6 +20,11 @@ module AdminScreens
     link :attempts,
          text: "Attempts",
          url: ->(context) { context.admin_screen_path("attempts") },
+         style: :secondary
+
+    link :provider_batches,
+         text: "Provider batches",
+         url: ->(context) { context.admin_screen_path("provider_batches") },
          style: :secondary
 
     link :custom_tools,

@@ -1,0 +1,123 @@
+<% recording_studio_page_nav(
+  page_nav_anchor_url: @admin_home_path,
+  page_nav_anchor_label: "Close"
+) %>
+<% if @access_recording.present? %>
+  <% recording_studio_page_nav_right do %>
+    <%= recording_studio_accessible_avatars(
+      @access_recording,
+      button_style: :ghost,
+      button_size: :md
+    ) %>
+  <% end %>
+<% end %>
+
+<% reply_type = @reply[:response_type].presence&.humanize %>
+<% reply_text = @reply[:content_text].presence %>
+<% structured_reply = @reply[:normalized_response] %>
+<% provider_payload = @reply[:raw_response] %>
+<% complete_badge = if @reply[:complete].nil?
+                      nil
+                    elsif @reply[:complete]
+                      { text: "Complete", style: :success }
+                    else
+                      { text: "Incomplete", style: :warning }
+                    end %>
+<% truncated_badge = { text: "Truncated", style: :warning } if @reply[:truncated] %>
+<% size_label = number_to_human_size(@reply[:byte_size]) if @reply[:byte_size].present? %>
+<% expiry_label = @reply[:expires_at]&.to_fs(:long) %>
+<% content_type = @reply[:content_type].presence %>
+
+<%= render FlatPack::Grid::Component.new(cols: 2, gap: :lg, align: :start) do %>
+  <%= render FlatPack::Grid::Component.new(cols: 1, gap: :lg, align: :start) do %>
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Saved reply",
+      subtitle: "What the model sent back.",
+      variant: :h1
+    ) %>
+
+    <%= render FlatPack::Card::Component.new(style: :elevated) do |card| %>
+      <% card.header(divider: true) do %>
+        <%= render FlatPack::PageTitle::Component.new(title: "About this reply", variant: :h3, class: "mb-0") %>
+      <% end %>
+      <% card.body do %>
+        <%= render FlatPack::List::Component.new(divider: true, spacing: :comfortable) do %>
+          <% if reply_type.present? %>
+            <%= render FlatPack::List::Item.new(trailing: reply_type) do %>
+              Type
+            <% end %>
+          <% end %>
+          <% if complete_badge %>
+            <%= render FlatPack::List::Item.new(
+              trailing: render(FlatPack::Badge::Component.new(text: complete_badge[:text], style: complete_badge[:style], size: :sm))
+            ) do %>
+              Status
+            <% end %>
+          <% end %>
+          <% if truncated_badge %>
+            <%= render FlatPack::List::Item.new(
+              trailing: render(FlatPack::Badge::Component.new(text: truncated_badge[:text], style: truncated_badge[:style], size: :sm))
+            ) do %>
+              Cut short
+            <% end %>
+          <% end %>
+          <% if size_label.present? %>
+            <%= render FlatPack::List::Item.new(trailing: size_label) do %>
+              Size
+            <% end %>
+          <% end %>
+          <% if expiry_label.present? %>
+            <%= render FlatPack::List::Item.new(trailing: expiry_label) do %>
+              Expires
+            <% end %>
+          <% end %>
+          <% if content_type.present? %>
+            <%= render FlatPack::List::Item.new(trailing: content_type) do %>
+              Content type
+            <% end %>
+          <% end %>
+          <% if @call && @call_path %>
+            <%= render FlatPack::List::Item.new do %>
+              <%= render FlatPack::Link::Component.new(href: @call_path, data: { turbo_frame: "_top" }) do %>
+                Open this call
+              <% end %>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <% if reply_text.present? %>
+      <%= render FlatPack::Card::Component.new(style: :elevated) do |card| %>
+        <% card.header(divider: true) do %>
+          <%= render FlatPack::PageTitle::Component.new(title: "Reply", variant: :h3, class: "mb-0") %>
+        <% end %>
+        <% card.body do %>
+          <%= simple_format(ERB::Util.html_escape(reply_text)) %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <% if structured_reply.present? %>
+      <%= render FlatPack::Collapse::Component.new(id: "saved-reply-structured", title: "Structured reply") do %>
+        <%= render FlatPack::CodeBlock::Component.new(
+          language: "json",
+          code: JSON.pretty_generate(structured_reply),
+          separated: false,
+          wrap: true
+        ) %>
+      <% end %>
+    <% end %>
+
+    <% if provider_payload.present? %>
+      <%= render FlatPack::Collapse::Component.new(id: "saved-reply-provider-payload", title: "Provider payload") do %>
+        <%= render FlatPack::CodeBlock::Component.new(
+          language: "json",
+          code: JSON.pretty_generate(provider_payload),
+          separated: false,
+          wrap: true
+        ) %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

@@ -135,6 +135,14 @@ module AdminScreens
       RecordingStudioAI::Attempt.joins(:run).merge(runs_scope(context))
     end
 
+    def batches_scope(context = admin_context)
+      bind_admin_context!(context) if context
+      root_id = context&.root_recording&.id
+      return RecordingStudioAI::Batch.none if root_id.blank?
+
+      RecordingStudioAI::Batch.where(root_recording_id: root_id)
+    end
+
     def responses_scope(context = admin_context)
       bind_admin_context!(context) if context
       root_id = context&.root_recording&.id
@@ -154,6 +162,10 @@ module AdminScreens
 
     def response_run(row)
       row.attempt&.run || row.batch_item&.run
+    end
+
+    def batch_distinct_values(column)
+      batches_scope.distinct.order(column).pluck(column).compact_blank
     end
 
     def run_distinct_values(column)
@@ -1020,8 +1032,10 @@ module AdminScreens
       runs_scope(context).where.not(total_tokens: nil).where(created_at: range).sum(:total_tokens).to_i
     end
 
-    def run_filtered_screen_path(context, screen_key, run)
-      query = date_range_query(context, screen: AdminScreens::RecordingStudioAICallsScreen).merge(run_id: run.id)
+    def run_filtered_screen_path(context, screen_key, run = nil, extra: {})
+      query = date_range_query(context, screen: AdminScreens::RecordingStudioAICallsScreen)
+      query = query.merge(run_id: run.id) if run
+      query = query.merge(extra)
       "#{context.admin_screen_path(screen_key)}?#{query.to_query}"
     end
 

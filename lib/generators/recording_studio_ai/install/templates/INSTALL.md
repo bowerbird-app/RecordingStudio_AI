@@ -67,13 +67,11 @@ Canonical execution history has a separate, disabled-by-default policy. Set
 only terminal history older than the cutoff, deleting responses and dependent
 records before runs and batches to preserve foreign-key integrity.
 
-Admin access also fails closed. Configure `admin_actor_resolver`,
-`admin_visible_roots_resolver`, and, when needed, `admin_layout`. The engine does
-not authenticate admin routes by itself — authenticate in
-`ApplicationController` and/or set `admin_authenticate`. Grant basic,
-sensitive, and retained-response actions independently. The retained-response
-viewer copies Recording Studio Admin's Accessible check when that gem is
-installed (`Authorization.authorize!` on the access recording).
+Staff UI is Recording Studio Admin. Install that gem, mount it, enable the
+`recording_studio_ai` section, and grant Accessible access. Saved replies live
+at `/recording_studio_ai/retained_responses/:id`. Decrypt still requires
+`recording_studio_ai.view_retained_response`. Grant basic, sensitive, and
+retained-response actions independently.
 
 Review the generated attachment count, size, and content-type limits before
 accepting request-scoped files. Attachment bytes and filenames are not persisted.
