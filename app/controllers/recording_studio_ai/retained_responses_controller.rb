@@ -11,24 +11,7 @@ module RecordingStudioAI
     rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
 
     def show
-      context = admin_context
-      ::RecordingStudioAdmin::Authorization.authorize!(context)
-      retained = AdminScreens::RecordingStudioAIWidgets.responses_scope(context).find(params[:id])
-      ::RecordingStudioAdmin.authorize_resource!(
-        key: RESOURCE_KEY,
-        action: :show,
-        context: context,
-        record: retained
-      )
-      @reply = RecordingStudioAI.read_retained_response(
-        response: retained,
-        initiator: context.current_actor,
-        execution_source: :admin
-      )
-      @call = AdminScreens::RecordingStudioAIWidgets.response_run(retained)
-      @call_path = call_attempts_path(context, @call)
-      @access_recording = context.access_recording
-      @admin_home_path = ::RecordingStudioAdmin.configuration.default_mount_path
+      assign_saved_reply_page
     rescue ::RecordingStudioAdmin::AuthorizationFailed
       head :forbidden
     rescue RecordingStudioAI::Errors::ContractValidationError => e
@@ -47,6 +30,41 @@ module RecordingStudioAI
       head :not_found
     end
 
+    def assign_saved_reply_page
+      context = authorize_admin_context!
+      retained = load_authorized_retained_response!(context)
+      assign_reply_ivars(context, retained)
+    end
+
+    def assign_reply_ivars(context, retained)
+      @reply = RecordingStudioAI.read_retained_response(
+        response: retained,
+        initiator: context.current_actor,
+        execution_source: :admin
+      )
+      @call = AdminScreens::RecordingStudioAIWidgets.response_run(retained)
+      @call_path = call_attempts_path(context, @call)
+      @access_recording = context.access_recording
+      @admin_home_path = ::RecordingStudioAdmin.configuration.default_mount_path
+    end
+
+    def authorize_admin_context!
+      context = admin_context
+      ::RecordingStudioAdmin::Authorization.authorize!(context)
+      context
+    end
+
+    def load_authorized_retained_response!(context)
+      retained = AdminScreens::RecordingStudioAIWidgets.responses_scope(context).find(params[:id])
+      ::RecordingStudioAdmin.authorize_resource!(
+        key: RESOURCE_KEY,
+        action: :show,
+        context: context,
+        record: retained
+      )
+      retained
+    end
+
     def admin_context
       @admin_context ||= ::RecordingStudioAdmin::Context.new(
         params: params.to_unsafe_h,
@@ -59,9 +77,7 @@ module RecordingStudioAI
     end
 
     def admin_actor
-      if defined?(Current) && Current.respond_to?(:actor) && !Current.actor.nil?
-        return Current.actor
-      end
+      return Current.actor if defined?(Current) && Current.respond_to?(:actor) && !Current.actor.nil?
 
       method_name = ::RecordingStudioAdmin.configuration.current_actor_method
       send(method_name) if method_name && respond_to?(method_name, true)
@@ -74,7 +90,8 @@ module RecordingStudioAI
     def call_attempts_path(context, call)
       return if call.blank?
 
-      "#{context.admin_screen_path("attempts")}?#{ { run_id: call.id }.to_query }"
+      query = { run_id: call.id }.to_query
+      "#{context.admin_screen_path('attempts')}?#{query}"
     end
   end
 end
