@@ -59,11 +59,13 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "admin retained body"
     assert_includes response.body, "Saved reply"
-    assert_includes response.body, "Complete / truncated"
-    assert_includes response.body, "Content type"
+    assert_includes response.body, "About this reply"
+    assert_includes response.body, "Complete"
+    refute_includes response.body, "Not kept."
     refute_includes response.body, "Retention metadata"
     refute_includes response.body, "retained response"
     refute_includes response.body, "authorization"
+    refute_includes response.body, "Complete / truncated"
   end
 
   test "retained response page still authorizes after a code reload" do

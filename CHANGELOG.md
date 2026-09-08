@@ -19,6 +19,8 @@ Staff use Recording Studio Admin only. The engine `/admin` chrome is gone.
   for that GET. Listing stays on the Admin surface role (default `:view`).
   Decrypt still requires `recording_studio_ai.view_retained_response`
   (Accessible `:admin`) through `RecordingStudioAI.read_retained_response`.
+  The saved-reply page is a width-capped staff screen: elevated cards, labeled
+  list rows, readable reply text, and JSON only when it exists.
 - New Admin screen `provider_batches` lists provider jobs. Item counts drill
   into `ai_calls?batch_id=`. `ai_calls` also filters on web search used.
 - Custom-tools widget links to the `tool_calls` screen, not a deleted engine

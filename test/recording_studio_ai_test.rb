@@ -111,8 +111,15 @@ class RecordingStudioAITest < Minitest::Test
     contents = File.read(path)
     refute_match(/<table[\s>]/, contents, "#{path} still has a raw table")
     refute_match(/<pre[\s>]/, contents, "#{path} still has a raw pre")
-    assert_includes contents, "FlatPack::Table::Component"
+    refute_includes contents, "FlatPack::Table::Component"
+    assert_includes contents, "FlatPack::Grid::Component"
+    assert_includes contents, "FlatPack::Card::Component"
+    assert_includes contents, "FlatPack::List::Component"
+    assert_includes contents, "FlatPack::Link::Component"
+    assert_includes contents, "simple_format"
+    assert_includes contents, "FlatPack::Collapse::Component"
     assert_includes contents, "FlatPack::CodeBlock::Component"
+    refute_includes contents, "Not kept."
     assert_includes contents, "Saved reply"
     assert_includes contents, "recording_studio_page_nav"
     assert_includes contents, "page_nav_anchor_url"

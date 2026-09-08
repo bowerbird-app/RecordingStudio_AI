@@ -65,8 +65,9 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     assert_gem_admin_shell
     assert_includes response.body, "Saved reply"
     assert_select "a[href='#{RecordingStudioAdmin.configuration.default_mount_path}'][aria-label='Close']"
-    assert_select "table", minimum: 1
-    assert_select "[class*='card-border-color'] table", count: 0
+    refute_select "table"
+    assert_includes response.body, "About this reply"
+    assert_includes response.body, "What the model sent back."
   end
 
   test "recording studio admin uses default_layout with Access-only page-nav and Flatpack assets" do
