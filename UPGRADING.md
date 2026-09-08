@@ -1,5 +1,27 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.3.2
+
+`0.3.2` removes the engine staff app. Point people at Recording Studio Admin.
+Saved replies move. Four engine-admin config keys go away.
+
+1. Update the host dependency to `recording_studio_ai`, `~> 0.3.2`.
+2. Install and mount Recording Studio Admin if the host does not already.
+   Enable the `recording_studio_ai` section and grant Accessible access. Staff
+   open `/admin`. There is no `/recording_studio_ai/admin` route and no
+   redirect from the old path.
+3. Delete `config.admin_layout`, `config.admin_authenticate`,
+   `config.admin_actor_resolver`, and `config.admin_visible_roots_resolver`.
+   Keep `admin_warning_thresholds`, `admin_slow_call_threshold_ms`, and
+   `admin_expensive_models` if you set them.
+4. Bookmark saved replies at `/recording_studio_ai/retained_responses/:id`
+   instead of `/recording_studio_ai/admin/retained_responses/:id`. Decrypt
+   still requires `recording_studio_ai.view_retained_response` (Accessible
+   `:admin`). Listing stays on the Admin surface role (default `:view`).
+5. Remove any host code that mounted, linked to, or authenticated
+   `RecordingStudioAI::Admin`. Provider batches and web-search used live on
+   Admin screens (`provider_batches`, `ai_calls?web_search=1`).
+
 ## Upgrading to 0.3.1
 
 `0.3.1` only changes Cloud Agent boot. There is no host, schema, or in-app AI

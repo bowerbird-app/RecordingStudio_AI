@@ -27,10 +27,10 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     RecordingStudioAccessible.configuration.access_management_authorizer = @original_access_management_authorizer
   end
 
-  test "engine admin redirects unauthenticated visitors to sign in" do
+  test "engine admin path is gone" do
     get "/recording_studio_ai/admin"
 
-    assert_redirected_to new_user_session_path
+    assert_response :not_found
   end
 
   test "admin root remains available" do
@@ -57,23 +57,35 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "engine admin custom tools index renders registered tools" do
+  test "engine admin custom tools path is gone" do
     sign_in @user
 
     get "/recording_studio_ai/admin/custom_tools"
 
+    assert_response :not_found
+  end
+
+  test "provider batches screen lists a seeded-style batch" do
+    sign_in @user
+    RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "dummy-echo-batch",
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 2,
+      failed_item_count: 0,
+      total_tokens: 40
+    )
+
+    get "/admin/screens/provider_batches"
     assert_response :success
-    assert_includes response.body, "Dummy Echo Tool"
-    refute_includes response.body, "version_admin_custom_tool"
-    assert_select "body[data-recording-studio-default-layout='true']", count: 1
-    refute_includes response.body, "flat-pack--sidebar-layout"
-    refute_includes response.body, "recording-studio-root-switchable--root-switch-dropdown"
-    assert_select "table", minimum: 1
-    assert_select "table td", text: /Dummy Echo Tool/
-    assert_select "[class*='card-border-color'] table", count: 0
-    assert_includes response.body, "overflow-x-auto"
-    assert_includes response.body, "stylesheet"
-    assert_includes response.body, "flat_pack/variables"
-    assert_includes response.body, "tailwind-"
+    assert_includes response.body, "Provider batches"
+
+    get "/admin/screens/provider_batches/table"
+    assert_response :success
+    assert_includes response.body, "dummy-echo-batch"
   end
 end

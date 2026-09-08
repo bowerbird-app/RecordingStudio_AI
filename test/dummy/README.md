@@ -10,11 +10,11 @@ It covers:
 - Recording Studio 4.2 recordable declarations and root recordings
 - the dummy host `flat_pack_sidebar` shell for host pages (rounded `html` /
   `body`)
-- `RecordingStudio::UsesDefaultLayout` on engine admin and Recording Studio
-  Admin AI screens only (`recording_studio/default_layout`, no vendored copy)
+- `RecordingStudio::UsesDefaultLayout` on Recording Studio Admin and the
+  saved-reply page (`recording_studio/default_layout`, no vendored copy)
 - Accessible first-owner bootstrap and later grants
 - all six non-recordable addon infrastructure tables
-- the mounted, GET-only addon administration screens
+- Recording Studio Admin as the only staff hub
 - fail-closed production configuration with an explicit demo-only authorization policy
 
 Tests use injected provider clients; live generation requires provider credentials.
@@ -42,22 +42,21 @@ Useful routes:
 - `/ai_playground` — generate against a profile model
 - `/config` — initializer and registry guide
 - `/methods` — call-site examples
-- `/recording_studio_ai/admin` — engine administration
 - `/admin` — Recording Studio Admin AI screens
+- `/recording_studio_ai/retained_responses/:id` — saved reply (decrypt)
 - `/recording_studio` — Recording Studio host integration
 - `/users/sign_in` — Devise sign in
 - `/up` — Rails health check
 
 Authenticated host pages use `layouts/flat_pack_sidebar` (sidebar + top nav,
-theme `rounded` on `html` and `body`). Engine admin (`/recording_studio_ai/admin`)
-and Recording Studio Admin (`/admin`) include `RecordingStudio::UsesDefaultLayout`
-and render the gem's `recording_studio/default_layout`. Dummy
+theme `rounded` on `html` and `body`). Recording Studio Admin (`/admin`) and
+the saved-reply page include `RecordingStudio::UsesDefaultLayout` and render
+the gem's `recording_studio/default_layout`. Dummy
 `app/views/recording_studio/_default_layout_head.html.erb` loads application,
 `flat_pack/variables`, `flat_pack/rich_text`, Tailwind, and importmap so FlatPack
-Tables render. Engine admin tables pass FlatPack column `html:` lambdas so
-cells land under headers, and those tables are not wrapped in a Card. The gem page-nav right slot is Access only — no Sign out, Root
+Tables render. The gem page-nav right slot is Access only — no Sign out, Root
 Switchable, or admin/root dropdown. Devise sign-in keeps `layouts/application`.
 Dummy-only FlatPack aliases map PageNav `anchor_url:` to `anchor_href:` and
 Button `url:` to `href:` so Recording Studio 4.2 and Admin 2.0.1 keep working
-against FlatPack 0.1.143 without forking the layout. Gem admin discards leftover
-Devise sign-in notices. Overview formats warning rates as percentages.
+against FlatPack 0.1.143 without forking the layout. Admin and the saved-reply
+page discard leftover Devise sign-in notices.

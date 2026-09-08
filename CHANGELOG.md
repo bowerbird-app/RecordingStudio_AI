@@ -5,6 +5,42 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.3.2] - Unreleased
+
+Staff use Recording Studio Admin only. The engine `/admin` chrome is gone.
+
+### Changed
+
+- Staff lists (calls, attempts, tool calls, saved replies, provider batches)
+  live on Recording Studio Admin screens. Dummy home "AI administration"
+  points at `/admin`.
+- Saved replies open at `/recording_studio_ai/retained_responses/:id`. The
+  Responses table uses the `recording_studio_ai_retained_responses` Resource
+  for that GET. Listing stays on the Admin surface role (default `:view`).
+  Decrypt still requires `recording_studio_ai.view_retained_response`
+  (Accessible `:admin`) through `RecordingStudioAI.read_retained_response`.
+- New Admin screen `provider_batches` lists provider jobs. Item counts drill
+  into `ai_calls?batch_id=`. `ai_calls` also filters on web search used.
+- Custom-tools widget links to the `tool_calls` screen, not a deleted engine
+  path.
+
+### Removed
+
+- Engine `namespace :admin` and `RecordingStudioAI::Admin::*` (overview, runs,
+  batches, custom tools, provider-native tools, retained-response viewer,
+  `Admin::Access`).
+- Unused `recording_studio_ai_overview` Admin screen.
+- Config keys `admin_layout`, `admin_authenticate`, `admin_actor_resolver`,
+  and `admin_visible_roots_resolver`. Warning-threshold knobs stay.
+
+### Upgrade notes
+
+- Point staff at Recording Studio Admin. Remove engine-admin mount usage and
+  the four deleted config keys. Saved-reply URLs change from
+  `/recording_studio_ai/admin/retained_responses/:id` to
+  `/recording_studio_ai/retained_responses/:id`. Old `/recording_studio_ai/admin`
+  paths 404; they do not redirect.
+
 ## [0.3.1] - 2026-09-02
 
 Cloud Agent install no longer fails a warm environment rebuild. Skills still
@@ -625,7 +661,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.1.0...v0.2.0

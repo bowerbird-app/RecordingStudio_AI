@@ -50,23 +50,6 @@ class DummyAccessibleHostHardeningTest < ActionDispatch::IntegrationTest
     )
   end
 
-  test "AI engine admin only lists Accessible roots" do
-    user = User.create!(email: "ai-admin-roots-#{SecureRandom.hex(4)}@example.com", password: "password123")
-    granted = Workspace.create!(name: "Granted admin root")
-    hidden = Workspace.create!(name: "Hidden admin root")
-    granted_root = RecordingStudio.root_recording_for(granted)
-    hidden_root = RecordingStudio.root_recording_for(hidden)
-    grant_accessible!(recording: granted_root, actor: user, role: :view)
-
-    visible_ids = RecordingStudioAI.configuration.admin_visible_roots_resolver.call(
-      actor: user,
-      controller: Object.new
-    )
-
-    assert_includes visible_ids, granted_root.id
-    refute_includes visible_ids, hidden_root.id
-  end
-
   test "admin access recording resolver fails closed without grants" do
     user = User.create!(email: "admin-fail-closed-#{SecureRandom.hex(4)}@example.com", password: "password123")
     Workspace.create!(name: "Ungranted admin fallback workspace")

@@ -1,0 +1,50 @@
+<%= render FlatPack::PageTitle::Component.new(
+  title: "Saved reply",
+  subtitle: "What came back from this call.",
+  variant: :h1
+) %>
+
+<% complete_label = @reply[:complete] ? "Complete" : "Incomplete" %>
+<% truncated_label = @reply[:truncated] ? "Truncated" : "Not truncated" %>
+<% size_label = @reply[:byte_size].present? ? number_to_human_size(@reply[:byte_size]) : "Not kept." %>
+<% expiry_label = @reply[:expires_at]&.to_fs(:long) || "No expiry" %>
+<% call_value = if @call && @call_path
+                  link_to(@call.id, @call_path, class: "text-(--color-primary-background-color) underline", data: { turbo_frame: "_top" })
+                elsif @call
+                  @call.id
+                else
+                  "Not kept."
+                end %>
+<% reply_rows = [
+     { label: "Type", value: @reply[:response_type].presence&.humanize || "Not kept." },
+     { label: "Complete / truncated", value: "#{complete_label} / #{truncated_label}" },
+     { label: "Size / expiry", value: "#{size_label} / #{expiry_label}" },
+     { label: "Content type", value: @reply[:content_type].presence || "Not kept." },
+     { label: "Call", value: call_value }
+   ] %>
+
+<%= render FlatPack::Table::Component.new(data: reply_rows) do |table| %>
+  <% table.column(title: "Field", html: ->(row) { row[:label] }) %>
+  <% table.column(title: "Value", html: ->(row) { row[:value] }) %>
+<% end %>
+
+<%= render FlatPack::CodeBlock::Component.new(
+  title: "Reply text",
+  language: "text",
+  code: @reply[:content_text].presence || "Not kept.",
+  separated: false
+) %>
+
+<%= render FlatPack::CodeBlock::Component.new(
+  title: "Structured reply",
+  language: @reply[:normalized_response].nil? ? "text" : "json",
+  code: @reply[:normalized_response].nil? ? "Not kept." : JSON.pretty_generate(@reply[:normalized_response]),
+  separated: false
+) %>
+
+<%= render FlatPack::CodeBlock::Component.new(
+  title: "Provider payload",
+  language: @reply[:raw_response].nil? ? "text" : "json",
+  code: @reply[:raw_response].nil? ? "Not kept." : JSON.pretty_generate(@reply[:raw_response]),
+  separated: false
+) %>

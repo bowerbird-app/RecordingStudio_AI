@@ -40,6 +40,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "href=\"/admin/screens/warnings\""
     refute_includes response.body, "/admin/screens/recording_studio_ai_overview?anchor_url="
     refute_includes response.body, "/admin/recording_studio_ai/admin"
+    refute_includes response.body, "/recording_studio_ai/admin"
+    assert_includes response.body, "Provider batches"
     assert_includes response.body, "Close"
     assert_includes response.body, "href=\"/admin\""
     refute_includes response.body, "Recording tree"
@@ -350,6 +352,78 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Custom tools"
     refute_includes response.body, "Current registry"
     assert_includes response.body, "href=\"/admin/screens/registered_custom_tools\""
+    refute_includes response.body, "/recording_studio_ai/admin/custom_tools"
+  end
+
+  test "custom tools widget links to tool calls instead of engine admin" do
+    authenticate_for_admin!
+    run = create_run!(status: "completed", operation: "generation")
+    run.custom_tool_invocations.create!(
+      tool_key: "dummy_echo_tool",
+      tool_version: 1,
+      tool_name_snapshot: "Dummy Echo Tool",
+      status: "completed",
+      read_only: true,
+      destructive: false,
+      requires_confirmation: false,
+      idempotent: true
+    )
+
+    get "/admin"
+
+    assert_response :success
+    refute_includes response.body, "/recording_studio_ai/admin/custom_tools"
+    assert_includes response.body, "tool_key=dummy_echo_tool"
+    assert_includes response.body, "/admin/screens/tool_calls"
+  end
+
+  test "provider batches screen lists jobs for the current root" do
+    authenticate_for_admin!
+    RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "dummy-echo-batch",
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 3,
+      failed_item_count: 1,
+      total_tokens: 90
+    )
+
+    get "/admin/screens/provider_batches"
+    assert_response :success
+    assert_includes response.body, "Provider batches"
+
+    get "/admin/screens/provider_batches/table"
+    assert_response :success
+    assert_includes response.body, "dummy-echo-batch"
+    refute_includes response.body, "provider_batch_id"
+    refute_includes response.body, "error_message"
+  end
+
+  test "ai calls web search filter keeps only searched calls" do
+    authenticate_for_admin!
+    searched = create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_model: "web-search-model",
+      web_search_used: true
+    )
+    create_run!(
+      status: "completed",
+      operation: "generation",
+      resolved_model: "plain-model",
+      web_search_used: false
+    )
+
+    get "/admin/screens/ai_calls/table", params: { web_search: "1" }
+
+    assert_response :success
+    assert_includes response.body, "web-search-model"
+    refute_includes response.body, "plain-model"
+    assert_includes response.body, searched.resolved_model
   end
 
   test "registered prompts widget and section link to the prompts screen" do
@@ -1747,7 +1821,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
   def create_run!(status:, operation:, prompt_key: nil, prompt_name_snapshot: nil,
                   prompt_version: nil, resolved_model: nil, resolved_provider: nil,
-                  total_tokens: nil, input_tokens: nil, output_tokens: nil, latency_ms: nil)
+                  total_tokens: nil, input_tokens: nil, output_tokens: nil, latency_ms: nil,
+                  web_search_used: false)
     RecordingStudioAI::Run.create!(
       operation: operation,
       status: status,
@@ -1757,6 +1832,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       resolved_model: resolved_model,
       resolved_provider: resolved_provider,
       latency_ms: latency_ms,
+      web_search_used: web_search_used,
       root_recording_id: @root_recording.id,
       context_recording_id: @root_recording.id,
       initiator_type: "User",

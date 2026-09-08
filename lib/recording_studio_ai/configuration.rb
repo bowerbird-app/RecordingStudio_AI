@@ -14,13 +14,9 @@ module RecordingStudioAI
       :attribution_validator,
       :batch_synchronization_job,
       :batch_synchronization_interval,
-      :admin_actor_resolver,
-      :admin_authenticate,
       :admin_expensive_models,
-      :admin_layout,
       :admin_slow_call_threshold_ms,
       :admin_warning_thresholds,
-      :admin_visible_roots_resolver,
       :custom_tool_confirmation_handler,
       :custom_tool_timeout,
       :cost_catalogs,
@@ -71,10 +67,7 @@ module RecordingStudioAI
       @attribution_validator = method(:validate_recording_attribution!)
       @batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"
       @batch_synchronization_interval = 1.minute
-      @admin_actor_resolver = nil
-      @admin_authenticate = nil
       @admin_expensive_models = []
-      @admin_layout = nil
       @admin_slow_call_threshold_ms = 10_000
       @admin_warning_thresholds = {
         runs: 1_000,
@@ -94,7 +87,6 @@ module RecordingStudioAI
         batch_expirations: 1,
         provider_error_rate: 0.2
       }
-      @admin_visible_roots_resolver = nil
       @allowed_attachment_content_types = %w[
         image/png
         image/jpeg

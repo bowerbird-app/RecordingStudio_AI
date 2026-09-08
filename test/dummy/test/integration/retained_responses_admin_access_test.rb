@@ -16,18 +16,16 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
   test "unauthenticated visitors are sent to sign in" do
     retained = create_retained_response!(root: @root_recording)
 
-    get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
+    get "/recording_studio_ai/retained_responses/#{retained.id}"
 
     assert_redirected_to new_user_session_path
   end
 
   test "signed-in users without Accessible grants are forbidden like Recording Studio Admin" do
-    assert RecordingStudioAI::Admin.const_defined?(:RecordingStudioAdminAuthorization)
-
     retained = create_retained_response!(root: @root_recording)
     sign_in @user
 
-    get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
+    get "/recording_studio_ai/retained_responses/#{retained.id}"
 
     assert_response :forbidden
   end
@@ -43,9 +41,10 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
 
     get "/admin/screens/recording_studio_ai_responses/table"
     assert_response :success
-    assert_includes response.body, "Response ##{retained.id}"
+    assert_includes response.body, "Saved reply ##{retained.id}"
+    assert_includes response.body, "/recording_studio_ai/retained_responses/#{retained.id}"
 
-    get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
+    get "/recording_studio_ai/retained_responses/#{retained.id}"
     assert_response :forbidden
     refute_includes response.body, "viewable retained body"
   end
@@ -56,12 +55,15 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
     sign_in @user
     switch_to_root!(@root_recording)
 
-    get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
+    get "/recording_studio_ai/retained_responses/#{retained.id}"
     assert_response :success
     assert_includes response.body, "admin retained body"
-    refute_includes response.body, "Retention metadata"
+    assert_includes response.body, "Saved reply"
     assert_includes response.body, "Complete / truncated"
     assert_includes response.body, "Content type"
+    refute_includes response.body, "Retention metadata"
+    refute_includes response.body, "retained response"
+    refute_includes response.body, "authorization"
   end
 
   test "retained response page still authorizes after a code reload" do
@@ -72,7 +74,7 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
 
     Rails.application.reloader.reload!
 
-    get "/recording_studio_ai/admin/retained_responses/#{retained.id}"
+    get "/recording_studio_ai/retained_responses/#{retained.id}"
     assert_response :success
     assert_includes response.body, "after reload"
   end
@@ -84,7 +86,7 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
     sign_in @user
     switch_to_root!(@root_recording)
 
-    get "/recording_studio_ai/admin/retained_responses/#{foreign.id}"
+    get "/recording_studio_ai/retained_responses/#{foreign.id}"
 
     assert_response :not_found
     refute_includes response.body, "foreign retained body"
