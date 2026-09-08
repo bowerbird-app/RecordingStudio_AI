@@ -114,6 +114,8 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes contents, "FlatPack::Table::Component"
     assert_includes contents, "FlatPack::CodeBlock::Component"
     assert_includes contents, "Saved reply"
+    assert_includes contents, "recording_studio_page_nav"
+    assert_includes contents, "page_nav_anchor_url"
 
     widgets = File.read(File.expand_path("../lib/recording_studio_ai/admin/recording_studio_ai_widgets.rb", __dir__))
     assert_includes widgets, "FlatPack::Modal::Component"

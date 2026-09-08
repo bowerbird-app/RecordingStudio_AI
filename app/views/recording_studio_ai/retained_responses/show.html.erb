@@ -1,3 +1,17 @@
+<% recording_studio_page_nav(
+  page_nav_anchor_url: @admin_home_path,
+  page_nav_anchor_label: "Close"
+) %>
+<% if @access_recording.present? %>
+  <% recording_studio_page_nav_right do %>
+    <%= recording_studio_accessible_avatars(
+      @access_recording,
+      button_style: :ghost,
+      button_size: :md
+    ) %>
+  <% end %>
+<% end %>
+
 <%= render FlatPack::PageTitle::Component.new(
   title: "Saved reply",
   subtitle: "What came back from this call.",

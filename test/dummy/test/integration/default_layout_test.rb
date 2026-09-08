@@ -64,7 +64,7 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_gem_admin_shell
     assert_includes response.body, "Saved reply"
-    assert_select "a[href='#{RecordingStudioAdmin.configuration.default_mount_path}']", text: "Close"
+    assert_select "a[href='#{RecordingStudioAdmin.configuration.default_mount_path}'][aria-label='Close']"
     assert_select "table", minimum: 1
     assert_select "[class*='card-border-color'] table", count: 0
   end

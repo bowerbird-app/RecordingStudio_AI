@@ -8,7 +8,6 @@ module RecordingStudioAI
 
     before_action :require_recording_studio_admin
     before_action :discard_default_layout_notice
-    before_action :assign_access_page_actions
     rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
 
     def show
@@ -28,6 +27,8 @@ module RecordingStudioAI
       )
       @call = AdminScreens::RecordingStudioAIWidgets.response_run(retained)
       @call_path = call_attempts_path(context, @call)
+      @access_recording = context.access_recording
+      @admin_home_path = ::RecordingStudioAdmin.configuration.default_mount_path
     rescue ::RecordingStudioAdmin::AuthorizationFailed
       head :forbidden
     rescue RecordingStudioAI::Errors::ContractValidationError => e
@@ -68,23 +69,6 @@ module RecordingStudioAI
 
     def discard_default_layout_notice
       flash.delete(:notice)
-    end
-
-    def assign_access_page_actions
-      helpers.recording_studio_page_nav(
-        page_nav_anchor_url: ::RecordingStudioAdmin.configuration.default_mount_path,
-        page_nav_anchor_label: "Close"
-      )
-      recording = admin_context.access_recording
-      return if recording.blank?
-
-      helpers.recording_studio_page_nav_right do
-        helpers.recording_studio_accessible_avatars(
-          recording,
-          button_style: :ghost,
-          button_size: :md
-        )
-      end
     end
 
     def call_attempts_path(context, call)
