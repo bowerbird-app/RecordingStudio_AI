@@ -41,6 +41,26 @@ module RecordingStudioAI
         }
       end
 
+      def result_citations(result)
+        result.respond_to?(:citations) ? result.citations : []
+      end
+
+      def result_provider_native_tools(result)
+        result.respond_to?(:provider_native_tools) ? result.provider_native_tools : []
+      end
+
+      def result_finish_reason(result)
+        result.respond_to?(:finish_reason) ? result.finish_reason : nil
+      end
+
+      def result_output_character_count(result)
+        if result.is_a?(RecordingStudioAI::Providers::DecisionResult)
+          result.success? ? result.output_character_count : nil
+        else
+          result.text&.length
+        end
+      end
+
       def result_completion_attributes(result, started_at:, completed_at: Time.current)
         {
           status: result.success? ? "completed" : "failed",

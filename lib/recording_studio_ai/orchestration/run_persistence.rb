@@ -9,15 +9,11 @@ module RecordingStudioAI
 
       def create!(request, candidate, operation:)
         attribution = request[:attribution]
-        input = Support.request_input(request)
-        attachment_metadata = RecordingStudioAI::Attachments.metadata(request[:attachments])
         prompt = request[:prompt_definition]
         RecordingStudioAI::Run.create!(
           core_attributes(request, candidate, operation, prompt).merge(
             attribution_attributes(attribution),
-            attachment_metadata,
-            input_character_count: input.length,
-            web_search_requested: request[:provider_native_tools].include?(:web_search),
+            input_attributes(request, operation),
             metadata: request[:metadata]
           )
         )
@@ -38,15 +34,13 @@ module RecordingStudioAI
                       retry_count: executions.count { |execution| execution.record.kind == "retry" },
                       fallback_count: executions.count { |execution| execution.record.kind == "fallback" },
                       custom_tool_invocation_count: custom_tool_invocation_count(run),
-                      output_character_count: final_result.text&.length,
-                      web_search_used: executions.any? do |execution|
-                        execution.result.provider_native_tools.include?("web_search")
-                      end,
-                      citation_count: executions.sum { |execution| execution.result.citations.length }
+                      **output_attributes(executions, final_result, operation: run.operation)
                     ))
       end
 
-      def complete_deadline_failure(request, run, operation:)
+      # Persists the failed terminal state and returns its normalized error. The
+      # public response stays the ResponseBuilder's job.
+      def complete_deadline_failure(run)
         error = deadline_error(run.resolved_provider)
         completed_at = Time.current
         run.update!(
@@ -55,20 +49,49 @@ module RecordingStudioAI
           **Support.completion_clock(run.started_at, completed_at),
           **Support.result_error_attributes(error)
         )
-        RecordingStudioAI::Contracts::GenerationResponse.new(
-          operation: operation.to_s,
-          purpose: request[:purpose],
-          profile: request[:profile],
-          provider: run.resolved_provider,
-          model: run.resolved_model,
-          run: run,
-          attempts: [],
-          error: error,
-          metadata: request[:metadata]
-        )
+        error
       end
 
       private
+
+      def input_attributes(request, operation)
+        return decision_input_attributes(request) if operation == :decision
+
+        RecordingStudioAI::Attachments.metadata(request[:attachments]).merge(
+          input_character_count: Support.request_input(request).length,
+          web_search_requested: request[:provider_native_tools].include?(:web_search)
+        )
+      end
+
+      # Decision state, question instructions, and criteria never reach a column.
+      # Only the caller-supplied character count crosses this boundary.
+      def decision_input_attributes(request)
+        RecordingStudioAI::Attachments.metadata([]).merge(
+          input_character_count: request.fetch(:input_character_count),
+          web_search_requested: false
+        )
+      end
+
+      def output_attributes(executions, final_result, operation:)
+        return decision_output_attributes(final_result) if operation == "decision"
+
+        {
+          output_character_count: final_result.text&.length,
+          web_search_used: executions.any? do |execution|
+            execution.result.provider_native_tools.include?("web_search")
+          end,
+          citation_count: executions.sum { |execution| execution.result.citations.length }
+        }
+      end
+
+      def decision_output_attributes(final_result)
+        answers = final_result.answers
+        {
+          output_character_count: answers.empty? ? nil : JSON.generate(answers.to_serializable_h).bytesize,
+          web_search_used: false,
+          citation_count: 0
+        }
+      end
 
       def core_attributes(request, candidate, operation, prompt)
         {

@@ -7,6 +7,7 @@ RecordingStudioAI.models.register(
   key: "gemini-2-5-flash",
   model: "gemini-2.5-flash",
   display_name: "Gemini 2.5 Flash",
+  operations: [:generation],
   delivery: RecordingStudioAI::Models::Gemini::Constants::DELIVERY,
   parameters: {
     temperature: RecordingStudioAI::Models::Gemini::Constants::TEMPERATURE,

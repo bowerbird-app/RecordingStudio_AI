@@ -54,7 +54,9 @@ module RecordingStudioAI
       :response_retention_period,
       :retain_responses,
       :stream_idle_timeout,
-      :total_execution_timeout
+      :total_execution_timeout,
+      :typesafe_api_key,
+      :typesafe_client
     )
 
     def initialize
@@ -126,15 +128,18 @@ module RecordingStudioAI
       @profiles = {
         low: [
           { provider: :openai, model: "gpt-5-mini" },
-          { provider: :gemini, model: "gemini-2.5-flash" }
+          { provider: :gemini, model: "gemini-2.5-flash" },
+          { provider: :typesafe, model: "jev-latest" }
         ],
         medium: [
           { provider: :openai, model: "gpt-5" },
-          { provider: :gemini, model: "gemini-2.5-pro" }
+          { provider: :gemini, model: "gemini-2.5-pro" },
+          { provider: :typesafe, model: "jev-latest" }
         ],
         high: [
           { provider: :openai, model: "gpt-5-pro" },
-          { provider: :gemini, model: "gemini-2.5-pro" }
+          { provider: :gemini, model: "gemini-2.5-pro" },
+          { provider: :typesafe, model: "jev-latest" }
         ]
       }
       @profile_fallbacks = {}
@@ -150,6 +155,8 @@ module RecordingStudioAI
       @retain_responses = false
       @stream_idle_timeout = 30
       @total_execution_timeout = 300
+      @typesafe_api_key = ENV.fetch("TYPESAFE_API_KEY", nil)
+      @typesafe_client = nil
     end
 
     def validate!
@@ -237,7 +244,8 @@ module RecordingStudioAI
     def install_shipped_providers
       [
         RecordingStudioAI::Providers::OpenAI,
-        RecordingStudioAI::Providers::Gemini
+        RecordingStudioAI::Providers::Gemini,
+        RecordingStudioAI::Providers::TypeSafe
       ].each do |provider_class|
         store_provider(provider_class.provider_key, provider_class.new(configuration: self))
       end

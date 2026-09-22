@@ -5,6 +5,7 @@ require "recording_studio_ai/version"
 require "recording_studio_ai/configuration"
 require "recording_studio_ai/engine"
 require "recording_studio_ai/errors"
+require "recording_studio_ai/decisions"
 require "recording_studio_ai/contracts"
 require "recording_studio_ai/metadata"
 require "recording_studio_ai/authorization"
@@ -127,6 +128,28 @@ module RecordingStudioAI
       end
 
       response = generate(**kwargs, &block)
+      raise Errors::ExecutionError, response unless response.success?
+
+      response
+    end
+
+    def decide(**)
+      request = Contracts::RequestValidation.validate_decision_request!(**)
+      configuration.validate!
+      Authorization.authorize!(
+        :execute,
+        attribution: request.attribution,
+        context: {
+          operation: "decision",
+          profile: request.profile,
+          purpose: request.purpose
+        }
+      )
+      Orchestrator.new.decide(request)
+    end
+
+    def decide!(**)
+      response = decide(**)
       raise Errors::ExecutionError, response unless response.success?
 
       response

@@ -8,20 +8,41 @@ module RecordingStudioAI
       end
 
       def build(request, run, executions, final_execution, operation:)
+        case operation
+        when :generation, :stream then build_generation(request, run, executions, final_execution, operation)
+        when :decision then build_decision(request, run, executions, final_execution)
+        else raise RecordingStudioAI::Providers::UnsupportedOperationError.new(operation: operation)
+        end
+      end
+
+      def resolution_failure(request, error, operation:)
+        failure_response(
+          request,
+          operation: operation,
+          error: RecordingStudioAI::Contracts::NormalizedError.new(
+            category: error.category,
+            code: error.code,
+            message: error.message,
+            retryable: false,
+            provider: request[:provider]&.to_s
+          )
+        )
+      end
+
+      # Persistence has already recorded the failed terminal state; this only
+      # builds the operation-specific public response.
+      def deadline_failure(request, run, error, operation:)
+        failure_response(request, operation: operation, error: error, run: run)
+      end
+
+      private
+
+      def build_generation(request, run, executions, final_execution, operation)
         final_result = final_execution.result
         final_attempt = final_execution.record
         RecordingStudioAI::Contracts::GenerationResponse.new(
           operation: operation.to_s,
-          purpose: request[:purpose],
-          profile: request[:profile],
-          provider: final_attempt.provider,
-          model: final_attempt.model,
-          run: run,
-          usage: @persistence.aggregate_usage(executions),
-          cost: @persistence.aggregate_cost(executions),
-          attempts: executions.map { |execution| attempt_summary(execution) },
-          error: final_result.error,
-          metadata: request[:metadata],
+          **common_attributes(request, run, executions, final_attempt, final_result),
           text: final_result.text,
           structured_data: final_result.structured_data,
           citations: final_result.citations,
@@ -31,24 +52,44 @@ module RecordingStudioAI
         )
       end
 
-      def resolution_failure(request, error, operation:)
-        RecordingStudioAI::Contracts::GenerationResponse.new(
-          operation: operation.to_s,
-          purpose: request[:purpose],
-          profile: request[:profile],
-          attempts: [],
-          error: RecordingStudioAI::Contracts::NormalizedError.new(
-            category: error.category,
-            code: error.code,
-            message: error.message,
-            retryable: false,
-            provider: request[:provider]&.to_s
-          ),
-          metadata: request[:metadata]
+      def build_decision(request, run, executions, final_execution)
+        final_result = final_execution.result
+        RecordingStudioAI::Contracts::DecisionResponse.new(
+          **common_attributes(request, run, executions, final_execution.record, final_result),
+          answers: final_result.answers
         )
       end
 
-      private
+      def common_attributes(request, run, executions, final_attempt, final_result)
+        {
+          purpose: request[:purpose],
+          profile: request[:profile],
+          provider: final_attempt.provider,
+          model: final_attempt.model,
+          run: run,
+          usage: @persistence.aggregate_usage(executions),
+          cost: @persistence.aggregate_cost(executions),
+          attempts: executions.map { |execution| attempt_summary(execution) },
+          error: final_result.error,
+          metadata: request[:metadata]
+        }
+      end
+
+      def failure_response(request, operation:, error:, run: nil)
+        attributes = {
+          purpose: request[:purpose],
+          profile: request[:profile],
+          provider: run&.resolved_provider,
+          model: run&.resolved_model,
+          run: run,
+          attempts: [],
+          error: error,
+          metadata: request[:metadata]
+        }
+        return RecordingStudioAI::Contracts::DecisionResponse.new(**attributes) if operation == :decision
+
+        RecordingStudioAI::Contracts::GenerationResponse.new(operation: operation.to_s, **attributes)
+      end
 
       def attempt_summary(execution)
         attempt = execution.record

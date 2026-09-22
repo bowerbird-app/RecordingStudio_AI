@@ -3,7 +3,7 @@
 module RecordingStudioAI
   module Contracts
     class Response
-      OPERATIONS = %w[generation stream batch_submit batch_refresh batch_cancel].freeze
+      OPERATIONS = %w[generation decision stream batch_submit batch_refresh batch_cancel].freeze
 
       attr_reader :operation, :purpose, :profile, :provider, :model, :run, :usage, :cost, :attempts, :error, :metadata
 

@@ -17,6 +17,13 @@ class ConfigController < ApplicationController
       explanation: "Gemini API key. Set this or inject a client, or Gemini calls fail."
     },
     {
+      key: "typesafe_api_key",
+      required: "Yes, to call TypeSafe",
+      accepted_values: "String or nil",
+      default: 'ENV["TYPESAFE_API_KEY"]',
+      explanation: "TypeSafe API key. Set this or inject a client, or decide calls fail."
+    },
+    {
       key: "openai_client",
       required: "No",
       accepted_values: "Client object or nil",
@@ -31,6 +38,13 @@ class ConfigController < ApplicationController
       explanation: "Swap in your own Gemini client for tests or custom transport."
     },
     {
+      key: "typesafe_client",
+      required: "No",
+      accepted_values: "Client object or nil",
+      default: "nil",
+      explanation: "Swap in your own TypeSafe client for tests or custom transport."
+    },
+    {
       key: "default_profile",
       required: "No",
       accepted_values: "Symbol, for example :low, :medium, :high",
@@ -41,8 +55,10 @@ class ConfigController < ApplicationController
       key: "profiles",
       required: "No",
       accepted_values: "Hash of profile keys to ordered { provider:, model: } lists",
-      default: "low: gpt-5-mini, gemini-2.5-flash / medium: gpt-5, gemini-2.5-pro / high: gpt-5-pro, gemini-2.5-pro",
-      explanation: "Preferred provider and model order for generate (including stream: true) and batch."
+      default: "low: gpt-5-mini, gemini-2.5-flash, jev-latest / medium: gpt-5, gemini-2.5-pro, jev-latest / " \
+               "high: gpt-5-pro, gemini-2.5-pro, jev-latest",
+      explanation: "Preferred provider and model order per operation. Resolution matches capabilities, " \
+                   "so generate never picks a decision model and decide never picks a generation model."
     },
     {
       key: "allowed_provider_overrides",
@@ -55,7 +71,7 @@ class ConfigController < ApplicationController
       key: "providers",
       required: "No",
       accepted_values: "Hash of provider symbol => provider object",
-      default: "OpenAI and Gemini adapters",
+      default: "OpenAI, Gemini, and TypeSafe adapters",
       explanation: "Registered providers. Override for a custom adapter or tests."
     },
     {
@@ -353,29 +369,37 @@ class ConfigController < ApplicationController
       # API keys: provide the providers your profiles actually use.
       config.openai_api_key = Rails.application.credentials.dig(:openai, :api_key) || ENV.fetch("OPENAI_API_KEY", nil)
       config.gemini_api_key = Rails.application.credentials.dig(:gemini, :api_key) || ENV.fetch("GEMINI_API_KEY", nil)
+      # TypeSafe powers RecordingStudioAI.decide.
+      config.typesafe_api_key = Rails.application.credentials.dig(:typesafe, :api_key) || ENV.fetch("TYPESAFE_API_KEY", nil)
 
       # Optional provider client injection for custom transport/testing.
       config.openai_client = nil
       config.gemini_client = nil
+      config.typesafe_client = nil
 
       # Profile routing. Reference models by their provider API model string.
       # Capabilities, tunable parameters, native tools, and modalities come from
       # the model registry (RecordingStudioAI.models), not from the profile entry.
+      # Generation and decision candidates share a tier; resolution matches the
+      # operation, so generate never picks jev-latest and decide only picks it.
       config.default_profile = :medium
       config.allowed_provider_overrides = []
       config.discovery_enabled = false
       config.profiles = {
         low: [
           { provider: :openai, model: "gpt-5-mini" },
-          { provider: :gemini, model: "gemini-2.5-flash" }
+          { provider: :gemini, model: "gemini-2.5-flash" },
+          { provider: :typesafe, model: "jev-latest" }
         ],
         medium: [
           { provider: :openai, model: "gpt-5" },
-          { provider: :gemini, model: "gemini-2.5-pro" }
+          { provider: :gemini, model: "gemini-2.5-pro" },
+          { provider: :typesafe, model: "jev-latest" }
         ],
         high: [
           { provider: :openai, model: "gpt-5-pro" },
-          { provider: :gemini, model: "gemini-2.5-pro" }
+          { provider: :gemini, model: "gemini-2.5-pro" },
+          { provider: :typesafe, model: "jev-latest" }
         ]
       }
       # Tier fallback only happens when this map is filled, for example { high: [:medium] }.
@@ -587,15 +611,18 @@ class ConfigController < ApplicationController
       config.profiles = {
         low: [
           { provider: :openai, model: "gpt-5-mini" },
-          { provider: :gemini, model: "gemini-2.5-flash" }
+          { provider: :gemini, model: "gemini-2.5-flash" },
+          { provider: :typesafe, model: "jev-latest" }
         ],
         medium: [
           { provider: :openai, model: "gpt-5" },
-          { provider: :gemini, model: "gemini-2.5-pro" }
+          { provider: :gemini, model: "gemini-2.5-pro" },
+          { provider: :typesafe, model: "jev-latest" }
         ],
         high: [
           { provider: :openai, model: "gpt-5-pro" },
-          { provider: :gemini, model: "gemini-2.5-pro" }
+          { provider: :gemini, model: "gemini-2.5-pro" },
+          { provider: :typesafe, model: "jev-latest" }
         ]
       }
 

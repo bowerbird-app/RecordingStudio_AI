@@ -80,6 +80,46 @@ module RecordingStudioAI
         }
       end
 
+      # Decision requests share attribution, profile, purpose, and fallback
+      # validation with generation. Every generation-only option (prompt,
+      # messages, schema, stream, generation parameters) is an unknown key here.
+      def validate_decision_request!(state:, questions:, root_recording:, initiator:, profile: nil, purpose: nil,
+                                     provider: nil, model: nil, fallbacks: nil, context_recording: nil,
+                                     executor: nil, impersonator: nil, initiator_kind: nil,
+                                     execution_source: nil, request_id: nil, job_id: nil,
+                                     metadata: {}, **unknown)
+        reject_unknown_keys!(unknown, path: "decision request")
+        profile ||= RecordingStudioAI.configuration.default_profile
+        ensure_profile!(profile)
+        ensure_machine_purpose!(purpose) if purpose
+        ensure_attribution!(root_recording: root_recording, initiator: initiator)
+        normalized_model = normalize_model_override!(model)
+        normalized_fallbacks = normalize_fallbacks!(fallbacks)
+        ensure_fallbacks_compatible!(fallbacks: normalized_fallbacks, provider: provider, model: normalized_model)
+
+        RecordingStudioAI::Contracts::DecisionRequest.new(
+          state: RecordingStudioAI::Decisions::State.parse(state),
+          questions: RecordingStudioAI::Decisions::QuestionSet.parse(questions),
+          profile: profile.to_sym,
+          purpose: purpose,
+          provider: provider&.to_sym,
+          model: normalized_model,
+          fallbacks: normalized_fallbacks,
+          attribution: attribution_from!(
+            root_recording: root_recording,
+            context_recording: context_recording,
+            initiator: initiator,
+            initiator_kind: initiator_kind,
+            executor: executor,
+            impersonator: impersonator,
+            execution_source: execution_source,
+            request_id: request_id,
+            job_id: job_id
+          ),
+          metadata: RecordingStudioAI::Metadata.sanitize!(metadata, path: "metadata")
+        )
+      end
+
       def validate_batch_submit_request!(items:, root_recording:, initiator:, profile: nil, provider: nil,
                                          model: nil, context_recording: nil, executor: nil, impersonator: nil,
                                          initiator_kind: nil, execution_source: nil,

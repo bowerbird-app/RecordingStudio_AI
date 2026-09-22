@@ -38,12 +38,14 @@ module RecordingStudioAI
             AddPromptAttributionToRecordingStudioAIRuns,
             RemoveCorrelationIdsFromRecordingStudioAI
           ]
-          return classes unless schema == :hardened
+          if schema == :hardened
+            classes += [
+              HardenRecordingStudioAIPersistence,
+              EnforceRecordingStudioAIHistoryIntegrity
+            ]
+          end
 
-          classes + [
-            HardenRecordingStudioAIPersistence,
-            EnforceRecordingStudioAIHistoryIntegrity
-          ]
+          classes + [AllowRecordingStudioAIDecisionExecutions]
         end
       end
 

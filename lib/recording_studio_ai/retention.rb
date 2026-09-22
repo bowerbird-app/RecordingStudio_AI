@@ -80,12 +80,13 @@ module RecordingStudioAI
     end
 
     def retained_attributes(attempt:, batch_item:, result:, configuration:)
+      decision = decision_result?(result)
       normalized = sanitize(normalized_result(result), configuration: configuration) || {}
-      content = sanitize(result.text, configuration: configuration)
+      content = decision ? nil : sanitize(result.text, configuration: configuration)
       raw = safe_raw_snapshot(result, configuration)
       bounded = bound_fields(raw: raw, normalized: normalized, content: content,
                              maximum: configuration.maximum_retained_response_size)
-      if result.structured_data && bounded[:truncated]
+      if !decision && result.structured_data && bounded[:truncated]
         bounded[:byte_size] -= bounded[:content].to_s.bytesize
         bounded[:content] = nil
       end
@@ -99,8 +100,8 @@ module RecordingStudioAI
         raw_response: bounded[:raw],
         normalized_response: bounded[:normalized],
         content_text: bounded[:content],
-        content_type: result.structured_data ? "application/json" : "text/plain",
-        finish_reason: result.finish_reason,
+        content_type: decision || result.structured_data ? "application/json" : "text/plain",
+        finish_reason: decision ? nil : result.finish_reason,
         complete: retained_result_complete?(result),
         truncated: bounded[:truncated],
         byte_size: bounded[:byte_size],
@@ -110,6 +111,8 @@ module RecordingStudioAI
     end
 
     def normalized_result(result)
+      return decision_normalized_result(result) if decision_result?(result)
+
       {
         text: result.text,
         structured_data: result.structured_data,
@@ -120,6 +123,22 @@ module RecordingStudioAI
         cost: result.cost&.to_h,
         error: result.error&.to_h
       }.compact
+    end
+
+    # Decision retention keeps the normalized answers and nothing else. State,
+    # question instructions, criteria, and the provider body stay out.
+    def decision_normalized_result(result)
+      payload = {
+        usage: result.usage&.to_h,
+        cost: result.cost&.to_h,
+        error: result.error&.to_h
+      }
+      payload[:answers] = result.answers.to_serializable_h if result.error.nil?
+      payload.compact
+    end
+
+    def decision_result?(result)
+      result.is_a?(RecordingStudioAI::Providers::DecisionResult)
     end
 
     def retained_result_complete?(result)
@@ -215,6 +234,7 @@ module RecordingStudioAI
     def response_type(attempt, result)
       return "batch_item" unless attempt
       return "error" if result.error
+      return "decision" if decision_result?(result)
 
       attempt.streaming? ? "stream" : "generation"
     end

@@ -61,11 +61,14 @@ openai:
   api_key: your-openai-key
 gemini:
   api_key: your-gemini-key
+typesafe:
+  api_key: your-typesafe-key
 ```
 
-At least one credential or injected client is required for generation. The
-generated initializer accepts credentials through Rails credentials or
-`OPENAI_API_KEY` and `GEMINI_API_KEY`:
+At least one OpenAI or Gemini credential or injected client is required for
+generation. TypeSafe credentials are required for `decide`. The generated
+initializer accepts credentials through Rails credentials or `OPENAI_API_KEY`,
+`GEMINI_API_KEY`, and `TYPESAFE_API_KEY`:
 
 ```ruby
 RecordingStudioAI.configure do |config|
@@ -75,10 +78,14 @@ RecordingStudioAI.configure do |config|
   config.gemini_api_key =
     Rails.application.credentials.dig(:gemini, :api_key) ||
       ENV.fetch("GEMINI_API_KEY", nil)
+  config.typesafe_api_key =
+    Rails.application.credentials.dig(:typesafe, :api_key) ||
+      ENV.fetch("TYPESAFE_API_KEY", nil)
 
   # Client objects may be injected for custom transport or testing.
   # config.openai_client = MyOpenAIClientFactory.build
   # config.gemini_client = MyGeminiClientFactory.build
+  # config.typesafe_client = MyTypeSafeClientFactory.build
 
   config.default_profile = :medium
   # Optional microunit rates per one million tokens, keyed by provider/model.
@@ -125,7 +132,10 @@ end
 
 Profile candidate order expresses preference. Resolution selects the first
 candidate that has a configured provider and supports every requested
-capability. Model names remain in configuration rather than application logic.
+capability. Each default tier lists generation candidates followed by the
+decision candidate `{ provider: :typesafe, model: "jev-latest" }`; because Jev
+declares no `:generation`, `generate` skips it and `decide` skips OpenAI and
+Gemini. Model names remain in configuration rather than application logic.
 Retries remain on the same candidate. Same-profile provider fallback follows
 candidate order, while profile-tier fallback only follows explicit
 `profile_fallbacks` mappings. For a one-off hop list that skips profiles, pass
@@ -244,6 +254,8 @@ Phase 2 introduced validation and normalized return contracts for:
 
 - `RecordingStudioAI.generate(...)`
 - `RecordingStudioAI.generate!(...)`
+- `RecordingStudioAI.decide(...)`
+- `RecordingStudioAI.decide!(...)`
 - `RecordingStudioAI.submit_batch(...)`
 - `RecordingStudioAI.refresh_batch(...)`
 - `RecordingStudioAI.refresh_batch_from_webhook(...)`
@@ -279,20 +291,107 @@ explicit fallback hops they stay when the next model supports them and are
 omitted when it does not. `RecordingStudioAI.stream` / `stream!` were removed —
 use `generate(stream: true)`.
 
+## Decisions (TypeSafe Jev)
+
+`decide` is a sibling of `generate`, not a flavour of it. A decision asks a
+model to classify state against caller-owned criteria and returns calibrated
+probabilities. TypeSafe's Jev is the first decision-only model: it declares
+`operations: [:decision]`, so it never appears as a generation candidate.
+
+```ruby
+response = RecordingStudioAI.decide(
+  state: article_text, # a non-empty String
+  questions: {
+    mentions_target: {
+      type: :noul,
+      instructions: "Does this content substantially mention ACME Architects?"
+    },
+    coverage_type: {
+      type: :choice,
+      instructions: "What type of coverage is this?",
+      criteria: {
+        feature: "A substantial feature about the target",
+        mention: "A shorter mention",
+        unrelated: "Not meaningfully about the target"
+      }
+    },
+    relevance: {
+      type: :score,
+      instructions: "How relevant is this content to the target?",
+      criteria: ["Not relevant", "Weakly relevant", "Clearly relevant", "Primarily about the target"]
+    }
+  },
+  profile: :medium,
+  purpose: "coverage_triage",
+  root_recording: root_recording,
+  initiator: current_user
+)
+
+response.answers[:coverage_type].choice        # => :feature
+response.answers[:coverage_type].probabilities # => { feature: 0.82, mention: 0.14, unrelated: 0.04 }
+response.answers[:coverage_type].confidence    # => 0.91
+response.answers[:relevance].score             # => 2.7
+response.answers[:relevance].legend            # => { "0" => "Not relevant", ... }
+response.answers[:mentions_target].probability # => 0.96
+```
+
+`decide!` matches `generate!`: it raises `Errors::ExecutionError` carrying the
+response unless the decision succeeded.
+
+Three question kinds, each a frozen value object under
+`RecordingStudioAI::Decisions`. Hashes are parsed into them at the public
+boundary, or construct them directly:
+
+- `Choice` has 1..255 named criteria with optional descriptions. The answer is
+  the caller's own criterion key plus a probability per criterion.
+- `Score` has an ordered list of 2..10 labels. The answer is a numeric score on
+  that scale, the legend, and a probability per string index (`"0"`, `"1"`, ...).
+- `Noul` asks one question with optional `true`/`false` descriptions. The answer
+  exposes a single `probability` and deliberately has no `confidence`.
+
+Answers are keyed by the caller's original question key, String or Symbol, and
+`:risk` alongside `"risk"` is rejected rather than merged. `response.model` is
+the registry model (`jev-latest`); the versioned identifier TypeSafe served is
+reported as `served_model` in safe attempt metadata.
+
+This is not `generate(schema:)`. Structured output asks a text model to emit
+JSON matching a schema, and the gem parses that text. A decision never produces
+text: the answers are typed, the probabilities come from the model rather than
+from prose, and nothing passes through `structured_data`, schema validation,
+tools, streaming, or batches. `Providers::DecisionResult` is a separate type
+from `Providers::Result` for the same reason.
+
+Decision runs persist `operation: "decision"` with the state character count
+only. State, question instructions, criteria, and the provider body never reach
+a column, an event payload, or a retained response. With
+`retain_responses = true`, retention keeps the normalized answers as
+`response_type: "decision"` and leaves `content_text` nil. TypeSafe cost stays
+`nil` until a host adds a `cost_catalogs` entry for it, and
+`provider_request_id` stays nil because the documented response has no request
+identifier.
+
 ## Adding a provider
 
-This gem already treats OpenAI and Gemini as two adapters behind one contract.
-Adding another vendor should not change `generate`, streaming, or batch.
+This gem already treats OpenAI, Gemini, and TypeSafe as adapters behind one
+contract. A provider implements one or more operations — `generate`, `decide`,
+streaming, and the batch methods — and declares which ones its models support.
+Nothing assumes every provider implements generation: TypeSafe implements
+`decide` only.
 
 1. Subclass `RecordingStudioAI::Providers::Base` and declare `provider_key`.
-2. Add credentials the same way as today: `config.<provider_key>_api_key` and
+2. Implement only the operations the vendor supports. The inherited defaults for
+   everything else stay unimplemented, and capability filtering keeps requests
+   from reaching them.
+3. Add credentials the same way as today: `config.<provider_key>_api_key` and
    optional `config.<provider_key>_client`.
-3. Register with `RecordingStudioAI.register_provider`, or set
+4. Register with `RecordingStudioAI.register_provider`, or set
    `config.discovery_enabled = true` if the class lives under
    `lib/recording_studio_ai/providers/`.
-4. Register models with `RecordingStudioAI.models.register` under
-   `lib/recording_studio_ai/models/<provider-key>/`.
-5. Optionally add a profile candidate `{ provider: :key, model: "..." }`.
+5. Register models with `RecordingStudioAI.models.register` under
+   `lib/recording_studio_ai/models/<provider-key>/`, declaring
+   `operations:` (`[:generation]` when omitted) and, for decision models,
+   `decision_types:`.
+6. Optionally add a profile candidate `{ provider: :key, model: "..." }`.
 
 The dummy `/config` page has copy-paste examples for registration and models.
 
@@ -584,9 +683,12 @@ RecordingStudioAI.tools.register(
 ## Resolution and execution (Phase 5)
 
 Candidates declare a provider, model, and capabilities. Supported capability
-keys are `generation`, `streaming`, `structured_output`, `image_input`,
-`file_input`, `provider_native_web_search`, `custom_tools`, `provider_batch`,
-and `provider_batch_cancellation`.
+keys are `generation`, `decision`, `decision_choice`, `decision_score`,
+`decision_noul`, `streaming`, `structured_output`, `image_input`, `file_input`,
+`provider_native_web_search`, `custom_tools`, `provider_batch`, and
+`provider_batch_cancellation`. Operation capabilities come from a model
+definition's `operations:` and `decision_types:`; the rest are derived from its
+delivery flags, tools, and modalities.
 
 Resolution never removes requirements. Unsupported requests and disabled
 provider overrides fail before a run, attempt, or provider call is created.
