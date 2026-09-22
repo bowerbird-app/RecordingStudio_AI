@@ -93,7 +93,7 @@ class DecisionsResolutionTest < RecordingStudioAI::Test::IsolatedCase
     assert_equal [:medium], plan.map(&:profile)
   end
 
-  def test_generation_planning_still_keeps_every_profile_hop
+  def test_generation_planning_drops_a_repeated_provider_and_model
     @configuration.openai_api_key = "openai-test-key"
     @configuration.profiles[:medium] = [{ provider: :openai, model: "gpt-5" }]
     @configuration.profiles[:high] = [{ provider: :openai, model: "gpt-5" }]
@@ -104,7 +104,8 @@ class DecisionsResolutionTest < RecordingStudioAI::Test::IsolatedCase
       operation: :generation
     )
 
-    assert_equal %i[medium high], plan.map(&:profile)
+    assert_equal [:medium], plan.map(&:profile)
+    assert_equal ["gpt-5"], plan.map { |hop| hop.candidate.model }
   end
 
   def test_planner_honours_a_pinned_decision_provider_and_model

@@ -122,7 +122,7 @@ module RecordingStudioAI
         return nil if value.nil?
 
         Decisions.validation_error!("noul criteria must be a Hash") unless value.is_a?(Hash)
-        unless value.keys.sort_by(&:to_s) == CRITERIA_KEYS.sort_by(&:to_s)
+        unless value.size == CRITERIA_KEYS.length && value.key?(true) && value.key?(false)
           Decisions.validation_error!("noul criteria keys must be exactly true and false")
         end
 

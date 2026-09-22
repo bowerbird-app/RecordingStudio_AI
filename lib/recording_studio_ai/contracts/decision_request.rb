@@ -33,9 +33,11 @@ module RecordingStudioAI
           validation_error!("state must be a RecordingStudioAI::Decisions::State::Text")
         end
 
-        return if questions.is_a?(RecordingStudioAI::Decisions::QuestionSet)
+        unless questions.is_a?(RecordingStudioAI::Decisions::QuestionSet)
+          validation_error!("questions must be a RecordingStudioAI::Decisions::QuestionSet")
+        end
 
-        validation_error!("questions must be a RecordingStudioAI::Decisions::QuestionSet")
+        RecordingStudioAI::Decisions.ensure_within_character_budget!(state, questions)
       end
 
       def validation_error!(message)

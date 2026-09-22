@@ -2,25 +2,10 @@
 
 module RecordingStudioAI
   module Orchestration
-    # The execution spine reads one Hash. A decision supplies the typed state and
-    # questions plus empty generation channels so RunPersistence,
-    # AttemptPersistence, and PlanExecutor keep their existing readers. This Hash
-    # is internal: it is neither a public contract nor a prompt.
+    # Internal hash for the execution spine. It carries the typed decision
+    # fields the planner and persistence read. Generation channels are absent;
+    # a missing attachment or tool list is empty.
     module DecisionExecution
-      EMPTY_GENERATION_CHANNELS = {
-        attachments: [],
-        provider_native_tools: [],
-        custom_tools: [],
-        custom_tool_definitions: [],
-        custom_tool_history: [],
-        prompt: nil,
-        messages: nil,
-        system_instruction: nil,
-        schema: nil,
-        prompt_definition: nil,
-        stream: false
-      }.freeze
-
       module_function
 
       def for(request)
@@ -36,7 +21,7 @@ module RecordingStudioAI
           attribution: request.attribution,
           metadata: request.metadata,
           execution_deadline: request.execution_deadline
-        }.merge(EMPTY_GENERATION_CHANNELS)
+        }
       end
     end
   end

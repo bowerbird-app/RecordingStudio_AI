@@ -346,13 +346,20 @@ boundary, or construct them directly:
   the caller's own criterion key plus a probability per criterion.
 - `Score` has an ordered list of 2..10 labels. The answer is a numeric score on
   that scale, the legend, and a probability per string index (`"0"`, `"1"`, ...).
-- `Noul` asks one question with optional `true`/`false` descriptions. The answer
+  A legend may be partial. Each index has to sit on the requested scale, and the
+  label has to be the criterion the caller sent.
+- `Noul` asks one question with optional criteria keyed by the booleans `true`
+  and `false`. String keys `"true"` and `"false"` are rejected. The answer
   exposes a single `probability` and deliberately has no `confidence`.
+
+State is at most 60,000 characters. A request has at most 20 questions. Each
+instruction, criterion description, and score label is at most 4,000 characters.
+State plus those texts together stay within 80,000 characters.
 
 Answers are keyed by the caller's original question key, String or Symbol, and
 `:risk` alongside `"risk"` is rejected rather than merged. `response.model` is
-the registry model (`jev-latest`); the versioned identifier TypeSafe served is
-reported as `served_model` in safe attempt metadata.
+the registry model (`jev-latest`). `response.served_model` is the versioned
+identifier TypeSafe served, and the same value is stored in safe attempt metadata.
 
 This is not `generate(schema:)`. Structured output asks a text model to emit
 JSON matching a schema, and the gem parses that text. A decision never produces

@@ -61,7 +61,8 @@ module RecordingStudioAI
           case question.type
           when :choice then decode_choice(answer, question, canonical_key)
           when :score then decode_score(answer, question, canonical_key)
-          else RecordingStudioAI::Decisions::NoulAnswer.new(probability: answer["noul"])
+          when :noul then RecordingStudioAI::Decisions::NoulAnswer.new(probability: answer["noul"])
+          else invalid!("response answers[#{canonical_key}] type #{question.type} is not a decision type")
           end
         end
 
@@ -78,19 +79,57 @@ module RecordingStudioAI
         def decode_score(answer, question, canonical_key)
           RecordingStudioAI::Decisions::ScoreAnswer.new(
             score: scale_score!(answer["score"], question, canonical_key),
-            legend: answer["legend"],
-            probabilities: answer["probabilities"],
+            legend: matched_legend!(answer["legend"], question, canonical_key),
+            probabilities: scale_probability_keys!(answer["probabilities"], question, canonical_key),
             confidence: answer["confidence"]
           )
         end
 
         def scale_score!(score, question, canonical_key)
-          unless score.is_a?(Numeric) && !score.is_a?(Complex) && score.to_f.finite?
-            invalid!("response answers[#{canonical_key}] score must be a finite number")
-          end
+          RecordingStudioAI::Decisions.finite_number!(score, path: "response answers[#{canonical_key}] score")
           return score if score.between?(0, question.maximum_score)
 
           invalid!("response answers[#{canonical_key}] score is outside the requested scale")
+        end
+
+        # A partial legend is accepted. Every reported index has to sit on the
+        # requested scale, and the label has to be the criterion the caller sent.
+        def matched_legend!(legend, question, canonical_key)
+          invalid!("response answers[#{canonical_key}] legend must be a Hash") unless legend.is_a?(Hash)
+
+          legend.each do |index, label|
+            unless scale_index?(index, question)
+              invalid!(
+                "response answers[#{canonical_key}] legend key #{index.inspect} is outside the requested scale"
+              )
+            end
+            next if label == question.criteria[index.to_i]
+
+            invalid!(
+              "response answers[#{canonical_key}] legend label for #{index} does not match the requested criterion"
+            )
+          end
+          legend
+        end
+
+        def scale_probability_keys!(probabilities, question, canonical_key)
+          invalid!("response answers[#{canonical_key}] probabilities must be a Hash") unless probabilities.is_a?(Hash)
+
+          probabilities.each_key do |index|
+            next if scale_index?(index, question)
+
+            invalid!(
+              "response answers[#{canonical_key}] probabilities key #{index.inspect} is outside the requested scale"
+            )
+          end
+          probabilities
+        end
+
+        def scale_index?(index, question)
+          return false unless index.is_a?(String)
+
+          ordinal = index.to_i
+          index == ordinal.to_s && ordinal >= 0 && ordinal < question.criteria.length
         end
 
         def public_criterion!(value, question, canonical_key)

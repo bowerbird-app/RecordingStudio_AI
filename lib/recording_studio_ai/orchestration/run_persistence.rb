@@ -59,7 +59,7 @@ module RecordingStudioAI
 
         RecordingStudioAI::Attachments.metadata(request[:attachments]).merge(
           input_character_count: Support.request_input(request).length,
-          web_search_requested: request[:provider_native_tools].include?(:web_search)
+          web_search_requested: Array(request[:provider_native_tools]).include?(:web_search)
         )
       end
 
@@ -73,24 +73,15 @@ module RecordingStudioAI
       end
 
       def output_attributes(executions, final_result, operation:)
-        return decision_output_attributes(final_result) if operation == "decision"
+        counted = { output_character_count: Support.result_output_character_count(final_result) }
+        return counted.merge(web_search_used: false, citation_count: 0) if operation == "decision"
 
-        {
-          output_character_count: final_result.text&.length,
+        counted.merge(
           web_search_used: executions.any? do |execution|
             execution.result.provider_native_tools.include?("web_search")
           end,
           citation_count: executions.sum { |execution| execution.result.citations.length }
-        }
-      end
-
-      def decision_output_attributes(final_result)
-        answers = final_result.answers
-        {
-          output_character_count: answers.empty? ? nil : JSON.generate(answers.to_serializable_h).bytesize,
-          web_search_used: false,
-          citation_count: 0
-        }
+        )
       end
 
       def core_attributes(request, candidate, operation, prompt)

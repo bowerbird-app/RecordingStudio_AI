@@ -19,7 +19,7 @@ module RecordingStudioAI
           streaming: run.operation == "stream",
           **attachment_metadata,
           provider_file_count: %i[openai gemini].include?(planned.candidate.provider) ? 0 : nil,
-          web_search_requested: request[:provider_native_tools].include?(:web_search),
+          web_search_requested: Array(request[:provider_native_tools]).include?(:web_search),
           started_at: Time.current
         )
       end

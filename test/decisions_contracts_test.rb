@@ -172,6 +172,26 @@ class DecisionsContractsTest < RecordingStudioAI::Test::IsolatedCase
       /noul criteria descriptions must be a non-empty String/,
       noul_error({ true => "", false => "Off topic" })
     )
+    assert_match(
+      /noul criteria keys must be exactly true and false/,
+      noul_error({ "true" => "On topic", "false" => "Off topic" })
+    )
+  end
+
+  def test_decision_input_is_capped
+    assert_match(
+      /state must be at most #{RecordingStudioAI::Decisions::MAXIMUM_STATE_CHARACTERS} characters/,
+      decision_request_error(state: "a" * (RecordingStudioAI::Decisions::MAXIMUM_STATE_CHARACTERS + 1))
+    )
+    assert_match(
+      /questions must contain at most #{RecordingStudioAI::Decisions::MAXIMUM_QUESTIONS} entries/,
+      decision_request_error(questions: oversized_questions)
+    )
+    assert_match(/question instructions must be at most/, choice_error_for_long_instructions)
+    assert_match(
+      /decision input must be at most #{RecordingStudioAI::Decisions::MAXIMUM_DECISION_CHARACTERS} characters/,
+      decision_request_error(state: "a" * 60_000, questions: budget_questions)
+    )
   end
 
   def test_choice_answer_exposes_choice_probabilities_and_confidence
@@ -479,7 +499,22 @@ class DecisionsContractsTest < RecordingStudioAI::Test::IsolatedCase
     assert_predicate response, :success?
     assert_equal 0.42, response.answers[:verdict].probability
     assert_equal({ "verdict" => { "type" => "noul", "probability" => 0.42 } }, response.to_h.fetch(:answers))
+    assert_nil response.served_model
+    assert_nil response.to_h.fetch(:served_model)
     assert_includes RecordingStudioAI::Contracts::Response::OPERATIONS, "decision"
+
+    reported = RecordingStudioAI::Contracts::DecisionResponse.new(
+      answers: answers, profile: :medium, provider: "typesafe", model: "jev-latest",
+      attempts: [], served_model: "jev-1.13.0"
+    )
+    assert_equal "jev-latest", reported.model
+    assert_equal "jev-1.13.0", reported.served_model
+    assert_equal "jev-1.13.0", reported.to_h.fetch(:served_model)
+    assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Contracts::DecisionResponse.new(
+        answers: answers, profile: :medium, attempts: [], served_model: "  "
+      )
+    end
   end
 
   def test_decision_response_cannot_carry_answers_alongside_an_error
@@ -526,6 +561,27 @@ class DecisionsContractsTest < RecordingStudioAI::Test::IsolatedCase
   def parse_questions_error(questions)
     assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
       RecordingStudioAI::Decisions::QuestionSet.parse(questions)
+    end.message
+  end
+
+  def oversized_questions
+    (RecordingStudioAI::Decisions::MAXIMUM_QUESTIONS + 1).times.to_h do |index|
+      ["q#{index}", { type: :noul, instructions: "Mentioned?" }]
+    end
+  end
+
+  def budget_questions
+    6.times.to_h do |index|
+      ["q#{index}", { type: :noul, instructions: "a" * RecordingStudioAI::Decisions::MAXIMUM_TEXT_CHARACTERS }]
+    end
+  end
+
+  def choice_error_for_long_instructions
+    assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Decisions::Choice.new(
+        instructions: "a" * (RecordingStudioAI::Decisions::MAXIMUM_TEXT_CHARACTERS + 1),
+        criteria: { feature: "Feature" }
+      )
     end.message
   end
 
