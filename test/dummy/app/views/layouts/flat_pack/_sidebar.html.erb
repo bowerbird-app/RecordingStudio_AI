@@ -62,6 +62,11 @@
         href: main_app.ai_playground_path,
         icon: :cpu_chip
       ) %>
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        text: "Decision playground",
+        href: main_app.decision_playground_path,
+        icon: :cpu_chip
+      ) %>
     </nav>
   <% end %>
 

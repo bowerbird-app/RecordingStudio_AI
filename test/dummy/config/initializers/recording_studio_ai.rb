@@ -3,21 +3,25 @@
 RecordingStudioAI.configure do |config|
   config.openai_api_key = ENV.fetch("OPENAI_API_KEY", nil)
   config.gemini_api_key = ENV.fetch("GEMINI_API_KEY", nil)
-  config.allowed_provider_overrides = %i[openai gemini]
+  config.typesafe_api_key = ENV.fetch("TYPESAFE_API_KEY", nil)
+  config.allowed_provider_overrides = %i[openai gemini typesafe]
 
   config.default_profile = :medium
   config.profiles = {
     low: [
       { provider: :openai, model: "gpt-5-mini" },
-      { provider: :gemini, model: "gemini-2.5-flash" }
+      { provider: :gemini, model: "gemini-2.5-flash" },
+      { provider: :typesafe, model: "jev-latest" }
     ],
     medium: [
       { provider: :openai, model: "gpt-5" },
-      { provider: :gemini, model: "gemini-2.5-pro" }
+      { provider: :gemini, model: "gemini-2.5-pro" },
+      { provider: :typesafe, model: "jev-latest" }
     ],
     high: [
       { provider: :openai, model: "gpt-5-pro" },
-      { provider: :gemini, model: "gemini-2.5-pro" }
+      { provider: :gemini, model: "gemini-2.5-pro" },
+      { provider: :typesafe, model: "jev-latest" }
     ]
   }
   # Map AI actions onto RecordingStudioAccessible roles for the selected root.

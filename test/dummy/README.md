@@ -40,6 +40,7 @@ origin mismatch. The dummy relaxes that origin check in development when
 Useful routes:
 
 - `/ai_playground` — generate against a profile model
+- `/decision_playground` runs `RecordingStudioAI.decide`
 - `/config` — initializer and registry guide
 - `/methods` — call-site examples
 - `/admin` — Recording Studio Admin AI screens
