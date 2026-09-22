@@ -16,6 +16,9 @@
   <% if @response&.success? %>
     <div class="space-y-3">
       <%= render FlatPack::PageTitle::Component.new(title: "Answers", variant: :h3, class: "mb-0 pb-0") %>
+      <% if @response.served_model.present? %>
+        <p class="text-sm text-(--surface-muted-content-color)">Served model: <%= @response.served_model %></p>
+      <% end %>
       <% @response.answers.each do |entry| %>
         <% answer = entry.answer %>
         <%= render FlatPack::Card::Component.new(style: :default) do |card| %>

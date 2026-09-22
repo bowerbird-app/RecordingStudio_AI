@@ -29,34 +29,23 @@ class DecisionPlaygroundTest < ActionDispatch::IntegrationTest
     "usage" => { "input_tokens" => 120, "output_tokens" => 8 }
   }.freeze
 
-  class TypeSafeClient
-    attr_reader :calls
-
-    def initialize(body)
-      @body = body
-      @calls = []
-    end
-
-    def decide(model:, state:, questions:)
-      @calls << { model: model, state: state, questions: questions }
-      @body
-    end
-  end
-
   setup do
     @previous_typesafe_client = RecordingStudioAI.configuration.typesafe_client
+    @previous_typesafe_api_key = RecordingStudioAI.configuration.typesafe_api_key
+    RecordingStudioAI.configuration.typesafe_client = nil
+    RecordingStudioAI.configuration.typesafe_api_key = "playground-test-key"
+    @captured_requests = []
     @user = User.create!(email: "decision-playground-#{SecureRandom.hex(4)}@example.com", password: "Password123!")
     workspace = Workspace.create!(name: "Decision playground workspace")
     @root = RecordingStudio.root_recording_for(workspace)
     grant_accessible!(recording: @root, actor: @user, role: :edit)
     sign_in @user
     switch_to_root!(@root)
-    @client = TypeSafeClient.new(DECISION_BODY)
-    RecordingStudioAI.configuration.typesafe_client = @client
   end
 
   teardown do
     RecordingStudioAI.configuration.typesafe_client = @previous_typesafe_client
+    RecordingStudioAI.configuration.typesafe_api_key = @previous_typesafe_api_key
   end
 
   test "show renders the ACME seed and question keys" do
@@ -73,17 +62,20 @@ class DecisionPlaygroundTest < ActionDispatch::IntegrationTest
     assert_select "form[data-turbo=false]", count: 0
   end
 
-  test "create runs decide and ignores a blank extra question row" do
-    post "/decision_playground", params: {
-      decision_playground: {
-        state: README_STATE,
-        profile: "medium",
-        model: "typesafe|jev-latest",
-        questions: seeded_questions + [ { key: "", type: "noul", instructions: "", criteria_text: "" } ]
+  test "create runs decide through the TypeSafe client and ignores a blank extra question row" do
+    with_typesafe_http do
+      post "/decision_playground", params: {
+        decision_playground: {
+          state: README_STATE,
+          profile: "medium",
+          model: "typesafe|jev-latest",
+          questions: seeded_questions + [ { key: "", type: "noul", instructions: "", criteria_text: "" } ]
+        }
       }
-    }
+    end
 
     assert_response :success
+    assert_includes response.body, "Served model: jev-1.13.0"
     assert_includes response.body, "0.96"
     assert_includes response.body, "0.99"
     assert_includes response.body, "feature"
@@ -92,26 +84,61 @@ class DecisionPlaygroundTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Not relevant"
     assert_equal "decision", RecordingStudioAI::Run.last.operation
 
-    assert_equal 1, @client.calls.length
-    questions = @client.calls.fetch(0).fetch(:questions)
+    assert_equal 1, @captured_requests.length
+    request = @captured_requests.fetch(0)
+    assert_equal "/v1/systemone", request.path
+    assert_equal "Bearer playground-test-key", request["Authorization"]
+    body = JSON.parse(request.body)
+    questions = body.fetch("questions")
     assert_equal 4, questions.length
     assert_equal(
       { "true" => "The firm is described as the designer", "false" => "The firm is not described as the designer" },
-      questions.fetch("described").fetch(:criteria)
+      questions.fetch("described").fetch("criteria")
     )
   end
 
-  test "create refreshes the results column with turbo and leaves the form in place" do
-    post "/decision_playground",
-      params: {
+  test "choice criteria round trip keys that contain a colon" do
+    criteria = { "a:b" => "has: colon", "plain" => nil, "slash\\key" => "kept" }
+    loaded = DecisionPlayground::CriteriaCodec.load("choice", DecisionPlayground::CriteriaCodec.dump("choice", criteria))
+
+    assert_equal criteria, loaded
+  end
+
+  test "create lets the gem reject a viewer on the selected workspace" do
+    viewer = User.create!(email: "decision-viewer-#{SecureRandom.hex(4)}@example.com", password: "Password123!")
+    grant_accessible!(recording: @root, actor: viewer, role: :view)
+    sign_in viewer
+    switch_to_root!(@root)
+
+    assert_no_difference -> { RecordingStudioAI::Run.count } do
+      post "/decision_playground", params: {
         decision_playground: {
           state: README_STATE,
           profile: "medium",
           model: "typesafe|jev-latest",
           questions: seeded_questions
         }
-      },
-      headers: { "Accept" => "text/vnd.turbo-stream.html" }
+      }
+    end
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "recording_studio_ai.execute"
+    assert_empty @captured_requests
+  end
+
+  test "create refreshes the results column with turbo and leaves the form in place" do
+    with_typesafe_http do
+      post "/decision_playground",
+        params: {
+          decision_playground: {
+            state: README_STATE,
+            profile: "medium",
+            model: "typesafe|jev-latest",
+            questions: seeded_questions
+          }
+        },
+        headers: { "Accept" => "text/vnd.turbo-stream.html" }
+    end
 
     assert_response :success
     assert_equal "text/vnd.turbo-stream.html", response.media_type
@@ -130,6 +157,25 @@ class DecisionPlaygroundTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def with_typesafe_http
+    http_response = Net::HTTPOK.new("1.1", "200", "OK")
+    http_response.instance_variable_set(:@read, true)
+    http_response.instance_variable_set(:@body, JSON.generate(DECISION_BODY))
+    http = Object.new
+    captured = @captured_requests
+    http.define_singleton_method(:request) do |request|
+      captured << request
+      http_response
+    end
+    original = Net::HTTP.method(:start)
+    Net::HTTP.define_singleton_method(:start) do |*_args, **_kwargs, &block|
+      block.call(http)
+    end
+    yield
+  ensure
+    Net::HTTP.define_singleton_method(:start, original) if original
+  end
 
   def seeded_questions
     [
