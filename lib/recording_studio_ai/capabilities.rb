@@ -39,9 +39,8 @@ module RecordingStudioAI
 
     # Decision candidates must declare the operation and every requested
     # question kind. Nothing about generation delivery applies.
-    def for_decision(request = nil, questions: nil)
-      question_set = questions || request[:questions]
-      [:decision, *question_set.types.map { |type| DECISION_BY_TYPE.fetch(type) }].uniq
+    def for_decision(request)
+      [:decision, *request[:questions].types.map { |type| DECISION_BY_TYPE.fetch(type) }].uniq
     end
 
     def attachment_capabilities(attachments)

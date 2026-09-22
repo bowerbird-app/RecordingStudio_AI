@@ -215,7 +215,7 @@ class DecisionsResolutionTest < RecordingStudioAI::Test::IsolatedCase
   end
 
   def capabilities_for(kinds)
-    RecordingStudioAI::Capabilities.for_decision(questions: question_set(kinds))
+    RecordingStudioAI::Capabilities.for_decision({ questions: question_set(kinds) })
   end
 
   def question_set(kinds)
