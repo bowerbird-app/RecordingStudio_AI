@@ -237,6 +237,54 @@ class DecisionsTypeSafeProviderTest < Minitest::Test
     assert_equal "invalid_response", result.error.category
   end
 
+  def test_decide_rejects_score_legend_and_probability_keys_outside_the_requested_scale
+    {
+      "invented legend index" => { "9" => "Not relevant" },
+      "padded index" => { "00" => "Not relevant" },
+      "mismatched label" => { "0" => "Something else" }
+    }.each do |label, legend|
+      body = {
+        "answers" => {
+          "relevance" => {
+            "type" => "score", "score" => 1, "legend" => legend,
+            "probabilities" => { "0" => 1.0 }, "confidence" => 0.5
+          }
+        }
+      }
+      result = adapter_for(Client.new(body: body)).decide(request: score_request, candidate: candidate)
+
+      refute_predicate result, :success?, label
+      assert_equal "invalid_response", result.error.category, label
+    end
+
+    body = {
+      "answers" => {
+        "relevance" => {
+          "type" => "score", "score" => 1, "legend" => { "0" => "Not relevant" },
+          "probabilities" => { "9" => 1.0 }, "confidence" => 0.5
+        }
+      }
+    }
+    result = adapter_for(Client.new(body: body)).decide(request: score_request, candidate: candidate)
+
+    refute_predicate result, :success?
+    assert_equal "invalid_response", result.error.category
+  end
+
+  def test_encoder_and_decoder_reject_an_unknown_question_type
+    mystery = Object.new
+    mystery.define_singleton_method(:type) { :mystery }
+
+    assert_raises(ArgumentError) do
+      RecordingStudioAI::Providers::TypeSafe::QuestionEncoder.encode(mystery)
+    end
+    assert_raises(RecordingStudioAI::Providers::TypeSafe::AnswerDecoder::InvalidResponse) do
+      RecordingStudioAI::Providers::TypeSafe::AnswerDecoder.decode_answer(
+        { "type" => "mystery" }, mystery, "verdict"
+      )
+    end
+  end
+
   def test_decide_rejects_scores_that_are_not_finite_numbers_on_the_requested_scale
     ["2", nil, Float::INFINITY, -1, 4].each do |score|
       body = {

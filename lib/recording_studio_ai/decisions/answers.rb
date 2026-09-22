@@ -6,9 +6,7 @@ module RecordingStudioAI
       module_function
 
       def parse(value, path:)
-        unless value.is_a?(Numeric) && !value.is_a?(Complex) && value.to_f.finite?
-          Decisions.validation_error!("#{path} must be a finite number")
-        end
+        Decisions.finite_number!(value, path: path)
         Decisions.validation_error!("#{path} must be between 0 and 1") unless value.between?(0, 1)
 
         value
@@ -44,10 +42,7 @@ module RecordingStudioAI
       attr_reader :score, :legend, :probabilities, :confidence
 
       def initialize(score:, legend:, probabilities:, confidence:)
-        unless score.is_a?(Numeric) && !score.is_a?(Complex) && score.to_f.finite?
-          Decisions.validation_error!("score must be a finite number")
-        end
-        @score = score
+        @score = Decisions.finite_number!(score, path: "score")
         @legend = normalize_legend(legend)
         @probabilities = Probability.parse_map(probabilities, path: "score probabilities")
         @confidence = Probability.parse(confidence, path: "score confidence")

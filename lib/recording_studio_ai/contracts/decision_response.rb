@@ -3,17 +3,18 @@
 module RecordingStudioAI
   module Contracts
     class DecisionResponse < Response
-      attr_reader :answers
+      attr_reader :answers, :served_model
 
-      def initialize(answers: RecordingStudioAI::Decisions::AnswerSet.empty, **common)
+      def initialize(answers: RecordingStudioAI::Decisions::AnswerSet.empty, served_model: nil, **common)
         @answers = answers
+        @served_model = served_model
 
         super(**common, operation: "decision")
         validate_decision_fields!
       end
 
       def to_h
-        super.merge(answers: answers.to_serializable_h)
+        super.merge(answers: answers.to_serializable_h, served_model: served_model)
       end
 
       private
@@ -21,6 +22,9 @@ module RecordingStudioAI
       def validate_decision_fields!
         unless answers.is_a?(RecordingStudioAI::Decisions::AnswerSet)
           validation_error!("answers must be a RecordingStudioAI::Decisions::AnswerSet")
+        end
+        unless served_model.nil? || (served_model.is_a?(String) && !served_model.strip.empty?)
+          validation_error!("served_model must be a non-empty String")
         end
 
         return if error.nil? || answers.empty?

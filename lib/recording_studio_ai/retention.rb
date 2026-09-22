@@ -5,7 +5,11 @@ require "uri"
 
 module RecordingStudioAI
   module Retention
-    SENSITIVE_KEY = /(?:authorization|credential|header|cookie|password|passwd|secret|signed[_-]?url|api[_-]?key|access[_-]?key|private[_-]?key|openai[_-]?key|gemini[_-]?key|(?:^|[_-])token(?:$|[_-]))/i
+    SENSITIVE_KEY = /
+      (?:authorization|credential|header|cookie|password|passwd|secret|signed[_-]?url|
+      api[_-]?key|access[_-]?key|private[_-]?key|
+      openai[_-]?key|gemini[_-]?key|typesafe[_-]?key|(?:^|[_-])token(?:$|[_-]))
+    /ix
     SENSITIVE_QUERY_KEY = /(?:key|token|signature|credential|password|secret|auth|x-amz-|x-goog-)/i
     RAW_SNAPSHOT_KEYS = %w[id model status finish_reason usage error].freeze
 

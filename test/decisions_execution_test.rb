@@ -76,6 +76,8 @@ class DecisionsExecutionTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal :medium, response.profile
     assert_equal "decisive", response.provider
     assert_equal "jev-test", response.model
+    assert_equal "jev-1.13.0", response.served_model
+    assert_equal "jev-1.13.0", response.to_h.fetch(:served_model)
     assert_equal "coverage_triage", response.purpose
     assert_equal 0.96, response.answers[:mentions_target].probability
     assert_equal :feature, response.answers[:coverage_type].choice
@@ -97,14 +99,9 @@ class DecisionsExecutionTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal STATE, request.fetch(:state).value
     assert_instance_of RecordingStudioAI::Decisions::QuestionSet, request.fetch(:questions)
     assert_equal %i[noul choice score], request.fetch(:questions).types
-    assert_nil request.fetch(:prompt)
-    assert_nil request.fetch(:messages)
-    assert_nil request.fetch(:system_instruction)
-    assert_nil request.fetch(:schema)
-    assert_equal false, request.fetch(:stream)
-    assert_empty request.fetch(:attachments)
-    assert_empty request.fetch(:provider_native_tools)
-    assert_empty request.fetch(:custom_tools)
+    %i[prompt messages system_instruction schema stream attachments provider_native_tools custom_tools].each do |key|
+      refute request.key?(key), "#{key} is a generation channel"
+    end
     assert_equal :decisive, @provider.requests.fetch(0).fetch(:candidate).provider
     assert_equal "jev-test", @provider.requests.fetch(0).fetch(:candidate).model
   end
@@ -140,11 +137,11 @@ class DecisionsExecutionTest < RecordingStudioAI::Test::PersistenceCase
   end
 
   def test_decide_records_the_answer_payload_size_as_the_output_character_count
-    decide
+    response = decide
     run = RecordingStudioAI::Run.first
 
     assert_equal 0, ActiveRecord::Base.connection.select_value("SELECT COUNT(*) FROM recording_studio_events")
-    assert_operator run.output_character_count, :>, 0
+    assert_equal JSON.generate(response.answers.to_serializable_h).length, run.output_character_count
     assert_equal 120, run.input_tokens
     assert_equal 8, run.output_tokens
     assert_equal 128, run.total_tokens

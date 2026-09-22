@@ -16,7 +16,9 @@ module RecordingStudioAI
           case question.type
           when :choice then encode_choice(question)
           when :score then encode_score(question)
-          else encode_noul(question)
+          when :noul then encode_noul(question)
+          else
+            raise ArgumentError, "Cannot encode #{question.type} as a TypeSafe question"
           end
         end
 

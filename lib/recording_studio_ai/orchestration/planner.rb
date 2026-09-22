@@ -18,7 +18,7 @@ module RecordingStudioAI
                  profiles = [request[:profile]] + fallback_profiles(request[:profile])
                  profiles.flat_map { |profile| candidates_for(profile, request, capabilities) }
                end
-        operation == :decision ? without_repeated_candidates(plan) : plan
+        without_repeated_candidates(plan)
       end
 
       private
@@ -38,8 +38,8 @@ module RecordingStudioAI
         end
       end
 
-      # Jev sits on every default profile, so a host profile_fallbacks chain
-      # would otherwise schedule the same decision candidate twice.
+      # Profile lists can name the same provider and model on more than one tier.
+      # One plan runs that candidate once. Retries are a separate counter.
       def without_repeated_candidates(plan)
         seen = {}
         plan.select do |planned|

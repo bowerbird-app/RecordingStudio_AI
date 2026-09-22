@@ -8,6 +8,7 @@ class SecurityHardeningTest < Minitest::Test
       {
         openai_key: "sk-live",
         gemini_key: "ge-live",
+        typesafe_key: "ts-live",
         private_key: "pk",
         access_key: "ak",
         safe: "ok"
@@ -16,6 +17,7 @@ class SecurityHardeningTest < Minitest::Test
 
     assert_equal "[REDACTED]", sanitized.fetch("openai_key")
     assert_equal "[REDACTED]", sanitized.fetch("gemini_key")
+    assert_equal "[REDACTED]", sanitized.fetch("typesafe_key")
     assert_equal "[REDACTED]", sanitized.fetch("private_key")
     assert_equal "[REDACTED]", sanitized.fetch("access_key")
     assert_equal "ok", sanitized.fetch("safe")

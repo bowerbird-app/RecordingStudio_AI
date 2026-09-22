@@ -56,7 +56,8 @@ module RecordingStudioAI
         final_result = final_execution.result
         RecordingStudioAI::Contracts::DecisionResponse.new(
           **common_attributes(request, run, executions, final_execution.record, final_result),
-          answers: final_result.answers
+          answers: final_result.answers,
+          served_model: final_result.metadata["served_model"]
         )
       end
 
