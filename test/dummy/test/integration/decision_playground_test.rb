@@ -68,6 +68,9 @@ class DecisionPlaygroundTest < ActionDispatch::IntegrationTest
     assert_select "input[name='decision_playground[questions][][key]'][value='described']"
     assert_select "input[name='decision_playground[questions][][key]'][value='coverage_type']"
     assert_select "input[name='decision_playground[questions][][key]'][value='relevance']"
+    assert_select "#decision_result"
+    assert_includes response.body, "md:grid-cols-2"
+    assert_select "form[data-turbo=false]", count: 0
   end
 
   test "create runs decide and ignores a blank extra question row" do
@@ -96,6 +99,26 @@ class DecisionPlaygroundTest < ActionDispatch::IntegrationTest
       { "true" => "The firm is described as the designer", "false" => "The firm is not described as the designer" },
       questions.fetch("described").fetch(:criteria)
     )
+  end
+
+  test "create refreshes the results column with turbo and leaves the form in place" do
+    post "/decision_playground",
+      params: {
+        decision_playground: {
+          state: README_STATE,
+          profile: "medium",
+          model: "typesafe|jev-latest",
+          questions: seeded_questions
+        }
+      },
+      headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+    assert_response :success
+    assert_equal "text/vnd.turbo-stream.html", response.media_type
+    assert_match(/action="replace" target="decision_result"/, response.body)
+    assert_includes response.body, "0.96"
+    assert_includes response.body, "feature"
+    refute_includes response.body, 'name="decision_playground[state]"'
   end
 
   test "unauthenticated visitors are redirected to sign in" do

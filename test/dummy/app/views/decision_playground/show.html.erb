@@ -15,166 +15,81 @@
     ) %>
   <% end %>
 
-  <%= form_with url: main_app.decision_playground_path, method: :post, scope: :decision_playground, local: true,
-      data: { turbo: false }, class: "space-y-4" do %>
-    <%= render FlatPack::TextArea::Component.new(
-      name: "decision_playground[state]",
-      label: "State",
-      value: @form.state,
-      rows: 6
-    ) %>
-
-    <%= render FlatPack::Select::Component.new(
-      name: "decision_playground[profile]",
-      label: "Profile",
-      options: DecisionPlayground::PROFILES.map { |value, label| { value: value, label: label } },
-      value: @form.profile
-    ) %>
-
-    <%= render FlatPack::Select::Component.new(
-      name: "decision_playground[model]",
-      label: "Model",
-      options: [ { value: "", label: "Profile default" } ] + DecisionPlayground.model_options,
-      value: @form.model_value,
-      placeholder: nil
-    ) %>
-
-    <% form_rows = @form.rows + [
-      DecisionPlayground::QuestionRow.new(index: @form.rows.length, key: "", type: "noul", instructions: "", criteria_text: "")
-    ] %>
-    <% form_rows.each do |row| %>
-      <div class="space-y-3 rounded-lg border border-(--surface-border-color) p-4">
-        <%= render FlatPack::PageTitle::Component.new(
-          title: "Question #{row.index + 1}",
-          variant: :h4,
-          class: "mb-0 pb-0"
+  <%= render FlatPack::Grid::Component.new(cols: 2, gap: :lg, align: :start) do %>
+    <div class="min-w-0">
+      <%= form_with url: main_app.decision_playground_path, method: :post, scope: :decision_playground,
+          class: "space-y-4" do %>
+        <%= render FlatPack::TextArea::Component.new(
+          name: "decision_playground[state]",
+          label: "State",
+          value: @form.state,
+          rows: 6
         ) %>
-        <%= render FlatPack::TextInput::Component.new(
-          name: "decision_playground[questions][][key]",
-          label: "Key",
-          value: row.key
-        ) %>
+
         <%= render FlatPack::Select::Component.new(
-          name: "decision_playground[questions][][type]",
-          label: "Type",
-          options: [
-            { value: "choice", label: "Choice" },
-            { value: "score", label: "Score" },
-            { value: "noul", label: "Noul" }
-          ],
-          value: row.type
+          name: "decision_playground[profile]",
+          label: "Profile",
+          options: DecisionPlayground::PROFILES.map { |value, label| { value: value, label: label } },
+          value: @form.profile
         ) %>
-        <%= render FlatPack::TextArea::Component.new(
-          name: "decision_playground[questions][][instructions]",
-          label: "Instructions",
-          value: row.instructions,
-          rows: 3
+
+        <%= render FlatPack::Select::Component.new(
+          name: "decision_playground[model]",
+          label: "Model",
+          options: [ { value: "", label: "Profile default" } ] + DecisionPlayground.model_options,
+          value: @form.model_value,
+          placeholder: nil
         ) %>
-        <%= render FlatPack::TextArea::Component.new(
-          name: "decision_playground[questions][][criteria_text]",
-          label: "Criteria",
-          value: row.criteria_text,
-          rows: 4
-        ) %>
-      </div>
-    <% end %>
 
-    <%= render FlatPack::Button::Component.new(
-      text: "Run decision",
-      style: :primary,
-      type: "submit",
-      disabled: !DecisionPlayground.provider_ready?
-    ) %>
-  <% end %>
-
-  <% alert_description = [
-    @error_message,
-    (@response.present? && !@response.success? ? @response.error&.message : nil)
-  ].compact.uniq.join(" ") %>
-  <% if alert_description.present? %>
-    <%= render FlatPack::Alert::Component.new(
-      title: "That run didn't work",
-      description: alert_description,
-      style: :danger
-    ) %>
-  <% end %>
-
-  <% if @response&.success? %>
-    <div class="space-y-3">
-      <%= render FlatPack::PageTitle::Component.new(title: "Answers", variant: :h3, class: "mb-0 pb-0") %>
-      <% @response.answers.each do |entry| %>
-        <% answer = entry.answer %>
-        <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
-          <% card.header do %>
+        <% form_rows = @form.rows + [
+          DecisionPlayground::QuestionRow.new(index: @form.rows.length, key: "", type: "noul", instructions: "", criteria_text: "")
+        ] %>
+        <% form_rows.each do |row| %>
+          <div class="space-y-3 rounded-lg border border-(--surface-border-color) p-4">
             <%= render FlatPack::PageTitle::Component.new(
-              title: entry.key.public_key.to_s,
+              title: "Question #{row.index + 1}",
               variant: :h4,
               class: "mb-0 pb-0"
             ) %>
-          <% end %>
-          <% card.body do %>
-            <% case answer.type %>
-            <% when :choice %>
-              <p class="text-sm">Chosen key: <%= answer.choice %></p>
-              <p class="text-sm">Confidence: <%= answer.confidence %></p>
-              <% answer.probabilities.each do |key, probability| %>
-                <p class="text-sm"><%= key %>: <%= probability %></p>
-              <% end %>
-            <% when :score %>
-              <p class="text-sm">Score: <%= answer.score %></p>
-              <% answer.legend.each do |index, label| %>
-                <p class="text-sm"><%= index %>: <%= label %></p>
-              <% end %>
-              <% answer.probabilities.each do |key, probability| %>
-                <p class="text-sm"><%= key %>: <%= probability %></p>
-              <% end %>
-            <% when :noul %>
-              <p class="text-sm"><%= answer.probability %></p>
-            <% end %>
-          <% end %>
+            <%= render FlatPack::TextInput::Component.new(
+              name: "decision_playground[questions][][key]",
+              label: "Key",
+              value: row.key
+            ) %>
+            <%= render FlatPack::Select::Component.new(
+              name: "decision_playground[questions][][type]",
+              label: "Type",
+              options: [
+                { value: "choice", label: "Choice" },
+                { value: "score", label: "Score" },
+                { value: "noul", label: "Noul" }
+              ],
+              value: row.type
+            ) %>
+            <%= render FlatPack::TextArea::Component.new(
+              name: "decision_playground[questions][][instructions]",
+              label: "Instructions",
+              value: row.instructions,
+              rows: 3
+            ) %>
+            <%= render FlatPack::TextArea::Component.new(
+              name: "decision_playground[questions][][criteria_text]",
+              label: "Criteria",
+              value: row.criteria_text,
+              rows: 4
+            ) %>
+          </div>
         <% end %>
+
+        <%= render FlatPack::Button::Component.new(
+          text: "Run decision",
+          style: :primary,
+          type: "submit",
+          disabled: !DecisionPlayground.provider_ready?
+        ) %>
       <% end %>
     </div>
-  <% end %>
 
-  <% if @response_payload.present? %>
-    <%= render FlatPack::CodeBlock::Component.new(
-      title: "Response JSON",
-      language: "json",
-      code: JSON.pretty_generate(@response_payload),
-      separated: false
-    ) %>
-  <% end %>
-
-  <% if @created_runs.present? %>
-    <div class="space-y-3">
-      <%= render FlatPack::PageTitle::Component.new(title: "Created runs", variant: :h3, class: "mb-0 pb-0") %>
-      <%= render FlatPack::List::Component.new(divider: true) do %>
-        <% @created_runs.each do |run| %>
-          <%= render FlatPack::List::Item.new(icon: :cpu_chip) do %>
-            <div class="flex flex-col gap-1">
-              <span class="text-sm font-medium">Run <%= run.id %> • <%= run.operation %> • <%= run.status %></span>
-              <span class="text-xs text-(--surface-muted-content-color)">Provider: <%= run.resolved_provider || "n/a" %> • Model: <%= run.resolved_model || "n/a" %></span>
-            </div>
-          <% end %>
-        <% end %>
-      <% end %>
-    </div>
-  <% end %>
-
-  <% if @created_attempts.present? %>
-    <div class="space-y-3">
-      <%= render FlatPack::PageTitle::Component.new(title: "Created attempts", variant: :h3, class: "mb-0 pb-0") %>
-      <%= render FlatPack::List::Component.new(divider: true) do %>
-        <% @created_attempts.each do |attempt| %>
-          <%= render FlatPack::List::Item.new(icon: :clock) do %>
-            <div class="flex flex-col gap-1">
-              <span class="text-sm font-medium">Attempt <%= attempt.id %> • seq <%= attempt.sequence %> • <%= attempt.status %></span>
-              <span class="text-xs text-(--surface-muted-content-color)">Provider: <%= attempt.provider || "n/a" %> • Model: <%= attempt.model || "n/a" %></span>
-            </div>
-          <% end %>
-        <% end %>
-      <% end %>
-    </div>
+    <%= render "decision_playground/result" %>
   <% end %>
 </div>
