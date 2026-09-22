@@ -16,15 +16,28 @@ class DecisionPlaygroundController < ApplicationController
     ))
     @response_payload = @response.to_h
     load_created_records!(@request_id)
-    render :show
+    render_result
   rescue StandardError => error
     @form ||= DecisionPlayground::Form.seed
     @error_message = playground_error_message(error)
     load_created_records!(@request_id)
-    render :show, status: :unprocessable_entity
+    render_result(status: :unprocessable_entity)
   end
 
   private
+
+  def render_result(status: :ok)
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace(
+          "decision_result",
+          partial: "decision_playground/result"
+        ), status: status
+      end
+      format.html { render :show, status: status }
+    end
+  end
+
 
   def playground_error_message(error)
     return error.message if error.is_a?(RecordingStudioAI::Errors::ContractValidationError)
