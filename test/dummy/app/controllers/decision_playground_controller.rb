@@ -8,7 +8,7 @@ class DecisionPlaygroundController < ApplicationController
   def create
     @form = DecisionPlayground::Form.parse(form_params)
     @request_id = SecureRandom.uuid
-    root_recording = playground_root_recording!
+    root_recording = selected_playground_root!
     @response = RecordingStudioAI.decide(**@form.to_decide_kwargs(
       root_recording: root_recording,
       initiator: current_user,

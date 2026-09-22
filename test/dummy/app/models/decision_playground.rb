@@ -62,7 +62,8 @@ module DecisionPlayground
       return "" if criteria.blank?
 
       criteria.map do |key, description|
-        description.nil? ? key.to_s : "#{key}: #{description}"
+        token = escape_criterion_key(key.to_s)
+        description.nil? ? token : "#{token}: #{description}"
       end.join("\n")
     end
 
@@ -81,13 +82,41 @@ module DecisionPlayground
         line = line.strip
         next if line.empty?
 
-        if line.include?(":")
-          key, _separator, description = line.partition(":")
-          criteria[key.strip] = description.strip
-        else
-          criteria[line] = nil
+        key, description = partition_criterion(line)
+        criteria[key] = description
+      end
+    end
+
+    # Keys may contain ":" and "\". Escape those before the first unescaped colon,
+    # which separates the key from the description.
+    def escape_criterion_key(key)
+      key.gsub("\\") { "\\\\" }.gsub(":") { "\\:" }
+    end
+
+    def unescape_criterion_key(key)
+      key.gsub(/\\./) do |token|
+        case token
+        when "\\:" then ":"
+        when "\\\\" then "\\"
+        else token[1]
         end
       end
+    end
+
+    def partition_criterion(line)
+      index = 0
+      while index < line.length
+        if line[index] == "\\"
+          index += 2
+          next
+        end
+        break if line[index] == ":"
+
+        index += 1
+      end
+      return [unescape_criterion_key(line.strip), nil] if index >= line.length
+
+      [unescape_criterion_key(line[0...index].strip), line[(index + 1)..].to_s.strip]
     end
 
     def load_score(criteria_text)
