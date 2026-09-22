@@ -24,4 +24,23 @@ class ApplicationController < ActionController::Base
   def set_current_actor
     Current.actor = current_user
   end
+
+  def playground_root_recording!
+    root = current_root_recording
+    if root.blank?
+      raise RecordingStudioAI::Errors::ContractValidationError.new(
+        "Select a workspace you can access before running AI.",
+        code: "authorization"
+      )
+    end
+
+    unless RecordingStudioAccessible.authorized?(actor: current_user, recording: root, role: :edit)
+      raise RecordingStudioAI::Errors::ContractValidationError.new(
+        "You need edit access on the selected workspace to run AI.",
+        code: "authorization"
+      )
+    end
+
+    root
+  end
 end
