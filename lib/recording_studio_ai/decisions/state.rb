@@ -21,9 +21,7 @@ module RecordingStudioAI
             Decisions.validation_error!("state must be a non-empty String")
           end
           limit = Decisions.maximum_state_characters
-          if value.length > limit
-            Decisions.validation_error!("state must be at most #{limit} characters")
-          end
+          Decisions.validation_error!("state must be at most #{limit} characters") if value.length > limit
 
           @value = value.dup.freeze
           freeze

@@ -105,7 +105,7 @@ class DecisionsResolutionTest < RecordingStudioAI::Test::IsolatedCase
     )
 
     assert_equal [:medium], plan.map(&:profile)
-    assert_equal ["gpt-5"], plan.map { |hop| hop.candidate.model }
+    assert_equal(["gpt-5"], plan.map { |hop| hop.candidate.model })
   end
 
   def test_planner_honours_a_pinned_decision_provider_and_model
