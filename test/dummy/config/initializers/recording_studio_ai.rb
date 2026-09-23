@@ -11,7 +11,14 @@ RecordingStudioAI.configure do |config|
     else
       ENV.fetch("GEMINI_API_KEY", nil)
     end
-  config.typesafe_api_key = ENV.fetch("TYPESAFE_API_KEY", nil)
+  # Development decisions can use the Cursor Cloud secret `typesafe` when
+  # TYPESAFE_API_KEY is unset. Test and production stay on TYPESAFE_API_KEY.
+  config.typesafe_api_key =
+    if Rails.env.development?
+      ENV["TYPESAFE_API_KEY"].presence || ENV["typesafe"].presence
+    else
+      ENV.fetch("TYPESAFE_API_KEY", nil)
+    end
   config.allowed_provider_overrides = %i[openai gemini typesafe]
 
   config.default_profile = :medium
