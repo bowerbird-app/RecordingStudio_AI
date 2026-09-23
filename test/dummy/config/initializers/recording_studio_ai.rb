@@ -2,7 +2,15 @@
 
 RecordingStudioAI.configure do |config|
   config.openai_api_key = ENV.fetch("OPENAI_API_KEY", nil)
-  config.gemini_api_key = ENV.fetch("GEMINI_API_KEY", nil)
+  # Development playgrounds can use the Cursor Cloud secret `google_ai_studio`
+  # when GEMINI_API_KEY is unset. Test and production stay on GEMINI_API_KEY so
+  # the injected secret never reaches the suite or a deployed host.
+  config.gemini_api_key =
+    if Rails.env.development?
+      ENV["GEMINI_API_KEY"].presence || ENV["google_ai_studio"].presence
+    else
+      ENV.fetch("GEMINI_API_KEY", nil)
+    end
   config.typesafe_api_key = ENV.fetch("TYPESAFE_API_KEY", nil)
   config.allowed_provider_overrides = %i[openai gemini typesafe]
 

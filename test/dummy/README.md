@@ -18,6 +18,7 @@ It covers:
 - fail-closed production configuration with an explicit demo-only authorization policy
 
 Tests use injected provider clients; live generation requires provider credentials.
+In development, an unset `GEMINI_API_KEY` falls back to the `google_ai_studio` environment variable.
 
 ## Run the host
 
