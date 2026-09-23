@@ -130,10 +130,13 @@ class PhaseTwelveResponseRetentionObservabilityTest < RecordingStudioAI::Test::P
     refute_includes sanitized["url"], "signed"
     assert_includes sanitized["url"], "name=report"
     assert_equal "sanitized", sanitized["host_value"]
-    metrics = RecordingStudioAI::Retention.sanitize({ input_tokens: 3, output_tokens: 2, access_token: "secret" })
+    metrics = RecordingStudioAI::Retention.sanitize(
+      { input_tokens: 3, output_tokens: 2, access_token: "secret", typesafe_key: "ts-live" }
+    )
     assert_equal 3, metrics["input_tokens"]
     assert_equal 2, metrics["output_tokens"]
     assert_equal "[REDACTED]", metrics["access_token"]
+    assert_equal "[REDACTED]", metrics["typesafe_key"]
   end
 
   def test_raw_snapshot_is_serializable_allowlisted_and_sanitized

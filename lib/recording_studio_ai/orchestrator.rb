@@ -34,6 +34,11 @@ module RecordingStudioAI
       execute(request, operation: :generation, stream_session: nil)
     end
 
+    def decide(request)
+      request = request.with_execution_deadline(Time.current + @configuration.total_execution_timeout)
+      execute(Orchestration::DecisionExecution.for(request), operation: :decision, stream_session: nil)
+    end
+
     def stream(request, &event_handler)
       request = request.merge(execution_deadline: Time.current + @configuration.total_execution_timeout)
       stream_session = Orchestration::StreamSession.new(event_handler: event_handler)
@@ -56,7 +61,10 @@ module RecordingStudioAI
       run = @persistence.create_run!(request, plan.first.candidate, operation: operation)
       stream_session&.active_run = run if operation == :stream
       executions = plan_executor(stream_session).execute(run, request, plan, operation: operation)
-      return @persistence.complete_deadline_failure(request, run, operation: operation) if executions.empty?
+      if executions.empty?
+        error = @persistence.complete_deadline_failure(run)
+        return @response_builder.deadline_failure(request, run, error, operation: operation)
+      end
 
       final_execution = executions.last
       @persistence.complete_run!(run, executions, final_execution)

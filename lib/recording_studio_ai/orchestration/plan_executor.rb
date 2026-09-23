@@ -52,7 +52,7 @@ module RecordingStudioAI
           @persistence.complete_attempt!(attempt, result)
           executions << ExecutedAttempt.new(record: attempt, result: result)
 
-          if result.success? && result.tool_calls.any?
+          if custom_tool_rounds?(result, operation) && result.tool_calls.any?
             return @custom_tools.execute_rounds(run, request, planned, executions, operation: operation)
           end
           return executions if stop_retries?(result)
@@ -61,6 +61,10 @@ module RecordingStudioAI
         end
 
         nil
+      end
+
+      def custom_tool_rounds?(result, operation)
+        result.success? && %i[generation stream].include?(operation)
       end
 
       def stop_retries?(result)

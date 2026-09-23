@@ -9,6 +9,7 @@
 
   <div class="flex flex-wrap items-center gap-3">
     <%= render FlatPack::Button::Component.new(text: "Playground", href: main_app.ai_playground_path, style: :primary, size: :sm) %>
+    <%= render FlatPack::Button::Component.new(text: "Decision playground", href: main_app.decision_playground_path, style: :secondary, size: :sm) %>
     <%= render FlatPack::Button::Component.new(text: "Config", href: main_app.gem_config_path, style: :secondary, size: :sm) %>
     <%= render FlatPack::Button::Component.new(text: "Methods", href: main_app.gem_methods_path, style: :secondary, size: :sm) %>
     <%= render FlatPack::Button::Component.new(text: "AI administration", href: "/admin", style: :secondary, size: :sm) %>

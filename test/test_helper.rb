@@ -6,6 +6,8 @@ $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 # expect the default configuration to resolve as unimplemented.
 ENV.delete("OPENAI_API_KEY")
 ENV.delete("GEMINI_API_KEY")
+ENV.delete("TYPESAFE_API_KEY")
+ENV.delete("TYPESAFE_API_KEY")
 
 require_relative "simplecov_helper"
 require "minitest/autorun"

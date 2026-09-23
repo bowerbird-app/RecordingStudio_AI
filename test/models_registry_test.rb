@@ -63,6 +63,122 @@ class ModelsRegistryTest < Minitest::Test
     assert_empty definition.tools
   end
 
+  def test_omitted_operations_still_mean_generation
+    definition = @registry.register(provider: :openai, key: "text-only", model: "text-only")
+
+    assert_equal [:generation], definition.operations
+    assert_empty definition.decision_types
+  end
+
+  def test_generation_only_model_declares_no_decision_capabilities
+    definition = @registry.register(
+      provider: :openai,
+      key: "gpt-5",
+      model: "gpt-5",
+      operations: [:generation],
+      delivery: { streaming: true, structured_output: true }
+    )
+
+    assert_equal %i[generation streaming structured_output], definition.capabilities
+  end
+
+  def test_decision_only_model_declares_operation_and_question_kinds_only
+    definition = @registry.register(
+      provider: :typesafe,
+      key: "jev-latest",
+      model: "jev-latest",
+      operations: [:decision],
+      decision_types: %i[choice score noul],
+      modalities: { input: [:text], output: [] }
+    )
+
+    assert_equal [:decision], definition.operations
+    assert_equal %i[choice score noul], definition.decision_types
+    assert_equal %i[decision decision_choice decision_score decision_noul], definition.capabilities
+    refute_includes definition.capabilities, :generation
+  end
+
+  def test_decision_model_may_declare_a_single_question_kind
+    definition = @registry.register(
+      provider: :typesafe,
+      key: "jev-noul",
+      model: "jev-noul",
+      operations: [:decision],
+      decision_types: [:noul]
+    )
+
+    assert_equal %i[decision decision_noul], definition.capabilities
+  end
+
+  def test_unknown_operation_raises
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      @registry.register(provider: :openai, key: "gpt-5", model: "gpt-5", operations: %i[generation divination])
+    end
+    assert_match(/unknown model operations: divination/, error.message)
+  end
+
+  def test_empty_operations_raises
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      @registry.register(provider: :openai, key: "gpt-5", model: "gpt-5", operations: [])
+    end
+    assert_match(/model operations must not be empty/, error.message)
+  end
+
+  def test_decision_operation_requires_decision_types
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      @registry.register(provider: :typesafe, key: "jev-latest", model: "jev-latest", operations: [:decision])
+    end
+    assert_match(/decision_types is required when operations include :decision/, error.message)
+  end
+
+  def test_decision_types_require_the_decision_operation
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      @registry.register(provider: :openai, key: "gpt-5", model: "gpt-5", decision_types: [:choice])
+    end
+    assert_match(/decision_types requires operations to include :decision/, error.message)
+  end
+
+  def test_unknown_decision_type_raises
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      @registry.register(provider: :typesafe, key: "jev-latest", model: "jev-latest",
+                         operations: [:decision], decision_types: %i[choice vibes])
+    end
+    assert_match(/unknown decision types: vibes/, error.message)
+  end
+
+  def test_generation_delivery_flags_require_the_generation_operation
+    %i[streaming structured_output batch batch_cancellation].each do |flag|
+      error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+        @registry.register(provider: :typesafe, key: "jev-latest", model: "jev-latest",
+                           operations: [:decision], decision_types: [:noul], delivery: { flag => true })
+      end
+      assert_match(/delivery #{flag} requires operations to include :generation/, error.message)
+    end
+  end
+
+  def test_builtin_jev_is_registered_as_a_decision_only_model
+    definition = RecordingStudioAI.models.fetch(:typesafe, "jev-latest")
+
+    assert_equal "Jev", definition.display_name
+    assert_equal [:decision], definition.operations
+    assert_equal %i[choice score noul], definition.decision_types
+    assert_equal %i[decision decision_choice decision_score decision_noul], definition.capabilities
+    assert_empty definition.parameters
+    assert_empty definition.tools
+    assert_equal [:text], definition.modalities[:input]
+  end
+
+  def test_builtin_generation_models_declare_the_generation_operation_only
+    [[:openai, "gpt-5-mini"], [:openai, "gpt-5"], [:openai, "gpt-5-pro"],
+     [:gemini, "gemini-2.5-flash"], [:gemini, "gemini-2.5-pro"]].each do |provider, model|
+      definition = RecordingStudioAI.models.fetch(provider, model)
+
+      assert_equal [:generation], definition.operations, "#{provider}/#{model} operations"
+      assert_empty definition.decision_types, "#{provider}/#{model} decision_types"
+      refute_includes definition.capabilities, :decision, "#{provider}/#{model} capabilities"
+    end
+  end
+
   def test_duplicate_registration_raises_without_override
     @registry.register(provider: :openai, key: "gpt-5", model: "gpt-5")
 
@@ -119,6 +235,7 @@ class ModelsRegistryTest < Minitest::Test
     assert registry.fetch(:openai, "gpt-5-pro")
     assert registry.fetch(:gemini, "gemini-2.5-flash")
     assert registry.fetch(:gemini, "gemini-2.5-pro")
+    assert registry.fetch(:typesafe, "jev-latest")
   end
 
   def test_resolver_derives_capabilities_from_registry_when_profile_omits_them

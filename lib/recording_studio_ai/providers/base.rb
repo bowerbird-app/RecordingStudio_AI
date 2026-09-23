@@ -31,6 +31,12 @@ module RecordingStudioAI
         raise NotImplementedError, "#{self.class} must implement #generate"
       end
 
+      # Unlike the generation and batch contract methods this raises a
+      # StandardError, so capability filtering and AttemptRunner both see it.
+      def decide(request:, candidate:) # rubocop:disable Lint/UnusedMethodArgument -- provider contract
+        raise UnsupportedOperationError.new(operation: :decision, provider: self.class.provider_key)
+      end
+
       def stream(request:, candidate:)
         raise NotImplementedError, "#{self.class} must implement #stream"
       end
@@ -82,6 +88,11 @@ module RecordingStudioAI
       def failed_result(error)
         normalized = normalize_failure(error)
         Result.new(error: normalized, retention_snapshot: error_retention_snapshot(normalized))
+      end
+
+      def failed_decision_result(error)
+        normalized = normalize_failure(error)
+        DecisionResult.new(error: normalized, retention_snapshot: error_retention_snapshot(normalized))
       end
 
       def failed_batch_result(error, status: "failed", provider_batch_id: nil)

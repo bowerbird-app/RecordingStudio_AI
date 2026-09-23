@@ -7,6 +7,7 @@ RecordingStudioAI.models.register(
   key: "gpt-5-mini",
   model: "gpt-5-mini",
   display_name: "GPT-5 Mini",
+  operations: [:generation],
   delivery: RecordingStudioAI::Models::Openai::Constants::DELIVERY,
   parameters: {
     temperature: RecordingStudioAI::Models::Openai::Constants::TEMPERATURE,

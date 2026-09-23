@@ -7,6 +7,7 @@ RecordingStudioAI.models.register(
   key: "gemini-2-5-pro",
   model: "gemini-2.5-pro",
   display_name: "Gemini 2.5 Pro",
+  operations: [:generation],
   delivery: RecordingStudioAI::Models::Gemini::Constants::DELIVERY,
   parameters: {
     temperature: RecordingStudioAI::Models::Gemini::Constants::TEMPERATURE,

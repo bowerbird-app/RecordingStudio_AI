@@ -12,29 +12,35 @@ module RecordingStudioAI
       end
 
       def execute(request, candidate, operation:, parameter_overrides: {})
-        request = apply_resolved_generation_parameters!(
-          request, candidate, parameter_overrides: parameter_overrides
-        )
+        unless operation == :decision
+          request = apply_resolved_generation_parameters!(
+            request, candidate, parameter_overrides: parameter_overrides
+          )
+        end
         buffer_stream_events = operation == :stream && request[:schema]
         @stream_session&.start_buffering! if buffer_stream_events
         result = run_provider(request, candidate, operation: operation)
-        ensure_provider_result!(result)
-        result = apply_cost_and_schema(result, request, candidate)
+        ensure_result_for_operation!(result, operation: operation)
+        result = apply_cost_and_schema(result, request, candidate, operation: operation)
         @stream_session&.flush_buffer if buffer_stream_events && result.success?
         result
       rescue RecordingStudioAI::Orchestrator::StreamConsumerError
         raise
       rescue RecordingStudioAI::Orchestrator::StreamIdleTimeout
-        timeout_result(candidate, code: "stream_idle_timeout",
+        timeout_result(candidate, operation: operation, code: "stream_idle_timeout",
                                   message: "AI stream exceeded its configured idle timeout.", retryable: false)
       rescue RecordingStudioAI::Orchestrator::ProviderRequestTimeout
-        timeout_result(candidate, code: "provider_timeout",
+        timeout_result(candidate, operation: operation, code: "provider_timeout",
                                   message: "AI provider request exceeded its configured timeout.", retryable: true)
       rescue Timeout::Error
-        timeout_result(candidate, code: "execution_deadline_exceeded",
+        timeout_result(candidate, operation: operation, code: "execution_deadline_exceeded",
                                   message: "AI execution exceeded its configured deadline.", retryable: false)
+      # NotImplementedError is a ScriptError, so the rescue below cannot see the
+      # unimplemented provider-contract defaults.
+      rescue RecordingStudioAI::Providers::UnsupportedOperationError, NotImplementedError
+        unsupported_operation_result(candidate, operation: operation)
       rescue StandardError
-        provider_failure(candidate)
+        provider_failure(candidate, operation: operation)
       ensure
         @stream_session&.clear_buffer! if buffer_stream_events
       end
@@ -48,18 +54,26 @@ module RecordingStudioAI
       def run_provider(request, candidate, operation:)
         timeout, timeout_error = provider_timeout(request)
         Timeout.timeout(timeout, timeout_error) do
-          if operation == :stream
+          case operation
+          when :stream
             @stream_provider.execute(request, candidate)
-          else
+          when :generation
             provider_for!(candidate).generate(request: request, candidate: candidate)
+          when :decision
+            provider_for!(candidate).decide(request: request, candidate: candidate)
+          else
+            raise RecordingStudioAI::Providers::UnsupportedOperationError.new(
+              operation: operation, provider: candidate.provider
+            )
           end
         end
       end
 
-      def apply_cost_and_schema(result, request, candidate)
+      def apply_cost_and_schema(result, request, candidate, operation:)
         result = RecordingStudioAI::CostCalculator.apply(
           result, provider: candidate.provider, model: candidate.model, configuration: @configuration
         )
+        return result if operation == :decision
         return result unless result.tool_calls.empty?
 
         RecordingStudioAI::StructuredOutput.apply(
@@ -104,14 +118,21 @@ module RecordingStudioAI
         [remaining, Timeout::Error]
       end
 
-      def ensure_provider_result!(result)
-        return if result.is_a?(RecordingStudioAI::Providers::Result)
+      def ensure_result_for_operation!(result, operation:)
+        expected = result_class(operation)
+        return if result.is_a?(expected)
 
-        raise TypeError, "Provider must return RecordingStudioAI::Providers::Result"
+        raise TypeError, "Provider must return #{expected}"
       end
 
-      def timeout_result(candidate, code:, message:, retryable:)
-        RecordingStudioAI::Providers::Result.new(
+      def result_class(operation)
+        return RecordingStudioAI::Providers::DecisionResult if operation == :decision
+
+        RecordingStudioAI::Providers::Result
+      end
+
+      def timeout_result(candidate, operation:, code:, message:, retryable:)
+        result_class(operation).new(
           error: RecordingStudioAI::Contracts::NormalizedError.new(
             category: "timeout",
             code: code,
@@ -122,8 +143,20 @@ module RecordingStudioAI
         )
       end
 
-      def provider_failure(candidate)
-        RecordingStudioAI::Providers::Result.new(
+      def unsupported_operation_result(candidate, operation:)
+        result_class(operation).new(
+          error: RecordingStudioAI::Contracts::NormalizedError.new(
+            category: "configuration",
+            code: "unsupported_operation",
+            message: "Provider does not implement the requested operation.",
+            retryable: false,
+            provider: candidate.provider.to_s
+          )
+        )
+      end
+
+      def provider_failure(candidate, operation:)
+        result_class(operation).new(
           error: RecordingStudioAI::Contracts::NormalizedError.new(
             category: "provider_error",
             code: "provider_execution_error",

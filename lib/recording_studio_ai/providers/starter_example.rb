@@ -19,7 +19,8 @@ module RecordingStudioAI
                 failed_result(e)
               end
 
-              # Add #stream and the batch methods only when your models support them.
+              # Implement only the operations your vendor supports. Add #stream,
+              # #decide, and the batch methods when your models support them.
 
               private
 

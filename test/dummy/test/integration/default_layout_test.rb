@@ -25,7 +25,7 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
   end
 
   test "host pages use the dummy sidebar shell with rounded theme and Flatpack assets" do
-    [ root_path, ai_playground_path, gem_config_path, gem_methods_path ].each do |path|
+    [ root_path, ai_playground_path, decision_playground_path, gem_config_path, gem_methods_path ].each do |path|
       get path
 
       assert_response :success, path

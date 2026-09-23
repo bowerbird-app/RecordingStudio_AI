@@ -10,6 +10,8 @@ class ProviderCapabilityContractTest < Minitest::Test
     provider_native_web_search custom_tools provider_batch provider_batch_cancellation
   ].freeze
 
+  DECISION_CONTRACT_CAPABILITIES = %i[decision decision_choice decision_score decision_noul].freeze
+
   ToolDefinition = Struct.new(:key, :provider_description, :json_schema)
   Batch = Struct.new(:provider_batch_id, :status)
 
@@ -141,15 +143,74 @@ class ProviderCapabilityContractTest < Minitest::Test
   def test_default_profile_declarations_are_exactly_covered_by_contract
     declarations = RecordingStudioAI::Configuration.new.profiles.values.flatten
 
-    assert_equal %i[gemini openai], declarations.map { |entry| entry.fetch(:provider) }.uniq.sort
+    assert_equal %i[gemini openai typesafe], declarations.map { |entry| entry.fetch(:provider) }.uniq.sort
     declarations.each do |entry|
       attributes = entry.transform_keys(&:to_sym)
       capabilities = attributes[:capabilities] ||
                      RecordingStudioAI.models.fetch(attributes.fetch(:provider), attributes.fetch(:model))&.capabilities
       assert capabilities, "#{attributes.fetch(:provider)} #{attributes.fetch(:model)} is missing capabilities"
-      assert_equal CONTRACT_CAPABILITIES.sort, capabilities.sort,
+      expected = attributes.fetch(:provider) == :typesafe ? DECISION_CONTRACT_CAPABILITIES : CONTRACT_CAPABILITIES
+      assert_equal expected.sort, capabilities.sort,
                    "#{attributes.fetch(:provider)} #{attributes.fetch(:model)} changed the shared capability contract"
     end
+  end
+
+  class DecisionClient
+    def decide(model:, state:, questions:)
+      {
+        "model" => "jev-1.13.0",
+        "answers" => { "verdict" => { "type" => "noul", "noul" => 0.91 } },
+        "usage" => { "input_tokens" => 10, "output_tokens" => 2 }
+      }
+    end
+  end
+
+  def test_typesafe_satisfies_the_decision_operation_contract
+    configuration = RecordingStudioAI::Configuration.new
+    configuration.typesafe_client = DecisionClient.new
+    adapter = RecordingStudioAI::Providers::TypeSafe.new(configuration: configuration)
+    candidate = RecordingStudioAI::Candidate.new(
+      provider: :typesafe, model: "jev-latest", capabilities: DECISION_CONTRACT_CAPABILITIES
+    )
+
+    result = adapter.decide(request: decision_request, candidate: candidate)
+
+    assert_instance_of RecordingStudioAI::Providers::DecisionResult, result
+    assert result.success?
+    assert_equal 0.91, result.answers.fetch(:verdict).probability
+    refute_respond_to result, :text
+    refute_respond_to result, :structured_data
+    refute_respond_to result, :tool_calls
+  end
+
+  def test_generation_providers_do_not_implement_decide
+    configuration = RecordingStudioAI::Configuration.new
+    candidate = RecordingStudioAI::Candidate.new(
+      provider: :openai, model: "gpt-5", capabilities: CONTRACT_CAPABILITIES
+    )
+
+    [RecordingStudioAI::Providers::OpenAI, RecordingStudioAI::Providers::Gemini].each do |provider_class|
+      adapter = provider_class.new(configuration: configuration)
+      error = assert_raises(RecordingStudioAI::Providers::UnsupportedOperationError) do
+        adapter.decide(request: decision_request, candidate: candidate)
+      end
+      assert_equal :decision, error.operation
+      assert_equal provider_class.provider_key, error.provider
+    end
+  end
+
+  def test_typesafe_does_not_implement_generation_stream_or_batches
+    adapter = RecordingStudioAI::Providers::TypeSafe.new(configuration: RecordingStudioAI::Configuration.new)
+    candidate = RecordingStudioAI::Candidate.new(
+      provider: :typesafe, model: "jev-latest", capabilities: DECISION_CONTRACT_CAPABILITIES
+    )
+
+    assert_raises(NotImplementedError) { adapter.generate(request: base_request, candidate: candidate) }
+    assert_raises(NotImplementedError) { adapter.stream(request: base_request, candidate: candidate) }
+    assert_raises(NotImplementedError) { adapter.submit_batch(request: batch_request, candidate: candidate) }
+    batch = Batch.new("b", "submitted")
+    assert_raises(NotImplementedError) { adapter.refresh_batch(batch: batch, candidate: candidate) }
+    assert_raises(NotImplementedError) { adapter.cancel_batch(batch: batch, candidate: candidate) }
   end
 
   private
@@ -210,6 +271,15 @@ class ProviderCapabilityContractTest < Minitest::Test
       configuration.gemini_client = client
       [RecordingStudioAI::Providers::Gemini.new(configuration: configuration), client]
     end
+  end
+
+  def decision_request
+    {
+      state: RecordingStudioAI::Decisions::State.parse("Article body."),
+      questions: RecordingStudioAI::Decisions::QuestionSet.parse(
+        verdict: { type: :noul, instructions: "Mentioned?" }
+      )
+    }
   end
 
   def base_request

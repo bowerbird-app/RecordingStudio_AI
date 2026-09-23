@@ -12,6 +12,9 @@ module RecordingStudioAI
     class Definition
       KEY_FORMAT = /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/
 
+      OPERATIONS = %i[generation decision].freeze
+      DECISION_TYPES = %i[choice score noul].freeze
+
       DELIVERY_KEYS = %i[streaming structured_output batch batch_cancellation].freeze
 
       KNOWN_PARAMETERS = %i[temperature verbosity max_output_tokens reasoning_effort].freeze
@@ -22,14 +25,17 @@ module RecordingStudioAI
 
       MODALITIES = %i[text image audio video file].freeze
 
-      attr_reader :provider, :key, :model, :display_name, :delivery, :parameters, :tools, :modalities, :metadata
+      attr_reader :provider, :key, :model, :display_name, :operations, :decision_types, :delivery, :parameters,
+                  :tools, :modalities, :metadata
 
-      def initialize(provider:, key:, model:, display_name: nil, delivery: {}, parameters: {}, tools: [],
-                     modalities: {}, metadata: {})
+      def initialize(provider:, key:, model:, display_name: nil, operations: [:generation], decision_types: [],
+                     delivery: {}, parameters: {}, tools: [], modalities: {}, metadata: {})
         @provider = normalize_provider(provider)
         @key = normalize_key(key)
         @model = normalize_model(model)
         @display_name = display_name.to_s.strip.presence || @key.tr("-", " ").split.map(&:capitalize).join(" ")
+        @operations = normalize_operations(operations)
+        @decision_types = normalize_decision_types(decision_types)
         @delivery = normalize_delivery(delivery)
         @parameters = normalize_parameters(parameters)
         @tools = normalize_tools(tools)
@@ -42,7 +48,8 @@ module RecordingStudioAI
       # Translate the declarative definition into the internal capability
       # symbols the resolver uses to match candidates against a request.
       def capabilities
-        capabilities = [:generation]
+        capabilities = operations.dup
+        capabilities.concat(decision_types.map { |type| :"decision_#{type}" })
         capabilities << :streaming if delivery[:streaming]
         capabilities << :structured_output if delivery[:structured_output]
         capabilities << :provider_batch if delivery[:batch]
@@ -72,6 +79,8 @@ module RecordingStudioAI
           key: key,
           model: model,
           display_name: display_name,
+          operations: operations,
+          decision_types: decision_types,
           delivery: delivery,
           parameters: parameters,
           tools: tools,
@@ -106,12 +115,45 @@ module RecordingStudioAI
         model
       end
 
+      def normalize_operations(value)
+        operations = Array(value).map(&:to_sym).uniq
+        validation_error!("model operations must not be empty") if operations.empty?
+        unknown = operations - OPERATIONS
+        if unknown.any?
+          validation_error!("unknown model operations: #{unknown.join(', ')} (known: #{OPERATIONS.join(', ')})")
+        end
+
+        operations.freeze
+      end
+
+      def normalize_decision_types(value)
+        types = Array(value).map(&:to_sym).uniq
+        unless @operations.include?(:decision)
+          validation_error!("decision_types requires operations to include :decision") if types.any?
+
+          return [].freeze
+        end
+
+        validation_error!("decision_types is required when operations include :decision") if types.empty?
+        unknown = types - DECISION_TYPES
+        if unknown.any?
+          validation_error!("unknown decision types: #{unknown.join(', ')} (known: #{DECISION_TYPES.join(', ')})")
+        end
+
+        types.freeze
+      end
+
       def normalize_delivery(value)
         validation_error!("model delivery must be a Hash") unless value.is_a?(Hash)
 
         delivery = value.transform_keys(&:to_sym)
         unknown = delivery.keys - DELIVERY_KEYS
         validation_error!("unknown delivery keys: #{unknown.join(', ')}") if unknown.any?
+
+        enabled = delivery.select { |_key, flag| flag == true }.keys
+        if enabled.any? && !@operations.include?(:generation)
+          validation_error!("delivery #{enabled.join(', ')} requires operations to include :generation")
+        end
 
         DELIVERY_KEYS.to_h { |delivery_key| [delivery_key, delivery.fetch(delivery_key, false) == true] }.freeze
       end

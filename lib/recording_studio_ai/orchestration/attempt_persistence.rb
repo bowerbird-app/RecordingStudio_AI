@@ -19,7 +19,7 @@ module RecordingStudioAI
           streaming: run.operation == "stream",
           **attachment_metadata,
           provider_file_count: %i[openai gemini].include?(planned.candidate.provider) ? 0 : nil,
-          web_search_requested: request[:provider_native_tools].include?(:web_search),
+          web_search_requested: Array(request[:provider_native_tools]).include?(:web_search),
           started_at: Time.current
         )
       end
@@ -31,13 +31,25 @@ module RecordingStudioAI
                             result, started_at: attempt.started_at, completed_at: completed_at
                           ),
                           provider_request_id: result.provider_request_id,
-                          finish_reason: result.finish_reason,
                           retryable: result.error&.retryable?,
-                          web_search_used: result.provider_native_tools.include?("web_search"),
-                          citation_count: result.citations.length,
-                          metadata: result.metadata
+                          metadata: result.metadata,
+                          **generation_attributes(result)
                         ))
         RecordingStudioAI::Retention.retain_attempt!(attempt, result, configuration: @configuration)
+      end
+
+      private
+
+      def generation_attributes(result)
+        if result.is_a?(RecordingStudioAI::Providers::DecisionResult)
+          return { finish_reason: nil, web_search_used: false, citation_count: 0 }
+        end
+
+        {
+          finish_reason: result.finish_reason,
+          web_search_used: result.provider_native_tools.include?("web_search"),
+          citation_count: result.citations.length
+        }
       end
     end
   end

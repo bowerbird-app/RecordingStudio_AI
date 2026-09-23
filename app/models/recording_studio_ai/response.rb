@@ -8,7 +8,8 @@ module RecordingStudioAI
       generation: "generation",
       stream: "stream",
       batch_item: "batch_item",
-      error: "error"
+      error: "error",
+      decision: "decision"
     }.freeze
 
     enum :response_type, RESPONSE_TYPES, validate: true

@@ -9,16 +9,46 @@ module RecordingStudioAI
       end
 
       def plan(request, operation:)
-        capability_operation = operation == :stream ? :streaming : :generation
-        capabilities = RecordingStudioAI::Capabilities.for_request(request, operation: capability_operation)
-        return explicit_fallbacks_plan(request, capabilities) if request[:fallbacks]
-        return pinned_primary_plan(request, capabilities) if pinned_primary?(request)
-
-        profiles = [request[:profile]] + fallback_profiles(request[:profile])
-        profiles.flat_map { |profile| candidates_for(profile, request, capabilities) }
+        capabilities = required_capabilities(request, operation)
+        plan = if request[:fallbacks]
+                 explicit_fallbacks_plan(request, capabilities)
+               elsif pinned_primary?(request)
+                 pinned_primary_plan(request, capabilities)
+               else
+                 profiles = [request[:profile]] + fallback_profiles(request[:profile])
+                 profiles.flat_map { |profile| candidates_for(profile, request, capabilities) }
+               end
+        without_repeated_candidates(plan)
       end
 
       private
+
+      # Operation dispatch is exhaustive. No unknown operation silently plans a
+      # generation candidate.
+      def required_capabilities(request, operation)
+        case operation
+        when :generation
+          RecordingStudioAI::Capabilities.for_request(request, operation: :generation)
+        when :stream
+          RecordingStudioAI::Capabilities.for_request(request, operation: :streaming)
+        when :decision
+          RecordingStudioAI::Capabilities.for_decision(request)
+        else
+          raise RecordingStudioAI::Providers::UnsupportedOperationError.new(operation: operation)
+        end
+      end
+
+      # Profile lists can name the same provider and model on more than one tier.
+      # One plan runs that candidate once. Retries are a separate counter.
+      def without_repeated_candidates(plan)
+        seen = {}
+        plan.select do |planned|
+          key = [planned.candidate.provider, planned.candidate.model]
+          next false if seen[key]
+
+          seen[key] = true
+        end
+      end
 
       def pinned_primary?(request)
         !request[:provider].nil? && !request[:model].nil?

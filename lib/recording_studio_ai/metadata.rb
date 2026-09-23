@@ -4,8 +4,12 @@ require "uri"
 
 module RecordingStudioAI
   module Metadata
-    SENSITIVE_KEY = /(?:authorization|credential|header|cookie|password|passwd|secret|signed[_-]?url|api[_-]?key|access[_-]?key|private[_-]?key|openai[_-]?key|gemini[_-]?key|(?:^|[_-])token(?:$|[_-]))/i
-    PAYLOAD_KEY = /\A(?:prompt|messages?|system_instruction|content|contents|payload|body|file_bytes|attachment(?:_data|_bytes)?|arguments?|results?|tool_(?:arguments?|results?)|raw_(?:request|response)|request_body|response_body)\z/i
+    SENSITIVE_KEY = /
+      (?:authorization|credential|header|cookie|password|passwd|secret|signed[_-]?url|
+      api[_-]?key|access[_-]?key|private[_-]?key|
+      openai[_-]?key|gemini[_-]?key|typesafe[_-]?key|(?:^|[_-])token(?:$|[_-]))
+    /ix
+    PAYLOAD_KEY = /\A(?:prompt|messages?|system_instruction|content|contents|payload|body|file_bytes|attachment(?:_data|_bytes)?|arguments?|results?|tool_(?:arguments?|results?)|raw_(?:request|response)|request_body|response_body|state|questions?|instructions|criteria)\z/i
     SENSITIVE_QUERY_KEY = /(?:key|token|signature|credential|password|secret|auth|x-amz-|x-goog-)/i
 
     module_function

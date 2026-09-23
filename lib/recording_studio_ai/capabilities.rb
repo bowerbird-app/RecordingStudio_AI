@@ -4,6 +4,10 @@ module RecordingStudioAI
   module Capabilities
     ALL = %i[
       generation
+      decision
+      decision_choice
+      decision_score
+      decision_noul
       streaming
       structured_output
       image_input
@@ -13,6 +17,12 @@ module RecordingStudioAI
       provider_batch
       provider_batch_cancellation
     ].freeze
+
+    DECISION_BY_TYPE = {
+      choice: :decision_choice,
+      score: :decision_score,
+      noul: :decision_noul
+    }.freeze
 
     module_function
 
@@ -25,6 +35,12 @@ module RecordingStudioAI
       end
       capabilities << :custom_tools if Array(request[:custom_tools]).any?
       capabilities.uniq
+    end
+
+    # Decision candidates must declare the operation and every requested
+    # question kind. Nothing about generation delivery applies.
+    def for_decision(request)
+      [:decision, *request[:questions].types.map { |type| DECISION_BY_TYPE.fetch(type) }].uniq
     end
 
     def attachment_capabilities(attachments)

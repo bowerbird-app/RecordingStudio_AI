@@ -5,10 +5,15 @@ RecordingStudioAI.configure do |config|
     Rails.application.credentials.dig(:openai, :api_key) || ENV.fetch("OPENAI_API_KEY", nil)
   config.gemini_api_key =
     Rails.application.credentials.dig(:gemini, :api_key) || ENV.fetch("GEMINI_API_KEY", nil)
+  # TypeSafe powers RecordingStudioAI.decide. Jev is decision-only and is never
+  # selected for generation.
+  config.typesafe_api_key =
+    Rails.application.credentials.dig(:typesafe, :api_key) || ENV.fetch("TYPESAFE_API_KEY", nil)
 
   # Provider client objects may be injected for custom transport or testing.
   # config.openai_client = MyOpenAIClientFactory.build
   # config.gemini_client = MyGeminiClientFactory.build
+  # config.typesafe_client = MyTypeSafeClientFactory.build
   # Additional providers use the same names: config.<provider_key>_api_key and
   # config.<provider_key>_client, then RecordingStudioAI.register_provider.
 
@@ -18,18 +23,24 @@ RecordingStudioAI.configure do |config|
   # tools, and modalities come from the model registry (see the /config guide
   # and RecordingStudioAI.models.register). Edit this map for your own cost and
   # quality targets.
+  # Each tier lists generation candidates and decision candidates together;
+  # resolution matches the operation's capabilities, so `decide` only ever sees
+  # Jev and `generate` never does.
   config.profiles = {
     low: [
       { provider: :openai, model: "gpt-5-mini" },
-      { provider: :gemini, model: "gemini-2.5-flash" }
+      { provider: :gemini, model: "gemini-2.5-flash" },
+      { provider: :typesafe, model: "jev-latest" }
     ],
     medium: [
       { provider: :openai, model: "gpt-5" },
-      { provider: :gemini, model: "gemini-2.5-pro" }
+      { provider: :gemini, model: "gemini-2.5-pro" },
+      { provider: :typesafe, model: "jev-latest" }
     ],
     high: [
       { provider: :openai, model: "gpt-5-pro" },
-      { provider: :gemini, model: "gemini-2.5-pro" }
+      { provider: :gemini, model: "gemini-2.5-pro" },
+      { provider: :typesafe, model: "jev-latest" }
     ]
   }
   # Rates are integer microunits per one million tokens, keyed by provider/model.
@@ -72,6 +83,12 @@ RecordingStudioAI.configure do |config|
   # Staff lists and saved-reply decrypt live on Recording Studio Admin. Install
   # that gem, mount it, and grant Accessible access. There is no engine /admin.
   config.maximum_attempts = 3
+  # Decision input caps. Raise maximum_decision_questions for a larger question
+  # set, and raise maximum_decision_characters when those questions are long.
+  config.maximum_decision_questions = 20
+  config.maximum_decision_state_characters = 60_000
+  config.maximum_decision_text_characters = 4_000
+  config.maximum_decision_characters = 80_000
   config.maximum_attachment_count = 10
   config.maximum_attachment_bytes = 20.megabytes
   config.maximum_attachment_total_bytes = 50.megabytes

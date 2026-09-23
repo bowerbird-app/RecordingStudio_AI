@@ -2,10 +2,9 @@
 
 module RecordingStudioAI
   module Providers
-    class Result
+    class Result < ExecutionResult
       attr_reader :text, :structured_data, :citations, :provider_native_tools,
-                  :custom_tool_invocations, :tool_calls, :finish_reason, :usage, :cost,
-                  :provider_request_id, :error, :metadata, :retention_snapshot
+                  :custom_tool_invocations, :tool_calls, :finish_reason
 
       def initialize(text: nil, structured_data: nil, citations: [], provider_native_tools: [],
                      custom_tool_invocations: [], tool_calls: [], finish_reason: nil, usage: nil, cost: nil,
@@ -32,19 +31,9 @@ module RecordingStudioAI
         end
         @tool_calls = tool_calls
         @finish_reason = finish_reason
-        @usage = usage
-        @cost = cost
-        @provider_request_id = provider_request_id
-        @error = error
-        @metadata = RecordingStudioAI::Metadata.sanitize!(metadata, path: "provider_result.metadata")
-        @retention_snapshot = RecordingStudioAI::Contracts::Containment.ensure_serializable!(
-          retention_snapshot,
-          path: "provider_result.retention_snapshot"
-        )
-      end
 
-      def success?
-        error.nil?
+        super(usage: usage, cost: cost, provider_request_id: provider_request_id, error: error,
+              metadata: metadata, retention_snapshot: retention_snapshot)
       end
 
       def with(**overrides)

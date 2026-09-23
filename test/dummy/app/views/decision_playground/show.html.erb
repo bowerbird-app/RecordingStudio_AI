@@ -1,0 +1,95 @@
+<% recording_studio_page_nav(title: "Decision playground", page_nav_anchor_url: root_path) %>
+
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Decision playground",
+    subtitle: "This page runs RecordingStudioAI.decide against a profile model.",
+    variant: :h1
+  ) %>
+
+  <% unless DecisionPlayground.provider_ready? %>
+    <%= render FlatPack::Alert::Component.new(
+      title: "Decision provider",
+      description: DecisionPlayground::EMPTY_PROVIDER_MESSAGE,
+      style: :warning
+    ) %>
+  <% end %>
+
+  <%= render FlatPack::Grid::Component.new(cols: 2, gap: :lg, align: :start) do %>
+    <div class="min-w-0">
+      <%= form_with url: main_app.decision_playground_path, method: :post, scope: :decision_playground,
+          class: "space-y-4" do %>
+        <%= render FlatPack::TextArea::Component.new(
+          name: "decision_playground[state]",
+          label: "State",
+          value: @form.state,
+          rows: 6
+        ) %>
+
+        <%= render FlatPack::Select::Component.new(
+          name: "decision_playground[profile]",
+          label: "Profile",
+          options: DecisionPlayground::PROFILES.map { |value, label| { value: value, label: label } },
+          value: @form.profile
+        ) %>
+
+        <%= render FlatPack::Select::Component.new(
+          name: "decision_playground[model]",
+          label: "Model",
+          options: [ { value: "", label: "Profile default" } ] + DecisionPlayground.model_options,
+          value: @form.model_value,
+          placeholder: nil
+        ) %>
+
+        <% form_rows = @form.rows + [
+          DecisionPlayground::QuestionRow.new(index: @form.rows.length, key: "", type: "noul", instructions: "", criteria_text: "")
+        ] %>
+        <% form_rows.each do |row| %>
+          <div class="space-y-3 rounded-lg border border-(--surface-border-color) p-4">
+            <%= render FlatPack::PageTitle::Component.new(
+              title: "Question #{row.index + 1}",
+              variant: :h4,
+              class: "mb-0 pb-0"
+            ) %>
+            <%= render FlatPack::TextInput::Component.new(
+              name: "decision_playground[questions][][key]",
+              label: "Key",
+              value: row.key
+            ) %>
+            <%= render FlatPack::Select::Component.new(
+              name: "decision_playground[questions][][type]",
+              label: "Type",
+              options: [
+                { value: "choice", label: "Choice" },
+                { value: "score", label: "Score" },
+                { value: "noul", label: "Noul" }
+              ],
+              value: row.type
+            ) %>
+            <%= render FlatPack::TextArea::Component.new(
+              name: "decision_playground[questions][][instructions]",
+              label: "Instructions",
+              value: row.instructions,
+              rows: 3
+            ) %>
+            <%= render FlatPack::TextArea::Component.new(
+              name: "decision_playground[questions][][criteria_text]",
+              label: "Criteria",
+              value: row.criteria_text,
+              rows: 4
+            ) %>
+          </div>
+        <% end %>
+
+        <%= render FlatPack::Button::Component.new(
+          text: "Run decision",
+          style: :primary,
+          type: "submit",
+          disabled: !DecisionPlayground.provider_ready?
+        ) %>
+      <% end %>
+    </div>
+
+    <%= render "decision_playground/result" %>
+  <% end %>
+</div>

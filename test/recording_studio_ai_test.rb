@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.3.2", RecordingStudioAI::VERSION
+    assert_equal "0.4.0", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -58,10 +58,11 @@ class RecordingStudioAITest < Minitest::Test
 
     migration_files = Dir[File.join(root, "db/migrate/*.rb")]
 
-    assert_equal 8, migration_files.size
+    assert_equal 9, migration_files.size
     assert migration_files.any? { |file| file.include?("create_recording_studio_ai_persistence_tables") }
     assert migration_files.any? { |file| file.include?("harden_recording_studio_ai_persistence") }
     assert migration_files.any? { |file| file.include?("enforce_recording_studio_ai_history_integrity") }
+    assert migration_files.any? { |file| file.include?("allow_recording_studio_ai_decision_executions") }
     assert migration_files.any? { |file| file.include?("add_prompt_attribution_to_recording_studio_ai_runs") }
     assert migration_files.any? do |file|
       file.include?("remove_prompt_namespace_and_short_name_from_recording_studio_ai_runs")

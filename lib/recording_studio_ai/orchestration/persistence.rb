@@ -25,8 +25,8 @@ module RecordingStudioAI
         @runs.complete!(run, executions, final_execution)
       end
 
-      def complete_deadline_failure(request, run, operation:)
-        @runs.complete_deadline_failure(request, run, operation: operation)
+      def complete_deadline_failure(run)
+        @runs.complete_deadline_failure(run)
       end
 
       def aggregate_usage(executions)
