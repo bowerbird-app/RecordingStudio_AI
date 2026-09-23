@@ -20,10 +20,9 @@ module RecordingStudioAI
           unless value.is_a?(String) && !value.strip.empty?
             Decisions.validation_error!("state must be a non-empty String")
           end
-          if value.length > Decisions::MAXIMUM_STATE_CHARACTERS
-            Decisions.validation_error!(
-              "state must be at most #{Decisions::MAXIMUM_STATE_CHARACTERS} characters"
-            )
+          limit = Decisions.maximum_state_characters
+          if value.length > limit
+            Decisions.validation_error!("state must be at most #{limit} characters")
           end
 
           @value = value.dup.freeze

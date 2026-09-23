@@ -110,6 +110,12 @@ RecordingStudioAI.configure do |config|
   config.admin_warning_thresholds = RecordingStudioAI::Configuration.new.admin_warning_thresholds
   config.admin_slow_call_threshold_ms = 10_000
   config.maximum_attempts = 3
+  # Decision input caps. Raise maximum_decision_questions for a larger question
+  # set, and raise maximum_decision_characters when those questions are long.
+  config.maximum_decision_questions = 20
+  config.maximum_decision_state_characters = 60_000
+  config.maximum_decision_text_characters = 4_000
+  config.maximum_decision_characters = 80_000
   config.maximum_retries_per_candidate = 1
   config.retry_backoff_base = 0.25 # seconds
   config.retry_backoff_max = 5.0   # seconds
@@ -352,9 +358,15 @@ boundary, or construct them directly:
   and `false`. String keys `"true"` and `"false"` are rejected. The answer
   exposes a single `probability` and deliberately has no `confidence`.
 
-State is at most 60,000 characters. A request has at most 20 questions. Each
-instruction, criterion description, and score label is at most 4,000 characters.
-State plus those texts together stay within 80,000 characters.
+The defaults cap state at 60,000 characters and a request at 20 questions. Each
+instruction, criterion description, and score label is at most 4,000 characters,
+and state plus those texts stay within 80,000 characters. Raise them together
+when a call needs more room:
+
+```ruby
+config.maximum_decision_questions = 40
+config.maximum_decision_characters = 200_000
+```
 
 Answers are keyed by the caller's original question key, String or Symbol, and
 `:risk` alongside `"risk"` is rejected rather than merged. `response.model` is

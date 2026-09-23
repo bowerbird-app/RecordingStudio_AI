@@ -35,6 +35,10 @@ module RecordingStudioAI
       :maximum_profile_fallbacks,
       :maximum_retries_per_candidate,
       :maximum_retained_response_size,
+      :maximum_decision_questions,
+      :maximum_decision_state_characters,
+      :maximum_decision_text_characters,
+      :maximum_decision_characters,
       :instrumentation_enabled,
       :notification_namespace,
       :openai_api_key,
@@ -117,6 +121,10 @@ module RecordingStudioAI
       @maximum_profile_fallbacks = 1
       @maximum_retries_per_candidate = 1
       @maximum_retained_response_size = 1.megabyte
+      @maximum_decision_questions = Decisions::MAXIMUM_QUESTIONS
+      @maximum_decision_state_characters = Decisions::MAXIMUM_STATE_CHARACTERS
+      @maximum_decision_text_characters = Decisions::MAXIMUM_TEXT_CHARACTERS
+      @maximum_decision_characters = Decisions::MAXIMUM_DECISION_CHARACTERS
       @instrumentation_enabled = true
       @notification_namespace = "recording_studio_ai"
       @openai_api_key = ENV.fetch("OPENAI_API_KEY", nil)
@@ -161,6 +169,20 @@ module RecordingStudioAI
 
     def validate!
       validate_integer!(:maximum_attempts, minimum: 1)
+      %i[
+        maximum_decision_questions maximum_decision_state_characters
+        maximum_decision_text_characters maximum_decision_characters
+      ].each { |name| validate_integer!(name, minimum: 1) }
+      if maximum_decision_characters < maximum_decision_state_characters
+        invalid_configuration!(
+          "maximum_decision_characters must be at least maximum_decision_state_characters"
+        )
+      end
+      if maximum_decision_characters < maximum_decision_text_characters
+        invalid_configuration!(
+          "maximum_decision_characters must be at least maximum_decision_text_characters"
+        )
+      end
       %i[
         maximum_attachment_count maximum_attachment_bytes maximum_attachment_total_bytes
         maximum_custom_tool_rounds maximum_custom_tool_arguments_size maximum_custom_tool_result_size maximum_provider_fallbacks

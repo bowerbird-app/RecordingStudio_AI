@@ -83,6 +83,12 @@ RecordingStudioAI.configure do |config|
   # Staff lists and saved-reply decrypt live on Recording Studio Admin. Install
   # that gem, mount it, and grant Accessible access. There is no engine /admin.
   config.maximum_attempts = 3
+  # Decision input caps. Raise maximum_decision_questions for a larger question
+  # set, and raise maximum_decision_characters when those questions are long.
+  config.maximum_decision_questions = 20
+  config.maximum_decision_state_characters = 60_000
+  config.maximum_decision_text_characters = 4_000
+  config.maximum_decision_characters = 80_000
   config.maximum_attachment_count = 10
   config.maximum_attachment_bytes = 20.megabytes
   config.maximum_attachment_total_bytes = 50.megabytes
