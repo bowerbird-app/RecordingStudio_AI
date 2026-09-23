@@ -5,6 +5,27 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-23
+
+`RecordingStudioAI.decide` runs a typed decision. TypeSafe Jev is the first decision-only model. `generate` still never selects it.
+
+### Added
+
+- `RecordingStudioAI.decide` and `decide!`. Questions are Choice, Score, or Noul, and answers keep the caller's original keys.
+- TypeSafe provider `:typesafe`, model `jev-latest`, operation `:decision`. It is appended to the low, medium, and high profiles and dropped when `typesafe_api_key` is absent.
+- Decision input caps: `maximum_decision_questions` (20), `maximum_decision_state_characters` (60_000), `maximum_decision_text_characters` (4_000), and `maximum_decision_characters` (80_000).
+- Dummy `/decision_playground` calls `decide` and shows the served model. It does not generate.
+
+### Changed
+
+- Profile planning keeps one copy of a repeated provider and model for every operation. A second try is a retry, not another copy of the same candidate.
+- `typesafe_key` is redacted with the other provider secrets.
+
+### Upgrade notes
+
+- Set `config.typesafe_api_key` and include `:typesafe` in `allowed_provider_overrides` before calling `decide`. Raise `maximum_decision_questions` when a call needs more than 20 questions, and raise `maximum_decision_characters` when those questions are long.
+- Hosts that listed the same generative model on more than one profile fallback now run that candidate once.
+
 ## [0.3.2] - Unreleased
 
 Staff use Recording Studio Admin only. The engine `/admin` chrome is gone.
@@ -663,7 +684,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.2.0...v0.3.0
