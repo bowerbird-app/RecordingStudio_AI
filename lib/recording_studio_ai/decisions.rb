@@ -57,9 +57,7 @@ module RecordingStudioAI
     def non_empty_string!(value, path:, maximum: nil)
       maximum ||= maximum_text_characters
       validation_error!("#{path} must be a non-empty String") unless value.is_a?(String) && !value.strip.empty?
-      if value.length > maximum
-        validation_error!("#{path} must be at most #{maximum} characters")
-      end
+      validation_error!("#{path} must be at most #{maximum} characters") if value.length > maximum
 
       value.dup.freeze
     end
@@ -82,17 +80,22 @@ module RecordingStudioAI
     end
 
     def text_characters(question)
+      question.instructions.length + criteria_characters(question)
+    end
+
+    def criteria_characters(question)
       case question
-      when Choice
-        question.instructions.length + question.criteria.sum { |criterion| criterion.description.to_s.length }
-      when Score
-        question.instructions.length + question.criteria.sum(&:length)
-      when Noul
-        descriptions = question.criteria ? question.criteria.values : []
-        question.instructions.length + descriptions.sum(&:length)
-      else
-        question.instructions.length
+      when Choice then question.criteria.sum { |criterion| criterion.description.to_s.length }
+      when Score then question.criteria.sum(&:length)
+      when Noul then noul_criteria_characters(question)
+      else 0
       end
+    end
+
+    def noul_criteria_characters(question)
+      return 0 unless question.criteria
+
+      question.criteria.values.sum(&:length)
     end
   end
 end

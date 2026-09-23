@@ -20,16 +20,23 @@ module RecordingStudioAI
       private
 
       def validate_decision_fields!
-        unless answers.is_a?(RecordingStudioAI::Decisions::AnswerSet)
-          validation_error!("answers must be a RecordingStudioAI::Decisions::AnswerSet")
-        end
-        unless served_model.nil? || (served_model.is_a?(String) && !served_model.strip.empty?)
-          validation_error!("served_model must be a non-empty String")
-        end
-
+        validate_answers!
+        validate_served_model!
         return if error.nil? || answers.empty?
 
         validation_error!("a failed decision response cannot carry answers")
+      end
+
+      def validate_answers!
+        return if answers.is_a?(RecordingStudioAI::Decisions::AnswerSet)
+
+        validation_error!("answers must be a RecordingStudioAI::Decisions::AnswerSet")
+      end
+
+      def validate_served_model!
+        return if served_model.nil? || (served_model.is_a?(String) && !served_model.strip.empty?)
+
+        validation_error!("served_model must be a non-empty String")
       end
 
       def validation_error!(message)
