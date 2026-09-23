@@ -297,14 +297,14 @@ class ConfigController < ApplicationController
       required: "No",
       accepted_values: "Number of seconds >= 0",
       default: "30",
-      explanation: "Timeout for one custom tool run."
+      explanation: "Timeout for one tool run."
     },
     {
       key: "maximum_custom_tool_result_size",
       required: "No",
       accepted_values: "Integer bytes >= 0",
       default: "256.kilobytes",
-      explanation: "Largest result a custom tool may return."
+      explanation: "Largest result a tool may return."
     },
     {
       key: "maximum_custom_tool_arguments_size",
@@ -871,7 +871,7 @@ class ConfigController < ApplicationController
       required: "No",
       accepted_values: "Array of tool keys or { key:, version: } hashes",
       default: "[]",
-      explanation: "Allowlisted registered custom tools for this prompt."
+      explanation: "Allowlisted registered tools for this prompt."
     },
     {
       key: "defaults",

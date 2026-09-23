@@ -61,7 +61,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "RecordingStudioAI.generate"
     assert_includes response.body, "Inline prompt"
     assert_includes response.body, "Registered prompt"
-    assert_includes response.body, "Registered custom tools"
+    assert_includes response.body, "Registered tools"
     assert_includes response.body, "RecordingStudioAI.prompt(:customer_reply)"
     assert_includes response.body, "custom_tools:"
     assert_includes response.body, "lookup_project"
@@ -123,7 +123,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_includes response.body, "Override a Model"
     assert_includes response.body, "override: true"
-    assert_includes response.body, "Create Custom Tools"
+    assert_includes response.body, "Create Tools"
     assert_includes response.body, "Tool registration fields"
     assert_includes response.body, "Argument fields inside parameters"
     assert_includes response.body, "RecordingStudioAI.tools.register"
@@ -207,7 +207,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Streaming"
     assert_includes response.body, "Web search"
     assert_includes response.body, "Live response"
-    assert_includes response.body, "Use custom tool"
+    assert_includes response.body, "Use tool"
     assert_includes response.body, "name=\"ai_playground[tool_key]\""
     assert_equal 1, response.body.scan(/>Batch items</).size
     assert_equal 3, response.body.scan(/name="ai_playground\[batch_items\]\[\]"/).size
@@ -349,7 +349,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin"
 
     assert_response :success
-    assert_includes response.body, "Custom tools"
+    assert_includes response.body, "Tools"
+    refute_includes response.body, "Custom tool"
+    refute_includes response.body, "custom tool"
     refute_includes response.body, "Current registry"
     assert_includes response.body, "href=\"/admin/screens/registered_custom_tools\""
     refute_includes response.body, "/recording_studio_ai/admin/custom_tools"
@@ -679,7 +681,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/registered_custom_tools"
 
     assert_response :success
-    assert_includes response.body, "Registered custom tools"
+    assert_includes response.body, "Registered tools"
     assert_includes response.body, "Cost class"
     assert_includes response.body, "Calls"
     refute_includes response.body, "Calls today"
@@ -1265,7 +1267,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/tool_calls/chart", params: { group_by: "month" }
 
     assert_response :success
-    assert_includes response.body, "Custom tool calls trend"
+    assert_includes response.body, "Tool calls trend"
   end
 
   test "tool calls chart marks increased denied, failed, and rejected calls as unfavorable" do

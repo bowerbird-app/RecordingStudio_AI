@@ -151,7 +151,7 @@
 
   <div class="space-y-3">
     <%= render FlatPack::PageTitle::Component.new(
-      title: "Create Custom Tools",
+      title: "Create Tools",
       subtitle: "Register a tool and pass it to generate. Streaming uses the same call with stream: true.",
       variant: :h3,
       class: "mb-0 pb-0"
@@ -208,7 +208,7 @@
   </div>
 
   <%= render FlatPack::CodeBlock::Component.new(
-    title: "Custom tool registration and usage",
+    title: "Tool registration and usage",
     language: "ruby",
     code: @custom_tools_example
   ) %>

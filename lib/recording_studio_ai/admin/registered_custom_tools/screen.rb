@@ -4,7 +4,7 @@ module AdminScreens
   class RecordingStudioAIRegisteredCustomToolsScreen < RecordingStudioAdmin::Screen
     key "registered_custom_tools"
     icon :wrench_screwdriver
-    title "Registered custom tools"
+    title "Registered tools"
     subtitle "Definitions, safety classifications, and execution reliability across visible roots."
 
     query do |context|

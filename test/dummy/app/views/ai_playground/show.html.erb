@@ -177,14 +177,14 @@
         <div class="hidden space-y-3" data-ai-playground-form-target="customToolsField">
           <%= render FlatPack::Checkbox::Component.new(
             name: "ai_playground[use_custom_tool]",
-            label: "Use custom tool",
+            label: "Use tool",
             checked: @form.fetch("use_custom_tool", "0") == "1",
             data: { ai_playground_form_target: "useCustomTool", action: "change->ai-playground-form#refreshToolDescription" }
           ) %>
           <div data-ai-playground-form-target="toolPicker">
             <%= render FlatPack::Select::Component.new(
               name: "ai_playground[tool_key]",
-              label: "Custom tool",
+              label: "Tool",
               options: @tool_options,
               value: @form.fetch("tool_key"),
               data: { ai_playground_form_target: "toolKey", action: "change->ai-playground-form#refreshToolDescription" }
