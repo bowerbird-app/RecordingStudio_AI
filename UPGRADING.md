@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.4.0
+
+`0.4.0` adds `RecordingStudioAI.decide`. Generation, streaming, and batches stay on OpenAI and Gemini. Jev is decision-only.
+
+1. Update the host dependency to `recording_studio_ai`, `~> 0.4.0`.
+2. Set `config.typesafe_api_key` from `TYPESAFE_API_KEY` and add `:typesafe` to `allowed_provider_overrides` before calling `decide`.
+3. Leave the key unset if the host does not make decisions. Jev drops out of resolution, and `generate` is unchanged.
+4. The default decision caps are 20 questions, 60,000 state characters, 4,000 characters per instruction or criterion, and 80,000 characters combined. Raise `maximum_decision_questions` for a larger set, and raise `maximum_decision_characters` when those questions are long.
+5. A profile fallback that names the same provider and model twice now runs that candidate once. Retries still use `maximum_retries_per_candidate`.
+
 ## Upgrading to 0.3.2
 
 `0.3.2` removes the engine staff app. Point people at Recording Studio Admin.
