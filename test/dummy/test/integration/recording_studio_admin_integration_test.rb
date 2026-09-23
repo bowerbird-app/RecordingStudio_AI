@@ -182,7 +182,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "recording_studio_ai_runs"
     assert_includes response.body, ">Column<"
-    assert_includes response.body, "overflow-x-auto rounded-lg border border-[var(--table-border-color)]"
+    assert_includes response.body, "overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--table-border-color)]"
   end
 
   test "ai playground shows capability-driven generate form and batch section" do
