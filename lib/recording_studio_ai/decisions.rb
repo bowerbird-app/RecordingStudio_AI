@@ -38,7 +38,24 @@ module RecordingStudioAI
       validation_error!("#{path} keys collide after normalization: #{duplicates.join(', ')}")
     end
 
-    def non_empty_string!(value, path:, maximum: MAXIMUM_TEXT_CHARACTERS)
+    def maximum_state_characters
+      RecordingStudioAI.configuration.maximum_decision_state_characters
+    end
+
+    def maximum_questions
+      RecordingStudioAI.configuration.maximum_decision_questions
+    end
+
+    def maximum_text_characters
+      RecordingStudioAI.configuration.maximum_decision_text_characters
+    end
+
+    def maximum_decision_characters
+      RecordingStudioAI.configuration.maximum_decision_characters
+    end
+
+    def non_empty_string!(value, path:, maximum: nil)
+      maximum ||= maximum_text_characters
       validation_error!("#{path} must be a non-empty String") unless value.is_a?(String) && !value.strip.empty?
       if value.length > maximum
         validation_error!("#{path} must be at most #{maximum} characters")
@@ -59,9 +76,9 @@ module RecordingStudioAI
     # combined ceiling so a request cannot sit at every individual maximum at once.
     def ensure_within_character_budget!(state, questions)
       total = state.length + questions.sum { |entry| text_characters(entry.question) }
-      return if total <= MAXIMUM_DECISION_CHARACTERS
+      return if total <= maximum_decision_characters
 
-      validation_error!("decision input must be at most #{MAXIMUM_DECISION_CHARACTERS} characters")
+      validation_error!("decision input must be at most #{maximum_decision_characters} characters")
     end
 
     def text_characters(question)

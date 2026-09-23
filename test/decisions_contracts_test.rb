@@ -190,8 +190,20 @@ class DecisionsContractsTest < RecordingStudioAI::Test::IsolatedCase
     assert_match(/question instructions must be at most/, choice_error_for_long_instructions)
     assert_match(
       /decision input must be at most #{RecordingStudioAI::Decisions::MAXIMUM_DECISION_CHARACTERS} characters/,
-      decision_request_error(state: "a" * 60_000, questions: budget_questions)
+      decision_request_error(
+        state: "a" * RecordingStudioAI::Decisions::MAXIMUM_STATE_CHARACTERS,
+        questions: budget_questions
+      )
     )
+  end
+
+  def test_decision_question_limit_follows_configuration
+    questions = 21.times.to_h { |index| ["q#{index}", { type: :noul, instructions: "Mentioned?" }] }
+    RecordingStudioAI.configuration.maximum_decision_questions = 25
+
+    request = decision_request(questions: questions)
+
+    assert_equal 21, request.questions.length
   end
 
   def test_choice_answer_exposes_choice_probabilities_and_confidence

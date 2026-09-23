@@ -30,6 +30,10 @@ class ConfigurationTest < Minitest::Test
     assert_equal 0.1, configuration.admin_warning_thresholds[:error_rate]
     assert_equal 100_000_000, configuration.admin_warning_thresholds[:spend_microunits]
     assert_equal 3, configuration.maximum_attempts
+    assert_equal 20, configuration.maximum_decision_questions
+    assert_equal 60_000, configuration.maximum_decision_state_characters
+    assert_equal 4_000, configuration.maximum_decision_text_characters
+    assert_equal 80_000, configuration.maximum_decision_characters
     assert_equal 10, configuration.maximum_attachment_count
     assert_equal 20.megabytes, configuration.maximum_attachment_bytes
     assert_equal 50.megabytes, configuration.maximum_attachment_total_bytes
@@ -142,5 +146,15 @@ class ConfigurationTest < Minitest::Test
 
     assert_equal "configuration", error.code
     assert_includes error.message, "maximum_attempts"
+
+    configuration = RecordingStudioAI::Configuration.new
+    configuration.maximum_decision_questions = 0
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
+    assert_includes error.message, "maximum_decision_questions"
+
+    configuration = RecordingStudioAI::Configuration.new
+    configuration.maximum_decision_characters = configuration.maximum_decision_state_characters - 1
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
+    assert_includes error.message, "maximum_decision_characters"
   end
 end

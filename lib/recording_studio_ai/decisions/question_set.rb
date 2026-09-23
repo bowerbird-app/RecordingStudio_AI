@@ -14,8 +14,9 @@ module RecordingStudioAI
       class << self
         def parse(value)
           Decisions.validation_error!("questions must be a non-empty Hash") unless value.is_a?(Hash) && value.any?
-          if value.length > Decisions::MAXIMUM_QUESTIONS
-            Decisions.validation_error!("questions must contain at most #{Decisions::MAXIMUM_QUESTIONS} entries")
+          limit = Decisions.maximum_questions
+          if value.length > limit
+            Decisions.validation_error!("questions must contain at most #{limit} entries")
           end
 
           entries = value.map { |key, question| parse_entry(key, question) }

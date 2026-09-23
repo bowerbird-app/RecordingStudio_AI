@@ -138,6 +138,34 @@ class ConfigController < ApplicationController
       explanation: "How many tries one call may take across retries and fallbacks."
     },
     {
+      key: "maximum_decision_questions",
+      required: "No",
+      accepted_values: "Integer >= 1",
+      default: "20",
+      explanation: "How many questions one RecordingStudioAI.decide call may send. Raise this when a decision needs more questions, and raise maximum_decision_characters if those questions are long."
+    },
+    {
+      key: "maximum_decision_state_characters",
+      required: "No",
+      accepted_values: "Integer >= 1",
+      default: "60000",
+      explanation: "Maximum characters of decision state. maximum_decision_characters must be at least this large."
+    },
+    {
+      key: "maximum_decision_text_characters",
+      required: "No",
+      accepted_values: "Integer >= 1",
+      default: "4000",
+      explanation: "Maximum characters for one instruction, criterion description, or score label."
+    },
+    {
+      key: "maximum_decision_characters",
+      required: "No",
+      accepted_values: "Integer >= 1",
+      default: "80000",
+      explanation: "Maximum characters of state plus instructions and criteria in one decision. Must be at least the state and text caps."
+    },
+    {
       key: "maximum_retries_per_candidate",
       required: "No",
       accepted_values: "Integer >= 0",
@@ -439,6 +467,10 @@ class ConfigController < ApplicationController
 
       # Retry/attempt controls.
       config.maximum_attempts = 3
+      config.maximum_decision_questions = 20
+      config.maximum_decision_state_characters = 60_000
+      config.maximum_decision_text_characters = 4_000
+      config.maximum_decision_characters = 80_000
       config.maximum_retries_per_candidate = 1
       config.maximum_provider_fallbacks = 1
       config.maximum_profile_fallbacks = 1
