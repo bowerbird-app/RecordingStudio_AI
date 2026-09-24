@@ -5,7 +5,7 @@ module AdminScreens
     key "ai_calls"
     icon :cpu_chip
     title "AI Calls"
-    subtitle "Run-level execution history across generation, streaming, and batch operations."
+    subtitle "Run-level execution history across generation, streaming, batch, decision, and tool operations."
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.runs_scope(context).order(created_at: :desc)

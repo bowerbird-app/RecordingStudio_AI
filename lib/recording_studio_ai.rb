@@ -155,6 +155,22 @@ module RecordingStudioAI
       response
     end
 
+    # Runs one registered tool without a model call. Does not authorize :execute;
+    # the tool executor still requires use_custom_tool, and confirmation when the
+    # tool asks for it. A finished request_id returns the stored outcome.
+    def perform_tool(**)
+      request = Contracts::RequestValidation.validate_tool_request!(**)
+      configuration.validate!
+      Orchestration::ToolPerformanceRunner.new(configuration: configuration).call(request)
+    end
+
+    def perform_tool!(**)
+      performance = perform_tool(**)
+      return performance if performance.success? || performance.awaiting_confirmation?
+
+      raise Errors::ExecutionError, performance
+    end
+
     def submit_batch(**)
       request = Contracts::RequestValidation.validate_batch_submit_request!(**)
       configuration.validate!
