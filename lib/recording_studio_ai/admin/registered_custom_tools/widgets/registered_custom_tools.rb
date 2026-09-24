@@ -3,7 +3,7 @@
 module AdminScreens
   RecordingStudioAIRegisteredCustomToolsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.registered_custom_tools") do
     type :list
-    title "Custom tools"
+    title "Tools"
     subtitle "Most-used tools by calls in the last 30 days."
     description "Open a tool to inspect its definition and recent executions."
     list_options { { divider: true } }
@@ -25,7 +25,7 @@ module AdminScreens
           trailing: "#{AdminScreens::RecordingStudioAIWidgets.number(calls)} calls",
           href: "#{context.admin_screen_path('tool_calls')}?#{query}"
         }
-      end.compact.presence || [{ text: "No custom tool calls in the last 30 days." }]
+      end.compact.presence || [{ text: "No tool calls in the last 30 days." }]
     end
     link_to { |context| context.admin_screen_path("registered_custom_tools") }
   end

@@ -3,8 +3,8 @@
 module AdminScreens
   RecordingStudioAIToolCallsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.tool_calls") do
     type :chart
-    title "Custom Tool Calls"
-    subtitle "Weekly custom tool-call volume for the last 4 weeks."
+    title "Tool Calls"
+    subtitle "Weekly tool-call volume for the last 4 weeks."
     description "Tracks how many tool calls were made each day, including today."
     metadata { { period_label: "Last 30 days" } }
     value do |context|

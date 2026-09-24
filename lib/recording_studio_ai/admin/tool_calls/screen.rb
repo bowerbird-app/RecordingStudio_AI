@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIToolCallsScreen < RecordingStudioAdmin::Screen
     key "tool_calls"
     icon :wrench_screwdriver
-    title "Custom Tool Calls"
-    subtitle "Custom tool invocation history with status, confirmation, and latency signals."
+    title "Tool Calls"
+    subtitle "Tool call history with status, confirmation, and latency."
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.tool_scope(context).includes(:run).order(created_at: :desc)
@@ -39,8 +39,8 @@ module AdminScreens
     end
 
     chart do
-      title "Custom tool calls trend"
-      subtitle "Custom tool call volume over time."
+      title "Tool calls trend"
+      subtitle "Tool call volume over time."
       type :line
       series do |context|
         [{

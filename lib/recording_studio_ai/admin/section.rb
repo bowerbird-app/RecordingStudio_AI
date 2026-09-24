@@ -13,7 +13,7 @@ module AdminScreens
          style: :secondary
 
     link :tool_calls,
-         text: "Custom Tool Calls",
+         text: "Tool Calls",
          url: ->(context) { context.admin_screen_path("tool_calls") },
          style: :secondary
 
