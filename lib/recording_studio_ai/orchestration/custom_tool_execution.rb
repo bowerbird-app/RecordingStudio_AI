@@ -19,19 +19,16 @@ module RecordingStudioAI
 
         invocation = @records.create!(run, requesting_attempt, tool_call, definition)
         emit("custom_tool_requested", invocation)
-        run_authorized_tool(request, definition, invocation, tool_call)
-      rescue RecordingStudioAI::Errors::ContractValidationError => e
-        handle_contract_error(e, invocation)
-      rescue Timeout::Error
-        @records.fail!(invocation, "failed", "custom_tool_failed", "custom_tool_timeout",
-                       "Custom tool execution timed out.")
-        { error: failure("custom_tool_timeout") }
-      rescue StandardError
-        @records.fail!(invocation, "failed", "custom_tool_failed", "custom_tool_execution",
-                       "Custom tool execution failed.")
-        { error: failure("custom_tool_execution") }
-      ensure
-        @stream_session&.active_cancellation_state = nil
+        with_tool_errors(invocation) { run_authorized_tool(request, definition, invocation, tool_call) }
+      end
+
+      # Continues an invocation that is already awaiting confirmation. Does not
+      # create another invocation or replace the stored arguments.
+      def resume(_run, request, invocation, tool_call)
+        definition = request.fetch(:custom_tool_definitions).find { |item| item.key == tool_call.key }
+        return @records.mark_unavailable!(invocation) unless definition
+
+        with_tool_errors(invocation) { run_authorized_tool(request, definition, invocation, tool_call) }
       end
 
       def tool_timeout(request)
@@ -82,6 +79,22 @@ module RecordingStudioAI
           },
           error: nil
         }
+      end
+
+      def with_tool_errors(invocation)
+        yield
+      rescue RecordingStudioAI::Errors::ContractValidationError => e
+        handle_contract_error(e, invocation)
+      rescue Timeout::Error
+        @records.fail!(invocation, "failed", "custom_tool_failed", "custom_tool_timeout",
+                       "Custom tool execution timed out.")
+        { error: failure("custom_tool_timeout") }
+      rescue StandardError
+        @records.fail!(invocation, "failed", "custom_tool_failed", "custom_tool_execution",
+                       "Custom tool execution failed.")
+        { error: failure("custom_tool_execution") }
+      ensure
+        @stream_session&.active_cancellation_state = nil
       end
 
       def handle_contract_error(error, invocation)

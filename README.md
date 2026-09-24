@@ -262,6 +262,8 @@ Phase 2 introduced validation and normalized return contracts for:
 - `RecordingStudioAI.generate!(...)`
 - `RecordingStudioAI.decide(...)`
 - `RecordingStudioAI.decide!(...)`
+- `RecordingStudioAI.perform_tool(...)`
+- `RecordingStudioAI.perform_tool!(...)`
 - `RecordingStudioAI.submit_batch(...)`
 - `RecordingStudioAI.refresh_batch(...)`
 - `RecordingStudioAI.refresh_batch_from_webhook(...)`
@@ -537,10 +539,44 @@ RecordingStudioAI.generate(
 Definitions and arguments are validated before execution. Tool use and
 confirmation have separate authorization actions; destructive tools always
 require confirmation. Execution is timeout- and size-bounded, and provider
-continuations are tracked as `continuation` attempts. Only invocation digests,
-bounded summaries, safety snapshots, timing, and errors are persisted. Complete
-arguments and results remain request-scoped. Non-idempotent tool execution is
-never automatically repeated.
+continuations are tracked as `continuation` attempts. Generation persists
+invocation summaries, safety snapshots, timing, and errors. `perform_tool`
+also stores the arguments and the result so a pending confirmation can resume
+and a finished `request_id` can be returned again without running the tool.
+Those values stay on the invocation row; metadata still redacts argument and
+result keys. Non-idempotent tool execution inside `generate` is never
+automatically repeated.
+
+`perform_tool` does not call a model and does not require
+`recording_studio_ai.execute`. It still requires `use_custom_tool`, and
+`confirm_custom_tool` when the tool requires confirmation or is destructive.
+Pass `resume: true` and `arguments: nil` with the same `request_id` to continue
+a pending confirmation. `perform_tool!` raises on a real failure and returns
+when the tool is waiting for confirmation.
+
+```ruby
+performance = RecordingStudioAI.perform_tool(
+  tool: { key: :summarize_record, version: 1 },
+  arguments: { topic: "Rails" },
+  purpose: "agent_step",
+  request_id: "recording-studio-agents:run-1:tool:1",
+  root_recording: root_recording,
+  initiator: current_user,
+  initiator_kind: :agent
+)
+
+if performance.awaiting_confirmation?
+  performance = RecordingStudioAI.perform_tool(
+    tool: { key: :summarize_record, version: 1 },
+    arguments: nil,
+    resume: true,
+    request_id: "recording-studio-agents:run-1:tool:1",
+    root_recording: root_recording,
+    initiator: current_user,
+    initiator_kind: :agent
+  )
+end
+```
 
 ## Registered prompts
 

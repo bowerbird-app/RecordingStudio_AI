@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.6.0
+
+`0.6.0` adds `RecordingStudioAI.perform_tool`. A host can run one registered tool without calling a model. `generate` and `decide` are unchanged.
+
+1. Update the host dependency to `recording_studio_ai`, `~> 0.6.0`.
+2. Run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`. The migration allows run operation `tool` and adds `arguments` and `result` on custom tool invocations.
+3. No configuration change. Tools that require confirmation still use `custom_tool_confirmation_handler`.
+4. Call `perform_tool` with a stable `request_id`. Call it again with `resume: true` and `arguments: nil` to continue a pending confirmation. A finished `request_id` returns the stored outcome and does not run the tool again.
+
 ## Upgrading to 0.5.0
 
 `0.5.0` adds a Profiles screen to Recording Studio Admin. Calls, profiles, and model resolution are unchanged.

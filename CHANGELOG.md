@@ -5,6 +5,20 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-24
+
+Hosts can run one registered tool without a model call.
+
+### Added
+
+- `RecordingStudioAI.perform_tool` and `perform_tool!` run a registered tool and return a `ToolPerformance`.
+- A pending confirmation stays on the run. `resume: true` with the same `request_id` continues it. A finished `request_id` returns the stored outcome.
+- Runs may use operation `tool`. Custom tool invocations store `arguments`, and `perform_tool` also stores `result`.
+
+### Upgrade notes
+
+- Run the new migration. No configuration change. A confirmation handler is only needed for tools that require confirmation.
+
 ## [0.5.0] - 2026-09-24
 
 Staff can see which models each profile uses for generative calls and for decisions.
@@ -692,7 +706,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.1...v0.3.2
