@@ -7,7 +7,7 @@ Versioning and Keep a Changelog.
 
 ### Added
 
-- Admin screen `profiles` lists each profile and the models it tries, split into generative and decision use.
+- Admin screen `profiles` lists each profile and the models it tries, split into generative and decision use. Filters narrow that table by kind, profile, provider, and model.
 
 ## [0.4.0] - 2026-09-23
 

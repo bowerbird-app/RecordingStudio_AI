@@ -739,6 +739,26 @@ module AdminScreens
       kinds.join(", ").presence || "—"
     end
 
+    def profile_kind_filter_values
+      %w[Generative Decision]
+    end
+
+    def profile_name_filter_values
+      RecordingStudioAI.configuration.profiles.keys.map(&:to_s)
+    end
+
+    def profile_provider_filter_values
+      profile_rows.filter_map { |row| row.provider.to_s unless row.provider == "—" }.uniq
+    end
+
+    def profile_model_filter_values
+      profile_rows.filter_map { |row| row.model.to_s unless row.model == "—" }.uniq
+    end
+
+    def profile_row_has_kind?(row, kind)
+      row.kind.to_s.split(", ").include?(kind.to_s)
+    end
+
     def registered_provider_keys
       RecordingStudioAI.configuration.providers.keys.map(&:to_s)
     end

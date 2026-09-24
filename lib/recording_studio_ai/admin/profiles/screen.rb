@@ -11,6 +11,29 @@ module AdminScreens
       AdminScreens::RecordingStudioAIWidgets.profile_rows(context)
     end
 
+    filter_presentation :inline
+    filter :kind,
+           values: -> { AdminScreens::RecordingStudioAIWidgets.profile_kind_filter_values },
+           apply: lambda { |rows, value, _context|
+             widgets = AdminScreens::RecordingStudioAIWidgets
+             Array(rows).select { |row| widgets.profile_row_has_kind?(row, value) }
+           }
+    filter :profile,
+           values: -> { AdminScreens::RecordingStudioAIWidgets.profile_name_filter_values },
+           apply: lambda { |rows, value, _context|
+             Array(rows).select { |row| row.profile.to_s == value.to_s }
+           }
+    filter :provider,
+           values: -> { AdminScreens::RecordingStudioAIWidgets.profile_provider_filter_values },
+           apply: lambda { |rows, value, _context|
+             Array(rows).select { |row| row.provider.to_s == value.to_s }
+           }
+    filter :model,
+           values: -> { AdminScreens::RecordingStudioAIWidgets.profile_model_filter_values },
+           apply: lambda { |rows, value, _context|
+             Array(rows).select { |row| row.model.to_s == value.to_s }
+           }
+
     table do
       title ""
       hide_columns_button

@@ -497,6 +497,13 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Profiles"
     assert_includes response.body, "Generative and decision models"
     assert_includes response.body, "src=\"/admin/screens/profiles/table\""
+    assert_includes response.body, "name=\"kind\""
+    assert_includes response.body, "name=\"profile\""
+    assert_includes response.body, "name=\"provider\""
+    assert_includes response.body, "name=\"model\""
+    assert_includes response.body, "value=\"Generative\""
+    assert_includes response.body, "value=\"Decision\""
+    assert_includes response.body, "value=\"jev-latest\""
 
     get "/admin/screens/profiles/table"
 
@@ -525,8 +532,60 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_equal [1, 2, 3, nil], classified.map(&:position)
     assert_equal "missing-model", classified[2].model
     assert_equal "—", classified[3].model
+    both = AdminScreens::RecordingStudioAIWidgets::ProfileRow.new(
+      "custom", false, 1, "openai", "gpt-5", "Generative, Decision"
+    )
+    assert AdminScreens::RecordingStudioAIWidgets.profile_row_has_kind?(both, "Generative")
+    assert AdminScreens::RecordingStudioAIWidgets.profile_row_has_kind?(both, "Decision")
   ensure
     RecordingStudioAI.configuration.profiles = original_profiles if defined?(original_profiles) && original_profiles
+  end
+
+  test "profiles screen filters by kind profile provider and model" do
+    authenticate_for_admin!
+
+    get "/admin/screens/profiles/table", params: { kind: "Decision" }
+
+    assert_response :success
+    assert_includes response.body, "jev-latest"
+    refute_includes response.body, "gpt-5-mini"
+    refute_includes response.body, "gemini-2.5-flash"
+    refute_includes response.body, "gpt-5-pro"
+
+    get "/admin/screens/profiles/table", params: { profile: "high" }
+
+    assert_response :success
+    assert_includes response.body, "gpt-5-pro"
+    refute_includes response.body, "gpt-5-mini"
+    refute_includes response.body, "gemini-2.5-flash"
+
+    get "/admin/screens/profiles/table", params: { provider: "typesafe" }
+
+    assert_response :success
+    assert_includes response.body, "jev-latest"
+    refute_includes response.body, "gpt-5-mini"
+    refute_includes response.body, "gemini-2.5-pro"
+
+    get "/admin/screens/profiles/table", params: { model: "gpt-5-mini" }
+
+    assert_response :success
+    assert_includes response.body, "gpt-5-mini"
+    refute_includes response.body, "jev-latest"
+    refute_includes response.body, "gemini-2.5-flash"
+
+    get "/admin/screens/profiles/table", params: { kind: "Decision", profile: "low", provider: "typesafe", model: "jev-latest" }
+
+    assert_response :success
+    assert_includes response.body, "jev-latest"
+    assert_includes response.body, ">low<"
+    refute_includes response.body, ">medium<"
+    refute_includes response.body, "gpt-5-mini"
+
+    get "/admin/screens/profiles", params: { kind: "Decision", profile: "low" }
+
+    assert_response :success
+    assert_includes response.body, "value=\"Decision\""
+    assert_includes response.body, "value=\"low\""
   end
 
   test "registered providers screen lists every configured provider" do
