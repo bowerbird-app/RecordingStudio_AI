@@ -10,13 +10,13 @@
   <div class="flex items-center gap-3">
     <%= render FlatPack::Button::Component.new(
       text: "AI Calls",
-      href: "/admin/screens/ai_calls",
+      href: admin_href("/admin/screens/ai_calls"),
       style: :secondary,
       size: :sm
     ) %>
     <%= render FlatPack::Button::Component.new(
       text: "AI Responses",
-      href: "/admin/screens/recording_studio_ai_responses",
+      href: admin_href("/admin/screens/recording_studio_ai_responses"),
       style: :secondary,
       size: :sm
     ) %>

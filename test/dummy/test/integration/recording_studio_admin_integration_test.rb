@@ -51,6 +51,29 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "recording-studio-root-switchable--root-switch-dropdown"
   end
 
+  test "root page passes itself as the admin close anchor" do
+    authenticate_for_admin!
+
+    get "/"
+
+    assert_response :success
+    assert_includes response.body, "href=\"/admin?anchor_url=%2F\""
+    assert_includes response.body, "href=\"/admin/screens/ai_calls?anchor_url=%2F\""
+    assert_includes response.body, "href=\"/admin/screens/recording_studio_ai_responses?anchor_url=%2F\""
+
+    get "/admin", params: { anchor_url: "/" }
+
+    assert_response :success
+    assert_includes response.body, "aria-label=\"Close\" href=\"/\""
+    assert_includes response.body, "anchor_url=%2F"
+    refute_includes response.body, "aria-label=\"Close\" href=\"/admin\""
+
+    get "/admin/screens/registered_providers", params: { anchor_url: "/" }
+
+    assert_response :success
+    assert_includes response.body, "aria-label=\"Close\" href=\"/\""
+  end
+
   test "methods guide documents the Recording Studio AI APIs" do
     authenticate_for_admin!
 
