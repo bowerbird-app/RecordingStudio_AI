@@ -464,8 +464,69 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Registered Models"
     assert_includes response.body, "href=\"/admin/screens/registered_providers\""
     assert_includes response.body, "href=\"/admin/screens/registered_models\""
+    assert_includes response.body, "href=\"/admin/screens/profiles\""
     assert_includes response.body, "openai"
     assert_includes response.body, "GPT-5"
+  end
+
+  test "profiles screen lists generative and decision models" do
+    authenticate_for_admin!
+
+    rows = AdminScreens::RecordingStudioAIWidgets.profile_rows(nil)
+    low = rows.select { |row| row.profile == "low" }
+    assert_equal(
+      [
+        ["openai", "gpt-5-mini", "Generative", 1, false],
+        ["gemini", "gemini-2.5-flash", "Generative", 2, false],
+        ["typesafe", "jev-latest", "Decision", 3, false]
+      ],
+      low.map { |row| [row.provider, row.model, row.kind, row.position, row.default_profile] }
+    )
+    medium = rows.select { |row| row.profile == "medium" }
+    assert medium.all?(&:default_profile)
+    assert_equal "gpt-5", medium.find { |row| row.kind == "Generative" && row.provider == "openai" }.model
+    assert_equal "Decision", medium.find { |row| row.model == "jev-latest" }.kind
+    high = rows.select { |row| row.profile == "high" }
+    assert_equal %w[gpt-5-pro gemini-2.5-pro jev-latest], high.map(&:model)
+    assert_equal ["Generative", "Generative", "Decision"], high.map(&:kind)
+    refute high.any?(&:default_profile)
+
+    get "/admin/screens/profiles"
+
+    assert_response :success
+    assert_includes response.body, "Profiles"
+    assert_includes response.body, "Generative and decision models"
+    assert_includes response.body, "src=\"/admin/screens/profiles/table\""
+
+    get "/admin/screens/profiles/table"
+
+    assert_response :success
+    assert_includes response.body, "gpt-5-mini"
+    assert_includes response.body, "gpt-5-pro"
+    assert_includes response.body, "gemini-2.5-flash"
+    assert_includes response.body, "gemini-2.5-pro"
+    assert_includes response.body, "jev-latest"
+    assert_includes response.body, "Generative"
+    assert_includes response.body, "Decision"
+    assert_includes response.body, "registered_models?provider=typesafe"
+    assert_includes response.body, "Whether this model writes replies or answers questions."
+
+    original_profiles = RecordingStudioAI.configuration.profiles.deep_dup
+    RecordingStudioAI.configuration.profiles = {
+      custom: [
+        { provider: :openai, model: "gpt-5", capabilities: %i[generation decision] },
+        { provider: :typesafe, model: "jev-latest", capabilities: %i[decision_choice] },
+        { provider: :openai, model: "missing-model" }
+      ],
+      empty: []
+    }
+    classified = AdminScreens::RecordingStudioAIWidgets.profile_rows(nil)
+    assert_equal ["Generative, Decision", "Decision", "—", "—"], classified.map(&:kind)
+    assert_equal [1, 2, 3, nil], classified.map(&:position)
+    assert_equal "missing-model", classified[2].model
+    assert_equal "—", classified[3].model
+  ensure
+    RecordingStudioAI.configuration.profiles = original_profiles if defined?(original_profiles) && original_profiles
   end
 
   test "registered providers screen lists every configured provider" do
@@ -776,7 +837,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       AdminScreens::RecordingStudioAIEstimatedSpendScreen,
       AdminScreens::RecordingStudioAICallsByProviderModelScreen,
       AdminScreens::RecordingStudioAIRegisteredProvidersScreen,
-      AdminScreens::RecordingStudioAIRegisteredModelsScreen
+      AdminScreens::RecordingStudioAIRegisteredModelsScreen,
+      AdminScreens::RecordingStudioAIProfilesScreen
     ]
 
     screens.each do |screen|
@@ -798,7 +860,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       "estimated_spend" => "Size of what we sent.",
       "calls_by_provider_model" => "Who we asked.",
       "registered_providers" => "Whether keys are set so it can run.",
-      "registered_models" => "How wild the answers can get."
+      "registered_models" => "How wild the answers can get.",
+      "profiles" => "Whether this model writes replies or answers questions."
     }.each do |key, phrase|
       get "/admin/screens/#{key}/table"
 

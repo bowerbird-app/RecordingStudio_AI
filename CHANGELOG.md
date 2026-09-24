@@ -5,6 +5,10 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+### Added
+
+- Admin screen `profiles` lists each profile and the models it tries, split into generative and decision use.
+
 ## [0.4.0] - 2026-09-23
 
 `RecordingStudioAI.decide` runs a typed decision. TypeSafe Jev is the first decision-only model. `generate` still never selects it.
