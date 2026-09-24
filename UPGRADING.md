@@ -1,5 +1,12 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.5.0
+
+`0.5.0` adds a Profiles screen to Recording Studio Admin. Calls, profiles, and model resolution are unchanged.
+
+1. Update the host dependency to `recording_studio_ai`, `~> 0.5.0`.
+2. Open the Recording Studio AI section and choose Profiles. The table lists each profile's models and whether they are used for generative or decision calls.
+
 ## Upgrading to 0.4.0
 
 `0.4.0` adds `RecordingStudioAI.decide`. Generation, streaming, and batches stay on OpenAI and Gemini. Jev is decision-only.

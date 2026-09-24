@@ -5,6 +5,14 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-24
+
+Staff can see which models each profile uses for generative calls and for decisions.
+
+### Added
+
+- Admin screen `profiles` lists each profile and the models it tries, in order, and whether each model is generative, decision, or both. Filters narrow that table by kind, profile, provider, and model.
+
 ## [0.4.0] - 2026-09-23
 
 `RecordingStudioAI.decide` runs a typed decision. TypeSafe Jev is the first decision-only model. `generate` still never selects it.
@@ -684,7 +692,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.0...v0.3.1
