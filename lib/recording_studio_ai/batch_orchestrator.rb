@@ -17,19 +17,10 @@ module RecordingStudioAI
         required_capabilities: Capabilities.for_batch(request.fetch(:items))
       )
       batch = create_records!(request, candidate)
-      result = provider_for!(candidate).submit_batch(request: request, candidate: candidate)
-      ensure_batch_result!(result)
-      result = normalize_submission_result(result, candidate)
-      result = apply_result!(batch, result, fail_pending_items: !result.success?)
-      build_response(batch, result, operation: "batch_submit", transient_items: result.items)
+      meter_submission!(batch, request)
+      deliver_submission!(batch, request, candidate)
     rescue Errors::ResolutionError => e
       resolution_failure(request, e)
-    rescue StandardError => e
-      raise unless batch
-
-      result = submission_failure(e, candidate)
-      apply_result!(batch, result, fail_pending_items: true)
-      build_response(batch, result, operation: "batch_submit")
     end
 
     def refresh(request)
@@ -53,6 +44,72 @@ module RecordingStudioAI
     end
 
     private
+
+    def meter_submission!(batch, request)
+      Usage.spend_batch_submission!(
+        batch: batch,
+        attribution: request.fetch(:attribution),
+        provider_native_tools: request.fetch(:items).flat_map { |item| item.fetch(:provider_native_tools) }
+      )
+    rescue StandardError => e
+      record_usage_refusal!(batch, e)
+      raise
+    end
+
+    def deliver_submission!(batch, request, candidate)
+      result = provider_for!(candidate).submit_batch(request: request, candidate: candidate)
+      ensure_batch_result!(result)
+      result = normalize_submission_result(result, candidate)
+      result = apply_result!(batch, result, fail_pending_items: !result.success?)
+      build_response(batch, result, operation: "batch_submit", transient_items: result.items)
+    rescue Errors::ResolutionError
+      raise
+    rescue StandardError => e
+      result = submission_failure(e, candidate)
+      apply_result!(batch, result, fail_pending_items: true)
+      build_response(batch, result, operation: "batch_submit")
+    end
+
+    def record_usage_refusal!(batch, error)
+      message = error.message.to_s[0, Usage::MESSAGE_LIMIT]
+      completed_at = Time.current
+      Batch.transaction do
+        batch.lock!
+        batch.update!(usage_refusal_batch_attributes(batch, message, completed_at))
+        batch.batch_items.reload.each { |item| refuse_batch_item!(item, message, completed_at) }
+      end
+    rescue StandardError
+      nil
+    end
+
+    def usage_refusal_batch_attributes(batch, message, completed_at)
+      usage_failure_columns(message, completed_at).merge(failed_item_count: batch.item_count)
+    end
+
+    def refuse_batch_item!(item, message, completed_at)
+      return if BatchItem.terminal_statuses.include?(item.status)
+
+      item.update!(usage_failure_columns(message, completed_at))
+      refuse_batch_run!(item.run, message, completed_at)
+    end
+
+    def refuse_batch_run!(run, message, completed_at)
+      return if run.nil? || Run.terminal_statuses.include?(run.status)
+
+      attributes = usage_failure_columns(message, completed_at)
+      clock = Orchestration::Support.completion_clock(run.started_at, completed_at) if run.started_at
+      run.update!(clock ? attributes.merge(clock) : attributes)
+    end
+
+    def usage_failure_columns(message, completed_at)
+      {
+        status: "failed",
+        error_category: Usage::DECLINED_CATEGORY,
+        error_code: Usage::DECLINED_CODE,
+        error_message: message,
+        completed_at: completed_at
+      }
+    end
 
     def create_records!(request, candidate)
       attribution = request.fetch(:attribution)

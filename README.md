@@ -155,20 +155,24 @@ Usage and compatible-currency cost aggregate across every reported attempt.
 
 ## Usage credits
 
-`usage_key_resolver` and `usage_handler` meter each external provider attempt before that attempt calls the provider. Leave `usage_handler` nil to keep the current behavior. There is no migration.
+`usage_key_resolver` and `usage_handler` meter each external provider attempt before that attempt calls the provider. When a handler is set, `submit_batch` spends once after the local batch row exists and before provider HTTP. Leave `usage_handler` nil to keep attempts and batch submit unmetered. There is no migration.
 
-The resolver receives the operation, provider, model, profile, purpose, and attribution. It returns a string key such as `ai.jev` or `ai.gemini_flash`. A nil return leaves that attempt unmetered. Recording Studio Stripe `usage_costs` turns the key into credits. This gem does not know those rates. Token columns and `CostCalculator` stay on the provider result.
+The resolver requires `provider_native_tools:`. A strict lambda that omits it raises `ArgumentError` and the provider does not run. Lambdas that take `**` already accept it. There is no compatibility shim.
+
+The value is `[]` or `[:web_search]`. Decisions pass `[]`. The host may return `ai.gemini_flash` or `ai.gemini_flash_search`. The gem does not hard-code those keys. A nil return leaves that attempt, or that batch submission, unmetered. Recording Studio Stripe `usage_costs` turns the key into credits. This gem does not know those rates. Token columns and `CostCalculator` stay on the provider result.
 
 ```ruby
 RecordingStudioAI.configure do |config|
-  config.usage_key_resolver = lambda do |operation:, provider:, model:, profile:, purpose:, attribution:|
+  config.usage_key_resolver = lambda do |operation:, provider:, model:, profile:, purpose:, attribution:, provider_native_tools:|
     case [operation, provider.to_s, model.to_s]
     when ["decision", "typesafe", "jev-latest"]
       "ai.jev"
     else
       case provider.to_s
       when "gemini"
-        "ai.gemini_flash" if model.to_s.include?("flash")
+        if model.to_s.include?("flash")
+          provider_native_tools.include?(:web_search) ? "ai.gemini_flash_search" : "ai.gemini_flash"
+        end
       when "openai"
         "ai.openai"
       end
@@ -186,9 +190,15 @@ end
 
 Hosts with more than one subscription line call `.line`. Unscoped `spend_usage` raises `AmbiguousSubscriptionLine` when more than one live plan holds credits. It raises `SubscriptionLineRequired` when more than one subscription type is configured and no live plan holds credits.
 
-The handler receives `key`, `quantity` of 1, the live attribution, `idempotency_key`, and metadata. Metadata names the operation, provider, model, profile, purpose, run id, and attempt id. It does not include the prompt or the response.
+The handler receives `key`, `quantity`, the live attribution, `idempotency_key`, and metadata. An attempt uses quantity 1 and idempotency key `ai-attempt:<attempt id>`. The same attempt repeats that key. Metadata names the operation, provider, model, profile, purpose, run id, attempt id, attempt kind, and `provider_native_tools`. `provider_native_tools` in metadata is an array of name strings. It does not include prompts, queries, or bodies. The charge follows the request, not whether the provider later used the tool.
 
-A handler exception propagates unchanged, and the provider call does not run. There is no refund if the provider fails after the handler returns. Each attempt spends once. That includes retries, fallbacks, and tool continuations. The idempotency key is `ai-attempt:<attempt id>`. The same attempt repeats that key. Batch submit, refresh, cancel, and `perform_tool` are not metered. Local tool execution is not metered.
+Each attempt spends once. That includes retries, fallbacks, and tool continuations. A handler exception propagates unchanged, and the provider call does not run. There is no refund if the provider fails after the handler returns.
+
+A batch submission uses quantity equal to the item count. The idempotency key is `ai-batch:<batch id>:submission`. The operation is `batch`. Purpose is nil. `provider_native_tools` is the union of requested tools. A mixed batch shares one key. Hosts who need different tariffs submit separate batches. One combined key is enough. Separate events per tool could be added later.
+
+A handler exception from `submit_batch` propagates unchanged. The provider is not called. The batch, items, and runs are `usage` / `usage_declined`. A nil handler leaves batch submit unmetered. A nil resolver result leaves that submission unmetered. There is no refund if the provider fails after the handler returns.
+
+Refresh, cancel, polling, webhook sync, `perform_tool`, and local tool execution stay unmetered.
 
 ## Operations
 

@@ -1,48 +1,51 @@
 # frozen_string_literal: true
 
+require "recording_studio_ai/usage/event"
+
 module RecordingStudioAI
   module Usage
+    DECLINED_CATEGORY = "usage"
+    DECLINED_CODE = "usage_declined"
+    MESSAGE_LIMIT = 255
+
     module_function
 
-    def spend!(attempt:, attribution:, operation:, purpose: nil)
+    def spend!(attempt:, attribution:, operation:, purpose: nil, provider_native_tools: [])
+      charge!(
+        Event.for_attempt(
+          attempt,
+          attribution: attribution,
+          operation: operation,
+          purpose: purpose,
+          provider_native_tools: provider_native_tools
+        )
+      )
+    end
+
+    def spend_batch_submission!(batch:, attribution:, provider_native_tools:)
+      charge!(Event.for_batch_submission(batch, attribution: attribution, provider_native_tools: provider_native_tools))
+    end
+
+    def charge!(event)
       handler = RecordingStudioAI.configuration.usage_handler
       return if handler.nil?
 
-      key = usage_key(attempt, attribution: attribution, operation: operation, purpose: purpose)
+      event.require_subject_id!
+      key = usage_key(event)
       return if key.nil?
 
-      handler.call(**usage_arguments(key, attempt, attribution: attribution, operation: operation, purpose: purpose))
+      handler.call(**event.handler_arguments(key))
       nil
     end
 
-    def usage_arguments(key, attempt, attribution:, operation:, purpose:)
-      {
-        key: key,
-        quantity: 1,
-        attribution: attribution,
-        idempotency_key: "ai-attempt:#{attempt.id}",
-        metadata: usage_metadata(attempt, operation: operation, purpose: purpose)
-      }
-    end
-
-    def usage_key(attempt, attribution:, operation:, purpose:)
+    def usage_key(event)
       resolver = RecordingStudioAI.configuration.usage_key_resolver
       require_resolver!(resolver)
-      require_attempt_id!(attempt)
-      normalize_usage_key(
-        resolve_usage_key(resolver, attempt, attribution: attribution, operation: operation, purpose: purpose)
-      )
+      normalize_usage_key(resolve_usage_key(resolver, event))
     end
 
-    def resolve_usage_key(resolver, attempt, attribution:, operation:, purpose:)
-      resolver.call(
-        attribution: attribution,
-        operation: operation.to_s,
-        provider: attempt.provider.to_s,
-        model: attempt.model.to_s,
-        profile: attempt.profile_key&.to_s,
-        purpose: purpose
-      )
+    def resolve_usage_key(resolver, event)
+      resolver.call(**event.resolver_arguments)
     end
 
     def normalize_usage_key(key)
@@ -58,29 +61,14 @@ module RecordingStudioAI
       configuration_error!("usage_key_resolver returned a blank key")
     end
 
-    def usage_metadata(attempt, operation:, purpose:)
-      {
-        operation: operation.to_s,
-        provider: attempt.provider.to_s,
-        model: attempt.model.to_s,
-        profile: attempt.profile_key&.to_s,
-        purpose: purpose,
-        ai_run_id: attempt.run_id,
-        attempt_id: attempt.id,
-        attempt_kind: attempt.kind
-      }.freeze
+    def normalize_provider_native_tools(tools)
+      Array(tools).map(&:to_sym).uniq.freeze
     end
 
     def require_resolver!(resolver)
       return if resolver.respond_to?(:call)
 
       configuration_error!("usage_key_resolver must respond to call")
-    end
-
-    def require_attempt_id!(attempt)
-      return if attempt.id
-
-      request_error!("attempt id is required")
     end
 
     def configuration_error!(message)
@@ -91,7 +79,8 @@ module RecordingStudioAI
       raise RecordingStudioAI::Errors::ContractValidationError.new(message, code: "invalid_request")
     end
 
-    private_class_method :usage_arguments, :usage_key, :resolve_usage_key, :normalize_usage_key, :usage_metadata,
-                         :require_resolver!, :require_attempt_id!, :configuration_error!, :request_error!
+    private_class_method :charge!, :usage_key, :resolve_usage_key, :normalize_usage_key,
+                         :normalize_provider_native_tools, :require_resolver!,
+                         :configuration_error!, :request_error!
   end
 end

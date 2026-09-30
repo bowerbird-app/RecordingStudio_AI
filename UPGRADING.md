@@ -2,21 +2,23 @@
 
 ## Upgrading to 0.7.0
 
-`0.7.0` can meter each external provider attempt before the provider runs. There is no migration. Leave `usage_handler` and `usage_key_resolver` nil to keep the current behavior.
+`0.7.0` can meter each external provider attempt before the provider runs. When a handler is set, `submit_batch` spends once after the local batch row exists and before provider HTTP. There is no migration. Leave `usage_handler` and `usage_key_resolver` nil to keep attempts and batch submit unmetered.
 
 1. Update the host dependency to `recording_studio_ai`, `~> 0.7.0`.
-2. Assign both procs when the host should charge credits. A nil resolver result leaves that attempt unmetered.
+2. Assign both procs when the host should charge credits. The resolver requires `provider_native_tools:`. A strict lambda that omits it raises `ArgumentError` and the provider does not run. Lambdas that take `**` already accept it. There is no compatibility shim. A nil resolver result leaves that attempt, or that batch submission, unmetered.
 
 ```ruby
 RecordingStudioAI.configure do |config|
-  config.usage_key_resolver = lambda do |operation:, provider:, model:, profile:, purpose:, attribution:|
+  config.usage_key_resolver = lambda do |operation:, provider:, model:, profile:, purpose:, attribution:, provider_native_tools:|
     case [operation, provider.to_s, model.to_s]
     when ["decision", "typesafe", "jev-latest"]
       "ai.jev"
     else
       case provider.to_s
       when "gemini"
-        "ai.gemini_flash" if model.to_s.include?("flash")
+        if model.to_s.include?("flash")
+          provider_native_tools.include?(:web_search) ? "ai.gemini_flash_search" : "ai.gemini_flash"
+        end
       when "openai"
         "ai.openai"
       end
@@ -34,7 +36,13 @@ end
 
 Hosts with more than one subscription line call `.line`. Unscoped `spend_usage` raises `AmbiguousSubscriptionLine` when more than one live plan holds credits. It raises `SubscriptionLineRequired` when more than one subscription type is configured and no live plan holds credits.
 
-The AI gem does not know credit rates. `ai.jev` and `ai.gemini_flash` are keys. Recording Studio Stripe `usage_costs` turns a key into credits. Token columns and `CostCalculator` stay. A nil resolver result is unmetered. A handler exception propagates unchanged, and the provider call does not run. There is no refund if the provider fails after the handler returns. Each attempt spends once, including retries, fallbacks, and tool continuations. The idempotency key is `ai-attempt:<attempt id>`. Batch submit, refresh, cancel, and `perform_tool` are not metered. Local tool execution is not metered.
+The AI gem does not know credit rates. `ai.jev`, `ai.gemini_flash`, and `ai.gemini_flash_search` are keys the host may return. The gem does not hard-code those keys. Recording Studio Stripe `usage_costs` turns a key into credits. Token columns and `CostCalculator` stay. The resolver value is `[]` or `[:web_search]`. Metadata `provider_native_tools` is an array of name strings. It does not include prompts, queries, or bodies. The charge follows the request, not whether the provider later used the tool.
+
+A handler exception propagates unchanged, and the provider call does not run. There is no refund if the provider fails after the handler returns. Each attempt spends once, including retries, fallbacks, and tool continuations. The idempotency key is `ai-attempt:<attempt id>`.
+
+When a handler is set, `submit_batch` spends once. Quantity is the item count. The idempotency key is `ai-batch:<batch id>:submission`. The operation is `batch`. Purpose is nil. `provider_native_tools` is the union of requested tools. A mixed batch shares one key. Hosts who need different tariffs submit separate batches. One combined key is enough. Separate events per tool could be added later.
+
+A handler exception from `submit_batch` propagates unchanged. The provider is not called. The batch, items, and runs are `usage` / `usage_declined`. A nil handler leaves batch submit unmetered. A nil resolver result leaves that submission unmetered. Refresh, cancel, polling, webhook sync, `perform_tool`, and local tool execution stay unmetered.
 
 ## Upgrading to 0.6.0
 

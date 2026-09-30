@@ -93,14 +93,14 @@ class ConfigController < ApplicationController
       required: "No",
       accepted_values: "Callable or nil",
       default: "nil",
-      explanation: "Receives each provider attempt before the provider runs. Leave nil to keep calls unmetered."
+      explanation: "Charges each provider attempt, and one batch submission, before the provider runs. Refresh and cancel are not charged. Leave nil to keep calls unmetered."
     },
     {
       key: "usage_key_resolver",
       required: "No",
       accepted_values: "Callable or nil",
       default: "nil",
-      explanation: "Returns a usage key such as ai.gemini_flash, or nil when that attempt is free. Set this when usage_handler is set."
+      explanation: "Returns a usage key for a provider attempt or a batch submission, or nil when that call is free. Refresh and cancel are not charged. Set this when usage_handler is set."
     },
     {
       key: "attribution_validator",

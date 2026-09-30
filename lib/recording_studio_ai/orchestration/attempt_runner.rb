@@ -38,7 +38,8 @@ module RecordingStudioAI
           attempt: attempt,
           attribution: request[:attribution],
           operation: operation,
-          purpose: request[:purpose]
+          purpose: request[:purpose],
+          provider_native_tools: request[:provider_native_tools]
         )
       rescue StandardError => e
         record_usage_refusal!(attempt, e)
