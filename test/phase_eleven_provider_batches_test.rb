@@ -665,6 +665,259 @@ class PhaseElevenProviderBatchesTest < RecordingStudioAI::Test::PersistenceCase
     end
   end
 
+  def test_nil_usage_handler_skips_the_resolver_and_still_submits
+    resolver_calls = 0
+    RecordingStudioAI.configuration.usage_key_resolver = lambda do |**|
+      resolver_calls += 1
+      raise "resolver must not run"
+    end
+
+    response = submit_two_items
+
+    assert response.success?
+    assert_equal 0, resolver_calls
+    assert_equal 1, @provider.submissions.length
+  end
+
+  def test_nil_usage_key_skips_the_handler_and_still_submits
+    handler_calls = 0
+    RecordingStudioAI.configuration.usage_key_resolver = ->(**) {}
+    RecordingStudioAI.configuration.usage_handler = lambda do |**|
+      handler_calls += 1
+      raise "handler must not run"
+    end
+
+    response = submit_two_items
+
+    assert response.success?
+    assert_equal 0, handler_calls
+    assert_equal 1, @provider.submissions.length
+  end
+
+  def test_submit_batch_spends_once_before_the_provider
+    order = []
+    spends = []
+    assign_batch_meter(spends) { order << :handler }
+    @provider.define_singleton_method(:submit_batch) do |request:, candidate:|
+      order << :provider
+      submissions << [request, candidate]
+      submit_result
+    end
+
+    response = submit_two_items
+
+    assert response.success?
+    assert_equal %i[handler provider], order
+    spend = spends.sole
+    batch = response.batch
+    assert_equal 2, spend.fetch(:quantity)
+    assert_equal "ai-batch:#{batch.id}:submission", spend.fetch(:idempotency_key)
+    assert_equal "batch", spend.dig(:metadata, :operation)
+    assert_nil spend.dig(:metadata, :purpose)
+    assert_equal [], spend.dig(:metadata, :provider_native_tools)
+    assert_same @provider.submissions.sole.first.fetch(:attribution), spend.fetch(:attribution)
+    refute_includes spend.fetch(:metadata).inspect, "sensitive first prompt"
+    refute spend.fetch(:metadata).key?(:ai_run_id)
+    refute spend.fetch(:metadata).key?(:attempt_id)
+    refute spend.fetch(:metadata).key?(:attempt_kind)
+  end
+
+  def test_mixed_batch_spends_once_for_the_tool_union
+    seen_tools = nil
+    spends = []
+    RecordingStudioAI.configuration.usage_key_resolver = lambda { |**kwargs|
+      seen_tools = kwargs.fetch(:provider_native_tools)
+      "ai.gemini_flash_search"
+    }
+    RecordingStudioAI.configuration.usage_handler = ->(**kwargs) { spends << kwargs }
+
+    response = RecordingStudioAI.submit_batch(
+      items: [
+        { reference: "plain", prompt: "Summarize the notes." },
+        { reference: "search", prompt: "What shipped this week?", provider_native_tools: [:web_search] }
+      ],
+      provider: :test, root_recording: @root_recording, initiator: @initiator
+    )
+
+    assert response.success?
+    assert_equal 1, spends.length
+    assert_equal 1, @provider.submissions.length
+    assert_equal [:web_search], seen_tools
+    assert seen_tools.frozen?
+    assert_equal ["web_search"], spends.sole.dig(:metadata, :provider_native_tools)
+    assert spends.sole.dig(:metadata, :provider_native_tools).frozen?
+    assert_equal 2, spends.sole.fetch(:quantity)
+    assert_equal "ai-batch:#{response.batch.id}:submission", spends.sole.fetch(:idempotency_key)
+    assert_equal "batch", spends.sole.dig(:metadata, :operation)
+    assert_nil spends.sole.dig(:metadata, :purpose)
+    refute_includes spends.sole.fetch(:metadata).inspect, "What shipped this week?"
+    refute_includes spends.sole.fetch(:metadata).inspect, "Summarize the notes."
+  end
+
+  def test_usage_refusal_on_submit_raises_and_does_not_call_the_provider
+    refusal = RuntimeError.new("credits exhausted")
+    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { "ai.batch" }
+    RecordingStudioAI.configuration.usage_handler = ->(**) { raise refusal }
+
+    error = assert_raises(RuntimeError) { submit_two_items }
+
+    assert_same refusal, error
+    assert_empty @provider.submissions
+    batch = RecordingStudioAI::Batch.sole
+    assert_equal "failed", batch.status
+    assert_equal "usage", batch.error_category
+    assert_equal "usage_declined", batch.error_code
+    assert_equal "credits exhausted", batch.error_message
+    assert_nil batch.submitted_at
+    assert_nil batch.provider_batch_id
+    assert batch.completed_at
+    assert_equal batch.item_count, batch.failed_item_count
+    assert_equal [0, 0], [batch.completed_item_count, batch.cancelled_item_count]
+    batch.batch_items.each do |item|
+      assert_equal "failed", item.status
+      assert_equal "usage", item.error_category
+      assert_equal "usage_declined", item.error_code
+      assert_equal "credits exhausted", item.error_message
+      assert item.completed_at
+      assert_nil item.started_at
+    end
+    RecordingStudioAI::Run.find_each do |run|
+      assert_equal "failed", run.status
+      assert_equal "usage", run.error_category
+      assert_equal "usage_declined", run.error_code
+      assert_equal "credits exhausted", run.error_message
+      assert run.completed_at
+      assert_nil run.started_at
+      assert_nil run.latency_ms
+    end
+    refute_equal "batch_submission_failed", batch.error_code
+    refute_equal "batch_submission", batch.error_category
+  end
+
+  def test_long_batch_usage_refusal_message_is_truncated_to_255_characters
+    message = "x" * 300
+    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { "ai.batch" }
+    RecordingStudioAI.configuration.usage_handler = ->(**) { raise message }
+
+    error = assert_raises(RuntimeError) { submit_two_items }
+
+    assert_equal message, error.message
+    assert_equal message[0, 255], RecordingStudioAI::Batch.sole.error_message
+    assert_equal [message[0, 255]], RecordingStudioAI::BatchItem.distinct.pluck(:error_message)
+    assert_equal [message[0, 255]], RecordingStudioAI::Run.distinct.pluck(:error_message)
+  end
+
+  def test_spend_batch_submission_twice_reuses_the_idempotency_key
+    response = submit_two_items
+    batch = response.batch
+    spends = []
+    seen_tools = []
+    RecordingStudioAI.configuration.usage_key_resolver = lambda { |**kwargs|
+      seen_tools << kwargs.fetch(:provider_native_tools)
+      "ai.batch"
+    }
+    RecordingStudioAI.configuration.usage_handler = ->(**kwargs) { spends << kwargs }
+
+    2.times do
+      assert_nil RecordingStudioAI::Usage.spend_batch_submission!(
+        batch: batch,
+        attribution: batch_attribution,
+        provider_native_tools: [:web_search, "web_search"]
+      )
+    end
+
+    keys = spends.map { |spend| spend.fetch(:idempotency_key) }
+    names = spends.map { |spend| spend.dig(:metadata, :provider_native_tools) }
+    assert_equal ["ai-batch:#{batch.id}:submission", "ai-batch:#{batch.id}:submission"], keys
+    assert_equal [[:web_search], [:web_search]], seen_tools
+    assert_equal [["web_search"], ["web_search"]], names
+  end
+
+  def test_a_second_submit_batch_creates_a_different_usage_key
+    spends = []
+    assign_batch_meter(spends)
+
+    first = submit_two_items
+    second = submit_two_items
+
+    keys = spends.map { |spend| spend.fetch(:idempotency_key) }
+    assert_equal [
+      "ai-batch:#{first.batch.id}:submission",
+      "ai-batch:#{second.batch.id}:submission"
+    ], keys
+    assert_equal 2, keys.uniq.length
+  end
+
+  def test_provider_error_after_a_successful_batch_spend_returns_a_response
+    spends = []
+    assign_batch_meter(spends)
+    RecordingStudioAI.configuration.providers[:test] = ExplodingBatchProvider.new
+
+    response = submit_two_items
+
+    assert_instance_of RecordingStudioAI::Contracts::BatchResponse, response
+    refute response.success?
+    assert_equal "batch_submission", response.error.category
+    assert_equal "batch_submission_failed", response.error.code
+    assert_equal 1, spends.length
+    assert_equal "batch_submission_failed", response.batch.error_code
+    assert_equal "batch_submission", response.batch.error_category
+  end
+
+  def test_refresh_and_cancel_do_not_call_the_usage_handler
+    spends = []
+    assign_batch_meter(spends)
+    response = submit_two_items
+
+    RecordingStudioAI.refresh_batch(
+      batch_id: response.batch.id, root_recording: @root_recording, initiator: @initiator
+    )
+    RecordingStudioAI.cancel_batch(
+      batch_id: response.batch.id, root_recording: @root_recording, initiator: @initiator
+    )
+
+    assert_equal 1, spends.length
+    assert_equal 1, @provider.refreshes.length
+    assert_equal 1, @provider.cancellations.length
+
+    scheduled = nil
+    polling_job = Class.new do
+      define_singleton_method(:perform_later) { |**arguments| scheduled = arguments }
+    end
+    RecordingStudioAI.configuration.batch_synchronization_job = polling_job
+    RecordingStudioAI.configuration.usage_handler = ->(**) { raise "usage handler must not run" }
+    RecordingStudioAI.refresh_batch_async(
+      batch_id: response.batch.id, root_recording: @root_recording, initiator: @initiator
+    )
+
+    assert_equal response.batch.id, scheduled.fetch(:batch_id)
+  end
+
+  def test_batch_spend_reads_the_global_configuration
+    calls = []
+    local = RecordingStudioAI::Configuration.new
+    local.attribution_validator = ->(**) {}
+    local.authorization_handler = ->(**) { true }
+    local.providers[:test] = @provider
+    local.allowed_provider_overrides = [:test]
+    local.profiles[:medium] = [{
+      provider: :test, model: "batch-model",
+      capabilities: %i[generation provider_native_web_search provider_batch provider_batch_cancellation]
+    }]
+    local.usage_handler = nil
+    local.usage_key_resolver = ->(**) { raise "local resolver must not run" }
+    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { "ai.batch" }
+    RecordingStudioAI.configuration.usage_handler = ->(**kwargs) { calls << kwargs }
+    request = normalized_request([{ reference: "only", prompt: "one" }])
+
+    response = RecordingStudioAI::BatchOrchestrator.new(configuration: local).submit(request)
+
+    assert response.success?
+    assert_equal 1, calls.length
+    assert_equal 1, @provider.submissions.length
+    assert_equal "ai-batch:#{response.batch.id}:submission", calls.sole.fetch(:idempotency_key)
+  end
+
   def submit_two_items
     RecordingStudioAI.submit_batch(
       items: [{ reference: "first", prompt: "sensitive first prompt" },
@@ -699,6 +952,18 @@ class PhaseElevenProviderBatchesTest < RecordingStudioAI::Test::PersistenceCase
     RecordingStudioAI::Contracts::RequestValidation.validate_batch_submit_request!(
       items: items, root_recording: @root_recording, initiator: @initiator
     )
+  end
+
+  def assign_batch_meter(bucket)
+    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { "ai.batch" }
+    RecordingStudioAI.configuration.usage_handler = lambda do |**kwargs|
+      yield if block_given?
+      bucket << kwargs
+    end
+  end
+
+  def batch_attribution
+    RecordingStudioAI::Contracts::Attribution.new(root_recording: @root_recording, initiator: @initiator)
   end
 
   def configured_configuration

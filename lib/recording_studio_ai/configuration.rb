@@ -60,12 +60,16 @@ module RecordingStudioAI
       :stream_idle_timeout,
       :total_execution_timeout,
       :typesafe_api_key,
-      :typesafe_client
+      :typesafe_client,
+      :usage_handler,
+      :usage_key_resolver
     )
 
     def initialize
       @default_profile = :medium
       @authorization_handler = ->(**) { false }
+      @usage_handler = nil
+      @usage_key_resolver = nil
       @providers = {}
       install_shipped_providers
       @allowed_provider_overrides = []
@@ -211,6 +215,7 @@ module RecordingStudioAI
       if !webhook_batch_initiator.nil? && !webhook_batch_initiator.respond_to?(:call)
         invalid_configuration!("webhook_batch_initiator must be nil or respond to call")
       end
+      validate_usage_meter!
       normalize_model_fallbacks!
       self
     end
@@ -299,6 +304,22 @@ module RecordingStudioAI
 
       range = maximum ? "between #{minimum} and #{maximum}" : "greater than or equal to #{minimum}"
       invalid_configuration!("#{name} must be a finite number #{range}")
+    end
+
+    def validate_usage_meter!
+      if present_but_not_callable?(usage_handler)
+        invalid_configuration!("usage_handler must respond to call")
+      end
+      if present_but_not_callable?(usage_key_resolver)
+        invalid_configuration!("usage_key_resolver must respond to call")
+      end
+      return if usage_handler.nil? || usage_key_resolver.respond_to?(:call)
+
+      invalid_configuration!("usage_handler requires a usage_key_resolver that responds to call")
+    end
+
+    def present_but_not_callable?(value)
+      !value.nil? && !value.respond_to?(:call)
     end
 
     def invalid_configuration!(message)

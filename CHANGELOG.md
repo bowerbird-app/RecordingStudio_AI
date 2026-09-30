@@ -5,6 +5,24 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-30
+
+Hosts can meter each billable external provider attempt, and one charge for each provider batch submission.
+
+### Added
+
+- `usage_handler` and `usage_key_resolver` report each provider attempt before the provider runs.
+- The resolver requires `provider_native_tools:`. The value is `[]` or `[:web_search]`. Metadata stores those names as strings. The charge follows the request, not whether the provider later used the tool.
+- When a handler is set, `submit_batch` spends once after the local batch row exists and before provider HTTP. Quantity is the item count. The idempotency key is `ai-batch:<batch id>:submission`. The operation is `batch`. Purpose is nil. `provider_native_tools` is the union of requested tools. A mixed batch shares one key.
+
+### Upgrade notes
+
+- No migration. A nil `usage_handler` leaves attempts and batch submit unmetered. A nil resolver result leaves that submission unmetered.
+- A strict lambda that omits `provider_native_tools:` raises `ArgumentError` and the provider does not run. Lambdas that take `**` already accept it. There is no compatibility shim. The gem does not hard-code keys such as `ai.gemini_flash` or `ai.gemini_flash_search`.
+- Metadata `provider_native_tools` is an array of name strings. It does not include prompts, queries, or bodies. One combined key is enough. Separate events per tool could be added later. Hosts who need different tariffs submit separate batches.
+- A handler exception propagates unchanged. The provider is not called. A `submit_batch` refusal leaves the batch, items, and runs `usage` / `usage_declined`. There is no refund if the provider fails after the handler returns.
+- Refresh, cancel, polling, webhook sync, `perform_tool`, and local tool execution stay unmetered.
+
 ## [0.6.0] - 2026-09-24
 
 Hosts can run one registered tool without a model call.
@@ -706,7 +724,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.2...v0.4.0

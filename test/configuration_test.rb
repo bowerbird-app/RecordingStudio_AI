@@ -157,4 +157,40 @@ class ConfigurationTest < Minitest::Test
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
     assert_includes error.message, "maximum_decision_characters"
   end
+
+  def test_usage_meter_defaults_are_nil_and_validate_as_a_pair
+    configuration = RecordingStudioAI::Configuration.new
+
+    assert_nil configuration.usage_handler
+    assert_nil configuration.usage_key_resolver
+    assert_same configuration, configuration.validate!
+
+    configuration.usage_key_resolver = ->(**) {}
+    configuration.validate!
+
+    configuration.usage_handler = ->(**) {}
+    configuration.usage_key_resolver = ->(**) { "ai.openai" }
+    configuration.validate!
+
+    configuration = RecordingStudioAI::Configuration.new
+    configuration.usage_handler = ->(**) {}
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
+
+    assert_equal "configuration", error.code
+    assert_includes error.message, "usage_key_resolver"
+
+    configuration = RecordingStudioAI::Configuration.new
+    configuration.usage_handler = "not-callable"
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
+
+    assert_equal "configuration", error.code
+    assert_includes error.message, "usage_handler"
+
+    configuration = RecordingStudioAI::Configuration.new
+    configuration.usage_key_resolver = "not-callable"
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
+
+    assert_equal "configuration", error.code
+    assert_includes error.message, "usage_key_resolver"
+  end
 end
