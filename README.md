@@ -153,6 +153,43 @@ overrides carry through every hop when the next model supports them;
 unsupported ones are dropped rather than failing the hop.
 Usage and compatible-currency cost aggregate across every reported attempt.
 
+## Usage credits
+
+`usage_key_resolver` and `usage_handler` meter each external provider attempt before that attempt calls the provider. Leave `usage_handler` nil to keep the current behavior. There is no migration.
+
+The resolver receives the operation, provider, model, profile, purpose, and attribution. It returns a string key such as `ai.jev` or `ai.gemini_flash`. A nil return leaves that attempt unmetered. Recording Studio Stripe `usage_costs` turns the key into credits. This gem does not know those rates. Token columns and `CostCalculator` stay on the provider result.
+
+```ruby
+RecordingStudioAI.configure do |config|
+  config.usage_key_resolver = lambda do |operation:, provider:, model:, profile:, purpose:, attribution:|
+    case [operation, provider.to_s, model.to_s]
+    when ["decision", "typesafe", "jev-latest"]
+      "ai.jev"
+    else
+      case provider.to_s
+      when "gemini"
+        "ai.gemini_flash" if model.to_s.include?("flash")
+      when "openai"
+        "ai.openai"
+      end
+    end
+  end
+
+  config.usage_handler = lambda do |key:, quantity:, attribution:, idempotency_key:, metadata:|
+    RecordingStudioStripe::Billing
+      .for_recording(attribution.root_recording)
+      .line(:pressbot)
+      .spend_usage(key:, quantity:, idempotency_key:)
+  end
+end
+```
+
+Hosts with more than one subscription line call `.line`. Unscoped `spend_usage` raises `AmbiguousSubscriptionLine` when more than one live plan holds credits. It raises `SubscriptionLineRequired` when more than one subscription type is configured and no live plan holds credits.
+
+The handler receives `key`, `quantity` of 1, the live attribution, `idempotency_key`, and metadata. Metadata names the operation, provider, model, profile, purpose, run id, and attempt id. It does not include the prompt or the response.
+
+A handler exception propagates unchanged, and the provider call does not run. There is no refund if the provider fails after the handler returns. Each attempt spends once. That includes retries, fallbacks, and tool continuations. The idempotency key is `ai-attempt:<attempt id>`. The same attempt repeats that key. Batch submit, refresh, cancel, and `perform_tool` are not metered. Local tool execution is not metered.
+
 ## Operations
 
 Response payload columns use Active Record Encryption. Before enabling

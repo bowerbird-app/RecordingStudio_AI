@@ -1,5 +1,41 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.7.0
+
+`0.7.0` can meter each external provider attempt before the provider runs. There is no migration. Leave `usage_handler` and `usage_key_resolver` nil to keep the current behavior.
+
+1. Update the host dependency to `recording_studio_ai`, `~> 0.7.0`.
+2. Assign both procs when the host should charge credits. A nil resolver result leaves that attempt unmetered.
+
+```ruby
+RecordingStudioAI.configure do |config|
+  config.usage_key_resolver = lambda do |operation:, provider:, model:, profile:, purpose:, attribution:|
+    case [operation, provider.to_s, model.to_s]
+    when ["decision", "typesafe", "jev-latest"]
+      "ai.jev"
+    else
+      case provider.to_s
+      when "gemini"
+        "ai.gemini_flash" if model.to_s.include?("flash")
+      when "openai"
+        "ai.openai"
+      end
+    end
+  end
+
+  config.usage_handler = lambda do |key:, quantity:, attribution:, idempotency_key:, metadata:|
+    RecordingStudioStripe::Billing
+      .for_recording(attribution.root_recording)
+      .line(:pressbot)
+      .spend_usage(key:, quantity:, idempotency_key:)
+  end
+end
+```
+
+Hosts with more than one subscription line call `.line`. Unscoped `spend_usage` raises `AmbiguousSubscriptionLine` when more than one live plan holds credits. It raises `SubscriptionLineRequired` when more than one subscription type is configured and no live plan holds credits.
+
+The AI gem does not know credit rates. `ai.jev` and `ai.gemini_flash` are keys. Recording Studio Stripe `usage_costs` turns a key into credits. Token columns and `CostCalculator` stay. A nil resolver result is unmetered. A handler exception propagates unchanged, and the provider call does not run. There is no refund if the provider fails after the handler returns. Each attempt spends once, including retries, fallbacks, and tool continuations. The idempotency key is `ai-attempt:<attempt id>`. Batch submit, refresh, cancel, and `perform_tool` are not metered. Local tool execution is not metered.
+
 ## Upgrading to 0.6.0
 
 `0.6.0` adds `RecordingStudioAI.perform_tool`. A host can run one registered tool without calling a model. `generate` and `decide` are unchanged.

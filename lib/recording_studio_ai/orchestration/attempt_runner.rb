@@ -11,19 +11,56 @@ module RecordingStudioAI
         @stream_provider = StreamProvider.new(configuration: configuration, stream_session: stream_session)
       end
 
-      def execute(request, candidate, operation:, parameter_overrides: {})
-        unless operation == :decision
-          request = apply_resolved_generation_parameters!(
-            request, candidate, parameter_overrides: parameter_overrides
-          )
+      def execute(request, candidate, operation:, attempt:, parameter_overrides: {})
+        request = prepare_request(request, candidate, operation: operation, parameter_overrides: parameter_overrides)
+        return request if request.is_a?(RecordingStudioAI::Providers::ExecutionResult)
+
+        spend_usage!(request, attempt, operation: operation)
+        invoke_provider(request, candidate, operation: operation)
+      end
+
+      def provider_for!(candidate)
+        @stream_provider.provider_for!(candidate)
+      end
+
+      private
+
+      def prepare_request(request, candidate, operation:, parameter_overrides:)
+        return request if operation == :decision
+
+        with_provider_failures(candidate, operation: operation) do
+          apply_resolved_generation_parameters!(request, candidate, parameter_overrides: parameter_overrides)
         end
+      end
+
+      def spend_usage!(request, attempt, operation:)
+        RecordingStudioAI::Usage.spend!(
+          attempt: attempt,
+          attribution: request[:attribution],
+          operation: operation,
+          purpose: request[:purpose]
+        )
+      rescue StandardError => e
+        record_usage_refusal!(attempt, e)
+        raise
+      end
+
+      def invoke_provider(request, candidate, operation:)
         buffer_stream_events = operation == :stream && request[:schema]
-        @stream_session&.start_buffering! if buffer_stream_events
-        result = run_provider(request, candidate, operation: operation)
-        ensure_result_for_operation!(result, operation: operation)
-        result = apply_cost_and_schema(result, request, candidate, operation: operation)
-        @stream_session&.flush_buffer if buffer_stream_events && result.success?
-        result
+        with_provider_failures(candidate, operation: operation) do
+          @stream_session&.start_buffering! if buffer_stream_events
+          result = run_provider(request, candidate, operation: operation)
+          ensure_result_for_operation!(result, operation: operation)
+          result = apply_cost_and_schema(result, request, candidate, operation: operation)
+          @stream_session&.flush_buffer if buffer_stream_events && result.success?
+          result
+        end
+      ensure
+        @stream_session&.clear_buffer! if buffer_stream_events
+      end
+
+      def with_provider_failures(candidate, operation:)
+        yield
       rescue RecordingStudioAI::Orchestrator::StreamConsumerError
         raise
       rescue RecordingStudioAI::Orchestrator::StreamIdleTimeout
@@ -41,15 +78,31 @@ module RecordingStudioAI
         unsupported_operation_result(candidate, operation: operation)
       rescue StandardError
         provider_failure(candidate, operation: operation)
-      ensure
-        @stream_session&.clear_buffer! if buffer_stream_events
       end
 
-      def provider_for!(candidate)
-        @stream_provider.provider_for!(candidate)
-      end
+      def record_usage_refusal!(attempt, error)
+        message = error.message.to_s[0, 255]
+        attempt.update!(
+          status: "failed",
+          retryable: false,
+          error_category: "usage",
+          error_code: "usage_declined",
+          error_message: message,
+          **Support.completion_clock(attempt.started_at)
+        )
+        run = attempt.run
+        return unless run&.status == "running"
 
-      private
+        run.update!(
+          status: "failed",
+          error_category: "usage",
+          error_code: "usage_declined",
+          error_message: message,
+          **Support.completion_clock(run.started_at)
+        )
+      rescue StandardError
+        nil
+      end
 
       def run_provider(request, candidate, operation:)
         timeout, timeout_error = provider_timeout(request)

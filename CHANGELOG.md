@@ -5,6 +5,18 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-30
+
+Hosts can meter each billable external provider attempt.
+
+### Added
+
+- `usage_handler` and `usage_key_resolver` report each provider attempt before the provider runs.
+
+### Upgrade notes
+
+- No migration. A nil `usage_handler` keeps the current behavior. A handler exception aborts the provider call.
+
 ## [0.6.0] - 2026-09-24
 
 Hosts can run one registered tool without a model call.
@@ -706,7 +718,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.3.2...v0.4.0
