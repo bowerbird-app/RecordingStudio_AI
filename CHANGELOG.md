@@ -5,6 +5,10 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+### Changed
+
+- Development and dummy Gemfiles pin Recording Studio to `v4.2.2`.
+
 ## [0.7.0] - 2026-09-30
 
 Hosts can meter each billable external provider attempt, and one charge for each provider batch submission.
