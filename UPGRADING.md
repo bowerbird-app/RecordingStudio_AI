@@ -108,7 +108,7 @@ are unchanged.
 `recording_studio_ai`, `~> 0.3.0`, then apply the steps below.
 
 1. Upgrade Recording Studio to `4.2.0` or newer (`~> 4.2`) before installing this
-   gem. Matching dummy/dev tags are Recording Studio `v4.2.0`, Accessible
+   gem. Matching dummy/dev tags are Recording Studio `v4.2.2`, Accessible
    `v0.7.0`, Admin `2.0.1`, Root Switchable `v0.5.0`, and FlatPack `v0.1.143`.
    This gem does not declare Accessible in the gemspec; hosts that use Accessible
    authorization should pin it themselves.
