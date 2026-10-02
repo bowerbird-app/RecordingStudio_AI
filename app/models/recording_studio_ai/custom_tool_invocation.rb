@@ -58,12 +58,14 @@ module RecordingStudioAI
           tool_key
           tool_version
           tool_name_snapshot
+          arguments
           read_only
           destructive
           requires_confirmation
           idempotent
           latency_category
           confirmation_status
+          result
           confirmed_by_type
           confirmed_by_id
           confirmed_at

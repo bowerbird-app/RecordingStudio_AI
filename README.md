@@ -153,6 +153,53 @@ overrides carry through every hop when the next model supports them;
 unsupported ones are dropped rather than failing the hop.
 Usage and compatible-currency cost aggregate across every reported attempt.
 
+## Usage credits
+
+`usage_key_resolver` and `usage_handler` meter each external provider attempt before that attempt calls the provider. When a handler is set, `submit_batch` spends once after the local batch row exists and before provider HTTP. Leave `usage_handler` nil to keep attempts and batch submit unmetered. There is no migration.
+
+The resolver requires `provider_native_tools:`. A strict lambda that omits it raises `ArgumentError` and the provider does not run. Lambdas that take `**` already accept it. There is no compatibility shim.
+
+The value is `[]` or `[:web_search]`. Decisions pass `[]`. The host may return `ai.gemini_flash` or `ai.gemini_flash_search`. The gem does not hard-code those keys. A nil return leaves that attempt, or that batch submission, unmetered. Recording Studio Stripe `usage_costs` turns the key into credits. This gem does not know those rates. Token columns and `CostCalculator` stay on the provider result.
+
+```ruby
+RecordingStudioAI.configure do |config|
+  config.usage_key_resolver = lambda do |operation:, provider:, model:, profile:, purpose:, attribution:, provider_native_tools:|
+    case [operation, provider.to_s, model.to_s]
+    when ["decision", "typesafe", "jev-latest"]
+      "ai.jev"
+    else
+      case provider.to_s
+      when "gemini"
+        if model.to_s.include?("flash")
+          provider_native_tools.include?(:web_search) ? "ai.gemini_flash_search" : "ai.gemini_flash"
+        end
+      when "openai"
+        "ai.openai"
+      end
+    end
+  end
+
+  config.usage_handler = lambda do |key:, quantity:, attribution:, idempotency_key:, metadata:|
+    RecordingStudioStripe::Billing
+      .for_recording(attribution.root_recording)
+      .line(:pressbot)
+      .spend_usage(key:, quantity:, idempotency_key:)
+  end
+end
+```
+
+Hosts with more than one subscription line call `.line`. Unscoped `spend_usage` raises `AmbiguousSubscriptionLine` when more than one live plan holds credits. It raises `SubscriptionLineRequired` when more than one subscription type is configured and no live plan holds credits.
+
+The handler receives `key`, `quantity`, the live attribution, `idempotency_key`, and metadata. An attempt uses quantity 1 and idempotency key `ai-attempt:<attempt id>`. The same attempt repeats that key. Metadata names the operation, provider, model, profile, purpose, run id, attempt id, attempt kind, and `provider_native_tools`. `provider_native_tools` in metadata is an array of name strings. It does not include prompts, queries, or bodies. The charge follows the request, not whether the provider later used the tool.
+
+Each attempt spends once. That includes retries, fallbacks, and tool continuations. A handler exception propagates unchanged, and the provider call does not run. There is no refund if the provider fails after the handler returns.
+
+A batch submission uses quantity equal to the item count. The idempotency key is `ai-batch:<batch id>:submission`. The operation is `batch`. Purpose is nil. `provider_native_tools` is the union of requested tools. A mixed batch shares one key. Hosts who need different tariffs submit separate batches. One combined key is enough. Separate events per tool could be added later.
+
+A handler exception from `submit_batch` propagates unchanged. The provider is not called. The batch, items, and runs are `usage` / `usage_declined`. A nil handler leaves batch submit unmetered. A nil resolver result leaves that submission unmetered. There is no refund if the provider fails after the handler returns.
+
+Refresh, cancel, polling, webhook sync, `perform_tool`, and local tool execution stay unmetered.
+
 ## Operations
 
 Response payload columns use Active Record Encryption. Before enabling
@@ -262,6 +309,8 @@ Phase 2 introduced validation and normalized return contracts for:
 - `RecordingStudioAI.generate!(...)`
 - `RecordingStudioAI.decide(...)`
 - `RecordingStudioAI.decide!(...)`
+- `RecordingStudioAI.perform_tool(...)`
+- `RecordingStudioAI.perform_tool!(...)`
 - `RecordingStudioAI.submit_batch(...)`
 - `RecordingStudioAI.refresh_batch(...)`
 - `RecordingStudioAI.refresh_batch_from_webhook(...)`
@@ -537,10 +586,44 @@ RecordingStudioAI.generate(
 Definitions and arguments are validated before execution. Tool use and
 confirmation have separate authorization actions; destructive tools always
 require confirmation. Execution is timeout- and size-bounded, and provider
-continuations are tracked as `continuation` attempts. Only invocation digests,
-bounded summaries, safety snapshots, timing, and errors are persisted. Complete
-arguments and results remain request-scoped. Non-idempotent tool execution is
-never automatically repeated.
+continuations are tracked as `continuation` attempts. Generation persists
+invocation summaries, safety snapshots, timing, and errors. `perform_tool`
+also stores the arguments and the result so a pending confirmation can resume
+and a finished `request_id` can be returned again without running the tool.
+Those values stay on the invocation row; metadata still redacts argument and
+result keys. Non-idempotent tool execution inside `generate` is never
+automatically repeated.
+
+`perform_tool` does not call a model and does not require
+`recording_studio_ai.execute`. It still requires `use_custom_tool`, and
+`confirm_custom_tool` when the tool requires confirmation or is destructive.
+Pass `resume: true` and `arguments: nil` with the same `request_id` to continue
+a pending confirmation. `perform_tool!` raises on a real failure and returns
+when the tool is waiting for confirmation.
+
+```ruby
+performance = RecordingStudioAI.perform_tool(
+  tool: { key: :summarize_record, version: 1 },
+  arguments: { topic: "Rails" },
+  purpose: "agent_step",
+  request_id: "recording-studio-agents:run-1:tool:1",
+  root_recording: root_recording,
+  initiator: current_user,
+  initiator_kind: :agent
+)
+
+if performance.awaiting_confirmation?
+  performance = RecordingStudioAI.perform_tool(
+    tool: { key: :summarize_record, version: 1 },
+    arguments: nil,
+    resume: true,
+    request_id: "recording-studio-agents:run-1:tool:1",
+    root_recording: root_recording,
+    initiator: current_user,
+    initiator_kind: :agent
+  )
+end
+```
 
 ## Registered prompts
 

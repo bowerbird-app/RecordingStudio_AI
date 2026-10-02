@@ -54,6 +54,9 @@ module AdminScreens
     ]
     remove_const(:ModelRow) if const_defined?(:ModelRow) && ModelRow.members != model_row_members
     ModelRow = Data.define(*model_row_members) unless const_defined?(:ModelRow)
+    profile_row_members = %i[profile default_profile position provider model kind]
+    remove_const(:ProfileRow) if const_defined?(:ProfileRow) && ProfileRow.members != profile_row_members
+    ProfileRow = Data.define(*profile_row_members) unless const_defined?(:ProfileRow)
 
     unless const_defined?(:ATTEMPT_KIND_LABELS)
       ATTEMPT_KIND_LABELS = {
@@ -703,6 +706,59 @@ module AdminScreens
       filter_model_rows_by_provider(rows, context).sort_by { |row| [-row.calls, row.provider, row.model] }
     end
 
+    def profile_rows(_context = nil)
+      default_profile = RecordingStudioAI.configuration.default_profile.to_s
+
+      RecordingStudioAI.configuration.profiles.flat_map do |profile, entries|
+        profile_key = profile.to_s
+        default = profile_key == default_profile
+        list = Array(entries)
+        next [ProfileRow.new(profile_key, default, nil, "—", "—", "—")] if list.empty?
+
+        list.each_with_index.map do |entry, index|
+          attributes = profile_entry_attributes(entry)
+          provider = attributes[:provider].to_s
+          model = attributes[:model].to_s
+          ProfileRow.new(
+            profile_key,
+            default,
+            index + 1,
+            provider.presence || "—",
+            model.presence || "—",
+            profile_kind_label(provider, model, attributes[:capabilities])
+          )
+        end
+      end
+    end
+
+    def profile_kind_label(provider, model, capabilities)
+      resolved = profile_entry_capabilities(provider, model, capabilities)
+      kinds = []
+      kinds << "Generative" if resolved.include?(:generation)
+      kinds << "Decision" if resolved.include?(:decision) || resolved.any? { |cap| cap.to_s.start_with?("decision_") }
+      kinds.join(", ").presence || "—"
+    end
+
+    def profile_kind_filter_values
+      %w[Generative Decision]
+    end
+
+    def profile_name_filter_values
+      RecordingStudioAI.configuration.profiles.keys.map(&:to_s)
+    end
+
+    def profile_provider_filter_values
+      profile_rows.filter_map { |row| row.provider.to_s unless row.provider == "—" }.uniq
+    end
+
+    def profile_model_filter_values
+      profile_rows.filter_map { |row| row.model.to_s unless row.model == "—" }.uniq
+    end
+
+    def profile_row_has_kind?(row, kind)
+      row.kind.to_s.split(", ").include?(kind.to_s)
+    end
+
     def registered_provider_keys
       RecordingStudioAI.configuration.providers.keys.map(&:to_s)
     end
@@ -713,6 +769,20 @@ module AdminScreens
 
     def registered_models_path(context, provider:)
       "#{context.admin_screen_path('registered_models')}?#{{ provider: provider }.to_query}"
+    end
+
+    def profile_entry_attributes(entry)
+      if entry.is_a?(RecordingStudioAI::Candidate)
+        return { provider: entry.provider, model: entry.model, capabilities: entry.capabilities }
+      end
+
+      entry.to_h.transform_keys(&:to_sym)
+    end
+
+    def profile_entry_capabilities(provider, model, capabilities)
+      return Array(capabilities).map(&:to_sym) unless capabilities.nil?
+
+      Array(RecordingStudioAI.models.fetch(provider, model)&.capabilities).map(&:to_sym)
     end
 
     def filter_model_rows_by_provider(rows, context)

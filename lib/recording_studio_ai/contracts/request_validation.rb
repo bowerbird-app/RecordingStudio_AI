@@ -120,6 +120,37 @@ module RecordingStudioAI
         )
       end
 
+      # A direct tool call names one registered tool. Unknown keys fail later,
+      # the same way a model-requested tool that was not registered fails.
+      def validate_tool_request!(tool:, root_recording:, initiator:, arguments: nil, resume: false,
+                                 purpose: nil, context_recording: nil, executor: nil, impersonator: nil,
+                                 initiator_kind: nil, execution_source: nil, request_id: nil,
+                                 job_id: nil, metadata: {}, **unknown)
+        reject_unknown_keys!(unknown, path: "tool request")
+        ensure_boolean!(resume, path: "resume")
+        ensure_machine_purpose!(purpose) if purpose
+        ensure_attribution!(root_recording: root_recording, initiator: initiator)
+
+        {
+          tool: ensure_tool_reference!(tool),
+          arguments: normalize_tool_arguments!(arguments, resume: resume),
+          resume: resume,
+          purpose: purpose,
+          attribution: attribution_from!(
+            root_recording: root_recording,
+            context_recording: context_recording,
+            initiator: initiator,
+            initiator_kind: initiator_kind,
+            executor: executor,
+            impersonator: impersonator,
+            execution_source: execution_source,
+            request_id: request_id,
+            job_id: job_id
+          ),
+          metadata: RecordingStudioAI::Metadata.sanitize!(metadata, path: "metadata")
+        }
+      end
+
       def validate_batch_submit_request!(items:, root_recording:, initiator:, profile: nil, provider: nil,
                                          model: nil, context_recording: nil, executor: nil, impersonator: nil,
                                          initiator_kind: nil, execution_source: nil,
@@ -481,6 +512,39 @@ module RecordingStudioAI
           )
         end
         values
+      end
+
+      def ensure_tool_reference!(tool)
+        custom_tool_error!("tool must be a Hash") unless tool.is_a?(Hash)
+
+        normalized = tool.transform_keys(&:to_sym)
+        custom_tool_error!("tool must contain only key and version") unless normalized.keys.sort == %i[key version]
+
+        key = normalized[:key].to_s
+        version = normalized[:version]
+        unless RecordingStudioAI::Providers::ToolCall.valid_key?(key) && version.is_a?(Integer) && version.positive?
+          custom_tool_error!("tool requires a snake_case key and positive integer version")
+        end
+
+        { key: key, version: version }
+      end
+
+      def normalize_tool_arguments!(arguments, resume:)
+        if resume
+          return nil if arguments.nil?
+
+          raise RecordingStudioAI::Errors::ContractValidationError.new(
+            "arguments must be omitted when resuming a tool run",
+            code: "invalid_request"
+          )
+        end
+
+        return arguments if arguments.is_a?(Hash)
+
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          "arguments must be a Hash",
+          code: "invalid_request"
+        )
       end
 
       def ensure_custom_tools!(tools)

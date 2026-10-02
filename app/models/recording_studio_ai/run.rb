@@ -37,7 +37,7 @@ module RecordingStudioAI
 
     validates :operation, :status, :initiator_type, :initiator_id, :initiator_kind,
               :root_recording_id, presence: true
-    validates :operation, inclusion: { in: %w[generation stream batch decision] }
+    validates :operation, inclusion: { in: %w[generation stream batch decision tool] }
 
     class << self
       def terminal_statuses

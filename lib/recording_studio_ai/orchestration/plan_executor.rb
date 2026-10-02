@@ -47,7 +47,8 @@ module RecordingStudioAI
             request,
             planned.candidate,
             operation: operation,
-            parameter_overrides: planned.parameter_overrides
+            parameter_overrides: planned.parameter_overrides,
+            attempt: attempt
           )
           @persistence.complete_attempt!(attempt, result)
           executions << ExecutedAttempt.new(record: attempt, result: result)

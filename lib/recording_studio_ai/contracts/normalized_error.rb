@@ -26,6 +26,7 @@ module RecordingStudioAI
         batch_submission
         batch_expired
         cancelled
+        usage
         configuration
         internal
       ].freeze

@@ -89,6 +89,20 @@ class ConfigController < ApplicationController
       explanation: "Return literal true to allow a call. Dummy maps actions to Accessible roles and ships closed until you set it. Prefer RecordingStudioAI::AccessibleAuthorization once Accessible is installed."
     },
     {
+      key: "usage_handler",
+      required: "No",
+      accepted_values: "Callable or nil",
+      default: "nil",
+      explanation: "Charges each provider attempt, and one batch submission, before the provider runs. Refresh and cancel are not charged. Leave nil to keep calls unmetered."
+    },
+    {
+      key: "usage_key_resolver",
+      required: "No",
+      accepted_values: "Callable or nil",
+      default: "nil",
+      explanation: "Returns a usage key for a provider attempt or a batch submission, or nil when that call is free. Refresh and cancel are not charged. Set this when usage_handler is set."
+    },
+    {
       key: "attribution_validator",
       required: "No",
       accepted_values: "Callable(root_recording:, context_recording:)",
@@ -450,6 +464,8 @@ class ConfigController < ApplicationController
       # Prefer RecordingStudioAI::AccessibleAuthorization once Accessible is installed:
       #   config.authorization_handler = RecordingStudioAI::AccessibleAuthorization.method(:call)
       config.authorization_handler = ->(**) { false }
+      config.usage_handler = nil
+      config.usage_key_resolver = nil
 
       # The gem already checks that the workspace root and context match.
       # Set this only for a stricter host rule.

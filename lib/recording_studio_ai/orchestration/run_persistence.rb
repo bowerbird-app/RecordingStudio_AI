@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 module RecordingStudioAI
   module Orchestration
     class RunPersistence
@@ -16,6 +18,21 @@ module RecordingStudioAI
             input_attributes(request, operation),
             metadata: request[:metadata]
           )
+        )
+      end
+
+      # A tool run has no provider, model, or profile. Arguments stay on the
+      # invocation; metadata is the caller's sanitized hash only.
+      def create_tool!(request)
+        attribution = request[:attribution]
+        RecordingStudioAI::Run.create!(
+          {
+            operation: "tool",
+            purpose: request[:purpose],
+            status: "running",
+            started_at: Time.current,
+            metadata: request[:metadata]
+          }.merge(attribution_attributes(attribution), tool_input_attributes(request))
         )
       end
 
@@ -53,6 +70,14 @@ module RecordingStudioAI
       end
 
       private
+
+      def tool_input_attributes(request)
+        payload = request[:arguments].nil? ? "" : JSON.generate(request[:arguments])
+        RecordingStudioAI::Attachments.metadata([]).merge(
+          input_character_count: payload.length,
+          web_search_requested: false
+        )
+      end
 
       def input_attributes(request, operation)
         return decision_input_attributes(request) if operation == :decision

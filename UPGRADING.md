@@ -1,5 +1,65 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.7.0
+
+`0.7.0` can meter each external provider attempt before the provider runs. When a handler is set, `submit_batch` spends once after the local batch row exists and before provider HTTP. There is no migration. Leave `usage_handler` and `usage_key_resolver` nil to keep attempts and batch submit unmetered.
+
+1. Update the host dependency to `recording_studio_ai`, `~> 0.7.0`.
+2. Assign both procs when the host should charge credits. The resolver requires `provider_native_tools:`. A strict lambda that omits it raises `ArgumentError` and the provider does not run. Lambdas that take `**` already accept it. There is no compatibility shim. A nil resolver result leaves that attempt, or that batch submission, unmetered.
+
+```ruby
+RecordingStudioAI.configure do |config|
+  config.usage_key_resolver = lambda do |operation:, provider:, model:, profile:, purpose:, attribution:, provider_native_tools:|
+    case [operation, provider.to_s, model.to_s]
+    when ["decision", "typesafe", "jev-latest"]
+      "ai.jev"
+    else
+      case provider.to_s
+      when "gemini"
+        if model.to_s.include?("flash")
+          provider_native_tools.include?(:web_search) ? "ai.gemini_flash_search" : "ai.gemini_flash"
+        end
+      when "openai"
+        "ai.openai"
+      end
+    end
+  end
+
+  config.usage_handler = lambda do |key:, quantity:, attribution:, idempotency_key:, metadata:|
+    RecordingStudioStripe::Billing
+      .for_recording(attribution.root_recording)
+      .line(:pressbot)
+      .spend_usage(key:, quantity:, idempotency_key:)
+  end
+end
+```
+
+Hosts with more than one subscription line call `.line`. Unscoped `spend_usage` raises `AmbiguousSubscriptionLine` when more than one live plan holds credits. It raises `SubscriptionLineRequired` when more than one subscription type is configured and no live plan holds credits.
+
+The AI gem does not know credit rates. `ai.jev`, `ai.gemini_flash`, and `ai.gemini_flash_search` are keys the host may return. The gem does not hard-code those keys. Recording Studio Stripe `usage_costs` turns a key into credits. Token columns and `CostCalculator` stay. The resolver value is `[]` or `[:web_search]`. Metadata `provider_native_tools` is an array of name strings. It does not include prompts, queries, or bodies. The charge follows the request, not whether the provider later used the tool.
+
+A handler exception propagates unchanged, and the provider call does not run. There is no refund if the provider fails after the handler returns. Each attempt spends once, including retries, fallbacks, and tool continuations. The idempotency key is `ai-attempt:<attempt id>`.
+
+When a handler is set, `submit_batch` spends once. Quantity is the item count. The idempotency key is `ai-batch:<batch id>:submission`. The operation is `batch`. Purpose is nil. `provider_native_tools` is the union of requested tools. A mixed batch shares one key. Hosts who need different tariffs submit separate batches. One combined key is enough. Separate events per tool could be added later.
+
+A handler exception from `submit_batch` propagates unchanged. The provider is not called. The batch, items, and runs are `usage` / `usage_declined`. A nil handler leaves batch submit unmetered. A nil resolver result leaves that submission unmetered. Refresh, cancel, polling, webhook sync, `perform_tool`, and local tool execution stay unmetered.
+
+## Upgrading to 0.6.0
+
+`0.6.0` adds `RecordingStudioAI.perform_tool`. A host can run one registered tool without calling a model. `generate` and `decide` are unchanged.
+
+1. Update the host dependency to `recording_studio_ai`, `~> 0.6.0`.
+2. Run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`. The migration allows run operation `tool` and adds `arguments` and `result` on custom tool invocations.
+3. No configuration change. Tools that require confirmation still use `custom_tool_confirmation_handler`.
+4. Call `perform_tool` with a stable `request_id`. Call it again with `resume: true` and `arguments: nil` to continue a pending confirmation. A finished `request_id` returns the stored outcome and does not run the tool again.
+
+## Upgrading to 0.5.0
+
+`0.5.0` adds a Profiles screen to Recording Studio Admin. Calls, profiles, and model resolution are unchanged.
+
+1. Update the host dependency to `recording_studio_ai`, `~> 0.5.0`.
+2. Open the Recording Studio AI section and choose Profiles. The table lists each profile's models and whether they are used for generative or decision calls.
+
 ## Upgrading to 0.4.0
 
 `0.4.0` adds `RecordingStudioAI.decide`. Generation, streaming, and batches stay on OpenAI and Gemini. Jev is decision-only.

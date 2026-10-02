@@ -72,6 +72,11 @@ module AdminScreens
          url: ->(context) { context.admin_screen_path("registered_models") },
          style: :secondary
 
+    link :profiles,
+         text: "Profiles",
+         url: ->(context) { context.admin_screen_path("profiles") },
+         style: :secondary
+
     widget "widgets.recording_studio_ai.ai_calls_windows"
     widget "widgets.recording_studio_ai.tool_calls"
     widget "widgets.recording_studio_ai.registered_custom_tools"

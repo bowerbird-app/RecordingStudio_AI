@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_21_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_24_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -174,6 +174,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_21_120000) do
   end
 
   create_table "recording_studio_ai_custom_tool_invocations", force: :cascade do |t|
+    t.json "arguments"
     t.datetime "completed_at"
     t.string "confirmation_status"
     t.datetime "confirmed_at"
@@ -194,6 +195,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_21_120000) do
     t.boolean "read_only", null: false
     t.bigint "requested_by_attempt_id"
     t.boolean "requires_confirmation", null: false
+    t.json "result"
     t.text "result_summary"
     t.bigint "run_id", null: false
     t.datetime "started_at"
@@ -313,7 +315,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_21_120000) do
     t.check_constraint "attachment_count >= 0 AND attachment_total_bytes >= 0 AND citation_count >= 0", name: "chk_rsai_runs_nonnegative_attachment_counts"
     t.check_constraint "attempt_count >= 0 AND retry_count >= 0 AND fallback_count >= 0 AND custom_tool_invocation_count >= 0", name: "chk_rsai_runs_nonnegative_counts"
     t.check_constraint "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at", name: "chk_rsai_runs_timeline"
-    t.check_constraint "operation::text = ANY (ARRAY['generation'::character varying::text, 'stream'::character varying::text, 'batch'::character varying::text, 'decision'::character varying::text])", name: "chk_rsai_runs_operation"
+    t.check_constraint "operation::text = ANY (ARRAY['generation'::character varying, 'stream'::character varying, 'batch'::character varying, 'decision'::character varying, 'tool'::character varying]::text[])", name: "chk_rsai_runs_operation"
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "chk_rsai_runs_status"
   end
 

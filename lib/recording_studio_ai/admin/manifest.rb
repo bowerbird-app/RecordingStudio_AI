@@ -25,6 +25,7 @@ module AdminScreens
     registered_prompts/screen
     registered_providers/screen
     registered_models/screen
+    profiles/screen
     estimated_spend/screen
     calls_by_provider_model/screen
     latency_by_model/screen
@@ -63,6 +64,7 @@ module AdminScreens
     RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredPromptsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredProvidersScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredModelsScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAIProfilesScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIEstimatedSpendScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAICallsByProviderModelScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAILatencyByModelScreen)

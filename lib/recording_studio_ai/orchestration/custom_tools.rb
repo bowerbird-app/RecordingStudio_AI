@@ -38,7 +38,8 @@ module RecordingStudioAI
             request.merge(history),
             planned.candidate,
             operation: operation,
-            parameter_overrides: planned.parameter_overrides
+            parameter_overrides: planned.parameter_overrides,
+            attempt: continuation
           )
           result = enforce_round_limit(result, rounds)
           @persistence.complete_attempt!(continuation, result)

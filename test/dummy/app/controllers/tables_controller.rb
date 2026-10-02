@@ -7,7 +7,7 @@ class TablesController < ApplicationController
       purpose: "One row per high-level AI operation. Tracks routing, attribution, lifecycle, usage, cost, and sanitized failure context.",
       columns: [
         { name: "id", type: "bigint", sample: "12041", explanation: "Primary key used as the durable identity for a run." },
-        { name: "operation", type: "string", sample: "generation", explanation: "Operation category such as generation, stream, or batch." },
+        { name: "operation", type: "string", sample: "generation", explanation: "Operation category such as generation, stream, batch, decision, or tool." },
         { name: "purpose", type: "string", sample: "summarize_page", explanation: "Host-defined business intent that explains why the call happened." },
         { name: "status", type: "string", sample: "completed", explanation: "Execution state used by orchestration and admin reporting." },
         { name: "profile_key", type: "string", sample: "medium", explanation: "Routing profile used to select candidate providers and models." },
@@ -98,7 +98,7 @@ class TablesController < ApplicationController
     },
     {
       name: "recording_studio_ai_custom_tool_invocations",
-      purpose: "Tracks every tool call requested by providers, including confirmation flow, execution outcome, and sanitized summaries.",
+      purpose: "Tracks every tool call, including confirmation, execution outcome, stored arguments, and sanitized summaries. perform_tool also stores the result.",
       columns: [
         { name: "id", type: "bigint", sample: "991", explanation: "Primary key for tool invocation." },
         { name: "run_id", type: "bigint", sample: "12041", explanation: "Parent run that owns the tool invocation." },
@@ -108,6 +108,7 @@ class TablesController < ApplicationController
         { name: "tool_key", type: "string", sample: "summarize_record", explanation: "Stable key of registered tool definition." },
         { name: "tool_version", type: "integer", sample: "1", explanation: "Tool contract version requested by model." },
         { name: "tool_name_snapshot", type: "string", sample: "Summarize Record", explanation: "Human-readable tool name snapshot for reporting." },
+        { name: "arguments", type: "json", sample: '{"topic":"Rails"}', explanation: "Arguments for this invocation. Kept off metadata so they are not redacted." },
         { name: "status", type: "string", sample: "completed", explanation: "Invocation lifecycle state from requested to terminal." },
         { name: "read_only", type: "boolean", sample: "true", explanation: "Tool capability flag indicating no side effects." },
         { name: "destructive", type: "boolean", sample: "false", explanation: "Tool capability flag indicating potentially destructive actions." },
@@ -118,6 +119,7 @@ class TablesController < ApplicationController
         { name: "confirmed_by_type", type: "string", sample: "User", explanation: "Actor class that approved execution." },
         { name: "confirmed_by_id", type: "string", sample: "7", explanation: "Identifier of actor that approved execution." },
         { name: "confirmed_at", type: "datetime", sample: "2026-08-12T06:31:01Z", explanation: "Timestamp when confirmation was granted." },
+        { name: "result", type: "json", sample: '{"summary":"Rails is a framework."}', explanation: "Executor result stored by perform_tool. Generation leaves this empty and keeps only the summary." },
         { name: "result_summary", type: "text", sample: "summary generated", explanation: "Sanitized compact summary of execution result." },
         { name: "started_at", type: "datetime", sample: "2026-08-12T06:31:01Z", explanation: "Execution start timestamp for the tool call." },
         { name: "completed_at", type: "datetime", sample: "2026-08-12T06:31:01Z", explanation: "Execution completion timestamp." },
