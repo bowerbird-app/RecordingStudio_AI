@@ -9,7 +9,7 @@ gem "recording_studio",
     tag: "v4.2.0"
 gem "flat_pack",
     github: "bowerbird-app/flatpack",
-    tag: "v0.1.197"
+    tag: "v0.1.198"
 
 gemspec
 
