@@ -31,9 +31,11 @@ end
 
 ### Secrets Management
 - **Status**: ✅ Secure
-- Rails credentials encrypted with `config/master.key`
-- Master key is gitignored and NOT committed
-- Each installation generates its own unique master key
+- Dummy app credentials live in `test/dummy/config/credentials.yml.enc`
+- That file is encrypted with the shared RecordingStudio_* development master key (dev/test only; these gems have no production site)
+- New gems keep this encrypted file. Do not mint a per-repo dummy master key
+- Developers set `RAILS_MASTER_KEY`, or write the shared key to `test/dummy/config/master.key`
+- `test/dummy/config/master.key` is gitignored and is never committed
 
 **Location**: `.gitignore` includes `test/dummy/config/master.key`
 
@@ -109,6 +111,7 @@ For security issues, please report via GitHub Issues or contact the maintainers 
 ## Updates
 
 - **2025-12-04**: Initial security review completed
+- **2026-10-05**: Dummy credentials use the shared RecordingStudio_* development master key; `master.key` stays gitignored
 - No vulnerabilities identified in current scope
 - Development environment appropriately configured
 - Production hardening checklist provided

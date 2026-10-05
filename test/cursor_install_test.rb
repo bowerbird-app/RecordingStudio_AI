@@ -48,6 +48,8 @@ class CursorInstallTest < Minitest::Test
     assert_includes install, "ruby-build"
     assert_includes install, "db:prepare"
     assert_includes install, "tailwindcss:build"
+    assert_includes install, "RAILS_MASTER_KEY"
+    assert_includes install, "test/dummy/config/master.key"
     refute_nil fetch_at, "install.sh must run fetch-skills.sh"
     assert_operator apt_at, :<, fetch_at
     assert_operator fetch_at, :<, complete_at
