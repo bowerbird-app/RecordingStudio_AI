@@ -16,6 +16,17 @@ PREFIX=/usr/local
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 
+# The committed credentials.yml.enc is reused across gems. Set
+# RAILS_MASTER_KEY in the environment, or write test/dummy/config/master.key.
+# Do not generate a per-repo master key. Never commit the key.
+write_dummy_master_key() {
+  if [ -n "${RAILS_MASTER_KEY:-}" ]; then
+    log "Writing dummy master.key from RAILS_MASTER_KEY"
+    umask 077
+    printf '%s' "${RAILS_MASTER_KEY}" > "${ROOT}/test/dummy/config/master.key"
+  fi
+}
+
 ruby_ok() {
   command -v ruby >/dev/null 2>&1 || return 1
   [ "$(ruby -e 'print RUBY_VERSION')" = "${RUBY_VERSION}" ]
@@ -88,6 +99,8 @@ start_postgres() {
   fi
   sudo -u postgres psql -tAc "ALTER USER postgres PASSWORD 'postgres';" >/dev/null 2>&1 || true
 }
+
+write_dummy_master_key
 
 if ruby_ok && bundle_ok && postgres_ok; then
   log "Ruby ${RUBY_VERSION}, bundle, and Postgres already usable; skipping apt, ruby-build, db:prepare, and tailwind"
