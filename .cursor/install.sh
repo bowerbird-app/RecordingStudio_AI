@@ -23,6 +23,7 @@ write_dummy_master_key() {
   if [ -n "${RAILS_MASTER_KEY:-}" ]; then
     log "Writing dummy master.key from RAILS_MASTER_KEY"
     umask 077
+    mkdir -p "${ROOT}/test/dummy/config"
     printf '%s' "${RAILS_MASTER_KEY}" > "${ROOT}/test/dummy/config/master.key"
   fi
 }
