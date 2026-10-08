@@ -17,11 +17,11 @@ GIT
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_admin.git
-  revision: e5f0ba8acaf04b5f36e940e89e5a43709cb25e03
-  tag: 2.0.1
+  revision: e1398281da7932bdec891a2b873b7d531191be35
+  tag: v2.0.6
   specs:
-    recording_studio_admin (2.0.1)
-      flat_pack (~> 0.1.129)
+    recording_studio_admin (2.0.2)
+      flat_pack (~> 0.1.207)
       rails (~> 8.1.0)
       recording_studio_accessible (~> 0.6)
 
@@ -38,10 +38,10 @@ GIT
 
 GIT
   remote: https://github.com/bowerbird-app/flatpack.git
-  revision: 3654913a87f3d72556223b81e0d8140a292e3c2e
-  tag: v0.1.143
+  revision: 7490c10b4ec59c7df81aa4f6a46d8f9ef83de8bc
+  tag: v0.1.207
   specs:
-    flat_pack (0.1.143)
+    flat_pack (0.1.207)
       pagy (~> 9.0)
       rails (>= 7.1, < 9)
       tailwind_merge (~> 0.13)
@@ -512,7 +512,7 @@ CHECKSUMS
   erubi (1.13.1) sha256=a082103b0885dbc5ecf1172fede897f9ebdb745a4b97a5e8dc63953db1ee4ad9
   et-orbi (1.4.0) sha256=6c7e3c90779821f9e3b324c5e96fda9767f72995d6ae435b96678a4f3e2de8bc
   ffi (1.17.2-x86_64-linux-gnu) sha256=05d2026fc9dbb7cfd21a5934559f16293815b7ce0314846fee2ac8efbdb823ea
-  flat_pack (0.1.143)
+  flat_pack (0.1.207)
   fugit (1.12.1) sha256=5898f478ede9b415f0804e42b8f3fd53f814bd85eebffceebdbc34e1107aaf68
   globalid (1.4.0) sha256=037f12fbf1d9d7a014d501c2d5c77356fd4ddd96d7a7991d6700bba96706f427
   hana (1.3.7) sha256=5425db42d651fea08859811c29d20446f16af196308162894db208cac5ce9b0d
@@ -573,7 +573,7 @@ CHECKSUMS
   rdoc (8.0.0) sha256=03bf8c08a9639658855a0cfd77c0abca8325c227693f7f33f82957811348c469
   recording_studio (4.2.1)
   recording_studio_accessible (0.7.0)
-  recording_studio_admin (2.0.1)
+  recording_studio_admin (2.0.2)
   recording_studio_ai (0.7.0)
   recording_studio_root_switchable (0.5.0)
   redis-client (0.30.1) sha256=5151bc5c7bbfe48623732cdae3b900d8a22dc691cc7cdfacfb351ac55116522d

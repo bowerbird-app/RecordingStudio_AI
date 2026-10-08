@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-# Recording Studio 4.2 default_layout passes PageNav `anchor_url:`.
-# FlatPack 0.1.143 PageNav reads `anchor_href:`. Alias without forking the layout.
-# Admin 2.0.1 section views still pass Button `url:`; FlatPack 0.1.143 reads `href:`.
+# Compatibility aliases for FlatPack 0.1.207 kwargs.
+# FlatPack PageNav reads `anchor_href:` / `secondary_anchor_href:`; Button reads `href:`.
+# Keep accepting older `anchor_url:` / `back_url:` / `url:` call sites without forking layouts.
 module DummyFlatPackPageNavAnchorUrl
   def initialize(anchor_url: nil, back_url: nil, **kwargs)
     kwargs[:anchor_href] = kwargs[:anchor_href].presence || anchor_url
