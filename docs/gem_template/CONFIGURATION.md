@@ -38,7 +38,7 @@ This will:
 
 ### RecordingStudio 4.2 Host-App Declarations
 
-The dummy host app pins RecordingStudio to `v4.2.2` and keeps strict recordable declarations enabled:
+The dummy host app pins RecordingStudio to `v4.3.0` and keeps strict recordable declarations enabled:
 
 ```ruby
 RecordingStudio.configure do |config|
