@@ -18,6 +18,10 @@ Versioning and Keep a Changelog.
   `recording_studio_ai/retained_responses/show` resolve through `t(...)`
   (English output unchanged)
 
+### Changed
+
+- Development and dummy Gemfiles pin Recording Studio to `v4.2.2`.
+
 ### Upgrade notes
 
 - No migration or host code change is required for English.
