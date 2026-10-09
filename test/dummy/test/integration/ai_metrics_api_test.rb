@@ -41,12 +41,7 @@ class AIMetricsApiTest < ActionDispatch::IntegrationTest
       name: "Workspace operations metrics #{SecureRandom.hex(4)}",
       api: :operations
     )
-    @public_token = provision_token(
-      access_point: @root,
-      actor: @staff,
-      role: :view,
-      name: "Public metrics #{SecureRandom.hex(4)}"
-    )
+    @public_token = "public-#{SecureRandom.hex(24)}"
     Current.actor = nil
   end
 

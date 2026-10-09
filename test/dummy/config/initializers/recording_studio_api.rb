@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 RecordingStudioApi.configure do |config|
+  # Dummy has no AdminRoot recordable (root types stay Workspace-only).
+  # Metrics auth uses a Workspace named "Admin" as that host AdminRoot.
+  config.admin_root_recordable_type_names = ["Workspace"]
   config.openapi_title = "Dummy host API"
   config.documentation_enabled = false
   config.api_management_authorization_required = false
