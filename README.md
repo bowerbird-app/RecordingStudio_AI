@@ -25,7 +25,7 @@ Add the addon and Recording Studio 4.2 to the host application's `Gemfile`:
 ```ruby
 gem "recording_studio",
     github: "bowerbird-app/RecordingStudio",
-    tag: "v4.3.0"
+    tag: "v4.4.0"
 gem "recording_studio_ai",
     github: "bowerbird-app/RecordingStudio_AI"
 ```
