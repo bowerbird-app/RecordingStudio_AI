@@ -5,9 +5,25 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-09
+
+### Added
+
+* English Rails I18n keys for static interface copy on the gem's saved-reply
+  page (`config/locales/en.yml` under `recording_studio.ai`)
+
 ### Changed
 
-- Development and dummy Gemfiles pin Recording Studio to `v4.2.2`.
+* Saved-reply labels, headings, badges, and the Close page-nav label in
+  `recording_studio_ai/retained_responses/show` resolve through `t(...)`
+  (English output unchanged)
+
+### Upgrade notes
+
+- No migration or host code change is required for English.
+- To translate or override the defaults, add keys under
+  `recording_studio.ai.retained_responses` in the host's locale files.
+- See [UPGRADING.md](UPGRADING.md#upgrading-to-080).
 
 ## [0.7.0] - 2026-09-30
 

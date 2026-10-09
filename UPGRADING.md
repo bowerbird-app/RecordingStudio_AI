@@ -1,5 +1,49 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.8.0
+
+This is a non-breaking upgrade. Rendered English interface text is unchanged.
+
+### What changed
+
+- Static copy on the gem's saved-reply page
+  (`app/views/recording_studio_ai/retained_responses/show.html.erb`) uses Rails
+  I18n keys under `recording_studio.ai.retained_responses`.
+- The gem ships English only in `config/locales/en.yml` (Rails engines load
+  that path by default). There is no dependency on
+  `recording_studio_internationalization`.
+
+Keys added:
+
+| Key | English |
+| --- | --- |
+| `recording_studio.ai.retained_responses.close` | Close |
+| `recording_studio.ai.retained_responses.page_title` | Saved reply |
+| `recording_studio.ai.retained_responses.page_subtitle` | What the model sent back. |
+| `recording_studio.ai.retained_responses.about_title` | About this reply |
+| `recording_studio.ai.retained_responses.type` | Type |
+| `recording_studio.ai.retained_responses.status` | Status |
+| `recording_studio.ai.retained_responses.cut_short` | Cut short |
+| `recording_studio.ai.retained_responses.size` | Size |
+| `recording_studio.ai.retained_responses.expires` | Expires |
+| `recording_studio.ai.retained_responses.content_type` | Content type |
+| `recording_studio.ai.retained_responses.open_call` | Open this call |
+| `recording_studio.ai.retained_responses.complete` | Complete |
+| `recording_studio.ai.retained_responses.incomplete` | Incomplete |
+| `recording_studio.ai.retained_responses.truncated` | Truncated |
+| `recording_studio.ai.retained_responses.reply` | Reply |
+| `recording_studio.ai.retained_responses.structured_reply` | Structured reply |
+| `recording_studio.ai.retained_responses.provider_payload` | Provider payload |
+
+Left untranslated on purpose: reply body and structured/provider JSON (user /
+model content), humanized response types, size and expiry values, content-type
+strings, icon/style tokens, and Admin widget copy under `lib/` (out of scope).
+
+### Upgrade steps
+
+No migration is required. English hosts need no change. To override or add
+another language, set the keys above in the host's `config/locales`.
+
 ## Upgrading to 0.7.0
 
 `0.7.0` can meter each external provider attempt before the provider runs. When a handler is set, `submit_batch` spends once after the local batch row exists and before provider HTTP. There is no migration. Leave `usage_handler` and `usage_key_resolver` nil to keep attempts and batch submit unmetered.
