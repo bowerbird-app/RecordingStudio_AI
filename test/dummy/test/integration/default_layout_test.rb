@@ -56,6 +56,13 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "Signed in successfully"
   end
 
+  test "engine english locale is on the host i18n load path" do
+    locale_path = File.expand_path("../../../../config/locales/en.yml", __dir__)
+
+    assert_includes I18n.load_path.map { |path| File.expand_path(path) }, locale_path
+    assert_equal "Saved reply", I18n.t("recording_studio.ai.retained_responses.page_title")
+  end
+
   test "saved reply page uses default_layout with Access-only page-nav and Flatpack assets" do
     retained = create_overview_retained_response!
 
@@ -64,10 +71,45 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_gem_admin_shell
     assert_includes response.body, "Saved reply"
+    assert_includes response.body, "What the model sent back."
+    assert_includes response.body, "About this reply"
+    assert_includes response.body, "Type"
+    assert_includes response.body, "Status"
+    assert_includes response.body, "Complete"
+    assert_includes response.body, "Size"
+    assert_includes response.body, "Expires"
+    assert_includes response.body, "Reply"
+    assert_includes response.body, "retained body"
+    assert_includes response.body, "Open this call"
     assert_select "a[href='#{RecordingStudioAdmin.configuration.default_mount_path}'][aria-label='Close']"
     refute_select "table"
-    assert_includes response.body, "About this reply"
-    assert_includes response.body, "What the model sent back."
+  end
+
+  test "saved reply page shows incomplete and truncated badges" do
+    retained = create_overview_retained_response!(complete: false, truncated: true)
+
+    get "/recording_studio_ai/retained_responses/#{retained.id}"
+
+    assert_response :success
+    assert_includes response.body, "Incomplete"
+    assert_includes response.body, "Truncated"
+    assert_includes response.body, "Cut short"
+    refute_includes response.body, ">Complete<"
+  end
+
+  test "saved reply page shows structured reply and provider payload sections" do
+    retained = create_overview_retained_response!(
+      normalized_response: JSON.generate("answer" => "yes"),
+      raw_response: JSON.generate("id" => "resp_1")
+    )
+
+    get "/recording_studio_ai/retained_responses/#{retained.id}"
+
+    assert_response :success
+    assert_includes response.body, "Structured reply"
+    assert_includes response.body, "Provider payload"
+    assert_includes response.body, "answer"
+    assert_includes response.body, "resp_1"
   end
 
   test "recording studio admin uses default_layout with Access-only page-nav and Flatpack assets" do
@@ -102,7 +144,12 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     end
   end
 
-  def create_overview_retained_response!
+  def create_overview_retained_response!(
+    complete: true,
+    truncated: false,
+    normalized_response: nil,
+    raw_response: nil
+  )
     run = RecordingStudioAI::Run.create!(
       operation: "generation",
       status: "completed",
@@ -127,9 +174,12 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
       response_type: "generation",
       provider: "test",
       model: "test-model",
-      complete: true,
+      complete: complete,
+      truncated: truncated,
       byte_size: 12,
       content_text: "retained body",
+      normalized_response: normalized_response,
+      raw_response: raw_response,
       expires_at: 7.days.from_now
     )
   end

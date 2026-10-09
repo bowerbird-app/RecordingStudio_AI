@@ -59,8 +59,12 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "admin retained body"
     assert_includes response.body, "Saved reply"
+    assert_includes response.body, "What the model sent back."
     assert_includes response.body, "About this reply"
     assert_includes response.body, "Complete"
+    assert_includes response.body, "Reply"
+    assert_includes response.body, "Open this call"
+    assert_includes response.body, "Close"
     refute_includes response.body, "Not kept."
     refute_includes response.body, "Retention metadata"
     refute_includes response.body, "retained response"
