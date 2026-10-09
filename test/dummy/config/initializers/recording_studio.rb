@@ -2,7 +2,16 @@
 
 RecordingStudio.configure do |config|
   # Registered delegated_type recordables (strings or classes)
-  config.recordable_types = [ "Workspace", "Folder", "Page" ]
+  config.recordable_types = [
+    "Workspace",
+    "Folder",
+    "Page",
+    "AdminRoot",
+    "RecordingStudioApi::ApiClient",
+    "RecordingStudioApi::ApiCredential",
+    "RecordingStudioApi::ApiAccessToken",
+    "RecordingStudioApi::AdminApi"
+  ]
   config.require_recordable_declarations = true
   config.app_name = "Recording Studio AI"
 
@@ -21,4 +30,7 @@ RecordingStudio.configure do |config|
   config.enable_capability(:accessible, on: "Workspace")
   config.enable_capability(:accessible, on: "Folder")
   config.enable_capability(:accessible, on: "Page")
+  config.enable_capability(:accessible, on: "AdminRoot")
+  config.enable_capability(:api_access_point, on: "Workspace")
+  config.enable_capability(:api_access_point, on: "AdminRoot")
 end

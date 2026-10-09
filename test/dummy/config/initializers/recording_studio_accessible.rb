@@ -4,7 +4,7 @@ RecordingStudioAccessible.configure do |config|
   # Keep this enabled if you want an info-level log when RecordingStudio still owns
   # the built-in access constants and this addon is running in compatibility mode.
   config.warn_on_core_conflict = true
-  config.access_actor_types = [ "User" ]
+  config.access_actor_types = [ "User", "RecordingStudioApi::ApiClient" ]
 
   config.avatar_resolver = lambda do |access_holder|
     next unless access_holder.is_a?(User)
