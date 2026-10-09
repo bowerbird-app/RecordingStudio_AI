@@ -10,10 +10,15 @@ module RecordingStudioAI
       def admin_root_recording
         return unless defined?(RecordingStudioAdmin)
 
-        resolver = RecordingStudioAdmin.configuration.access_recording_resolver
+        config = RecordingStudioAdmin.configuration
+        resolver = config.site_admin_recording_resolver || config.access_recording_resolver
         return unless resolver
 
-        resolver.call(ResolverContext.new(nil))
+        begin
+          resolver.call(ResolverContext.new(nil))
+        rescue StandardError
+          nil
+        end
       end
 
       def actor_for(context)
