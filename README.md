@@ -28,7 +28,26 @@ gem "recording_studio",
     tag: "v4.4.0"
 gem "recording_studio_ai",
     github: "bowerbird-app/RecordingStudio_AI"
+gem "recording_studio_metrics",
+    github: "bowerbird-app/RecordingStudio_metrics",
+    tag: "v0.2.0"
 ```
+
+AI registers site-wide run metrics. The host exposes them once:
+
+```ruby
+RecordingStudioMetrics::Api.register!(api: :operations)
+```
+
+Staff with AdminRoot `:view` (`RecordingStudioAI::Api::Access.can_view?`) can read:
+
+- `GET /recording_studio_api/apis/operations/v1/metrics`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/over_time`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/by_status`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/by_model`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/tokens`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/tokens_over_time`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/avg_latency`
 
 Then install the addon foundation:
 

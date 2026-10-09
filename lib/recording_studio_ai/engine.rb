@@ -8,6 +8,10 @@ module RecordingStudioAI
       ActiveSupport::Inflector.inflections(:en) { |inflect| inflect.acronym "AI" }
     end
 
+    initializer "recording_studio_ai.metrics" do
+      config.to_prepare { RecordingStudioAI::Metrics.register! }
+    end
+
     config.to_prepare do
       next unless defined?(RecordingStudioAdmin)
 
