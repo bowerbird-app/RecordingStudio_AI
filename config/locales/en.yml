@@ -1,0 +1,21 @@
+en:
+  recording_studio:
+    ai:
+      retained_responses:
+        close: "Close"
+        page_title: "Saved reply"
+        page_subtitle: "What the model sent back."
+        about_title: "About this reply"
+        type: "Type"
+        status: "Status"
+        cut_short: "Cut short"
+        size: "Size"
+        expires: "Expires"
+        content_type: "Content type"
+        open_call: "Open this call"
+        complete: "Complete"
+        incomplete: "Incomplete"
+        truncated: "Truncated"
+        reply: "Reply"
+        structured_reply: "Structured reply"
+        provider_payload: "Provider payload"

@@ -45,6 +45,7 @@ Useful routes:
 - `/methods` — call-site examples
 - `/admin` — Recording Studio Admin AI screens
 - `/recording_studio_ai/retained_responses/:id` — saved reply (decrypt)
+  (gem view copy uses `recording_studio.ai.retained_responses` English I18n keys)
 - `/recording_studio` — Recording Studio host integration
 - `/users/sign_in` — Devise sign in
 - `/up` — Rails health check

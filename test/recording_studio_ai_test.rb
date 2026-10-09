@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.7.0", RecordingStudioAI::VERSION
+    assert_equal "0.8.0", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -122,7 +122,7 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes contents, "FlatPack::Collapse::Component"
     assert_includes contents, "FlatPack::CodeBlock::Component"
     refute_includes contents, "Not kept."
-    assert_includes contents, "Saved reply"
+    assert_includes contents, 't("recording_studio.ai.retained_responses.page_title")'
     assert_includes contents, "recording_studio_page_nav"
     assert_includes contents, "page_nav_anchor_url"
 
