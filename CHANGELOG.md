@@ -5,6 +5,21 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-09
+
+### Fixed
+
+- Site-wide AI metrics authorization resolves the admin root with
+  `site_admin_recording_resolver` when it is set, and otherwise with
+  `access_recording_resolver`. If that resolver raises, `can_view?` denies
+  the request instead of failing metrics discovery.
+
+### Upgrade notes
+
+- Bump to `0.9.1`. No migration.
+- Set `site_admin_recording_resolver` when site-wide metrics should use the
+  admin root without a controller. A resolver error denies access.
+
 ## [0.9.0] - 2026-10-09
 
 Site-wide AI run metrics register with Recording Studio Metrics for the operations API.
