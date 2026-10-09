@@ -1,14 +1,7 @@
 # frozen_string_literal: true
 
+# Dummy table for an AdminRoot fixture. It is not a configured recordable:
+# `root_recordable_types` must stay `["Workspace"]`. Metrics auth uses a
+# Workspace named "Admin" as the AdminRoot recording the host resolver returns.
 class AdminRoot < ApplicationRecord
-  include RecordingStudio::Recordable
-  include RecordingStudioAdmin::AllowsAdminSections
-
-  recording_studio_recordable label: "Admin", root: true, shared: false
-  RecordingStudio.enable_capability(:accessible, on: self)
-  RecordingStudio.enable_capability(:api_access_point, on: self)
-
-  recording_studio_admin_sections do
-    section :recording_studio_ai
-  end
 end

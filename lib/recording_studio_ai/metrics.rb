@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "api/access"
 require "recording_studio_metrics"
 
 module RecordingStudioAI
@@ -7,9 +8,7 @@ module RecordingStudioAI
     RESOURCE = :ai_runs
     API = :operations
     EXPOSE = { api: [API] }.freeze
-    AUTHORIZE = lambda { |context|
-      RecordingStudioAI::AccessibleAuthorization.admin_operator?(actor: context.access_grant&.actor)
-    }
+    AUTHORIZE = ->(context) { RecordingStudioAI::Api::Access.can_view?(context) }
 
     module_function
 

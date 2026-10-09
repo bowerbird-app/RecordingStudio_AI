@@ -39,7 +39,7 @@ AI registers site-wide run metrics. The host exposes them once:
 RecordingStudioMetrics::Api.register!(api: :operations)
 ```
 
-Staff with AdminRoot admin (`AccessibleAuthorization.admin_operator?`) can read:
+Staff with AdminRoot `:view` (`RecordingStudioAI::Api::Access.can_view?`) can read:
 
 - `GET /recording_studio_api/apis/operations/v1/metrics`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/over_time`

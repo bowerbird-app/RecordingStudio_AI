@@ -6,7 +6,6 @@ RecordingStudio.configure do |config|
     "Workspace",
     "Folder",
     "Page",
-    "AdminRoot",
     "RecordingStudioApi::ApiClient",
     "RecordingStudioApi::ApiCredential",
     "RecordingStudioApi::ApiAccessToken",
@@ -30,7 +29,5 @@ RecordingStudio.configure do |config|
   config.enable_capability(:accessible, on: "Workspace")
   config.enable_capability(:accessible, on: "Folder")
   config.enable_capability(:accessible, on: "Page")
-  config.enable_capability(:accessible, on: "AdminRoot")
   config.enable_capability(:api_access_point, on: "Workspace")
-  config.enable_capability(:api_access_point, on: "AdminRoot")
 end

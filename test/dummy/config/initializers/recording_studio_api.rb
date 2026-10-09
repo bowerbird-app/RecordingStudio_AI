@@ -25,13 +25,6 @@ RecordingStudioApi.register_default_resource_actions!(api: :operations)
 RecordingStudioApi.register_default_capability_actions!(api: :operations)
 
 RecordingStudioApi.register_recordable_type_api(
-  "AdminRoot",
-  api: :operations,
-  operations: %i[index show],
-  serializer: ->(recordable, **) { { name: recordable.name } },
-  output_keys: %i[name]
-)
-RecordingStudioApi.register_recordable_type_api(
   "Workspace",
   api: :operations,
   operations: %i[index show],

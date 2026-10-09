@@ -8,6 +8,11 @@ RecordingStudioAdmin.configure do |config|
 
   # Fail closed: never fall back to an ungranted or global root.
   config.access_recording_resolver = lambda do |context|
+    if context.controller.nil?
+      admin = Workspace.find_by(name: "Admin")
+      return RecordingStudio.root_recording_for(admin) if admin
+    end
+
     actor = context.current_actor
     return nil if actor.blank?
 

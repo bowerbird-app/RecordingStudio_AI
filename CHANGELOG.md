@@ -5,6 +5,34 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-09
+
+Site-wide AI run metrics register with Recording Studio Metrics for the operations API.
+
+### Added
+
+- `RecordingStudioAI::Metrics.register!` registers `:ai_runs` (`blast_radius: :site`)
+  with RecordingStudioMetrics. Metrics: `ai_runs.over_time` (`created_at`),
+  `ai_runs.by_status`, `ai_runs.by_model` (`resolved_model`), `ai_runs.tokens`
+  (`total_tokens` sum), `ai_runs.tokens_over_time`, and `ai_runs.avg_latency`
+  (`latency_ms`). Each metric is exposed on `:operations` only.
+  `api_authorize` uses `RecordingStudioAI::Api::Access.can_view?` (AdminRoot
+  `:view` via Accessible, same as RecordingStudio_users). Estimated spend is
+  omitted: Admin's estimated-spend widget sums tokens, and dollar estimates
+  live in the provider catalog.
+- Runtime dependency `recording_studio_metrics` `~> 0.2` (GitHub tag `v0.2.0`).
+
+### Upgrade notes
+
+- Bump to `0.9.0`. No migration.
+- Add `recording_studio_metrics` at tag `v0.2.0`.
+- This gem does not call `RecordingStudioMetrics::Api.register!`. The host
+  registers Metrics endpoints once:
+
+```ruby
+RecordingStudioMetrics::Api.register!(api: :operations)
+```
+
 ## [0.8.0] - 2026-10-09
 
 ### Added
@@ -17,10 +45,6 @@ Versioning and Keep a Changelog.
 * Saved-reply labels, headings, badges, and the Close page-nav label in
   `recording_studio_ai/retained_responses/show` resolve through `t(...)`
   (English output unchanged)
-
-### Changed
-
-- Development and dummy Gemfiles pin Recording Studio to `v4.2.2`.
 
 ### Upgrade notes
 
