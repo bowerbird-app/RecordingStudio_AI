@@ -15,7 +15,6 @@ Rails.application.routes.draw do
   mount RecordingStudio::Engine, at: "/recording_studio"
   mount RecordingStudioAI::Engine, at: "/recording_studio_ai"
   mount RecordingStudioAccessible::Engine, at: "/recording_studio_accessible"
-  mount RecordingStudioApi::Engine, at: "/recording_studio_api"
   mount RecordingStudioRootSwitchable::Engine, at: "/recording_studio_root_switchable"
   recording_studio_admin_for :admin, at: "/admin", root_section: :recording_studio_ai
 
