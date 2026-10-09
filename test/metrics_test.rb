@@ -33,6 +33,7 @@ class MetricsTest < Minitest::Test
     refute_includes metrics, "respond_to?"
     refute_includes metrics, "rescue"
 
+    assert_includes metrics, "for_resource(RESOURCE).any?"
     assert_includes engine, "RecordingStudioAI::Metrics.register!"
     refute_includes engine, "RecordingStudioMetrics::Api.register!"
 

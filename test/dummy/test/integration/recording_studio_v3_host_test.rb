@@ -13,7 +13,7 @@ class RecordingStudioV3HostTest < ActiveSupport::TestCase
 
   test "dummy app validates v3 recordable declarations" do
     assert RecordingStudio.validate_recordable_declarations!
-    assert_equal [ "Workspace" ], RecordingStudio.root_recordable_types
+    assert_equal [ "Workspace", "AdminRoot" ], RecordingStudio.root_recordable_types
     assert_equal [ "Workspace", "Folder" ], RecordingStudio.allowed_parent_types_for("Page")
   end
 

@@ -14,6 +14,8 @@ module RecordingStudioAI
     module_function
 
     def register!
+      return if RecordingStudioMetrics.for_resource(RESOURCE).any?
+
       RecordingStudioMetrics.register(
         RESOURCE,
         model: RecordingStudioAI::Run,
