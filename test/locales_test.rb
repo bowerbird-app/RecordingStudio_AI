@@ -62,6 +62,9 @@ class LocalesTest < ActiveSupport::TestCase
     assert tree.key?("common")
     assert_equal "Recording Studio AI", tree.dig("admin", "section", "title")
     assert_equal "1st attempt", tree.dig("admin", "attempt_kinds", "primary")
+    # Quoted in en.yml so YAML 1.1 does not coerce them to boolean keys.
+    assert_equal "Yes", tree.fetch("common").fetch("yes")
+    assert_equal "No", tree.fetch("common").fetch("no")
   end
 
   test "gemspec does not depend on recording_studio_internationalization" do
@@ -91,6 +94,11 @@ class LocalesTest < ActiveSupport::TestCase
                    RecordingStudioAI::Copy.t("retained_responses.page_title", default: "Saved reply")
       assert_equal "AI Calls",
                    RecordingStudioAI::Copy.t("admin.screens.ai_calls.title", default: "AI Calls")
+      # Must resolve from the locale file, not only via default: (yes/no are YAML-sensitive).
+      assert_equal "Yes", RecordingStudioAI::Copy.t("common.yes", default: nil)
+      assert_equal "No", RecordingStudioAI::Copy.t("common.no", default: nil)
+      assert_equal "Yes", I18n.t("recording_studio.ai.common.yes", raise: true)
+      assert_equal "No", I18n.t("recording_studio.ai.common.no", raise: true)
     end
   end
 

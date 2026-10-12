@@ -27,11 +27,17 @@ Wave 2 Rails I18n for Admin DSL chrome and other user-facing copy outside views.
   `attempt_kind_label` resolves the display string at call time
 - Saved-reply view `t(...)` calls pass `default:` with the original English
 
+### Fixed
+
+- Quote `common.yes` / `common.no` in `en.yml` so YAML 1.1 does not coerce them
+  to boolean keys (host overrides of those keys would otherwise miss)
+
 ### Upgrade notes
 
 - Bump to `0.10.0`. No migration and no host code change for English.
 - Override or translate keys under `recording_studio.ai.admin` and
-  `recording_studio.ai.common` in the host's locale files.
+  `recording_studio.ai.common` in the host's locale files. Quote `yes` / `no`
+  keys in host YAML the same way (`"yes":` / `"no":`).
 - Admin table column headers, header tooltips, and filter titles stay English
   literals (Admin DSL stores them at class load).
 - See [UPGRADING.md](UPGRADING.md#upgrading-to-0100).

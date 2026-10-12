@@ -20,8 +20,9 @@ en:
         structured_reply: "Structured reply"
         provider_payload: "Provider payload"
       common:
-        yes: "Yes"
-        no: "No"
+        # Quote yes/no — YAML 1.1 otherwise loads them as booleans.
+        "yes": "Yes"
+        "no": "No"
         unknown: "Unknown"
         none: "—"
         none_word: "None"

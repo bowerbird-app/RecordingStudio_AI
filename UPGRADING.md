@@ -22,14 +22,22 @@ Left untranslated on purpose:
 
 - Admin table column headers, header tooltips, and filter titles (Admin DSL
   stores them as strings at class load)
-- Model integrity validation messages, developer `ArgumentError`s, logs,
-  generator CLI text, AI prompt content sent to models, icon/style tokens,
-  stored/user data, and dummy-app chrome
+- Model integrity `errors.add` sites (ActiveModel 8.1 ignores `message:` for
+  String types; left byte-identical to main):
+  - `CustomToolInvocation` — `"must belong to the same run"`
+  - `BatchItem` — `"must belong to the batch root"` /
+    `"must use the batch context"`
+  - `Response` — `"exactly one of attempt_id or batch_item_id must be present"`
+  - `TerminalImmutability` — `"Cannot modify terminal fields after status is terminal: …"`
+- Developer `ArgumentError`s, logs, generator CLI text, AI prompt content sent
+  to models, icon/style tokens, stored/user data, and dummy-app chrome
 
 ### Upgrade steps
 
 No migration is required. English hosts need no change. To override or add
-another language, set the keys above in the host's `config/locales`.
+another language, set the keys above in the host's `config/locales`. Quote
+`"yes"` / `"no"` keys in host YAML (YAML 1.1 otherwise treats them as
+booleans).
 
 ## Upgrading to 0.8.0
 
