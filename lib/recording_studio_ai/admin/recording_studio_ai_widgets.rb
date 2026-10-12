@@ -212,9 +212,7 @@ module AdminScreens
     end
 
     def attempt_kind_label(kind)
-      english = ATTEMPT_KIND_LABELS[kind.to_s]
-      return kind.to_s.humanize if english.blank?
-
+      english = ATTEMPT_KIND_LABELS.fetch(kind.to_s, kind.to_s.humanize)
       Copy.t("admin.attempt_kinds.#{kind}", default: english)
     end
 
@@ -1082,8 +1080,12 @@ module AdminScreens
       start_week..reference_time
     end
 
-    def weekly_calls_series(scope, weeks_back: 12, series_name: nil)
-      series_name ||= Copy.t("common.ai_calls", default: "AI calls")
+    def weekly_calls_series(scope, weeks_back: 12, series_name: "AI calls")
+      series_name = if series_name == "AI calls"
+                      Copy.t("common.ai_calls", default: "AI calls")
+                    else
+                      series_name
+                    end
       current_week_start = Time.current.beginning_of_week
       start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
       range = start_week..Time.current
@@ -1100,8 +1102,12 @@ module AdminScreens
       }]
     end
 
-    def weekly_token_series(scope, weeks_back: 12, series_name: nil)
-      series_name ||= Copy.t("common.token_usage", default: "Token usage")
+    def weekly_token_series(scope, weeks_back: 12, series_name: "Token usage")
+      series_name = if series_name == "Token usage"
+                      Copy.t("common.token_usage", default: "Token usage")
+                    else
+                      series_name
+                    end
       current_week_start = Time.current.beginning_of_week
       start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
       range = start_week..Time.current
@@ -1222,14 +1228,11 @@ module AdminScreens
       baseline_average = baseline_daily.empty? ? 0 : (baseline_daily.sum.to_f / baseline_daily.size)
       if usage_today >= [20, (baseline_average * 1.8).ceil].max
         warnings << {
+          # Interpolation matches main: formatted count in %{count}, always "calls".
           text: Copy.t(
             "admin.alerts.high_usage",
-            count: usage_today,
-            formatted_count: number(usage_today),
-            default: {
-              one: "Unusually high usage today: %{formatted_count} call",
-              other: "Unusually high usage today: %{formatted_count} calls"
-            }
+            count: number(usage_today),
+            default: "Unusually high usage today: %{count} calls"
           ),
           icon: "arrow-trending-up"
         }

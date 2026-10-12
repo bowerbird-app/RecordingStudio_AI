@@ -59,29 +59,14 @@ class ProfileKindI18nTest < ActiveSupport::TestCase
     end
   end
 
-  def test_high_usage_alert_uses_numeric_count_and_plural_forms
+  def test_high_usage_alert_english_matches_main
     I18n.with_locale(:en) do
-      one = RecordingStudioAI::Copy.t(
+      text = RecordingStudioAI::Copy.t(
         "admin.alerts.high_usage",
-        count: 1,
-        formatted_count: "1",
-        default: {
-          one: "Unusually high usage today: %{formatted_count} call",
-          other: "Unusually high usage today: %{formatted_count} calls"
-        }
+        count: "20",
+        default: "Unusually high usage today: %{count} calls"
       )
-      other = RecordingStudioAI::Copy.t(
-        "admin.alerts.high_usage",
-        count: 20,
-        formatted_count: "20",
-        default: {
-          one: "Unusually high usage today: %{formatted_count} call",
-          other: "Unusually high usage today: %{formatted_count} calls"
-        }
-      )
-
-      assert_equal "Unusually high usage today: 1 call", one
-      assert_equal "Unusually high usage today: 20 calls", other
+      assert_equal "Unusually high usage today: 20 calls", text
     end
   end
 

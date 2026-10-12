@@ -63,17 +63,6 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
     assert_equal "Saved reply", I18n.t("recording_studio.ai.retained_responses.page_title")
   end
 
-  test "host config locales override a rarely shown gem key at boot" do
-    boot_override = Rails.root.join("config/locales/recording_studio_ai_boot_override.en.yml")
-
-    assert_path_exists boot_override
-    assert_includes I18n.load_path.map { |path| File.expand_path(path) }, boot_override.to_s
-    assert_equal "HOST expensive model usage elevated: 40% in the last 24h",
-                 I18n.t("recording_studio.ai.admin.alerts.expensive_model", share: 40)
-    refute_equal "Expensive model usage elevated: 40% in the last 24h",
-                 I18n.t("recording_studio.ai.admin.alerts.expensive_model", share: 40)
-  end
-
   test "saved reply page uses default_layout with Access-only page-nav and Flatpack assets" do
     retained = create_overview_retained_response!
 

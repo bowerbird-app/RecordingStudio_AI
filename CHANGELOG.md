@@ -22,21 +22,20 @@ Wave 2 Rails I18n for Admin DSL chrome and other user-facing copy outside views.
 
 - Admin section, screen, widget, chart, summary, and resource action copy under
   `lib/recording_studio_ai/admin` resolves through `Copy.t(...)` at render time
-  where the Admin DSL evaluates callables (English output unchanged)
+  (English strings match main)
 - `ATTEMPT_KIND_LABELS` stays as the public English constant map;
   `attempt_kind_label` resolves the display string at call time
 - Saved-reply view `t(...)` calls pass `default:` with the original English
+- Profile Kind keeps raw `Generative` / `Decision` tokens for filter matching;
+  table display translates those tokens only
 
 ### Fixed
 
 - Quote `common.yes` / `common.no` in `en.yml` so YAML 1.1 does not coerce them
   to boolean keys (host overrides of those keys would otherwise miss)
 - Prompt message titles for non-system/user roles match main (`role.humanize`, so
-  `assistant` stays `Assistant`)
-- Profile Kind filter keeps raw `Generative` / `Decision` tokens on the row for
-  matching; only the table display (and token labels) translate
-- Tool safety suffix `, destructive` and high-usage alert plural forms are
-  translated (`count:` numeric, `formatted_count:` for display)
+  `assistant` is `Assistant`)
+- Tool safety suffix `, destructive` is translated
 
 ### Upgrade notes
 
@@ -44,6 +43,7 @@ Wave 2 Rails I18n for Admin DSL chrome and other user-facing copy outside views.
 - Override or translate keys under `recording_studio.ai.admin` and
   `recording_studio.ai.common` in the host's locale files. Quote `yes` / `no`
   keys in host YAML the same way (`"yes":` / `"no":`).
+- Profile Kind filter params stay `Generative` / `Decision`.
 - Admin table column headers, header tooltips, and filter titles stay English
   literals (Admin DSL stores them at class load).
 - See [UPGRADING.md](UPGRADING.md#upgrading-to-0100).

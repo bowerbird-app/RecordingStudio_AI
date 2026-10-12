@@ -56,8 +56,16 @@ class LocalesTest < ActiveSupport::TestCase
     tree = locale_tree(File.join(engine_locales_dir, "en.yml"), "en")
            .fetch("recording_studio")
            .fetch("ai")
+           .fetch("retained_responses")
 
-    assert_equal RETAINED_RESPONSE_KEYS, tree.fetch("retained_responses").transform_keys(&:to_s)
+    assert_equal RETAINED_RESPONSE_KEYS, tree.transform_keys(&:to_s)
+  end
+
+  test "en.yml includes wave2 admin and common keys" do
+    tree = locale_tree(File.join(engine_locales_dir, "en.yml"), "en")
+           .fetch("recording_studio")
+           .fetch("ai")
+
     assert tree.key?("admin")
     assert tree.key?("common")
     assert_equal "Recording Studio AI", tree.dig("admin", "section", "title")

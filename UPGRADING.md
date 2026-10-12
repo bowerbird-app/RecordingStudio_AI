@@ -2,8 +2,8 @@
 
 ## Upgrading to 0.10.0
 
-This is a non-breaking upgrade for English hosts. Rendered English interface
-text is unchanged.
+This is a translation-only upgrade for English hosts. Rendered English interface
+text matches main (no new UI, filters, dialogs, or reachability changes).
 
 ### What changed
 
@@ -39,9 +39,7 @@ another language, set the keys above in the host's `config/locales`. Quote
 `"yes"` / `"no"` keys in host YAML (YAML 1.1 otherwise treats them as
 booleans). Profile Kind filter params stay the English tokens `Generative` /
 `Decision`; translate only display via `common.generative` /
-`common.decision`. High-usage alerts use plural forms under
-`admin.alerts.high_usage` with numeric `count:` and `formatted_count:` for the
-rendered number.
+`common.decision`.
 
 ## Upgrading to 0.8.0
 
