@@ -1081,11 +1081,7 @@ module AdminScreens
     end
 
     def weekly_calls_series(scope, weeks_back: 12, series_name: "AI calls")
-      series_name = if series_name == "AI calls"
-                      Copy.t("common.ai_calls", default: "AI calls")
-                    else
-                      series_name
-                    end
+      series_name = Copy.t("common.ai_calls", default: "AI calls") if series_name == "AI calls"
       current_week_start = Time.current.beginning_of_week
       start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
       range = start_week..Time.current
@@ -1103,11 +1099,7 @@ module AdminScreens
     end
 
     def weekly_token_series(scope, weeks_back: 12, series_name: "Token usage")
-      series_name = if series_name == "Token usage"
-                      Copy.t("common.token_usage", default: "Token usage")
-                    else
-                      series_name
-                    end
+      series_name = Copy.t("common.token_usage", default: "Token usage") if series_name == "Token usage"
       current_week_start = Time.current.beginning_of_week
       start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
       range = start_week..Time.current
