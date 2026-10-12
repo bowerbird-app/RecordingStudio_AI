@@ -19,6 +19,10 @@ Style/StringLiterals:
   Enabled: true
   EnforcedStyle: double_quotes
 
+# I18n defaults and locale strings use %{name} interpolation, not sprintf tokens.
+Style/FormatStringToken:
+  EnforcedStyle: template
+
 Layout/LineLength:
   Max: 120
   Exclude:

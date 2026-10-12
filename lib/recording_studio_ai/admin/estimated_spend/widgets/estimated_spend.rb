@@ -3,10 +3,10 @@
 module AdminScreens
   RecordingStudioAIEstimatedSpendWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.estimated_spend") do
     type :chart
-    title "Estimated token usage"
-    subtitle "Top 5 models by token usage in the last 30 days."
-    description "Ranks models by token usage so the heavy hitters are easy to spot."
-    metadata { { period_label: "Last 30 days" } }
+    title { Copy.t("admin.widgets.estimated_spend.title", default: "Estimated token usage") }
+    subtitle { Copy.t("admin.widgets.estimated_spend.subtitle", default: "Top 5 models by token usage in the last 30 days.") }
+    description { Copy.t("admin.widgets.estimated_spend.description", default: "Ranks models by token usage so the heavy hitters are easy to spot.") }
+    metadata { { period_label: Copy.t("common.last_30_days", default: "Last 30 days") } }
     value do |context|
       runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
       total_tokens = runs.where(created_at: 30.days.ago..Time.current).where.not(total_tokens: nil).sum(:total_tokens)
@@ -26,7 +26,7 @@ module AdminScreens
       rows = AdminScreens::RecordingStudioAIWidgets.top_model_token_chart_rows(context)
 
       [{
-        name: "Token usage",
+        name: Copy.t("common.token_usage", default: "Token usage"),
         data: rows.map { |_model, total_tokens| total_tokens.to_i }
       }]
     end

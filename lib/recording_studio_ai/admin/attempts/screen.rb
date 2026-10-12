@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIAttemptsScreen < RecordingStudioAdmin::Screen
     key "attempts"
     icon :arrow_path
-    title "Attempts"
-    subtitle "Provider attempts for AI calls, ordered by their execution sequence."
+    title { Copy.t("admin.screens.attempts.title", default: "Attempts") }
+    subtitle { Copy.t("admin.screens.attempts.subtitle", default: "Provider attempts for AI calls, ordered by their execution sequence.") }
 
     query do |context|
       relation = AdminScreens::RecordingStudioAIWidgets.attempts_scope(context)
@@ -75,8 +75,8 @@ module AdminScreens
     end
 
     chart do
-      title "Attempts by kind"
-      subtitle "Stacked tries: 1st attempt, retry, fallback, and after tools."
+      title { Copy.t("admin.screens.attempts.chart_title", default: "Attempts by kind") }
+      subtitle { Copy.t("admin.screens.attempts.chart_subtitle", default: "Stacked tries: 1st attempt, retry, fallback, and after tools.") }
       type :column
       series do |context|
         AdminScreens::RecordingStudioAIWidgets.attempt_kind_series(
@@ -128,7 +128,7 @@ module AdminScreens
              sortable: false,
              header_tooltip: "The prompt this try used.",
              value: lambda { |attempt, _context|
-               attempt.run&.prompt_name_snapshot.presence || attempt.run&.prompt_key || "No prompt"
+               attempt.run&.prompt_name_snapshot.presence || attempt.run&.prompt_key || Copy.t("common.no_prompt", default: "No prompt")
              }
       column :tools,
              title: "Tools",

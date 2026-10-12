@@ -3,9 +3,9 @@
 module AdminScreens
   RecordingStudioAIRegisteredPromptsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.registered_prompts") do
     type :list
-    title "Registered prompts"
-    subtitle "Top 5 most-called prompts in the last 30 days."
-    description "Open a prompt to inspect recent AI calls that used it."
+    title { Copy.t("admin.widgets.registered_prompts.title", default: "Registered prompts") }
+    subtitle { Copy.t("admin.widgets.registered_prompts.subtitle", default: "Top 5 most-called prompts in the last 30 days.") }
+    description { Copy.t("admin.widgets.registered_prompts.description", default: "Open a prompt to inspect recent AI calls that used it.") }
     list_options { { divider: true } }
     items do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.top_prompt_call_rows(
@@ -22,7 +22,7 @@ module AdminScreens
             prompt: prompt_key
           }.compact.to_query}"
         }
-      end.presence || [{ text: "No prompt calls in the last 30 days." }]
+      end.presence || [{ text: Copy.t("admin.widgets.registered_prompts.empty", default: "No prompt calls in the last 30 days.") }]
     end
     link_to { |context| context.admin_screen_path("registered_prompts") }
   end

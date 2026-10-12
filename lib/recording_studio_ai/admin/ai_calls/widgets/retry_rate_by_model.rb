@@ -3,10 +3,10 @@
 module AdminScreens
   RecordingStudioAIRetryRateByModelWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.retry_rate_by_model") do
     type :chart
-    title "Retry rate by model"
-    subtitle "Top three models by runs requiring at least one retry in the last 30 days."
-    description "Highlights models with the highest share of retried runs."
-    metadata { { period_label: "Last 30 days" } }
+    title { Copy.t("admin.widgets.retry_rate_by_model.title", default: "Retry rate by model") }
+    subtitle { Copy.t("admin.widgets.retry_rate_by_model.subtitle", default: "Top three models by runs requiring at least one retry in the last 30 days.") }
+    description { Copy.t("admin.widgets.retry_rate_by_model.description", default: "Highlights models with the highest share of retried runs.") }
+    metadata { { period_label: Copy.t("common.last_30_days", default: "Last 30 days") } }
     value do |context|
       retries = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
                                                       .where(created_at: 30.days.ago..Time.current)
@@ -25,7 +25,7 @@ module AdminScreens
     chart_type :bar
     series do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.retry_rate_chart_rows(context)
-      [{ name: "Retry rate", data: rows.map(&:last) }]
+      [{ name: Copy.t("common.retry_rate", default: "Retry rate"), data: rows.map(&:last) }]
     end
     chart_options do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.retry_rate_chart_rows(context)

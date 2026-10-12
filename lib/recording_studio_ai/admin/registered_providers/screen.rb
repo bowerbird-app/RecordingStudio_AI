@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIRegisteredProvidersScreen < RecordingStudioAdmin::Screen
     key "registered_providers"
     icon :server
-    title "Registered providers"
-    subtitle "Who's wired up."
+    title { Copy.t("admin.screens.registered_providers.title", default: "Registered providers") }
+    subtitle { Copy.t("admin.screens.registered_providers.subtitle", default: "Who's wired up.") }
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.provider_rows(context)
@@ -21,10 +21,10 @@ module AdminScreens
       column :configured,
              title: "Configured",
              header_tooltip: "Whether keys are set so it can run.",
-             value: ->(row, _context) { row.configured ? "Yes" : "No" },
+             value: ->(row, _context) { row.configured ? Copy.t("common.yes", default: "Yes") : Copy.t("common.no", default: "No") },
              display: :badge,
-             display_options: lambda { |_row, _context, value|
-               { text: value, style: value == "Yes" ? :success : :warning, size: :sm }
+             display_options: lambda { |row, _context, value|
+               { text: value, style: row.configured ? :success : :warning, size: :sm }
              }
       column :calls_series,
              title: "Calls",
@@ -38,7 +38,7 @@ module AdminScreens
                  }.to_query}",
                  class: "inline-block",
                  data: { turbo_frame: "_top" },
-                 aria: { label: "AI calls for #{row.key} in the last 30 days" }
+                 aria: { label: Copy.t("common.ai_calls_for_provider", name: row.key, default: "AI calls for %{name} in the last 30 days") }
                )
              }
       column :models_count,
@@ -49,7 +49,7 @@ module AdminScreens
                  row.models_count.to_s,
                  AdminScreens::RecordingStudioAIWidgets.registered_models_path(context, provider: row.key),
                  data: { turbo_frame: "_top" },
-                 aria: { label: "Registered models for #{row.key}" }
+                 aria: { label: Copy.t("common.registered_models_for", name: row.key, default: "Registered models for %{name}") }
                )
              }
     end

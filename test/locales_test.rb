@@ -61,10 +61,53 @@ class LocalesTest < ActiveSupport::TestCase
     assert_equal RETAINED_RESPONSE_KEYS, tree.transform_keys(&:to_s)
   end
 
+  test "en.yml includes wave2 admin and common keys" do
+    tree = locale_tree(File.join(engine_locales_dir, "en.yml"), "en")
+           .fetch("recording_studio")
+           .fetch("ai")
+
+    assert tree.key?("admin")
+    assert tree.key?("common")
+    assert_equal "Recording Studio AI", tree.dig("admin", "section", "title")
+    assert_equal "1st attempt", tree.dig("admin", "attempt_kinds", "primary")
+    # Quoted in en.yml so YAML 1.1 does not coerce them to boolean keys.
+    assert_equal "Yes", tree.fetch("common").fetch("yes")
+    assert_equal "No", tree.fetch("common").fetch("no")
+  end
+
   test "gemspec does not depend on recording_studio_internationalization" do
     gemspec = File.read(File.expand_path("../recording_studio_ai.gemspec", __dir__))
 
     refute_includes gemspec, "recording_studio_internationalization"
+  end
+
+  test "lib ruby files do not append to i18n load path" do
+    lib_files = Dir[File.expand_path("../lib/**/*.rb", __dir__)]
+
+    assert_operator lib_files.length, :>=, 1
+
+    lib_files.each do |path|
+      source = File.read(path)
+
+      refute_includes source, "i18n.load_path",
+                      "#{path} must not touch config.i18n.load_path (Rails engines load config/locales automatically)"
+      refute_includes source, "I18n.load_path",
+                      "#{path} must not append to I18n.load_path (that re-adds gem English after host overrides)"
+    end
+  end
+
+  test "copy helper prefixes recording_studio.ai and accepts default english" do
+    I18n.with_locale(:en) do
+      assert_equal "Saved reply",
+                   RecordingStudioAI::Copy.t("retained_responses.page_title", default: "Saved reply")
+      assert_equal "AI Calls",
+                   RecordingStudioAI::Copy.t("admin.screens.ai_calls.title", default: "AI Calls")
+      # Must resolve from the locale file, not only via default: (yes/no are YAML-sensitive).
+      assert_equal "Yes", RecordingStudioAI::Copy.t("common.yes", default: nil)
+      assert_equal "No", RecordingStudioAI::Copy.t("common.no", default: nil)
+      assert_equal "Yes", I18n.t("recording_studio.ai.common.yes", raise: true)
+      assert_equal "No", I18n.t("recording_studio.ai.common.no", raise: true)
+    end
   end
 
   private
@@ -82,7 +125,9 @@ class LocalesTest < ActiveSupport::TestCase
     expanded = I18n.load_path.map { |path| File.expand_path(path) }
     return if expanded.include?(locale_path)
 
+    # Setup-only: gem unit tests boot without Rails auto-loading engine locales.
+    # Prefer load_translations over reload! so in-memory store_translations stay put.
     I18n.load_path << locale_path
-    I18n.backend.reload!
+    I18n.backend.load_translations
   end
 end

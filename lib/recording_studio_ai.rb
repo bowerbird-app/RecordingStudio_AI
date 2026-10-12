@@ -2,6 +2,7 @@
 
 require "recording_studio"
 require "recording_studio_ai/version"
+require "recording_studio_ai/copy"
 require "recording_studio_ai/configuration"
 require "recording_studio_ai/engine"
 require "recording_studio_ai/errors"
