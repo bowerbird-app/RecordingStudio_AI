@@ -187,8 +187,8 @@ class PhaseThreePersistenceTest < RecordingStudioAI::Test::PersistenceCase
     )
     refute invocation.valid?
     assert_includes invocation.errors[:requested_by_attempt_id], "must belong to the same run"
-    # Integrity checks stay untranslated; keep the string error TYPE so of_kind?/added?
-    # match main (never errors.add(attr, Copy.t(...)) which would drop the type).
+    # Integrity checks stay untranslated (byte-identical to main). ActiveModel 8.1
+    # ignores message: for String types, so these sites keep the English string type.
     assert_equal(
       ["must belong to the same run"],
       invocation.errors.details[:requested_by_attempt_id].map { |detail| detail[:error] }

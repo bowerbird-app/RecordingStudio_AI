@@ -3,9 +3,10 @@
 require "test_helper"
 require_relative "support/i18n_backend_isolation"
 
-# Wave 2 did not touch any errors.add sites (byte-identical to main). Main passes
-# English STRING types (not symbols). These tests lock errors.details under :en
-# and a non-English locale so of_kind?/added? stay identical to main.
+# Wave 2 left all six integrity errors.add sites untranslated (byte-identical to
+# main). ActiveModel 8.1 ignores message: for String types, so translating later
+# must pass Copy.t(..., default: "<main English>") as the type itself. These
+# tests lock errors.details under :en and a non-English locale.
 class ValidationErrorDetailsI18nTest < RecordingStudioAI::Test::PersistenceCase
   def persistence_schema
     :hardened
