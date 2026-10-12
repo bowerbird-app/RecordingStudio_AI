@@ -3,7 +3,7 @@
 require "test_helper"
 require "recording_studio_ai/admin/recording_studio_ai_widgets"
 
-class AdminI18nTest < Minitest::Test
+class AdminI18nTest < ActiveSupport::TestCase
   Copy = RecordingStudioAI::Copy
 
   def setup
@@ -37,19 +37,19 @@ class AdminI18nTest < Minitest::Test
 
     assert_includes section, 'Copy.t("admin.section.title"'
     assert_includes section, "text: ->(_context) { Copy.t("
-    refute_includes section, 'title "Recording Studio AI"'
-    refute_includes section, 'text: "AI Calls"'
+    assert_not_includes section, 'title "Recording Studio AI"'
+    assert_not_includes section, 'text: "AI Calls"'
 
     assert_includes screen, 'Copy.t("admin.screens.ai_calls.title"'
-    refute_includes screen, 'title "AI Calls"'
+    assert_not_includes screen, 'title "AI Calls"'
     assert_includes screen, 'title: "Created"'
 
     assert_includes widget, 'Copy.t("admin.widgets.ai_calls_windows.title"'
     assert_includes widget, 'Copy.t("common.last_30_days"'
-    refute_includes widget, 'title "AI calls"'
+    assert_not_includes widget, 'title "AI calls"'
 
     assert_includes resource, 'Copy.t("admin.open_saved_reply"'
-    refute_includes resource, 'text: "Open saved reply"'
+    assert_not_includes resource, 'text: "Open saved reply"'
   end
 
   def test_attempt_kind_label_keeps_constant_and_resolves_at_call_time
