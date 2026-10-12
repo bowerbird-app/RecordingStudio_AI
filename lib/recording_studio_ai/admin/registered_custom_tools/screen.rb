@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIRegisteredCustomToolsScreen < RecordingStudioAdmin::Screen
     key "registered_custom_tools"
     icon :wrench_screwdriver
-    title "Registered custom tools"
-    subtitle "Definitions, safety classifications, and execution reliability across visible roots."
+    title { Copy.t("admin.screens.registered_custom_tools.title", default: "Registered custom tools") }
+    subtitle { Copy.t("admin.screens.registered_custom_tools.subtitle", default: "Definitions, safety classifications, and execution reliability across visible roots.") }
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.custom_tool_rows(context)
@@ -39,7 +39,7 @@ module AdminScreens
                  url,
                  class: "inline-block",
                  data: { turbo_frame: "_top" },
-                 aria: { label: "AI calls for #{row.name} in the selected date range" }
+                 aria: { label: Copy.t("common.ai_calls_for_name_range", name: row.name, default: "AI calls for %{name} in the selected date range") }
                )
              }
       column :success_rate, title: "Success rate",

@@ -6,7 +6,7 @@ module AdminScreens
     section "recording_studio_ai"
 
     action :show,
-           text: "Open saved reply",
+           text: ->(*) { Copy.t("admin.open_saved_reply", default: "Open saved reply") },
            url: lambda { |row, _context|
              RecordingStudioAI::Engine.routes.url_helpers.retained_response_path(row)
            },

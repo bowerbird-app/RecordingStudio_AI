@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAILatencyByPromptScreen < RecordingStudioAdmin::Screen
     key "latency_by_prompt"
     icon :chart_bar
-    title "Latency by prompt"
-    subtitle "Compare prompt response speed using P90 latency."
+    title { Copy.t("admin.screens.latency_by_prompt.title", default: "Latency by prompt") }
+    subtitle { Copy.t("admin.screens.latency_by_prompt.subtitle", default: "Compare prompt response speed using P90 latency.") }
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.latency_rows(context, dimension: :prompt)
@@ -15,7 +15,7 @@ module AdminScreens
     filter :date_range, field: :created_at, default: :last_4_weeks
 
     summary do
-      label "P90 (ms)"
+      label { Copy.t("common.p90_ms", default: "P90 (ms)") }
       change_good_when :down
       value do |context|
         AdminScreens::RecordingStudioAIWidgets.latency_summary_p90(context, dimension: :prompt)
@@ -26,10 +26,10 @@ module AdminScreens
     end
 
     chart do
-      title "Prompt P90 latency"
-      subtitle "Latency at or below which 90% of calls completed."
+      title { Copy.t("admin.screens.latency_by_prompt.chart_title", default: "Prompt P90 latency") }
+      subtitle { Copy.t("admin.screens.latency_by_prompt.chart_subtitle", default: "Latency at or below which 90% of calls completed.") }
       type :bar
-      series { |context| [{ name: "P90 latency (ms)", data: context.query_result.relation.map(&:p90_latency_ms) }] }
+      series { |context| [{ name: Copy.t("common.p90_latency_ms", default: "P90 latency (ms)"), data: context.query_result.relation.map(&:p90_latency_ms) }] }
       options do |context|
         {
           height: 300,
@@ -53,7 +53,7 @@ module AdminScreens
                  AdminScreens::RecordingStudioAIWidgets.latency_prompt_calls_path(context, row),
                  class: "inline-block",
                  data: { turbo_frame: "_top" },
-                 aria: { label: "AI calls for #{row.name} in the selected date range" }
+                 aria: { label: Copy.t("common.ai_calls_for_name_range", name: row.name, default: "AI calls for %{name} in the selected date range") }
                )
              }
       column :p50_latency_ms, title: "Median (ms)",

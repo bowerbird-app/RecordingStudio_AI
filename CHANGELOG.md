@@ -5,6 +5,37 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-12
+
+Wave 2 Rails I18n for Admin DSL chrome and other user-facing copy outside views.
+
+### Added
+
+- English Rails I18n keys under `recording_studio.ai.admin.*` and
+  `recording_studio.ai.common.*` for Admin section/screen/widget chrome, attempt
+  kind labels, empty states, series names, period labels, definition-modal
+  field labels, and warning copy (`config/locales/en.yml`)
+- `RecordingStudioAI::Copy` helper for gem-prefixed lookups with English
+  `default:` values
+
+### Changed
+
+- Admin section, screen, widget, chart, summary, and resource action copy under
+  `lib/recording_studio_ai/admin` resolves through `Copy.t(...)` at render time
+  where the Admin DSL evaluates callables (English output unchanged)
+- `ATTEMPT_KIND_LABELS` stays as the public English constant map;
+  `attempt_kind_label` resolves the display string at call time
+- Saved-reply view `t(...)` calls pass `default:` with the original English
+
+### Upgrade notes
+
+- Bump to `0.10.0`. No migration and no host code change for English.
+- Override or translate keys under `recording_studio.ai.admin` and
+  `recording_studio.ai.common` in the host's locale files.
+- Admin table column headers, header tooltips, and filter titles stay English
+  literals (Admin DSL stores them at class load).
+- See [UPGRADING.md](UPGRADING.md#upgrading-to-0100).
+
 ## [0.9.1] - 2026-10-09
 
 Site-wide AI metrics authorization resolves the admin root without a request controller.
@@ -793,7 +824,11 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.9.1...v0.10.0
+[0.9.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.4.0...v0.5.0

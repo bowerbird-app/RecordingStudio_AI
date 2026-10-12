@@ -1,0 +1,10 @@
+# Test-only host override. Not under config/locales, so the dummy app's normal
+# English UI keeps the gem defaults. Loaded inside HostLocaleOverrideTest only.
+en:
+  recording_studio:
+    ai:
+      retained_responses:
+        page_title: HOST Saved reply
+      admin:
+        section:
+          title: HOST Recording Studio AI

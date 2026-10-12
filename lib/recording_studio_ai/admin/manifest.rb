@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
+require "recording_studio_ai/copy"
+
 module AdminScreens
+  Copy = RecordingStudioAI::Copy unless const_defined?(:Copy, false)
+
   DEFINITION_FILES = %w[
     recording_studio_ai_widgets
     ai_calls/widgets/ai_calls_windows

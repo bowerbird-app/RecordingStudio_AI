@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIResponsesScreen < RecordingStudioAdmin::Screen
     key "recording_studio_ai_responses"
     icon :table
-    title "AI Responses"
-    subtitle "What came back from each call."
+    title { Copy.t("admin.screens.responses.title", default: "AI Responses") }
+    subtitle { Copy.t("admin.screens.responses.subtitle", default: "What came back from each call.") }
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.responses_scope(context).order(created_at: :desc)
@@ -76,7 +76,7 @@ module AdminScreens
              sortable: false,
              value: lambda { |row, _context|
                run = AdminScreens::RecordingStudioAIWidgets.response_run(row)
-               run&.prompt_name_snapshot.presence || run&.prompt_key || "No prompt"
+               run&.prompt_name_snapshot.presence || run&.prompt_key || Copy.t("common.no_prompt", default: "No prompt")
              }
       column :provider
       column :model
@@ -85,19 +85,21 @@ module AdminScreens
              sortable: false,
              value: lambda { |row, _context|
                if row.complete.nil?
-                 "Unknown"
+                 Copy.t("common.unknown", default: "Unknown")
                elsif row.complete
-                 "Yes"
+                 Copy.t("common.yes", default: "Yes")
                else
-                 "No"
+                 Copy.t("common.no", default: "No")
                end
              },
              display: :badge,
-             display_options: lambda { |_row, _context, value|
-               style = case value
-                       when "Yes" then :success
-                       when "No" then :warning
-                       else :default
+             display_options: lambda { |row, _context, value|
+               style = if row.complete.nil?
+                         :default
+                       elsif row.complete
+                         :success
+                       else
+                         :warning
                        end
                { text: value, style: style, size: :sm }
              }

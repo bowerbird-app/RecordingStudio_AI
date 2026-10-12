@@ -56,15 +56,42 @@ class LocalesTest < ActiveSupport::TestCase
     tree = locale_tree(File.join(engine_locales_dir, "en.yml"), "en")
            .fetch("recording_studio")
            .fetch("ai")
-           .fetch("retained_responses")
 
-    assert_equal RETAINED_RESPONSE_KEYS, tree.transform_keys(&:to_s)
+    assert_equal RETAINED_RESPONSE_KEYS, tree.fetch("retained_responses").transform_keys(&:to_s)
+    assert tree.key?("admin")
+    assert tree.key?("common")
+    assert_equal "Recording Studio AI", tree.dig("admin", "section", "title")
+    assert_equal "1st attempt", tree.dig("admin", "attempt_kinds", "primary")
   end
 
   test "gemspec does not depend on recording_studio_internationalization" do
     gemspec = File.read(File.expand_path("../recording_studio_ai.gemspec", __dir__))
 
     refute_includes gemspec, "recording_studio_internationalization"
+  end
+
+  test "lib ruby files do not append to i18n load path" do
+    lib_files = Dir[File.expand_path("../lib/**/*.rb", __dir__)]
+
+    assert_operator lib_files.length, :>=, 1
+
+    lib_files.each do |path|
+      source = File.read(path)
+
+      refute_includes source, "i18n.load_path",
+                      "#{path} must not touch config.i18n.load_path (Rails engines load config/locales automatically)"
+      refute_includes source, "I18n.load_path",
+                      "#{path} must not append to I18n.load_path (that re-adds gem English after host overrides)"
+    end
+  end
+
+  test "copy helper prefixes recording_studio.ai and accepts default english" do
+    I18n.with_locale(:en) do
+      assert_equal "Saved reply",
+                   RecordingStudioAI::Copy.t("retained_responses.page_title", default: "Saved reply")
+      assert_equal "AI Calls",
+                   RecordingStudioAI::Copy.t("admin.screens.ai_calls.title", default: "AI Calls")
+    end
   end
 
   private

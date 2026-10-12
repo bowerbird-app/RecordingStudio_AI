@@ -1,5 +1,36 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.10.0
+
+This is a non-breaking upgrade for English hosts. Rendered English interface
+text is unchanged.
+
+### What changed
+
+- Admin DSL chrome under `lib/recording_studio_ai/admin` (section, screens,
+  widgets, charts, summary labels, resource actions, attempt-kind labels, empty
+  states, and related cell/aria/modal copy that the DSL evaluates at render
+  time) uses Rails I18n via `RecordingStudioAI::Copy`.
+- Keys live under `recording_studio.ai.admin.*` and
+  `recording_studio.ai.common.*` in the gem's `config/locales/en.yml`.
+- `ATTEMPT_KIND_LABELS` remains the public English constant map. Display strings
+  resolve at call time through `attempt_kind_label`.
+- Saved-reply view lookups pass an English `default:` so a host locale without
+  fallback never shows “translation missing”.
+
+Left untranslated on purpose:
+
+- Admin table column headers, header tooltips, and filter titles (Admin DSL
+  stores them as strings at class load)
+- Model integrity validation messages, developer `ArgumentError`s, logs,
+  generator CLI text, AI prompt content sent to models, icon/style tokens,
+  stored/user data, and dummy-app chrome
+
+### Upgrade steps
+
+No migration is required. English hosts need no change. To override or add
+another language, set the keys above in the host's `config/locales`.
+
 ## Upgrading to 0.8.0
 
 This is a non-breaking upgrade. Rendered English interface text is unchanged.

@@ -3,10 +3,10 @@
 module AdminScreens
   RecordingStudioAIAICallsWindowsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.ai_calls_windows") do
     type :chart
-    title "AI calls"
-    subtitle "Weekly AI call volume for the last 4 weeks."
-    description "Quick traffic trend to spot sudden growth or drop-offs."
-    metadata { { period_label: "Last 30 days" } }
+    title { Copy.t("admin.widgets.ai_calls_windows.title", default: "AI calls") }
+    subtitle { Copy.t("admin.widgets.ai_calls_windows.subtitle", default: "Weekly AI call volume for the last 4 weeks.") }
+    description { Copy.t("admin.widgets.ai_calls_windows.description", default: "Quick traffic trend to spot sudden growth or drop-offs.") }
+    metadata { { period_label: Copy.t("common.last_30_days", default: "Last 30 days") } }
     value do |context|
       runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
       AdminScreens::RecordingStudioAIWidgets.number(
@@ -25,7 +25,7 @@ module AdminScreens
       AdminScreens::RecordingStudioAIWidgets.weekly_calls_series(
         AdminScreens::RecordingStudioAIWidgets.runs_scope(context),
         weeks_back: 4,
-        series_name: "AI calls"
+        series_name: Copy.t("common.ai_calls", default: "AI calls")
       )
     end
     chart_options do

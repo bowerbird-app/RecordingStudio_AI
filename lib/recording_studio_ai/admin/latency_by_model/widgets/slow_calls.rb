@@ -3,10 +3,10 @@
 module AdminScreens
   RecordingStudioAISlowCallsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.slow_calls") do
     type :chart
-    title "AI Response P90 latency"
-    subtitle "90th-percentile AI call latency over the last 30 days."
-    description "Shows the latency at or below which 90% of AI calls completed, without letting isolated outliers dominate."
-    metadata { { period_label: "Last 30 days" } }
+    title { Copy.t("admin.widgets.slow_calls.title", default: "AI Response P90 latency") }
+    subtitle { Copy.t("admin.widgets.slow_calls.subtitle", default: "90th-percentile AI call latency over the last 30 days.") }
+    description { Copy.t("admin.widgets.slow_calls.description", default: "Shows the latency at or below which 90% of AI calls completed, without letting isolated outliers dominate.") }
+    metadata { { period_label: Copy.t("common.last_30_days", default: "Last 30 days") } }
     value do |context|
       runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
                                                    .where(created_at: 30.days.ago..Time.current)
@@ -24,7 +24,7 @@ module AdminScreens
     chart_type :bar
     series do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.latency_chart_rows(context, dimension: :model)
-      [{ name: "P90 latency (ms)", data: rows.map(&:p90_latency_ms) }]
+      [{ name: Copy.t("common.p90_latency_ms", default: "P90 latency (ms)"), data: rows.map(&:p90_latency_ms) }]
     end
     chart_options do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.latency_chart_rows(context, dimension: :model)
