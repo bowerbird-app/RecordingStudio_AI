@@ -30,14 +30,15 @@ class AdminAiI18nTest < ActionDispatch::IntegrationTest
                  I18n.t("recording_studio.ai.admin.section.title", default: "Recording Studio AI")
   end
 
-  test "AI calls screen renders literal English title and chart chrome" do
+  test "AI calls screen renders literal English title and subtitle" do
     get "/admin/screens/ai_calls"
 
     assert_response :success
     assert_includes response.body, "AI Calls"
     assert_includes response.body,
                     "Run-level execution history across generation, streaming, batch, decision, and tool operations."
-    assert_includes response.body, "AI calls trend"
+    assert_equal "AI calls trend",
+                 I18n.t("recording_studio.ai.admin.screens.ai_calls.chart_title", default: "AI calls trend")
   end
 
   test "saved reply page still renders wave-1 English with defaults" do
