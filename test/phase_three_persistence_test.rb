@@ -189,8 +189,10 @@ class PhaseThreePersistenceTest < RecordingStudioAI::Test::PersistenceCase
     assert_includes invocation.errors[:requested_by_attempt_id], "must belong to the same run"
     # Integrity checks stay untranslated; keep the string error TYPE so of_kind?/added?
     # match main (never errors.add(attr, Copy.t(...)) which would drop the type).
-    assert_equal ["must belong to the same run"],
-                 invocation.errors.details[:requested_by_attempt_id].map { |detail| detail[:error] }
+    assert_equal(
+      ["must belong to the same run"],
+      invocation.errors.details[:requested_by_attempt_id].map { |detail| detail[:error] }
+    )
 
     batch = RecordingStudioAI::Batch.create!(
       status: "preparing", root_recording_id: first_root,
@@ -199,8 +201,10 @@ class PhaseThreePersistenceTest < RecordingStudioAI::Test::PersistenceCase
     item = batch.batch_items.new(run: second_run, position: 0, reference: "cross-root", status: "pending")
     refute item.valid?
     assert_includes item.errors[:run_id], "must belong to the batch root"
-    assert_equal ["must belong to the batch root"],
-                 item.errors.details[:run_id].map { |detail| detail[:error] }
+    assert_equal(
+      ["must belong to the batch root"],
+      item.errors.details[:run_id].map { |detail| detail[:error] }
+    )
 
     assert_raises(ActiveRecord::StatementInvalid) do
       RecordingStudioAI::BatchItem.insert_all!([{
@@ -233,8 +237,10 @@ class PhaseThreePersistenceTest < RecordingStudioAI::Test::PersistenceCase
 
     assert_equal false, response.valid?
     assert_includes response.errors.full_messages.join, "exactly one of attempt_id or batch_item_id"
-    assert_equal ["exactly one of attempt_id or batch_item_id must be present"],
-                 response.errors.details[:base].map { |detail| detail[:error] }
+    assert_equal(
+      ["exactly one of attempt_id or batch_item_id must be present"],
+      response.errors.details[:base].map { |detail| detail[:error] }
+    )
 
     encrypted_attributes = RecordingStudioAI::Response.encrypted_attributes.map(&:to_s)
     assert_includes encrypted_attributes, "raw_response"

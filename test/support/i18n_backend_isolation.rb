@@ -54,9 +54,7 @@ module I18nBackendIsolation
   def deep_copy(value)
     case value
     when Hash
-      value.each_with_object({}) do |(key, child), copy|
-        copy[key] = deep_copy(child)
-      end
+      value.transform_values { |child| deep_copy(child) }
     when Array
       value.map { |child| deep_copy(child) }
     else
