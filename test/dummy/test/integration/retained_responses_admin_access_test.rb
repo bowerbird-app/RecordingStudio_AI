@@ -78,7 +78,16 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
     sign_in @user
     switch_to_root!(@root_recording)
 
-    Rails.application.reloader.reload!
+    # Root Switchable 0.7+ registers metrics in to_prepare without an
+    # already-registered guard. Metrics only replaces on reload when
+    # cache_classes is false (dev-like). Test defaults to true.
+    was_caching = Rails.application.config.cache_classes
+    Rails.application.config.cache_classes = false
+    begin
+      Rails.application.reloader.reload!
+    ensure
+      Rails.application.config.cache_classes = was_caching
+    end
 
     get "/recording_studio_ai/retained_responses/#{retained.id}"
     assert_response :success
