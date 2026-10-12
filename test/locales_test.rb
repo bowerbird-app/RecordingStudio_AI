@@ -109,7 +109,9 @@ class LocalesTest < ActiveSupport::TestCase
     expanded = I18n.load_path.map { |path| File.expand_path(path) }
     return if expanded.include?(locale_path)
 
+    # Setup-only: gem unit tests boot without Rails auto-loading engine locales.
+    # Prefer load_translations over reload! so in-memory store_translations stay put.
     I18n.load_path << locale_path
-    I18n.backend.reload!
+    I18n.backend.load_translations
   end
 end

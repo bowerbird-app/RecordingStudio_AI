@@ -2,6 +2,7 @@
 
 require "test_helper"
 require "devise/test/integration_helpers"
+require_relative "../../../support/i18n_backend_isolation"
 
 class HostLocaleOverrideTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
@@ -25,34 +26,30 @@ class HostLocaleOverrideTest < ActionDispatch::IntegrationTest
     refute_includes OVERRIDE_PATH.to_s, "config/locales",
                     "override must stay test-only so the default dummy UI keeps gem English"
 
-    original_load_path = I18n.load_path.dup
-    I18n.load_path << OVERRIDE_PATH.to_s
-    I18n.reload!
+    I18nBackendIsolation.with_snapshot do
+      I18n.load_path << OVERRIDE_PATH.to_s
+      I18n.backend.load_translations
 
-    get "/admin/sections/recording_studio_ai"
+      get "/admin/sections/recording_studio_ai"
 
-    assert_response :success
-    assert_includes response.body, HOST_SECTION_TITLE
-    refute_includes response.body, ">Recording Studio AI<"
-  ensure
-    I18n.load_path.replace(original_load_path) if original_load_path
-    I18n.reload!
+      assert_response :success
+      assert_includes response.body, HOST_SECTION_TITLE
+      refute_includes response.body, ">Recording Studio AI<"
+    end
   end
 
   test "host locale override wins on the saved-reply page" do
-    original_load_path = I18n.load_path.dup
-    I18n.load_path << OVERRIDE_PATH.to_s
-    I18n.reload!
+    I18nBackendIsolation.with_snapshot do
+      I18n.load_path << OVERRIDE_PATH.to_s
+      I18n.backend.load_translations
 
-    retained = create_overview_retained_response!
-    get "/recording_studio_ai/retained_responses/#{retained.id}"
+      retained = create_overview_retained_response!
+      get "/recording_studio_ai/retained_responses/#{retained.id}"
 
-    assert_response :success
-    assert_includes response.body, HOST_PAGE_TITLE
-    refute_includes response.body, ">Saved reply<"
-  ensure
-    I18n.load_path.replace(original_load_path) if original_load_path
-    I18n.reload!
+      assert_response :success
+      assert_includes response.body, HOST_PAGE_TITLE
+      refute_includes response.body, ">Saved reply<"
+    end
   end
 
   test "default dummy UI still shows gem English when no test override is loaded" do

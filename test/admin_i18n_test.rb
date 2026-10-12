@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require_relative "support/i18n_backend_isolation"
 require "recording_studio_ai/admin/recording_studio_ai_widgets"
 
 class AdminI18nTest < ActiveSupport::TestCase
@@ -65,27 +66,26 @@ class AdminI18nTest < ActiveSupport::TestCase
 
   def test_attempt_kind_label_uses_non_english_locale_with_english_fallback_default
     widgets = AdminScreens::RecordingStudioAIWidgets
-    original_locales = I18n.available_locales
-    I18n.available_locales = original_locales | [:zz]
-    I18n.backend.store_translations(:zz, {
-                                      recording_studio: {
-                                        ai: {
-                                          admin: {
-                                            attempt_kinds: {
-                                              primary: "Premier essai"
+
+    I18nBackendIsolation.with_snapshot do
+      I18n.available_locales = I18n.available_locales | [:zz]
+      I18n.backend.store_translations(:zz, {
+                                        recording_studio: {
+                                          ai: {
+                                            admin: {
+                                              attempt_kinds: {
+                                                primary: "Premier essai"
+                                              }
                                             }
                                           }
                                         }
-                                      }
-                                    })
+                                      })
 
-    I18n.with_locale(:zz) do
-      assert_equal "Premier essai", widgets.attempt_kind_label("primary")
-      assert_equal "Retry", widgets.attempt_kind_label("retry")
+      I18n.with_locale(:zz) do
+        assert_equal "Premier essai", widgets.attempt_kind_label("primary")
+        assert_equal "Retry", widgets.attempt_kind_label("retry")
+      end
     end
-  ensure
-    I18n.available_locales = original_locales if original_locales
-    I18n.backend.reload!
   end
 
   private
@@ -95,7 +95,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     expanded = I18n.load_path.map { |path| File.expand_path(path) }
     return if expanded.include?(locale_path)
 
+    # Setup-only: gem unit tests boot without Rails auto-loading engine locales.
     I18n.load_path << locale_path
-    I18n.backend.reload!
+    I18n.backend.load_translations
   end
 end
