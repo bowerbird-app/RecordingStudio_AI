@@ -10,10 +10,16 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_100023) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_12_044041) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
+
+  create_table "admin_roots", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", default: "Admin", null: false
+    t.datetime "updated_at", null: false
+  end
 
   create_table "folders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
@@ -30,6 +36,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_100023) do
   create_table "recording_studio_access_boundaries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "minimum_role"
+  end
+
+  create_table "recording_studio_access_constraints", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "action", null: false
+    t.string "allowed_audiences", default: [], null: false, array: true
+    t.datetime "created_at", null: false
+    t.index ["action"], name: "index_recording_studio_access_constraints_on_action"
   end
 
   create_table "recording_studio_access_invitations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -51,6 +64,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_100023) do
     t.index ["recording_id"], name: "index_recording_studio_access_invitations_on_recording_id"
     t.index ["token_digest"], name: "idx_rs_access_invitations_token_digest", unique: true
     t.check_constraint "accepted_at IS NULL OR revoked_at IS NULL", name: "access_invitations_not_accepted_and_revoked"
+  end
+
+  create_table "recording_studio_access_rules", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "action", null: false
+    t.string "audience", null: false
+    t.datetime "created_at", null: false
+    t.index ["action"], name: "index_recording_studio_access_rules_on_action"
   end
 
   create_table "recording_studio_accesses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
