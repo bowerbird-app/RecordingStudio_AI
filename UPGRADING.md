@@ -37,7 +37,11 @@ Left untranslated on purpose:
 No migration is required. English hosts need no change. To override or add
 another language, set the keys above in the host's `config/locales`. Quote
 `"yes"` / `"no"` keys in host YAML (YAML 1.1 otherwise treats them as
-booleans).
+booleans). Profile Kind filter params stay the English tokens `Generative` /
+`Decision`; translate only display via `common.generative` /
+`common.decision`. High-usage alerts use plural forms under
+`admin.alerts.high_usage` with numeric `count:` and `formatted_count:` for the
+rendered number.
 
 ## Upgrading to 0.8.0
 

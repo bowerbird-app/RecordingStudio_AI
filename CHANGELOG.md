@@ -31,6 +31,12 @@ Wave 2 Rails I18n for Admin DSL chrome and other user-facing copy outside views.
 
 - Quote `common.yes` / `common.no` in `en.yml` so YAML 1.1 does not coerce them
   to boolean keys (host overrides of those keys would otherwise miss)
+- Prompt message titles for non-system/user roles match main (`role.humanize`, so
+  `assistant` stays `Assistant`)
+- Profile Kind filter keeps raw `Generative` / `Decision` tokens on the row for
+  matching; only the table display (and token labels) translate
+- Tool safety suffix `, destructive` and high-usage alert plural forms are
+  translated (`count:` numeric, `formatted_count:` for display)
 
 ### Upgrade notes
 

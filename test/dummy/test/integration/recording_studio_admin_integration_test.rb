@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require_relative "../../../support/i18n_backend_isolation"
 
 class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
@@ -586,6 +587,33 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "value=\"Decision\""
     assert_includes response.body, "value=\"low\""
+  end
+
+  test "profiles kind filter still matches when common.decision is translated" do
+    authenticate_for_admin!
+
+    I18nBackendIsolation.with_snapshot do
+      I18n.available_locales = I18n.available_locales | [:zz]
+      I18n.backend.store_translations(:zz, {
+                                        recording_studio: {
+                                          ai: {
+                                            common: {
+                                              generative: "Génératif",
+                                              decision: "Décision"
+                                            }
+                                          }
+                                        }
+                                      })
+
+      I18n.with_locale(:zz) do
+        get "/admin/screens/profiles/table", params: { kind: "Decision" }
+
+        assert_response :success
+        assert_includes response.body, "jev-latest"
+        assert_includes response.body, "Décision"
+        refute_includes response.body, "gpt-5-mini"
+      end
+    end
   end
 
   test "registered providers screen lists every configured provider" do

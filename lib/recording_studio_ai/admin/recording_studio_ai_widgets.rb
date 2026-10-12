@@ -481,7 +481,9 @@ module AdminScreens
                  else
                    Copy.t("common.writes", default: "Writes")
                  end
-        safety = "#{safety}, destructive" if definition.destructive
+        if definition.destructive
+          safety = Copy.t("common.safety_with_destructive", safety: safety, default: "%{safety}, destructive")
+        end
 
         ToolRow.new(
           definition.key,
@@ -743,18 +745,41 @@ module AdminScreens
       end
     end
 
+    # Raw English kind tokens for row.kind / filter matching (stable across locales).
+    PROFILE_KIND_GENERATIVE = "Generative" unless const_defined?(:PROFILE_KIND_GENERATIVE)
+    PROFILE_KIND_DECISION = "Decision" unless const_defined?(:PROFILE_KIND_DECISION)
+
     def profile_kind_label(provider, model, capabilities)
       resolved = profile_entry_capabilities(provider, model, capabilities)
       kinds = []
-      kinds << "Generative" if resolved.include?(:generation)
+      kinds << PROFILE_KIND_GENERATIVE if resolved.include?(:generation)
       if resolved.include?(:decision) || resolved.any? { |cap| cap.to_s.start_with?("decision_") }
-        kinds << Copy.t("common.decision", default: "Decision")
+        kinds << PROFILE_KIND_DECISION
       end
       kinds.join(", ").presence || "—"
     end
 
+    def profile_kind_display(kind_string)
+      return Copy.t("common.none", default: "—") if kind_string.blank? || kind_string == "—"
+
+      kind_string.to_s.split(", ").map { |token| profile_kind_token_label(token) }.join(", ")
+    end
+
+    def profile_kind_token_label(token)
+      case token.to_s
+      when PROFILE_KIND_GENERATIVE
+        Copy.t("common.generative", default: "Generative")
+      when PROFILE_KIND_DECISION
+        Copy.t("common.decision", default: "Decision")
+      else
+        token.to_s
+      end
+    end
+
     def profile_kind_filter_values
-      %w[Generative Decision]
+      # Raw tokens so params and profile_row_has_kind? stay locale-stable. Admin
+      # select labels humanize these strings (English equals the token).
+      [PROFILE_KIND_GENERATIVE, PROFILE_KIND_DECISION]
     end
 
     def profile_name_filter_values
@@ -967,9 +992,10 @@ module AdminScreens
       case role.to_s
       when "system" then Copy.t("common.system_prompt", default: "System Prompt")
       when "user" then Copy.t("common.user_prompt", default: "User Prompt")
-      when "assistant" then Copy.t("common.assistant_prompt", default: "Assistant Prompt")
       else
-        role.to_s.humanize
+        # Match main: non-system/user roles use role.humanize ("assistant" => "Assistant").
+        english = role.to_s.humanize
+        Copy.t("common.role.#{role}", default: english)
       end
     end
 
@@ -1196,8 +1222,15 @@ module AdminScreens
       baseline_average = baseline_daily.empty? ? 0 : (baseline_daily.sum.to_f / baseline_daily.size)
       if usage_today >= [20, (baseline_average * 1.8).ceil].max
         warnings << {
-          text: Copy.t("admin.alerts.high_usage", count: number(usage_today),
-                                                 default: "Unusually high usage today: %{count} calls"),
+          text: Copy.t(
+            "admin.alerts.high_usage",
+            count: usage_today,
+            formatted_count: number(usage_today),
+            default: {
+              one: "Unusually high usage today: %{formatted_count} call",
+              other: "Unusually high usage today: %{formatted_count} calls"
+            }
+          ),
           icon: "arrow-trending-up"
         }
       end

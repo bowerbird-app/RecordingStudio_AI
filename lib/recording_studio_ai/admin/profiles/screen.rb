@@ -50,7 +50,8 @@ module AdminScreens
              }
       column :kind,
              title: "Kind",
-             header_tooltip: "Whether this model writes replies or answers questions."
+             header_tooltip: "Whether this model writes replies or answers questions.",
+             value: ->(row, _context) { AdminScreens::RecordingStudioAIWidgets.profile_kind_display(row.kind) }
       column :position,
              title: "Order",
              header_tooltip: "Where this model sits in the profile's list.",

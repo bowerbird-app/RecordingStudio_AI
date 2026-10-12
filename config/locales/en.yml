@@ -44,10 +44,11 @@ en:
         read_only: "Read only"
         read_only_hyphen: "Read-only"
         writes: "Writes"
+        generative: "Generative"
         decision: "Decision"
+        safety_with_destructive: "%{safety}, destructive"
         system_prompt: "System Prompt"
         user_prompt: "User Prompt"
-        assistant_prompt: "Assistant Prompt"
         show_definition_for: "Show definition for %{name}"
         registered_models_for: "Registered models for %{name}"
         ai_calls_for_provider: "AI calls for %{name} in the last 30 days"
@@ -212,6 +213,8 @@ en:
           idempotent_yes: "yes"
           idempotent_no: "no"
         alerts:
-          high_usage: "Unusually high usage today: %{count} calls"
+          high_usage:
+            one: "Unusually high usage today: %{formatted_count} call"
+            other: "Unusually high usage today: %{formatted_count} calls"
           error_spike: "Error spike: %{rate}% failures in the last 24h"
           expensive_model: "Expensive model usage elevated: %{share}% in the last 24h"
