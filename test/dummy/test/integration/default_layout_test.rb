@@ -68,16 +68,21 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
 
     assert_path_exists boot_override
     assert_includes I18n.load_path.map { |path| File.expand_path(path) }, boot_override.to_s
+    # Main's boot guard key (I18n.t preconditions).
     assert_equal "HOST expensive model usage elevated: 40% in the last 24h",
                  I18n.t("recording_studio.ai.admin.alerts.expensive_model", share: 40)
     refute_equal "Expensive model usage elevated: 40% in the last 24h",
                  I18n.t("recording_studio.ai.admin.alerts.expensive_model", share: 40)
+    # Rarely shown shipped key used for the real-page render assertion.
+    assert_equal "HOST Cut short", I18n.t("recording_studio.ai.retained_responses.cut_short")
+    refute_equal "Cut short", I18n.t("recording_studio.ai.retained_responses.cut_short")
 
-    # Real render (plain-text probe): boot-loaded host override must win in the body.
-    get "/i18n_probes/expensive_model", params: { share: 40 }
+    # Real page: truncated saved reply shows cut_short; boot override must win.
+    retained = create_overview_retained_response!(complete: false, truncated: true)
+    get "/recording_studio_ai/retained_responses/#{retained.id}"
     assert_response :success
-    assert_equal "HOST expensive model usage elevated: 40% in the last 24h", response.body
-    refute_includes response.body, "Expensive model usage elevated: 40% in the last 24h"
+    assert_includes response.body, "HOST Cut short"
+    refute_includes response.body, ">Cut short<"
   end
 
   test "saved reply page uses default_layout with Access-only page-nav and Flatpack assets" do

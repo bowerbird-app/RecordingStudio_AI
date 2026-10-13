@@ -1,9 +1,12 @@
-# Always-loaded host override for a rarely shown gem key. Proves Rails boot
-# order lets host config/locales win over the gem without a test-time load_path
-# append. Keep HostLocaleOverrideTest's test-only fixture alongside this file.
+# Always-loaded host override. expensive_model stays from main's boot guard.
+# cut_short is a rarely shown shipped key on the saved-reply page (only when
+# truncated). Asserted on that real render. Keep HostLocaleOverrideTest's
+# test-only fixture alongside this file.
 en:
   recording_studio:
     ai:
       admin:
         alerts:
           expensive_model: "HOST expensive model usage elevated: %{share}% in the last 24h"
+      retained_responses:
+        cut_short: "HOST Cut short"
