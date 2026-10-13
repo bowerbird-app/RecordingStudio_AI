@@ -68,19 +68,19 @@ class ProfileKindI18nTest < ActiveSupport::TestCase
     forms = tree.dig("en", "recording_studio", "ai", "admin", "alerts", "high_usage")
 
     assert_kind_of Hash, forms, "high_usage must be a plural Hash (one/other), not a flat String"
-    assert_equal "Unusually high usage today: %{formatted_count} calls", forms.fetch("one")
+    assert_equal "Unusually high usage today: %{formatted_count} call", forms.fetch("one")
     assert_equal "Unusually high usage today: %{formatted_count} calls", forms.fetch("other")
   end
 
   def test_high_usage_alert_english_matches_main_for_one
-    # Same call site as warning_items. Main always rendered "calls".
+    # Sanctioned English change vs main: singular "call" when count is 1.
     I18n.with_locale(:en) do
       text = RecordingStudioAI::Copy.t(
         "admin.alerts.high_usage",
         count: 1,
         formatted_count: "1"
       )
-      assert_equal "Unusually high usage today: 1 calls", text
+      assert_equal "Unusually high usage today: 1 call", text
     end
   end
 
@@ -99,6 +99,39 @@ class ProfileKindI18nTest < ActiveSupport::TestCase
 
       assert_equal "Unusually high usage today: 20 calls", text
       assert_equal "Unusually high usage today: 1,000 calls", delimited
+    end
+  end
+
+  def test_high_usage_flat_string_host_override_still_works_for_any_count
+    # I18n returns a non-Hash override as-is (no plural lookup).
+    I18nBackendIsolation.with_snapshot do
+      I18n.backend.store_translations(:en, {
+                                        recording_studio: {
+                                          ai: {
+                                            admin: {
+                                              alerts: {
+                                                high_usage: "HOST flat high usage: %{formatted_count}"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      })
+
+      I18n.with_locale(:en) do
+        one = RecordingStudioAI::Copy.t(
+          "admin.alerts.high_usage",
+          count: 1,
+          formatted_count: "1"
+        )
+        many = RecordingStudioAI::Copy.t(
+          "admin.alerts.high_usage",
+          count: 20,
+          formatted_count: "20"
+        )
+
+        assert_equal "HOST flat high usage: 1", one
+        assert_equal "HOST flat high usage: 20", many
+      end
     end
   end
 

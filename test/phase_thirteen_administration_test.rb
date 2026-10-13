@@ -247,14 +247,14 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
   def test_warning_items_high_usage_renders_english_for_one_and_other_at_call_site
     # warning_items itself hits Postgres-only ~* on SQLite unit DB; exercise the
     # public call-site helper used by warning_items.
-    ensure_engine_locale_loaded_for_high_usage!
+    with_engine_locale_backend_for_high_usage! do
+      I18n.with_locale(:en) do
+        one = AdminScreens::RecordingStudioAIWidgets.high_usage_alert_text(1)
+        other = AdminScreens::RecordingStudioAIWidgets.high_usage_alert_text(20)
 
-    I18n.with_locale(:en) do
-      one = AdminScreens::RecordingStudioAIWidgets.high_usage_alert_text(1)
-      other = AdminScreens::RecordingStudioAIWidgets.high_usage_alert_text(20)
-
-      assert_equal "Unusually high usage today: 1 calls", one
-      assert_equal "Unusually high usage today: 20 calls", other
+        assert_equal "Unusually high usage today: 1 call", one
+        assert_equal "Unusually high usage today: 20 calls", other
+      end
     end
   end
 
@@ -557,13 +557,17 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
 
   private
 
-  def ensure_engine_locale_loaded_for_high_usage!
+  def with_engine_locale_backend_for_high_usage!
     locale_path = File.expand_path("../config/locales/en.yml", __dir__)
-    expanded = I18n.load_path.map { |path| File.expand_path(path) }
-    return if expanded.include?(locale_path)
-
-    I18n.load_path << locale_path
-    I18n.backend.load_translations
+    previous_backend = I18n.backend
+    previous_load_path = I18n.load_path.dup
+    backend = I18n::Backend::Simple.new
+    backend.load_translations(locale_path)
+    I18n.backend = backend
+    yield
+  ensure
+    I18n.backend = previous_backend
+    I18n.load_path.replace(previous_load_path)
   end
 
   def create_run(root_id:, status:, tokens:, **attributes)

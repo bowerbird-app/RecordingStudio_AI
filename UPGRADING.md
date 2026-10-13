@@ -2,21 +2,21 @@
 
 ## Upgrading to 0.11.0
 
-This is a translation-only upgrade for English hosts. Rendered English interface
-text matches main.
+Mostly a translation-shape upgrade. English for `count` 1 now says `call`
+instead of main's always-plural `calls`.
 
 ### What changed
 
 - `recording_studio.ai.admin.alerts.high_usage` is an I18n plural key (`one` /
   `other`). Call sites pass numeric `count:` for form selection and
-  `formatted_count` for the delimited number shown in English (same as main's
-  `number_with_delimiter`). English still says `calls` for both forms.
+  `formatted_count` for the delimited number (same as main's
+  `number_with_delimiter`). English `one` uses `call`; `other` uses `calls`.
 
 ### Upgrade steps
 
-No migration is required. English hosts need no change. Hosts that override
-`admin.alerts.high_usage` should define `one` / `other` (and may interpolate
-`%{formatted_count}`).
+No migration is required. Prefer host overrides with `one` / `other` (and
+`%{formatted_count}`). A flat-string host override still works: I18n returns a
+non-Hash entry as-is for every count.
 
 ## Upgrading to 0.10.0
 

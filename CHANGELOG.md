@@ -13,13 +13,17 @@ Wave 2 follow-up: proper I18n plural forms for the high-usage admin alert.
 
 - `recording_studio.ai.admin.alerts.high_usage` uses I18n `one` / `other` plural
   forms with a numeric `count:` (formatted display via `formatted_count`).
-  English still says `calls` for both forms so rendered English matches main.
+  English `one` is now `… %{formatted_count} call` (singular); `other` stays
+  `… calls`. This is the one sanctioned English wording change vs main (main
+  always said `calls`).
 
 ### Upgrade notes
 
-- Bump to `0.11.0`. No migration and no host code change for English.
-- Hosts that override `admin.alerts.high_usage` should supply `one` / `other`
-  forms (and may use `%{formatted_count}` for the delimited number).
+- Bump to `0.11.0`. No migration. English hosts see singular `call` when
+  `count` is 1.
+- Prefer host overrides with `one` / `other` (and `%{formatted_count}` for the
+  delimited number). A flat-string host override still works: I18n returns a
+  non-Hash entry as-is for every count.
 - See [UPGRADING.md](UPGRADING.md#upgrading-to-0110).
 
 ## [0.10.0] - 2026-10-12

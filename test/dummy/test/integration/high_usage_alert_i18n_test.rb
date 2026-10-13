@@ -36,11 +36,11 @@ class HighUsageAlertI18nTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "high_usage alert english matches main for one at call site" do
+  test "high_usage alert english uses singular call for count one at call site" do
     # Threshold is always >= 20, so :one never fires through warning_items.
     I18n.with_locale(:en) do
       text = AdminScreens::RecordingStudioAIWidgets.high_usage_alert_text(1)
-      assert_equal "Unusually high usage today: 1 calls", text
+      assert_equal "Unusually high usage today: 1 call", text
     end
   end
 end

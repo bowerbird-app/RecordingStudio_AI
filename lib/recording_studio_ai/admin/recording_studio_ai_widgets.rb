@@ -873,8 +873,8 @@ module AdminScreens
       ActionController::Base.helpers.number_with_delimiter(value.to_i)
     end
 
-    # Numeric count: selects one/other; formatted_count keeps main's delimited number.
-    # English one/other both say "calls" so English stays byte-identical to main.
+    # Numeric count: selects one/other; formatted_count is the delimited number.
+    # English :one says "call"; :other says "calls" (sanctioned wording fix).
     def high_usage_alert_text(usage_today)
       Copy.t(
         "admin.alerts.high_usage",
