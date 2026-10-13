@@ -72,6 +72,12 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
                  I18n.t("recording_studio.ai.admin.alerts.expensive_model", share: 40)
     refute_equal "Expensive model usage elevated: 40% in the last 24h",
                  I18n.t("recording_studio.ai.admin.alerts.expensive_model", share: 40)
+
+    # Real render (plain-text probe): boot-loaded host override must win in the body.
+    get "/i18n_probes/expensive_model", params: { share: 40 }
+    assert_response :success
+    assert_equal "HOST expensive model usage elevated: 40% in the last 24h", response.body
+    refute_includes response.body, "Expensive model usage elevated: 40% in the last 24h"
   end
 
   test "saved reply page uses default_layout with Access-only page-nav and Flatpack assets" do

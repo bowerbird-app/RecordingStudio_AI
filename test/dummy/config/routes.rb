@@ -39,5 +39,13 @@ Rails.application.routes.draw do
   get "decision_playground", to: "decision_playground#show"
   post "decision_playground", to: "decision_playground#create"
   post "ai_playground/stream", to: "ai_playground/streams#stream", as: :stream_ai_playground
+
+  # Plain-text i18n probes (not product UI). Used by boot-override / plural
+  # render tests and before/after screenshots of rarely shown alert copy.
+  unless Rails.env.production?
+    get "i18n_probes/expensive_model", to: "i18n_probes#expensive_model"
+    get "i18n_probes/high_usage", to: "i18n_probes#high_usage"
+  end
+
   root "home#index"
 end

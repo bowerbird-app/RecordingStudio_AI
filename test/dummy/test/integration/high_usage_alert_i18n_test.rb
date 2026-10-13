@@ -36,15 +36,13 @@ class HighUsageAlertI18nTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "high_usage alert english matches main for one at call site args" do
-    # Threshold is always >= 20, so :one never fires through warning_items.
-    I18n.with_locale(:en) do
-      text = RecordingStudioAI::Copy.t(
-        "admin.alerts.high_usage",
-        count: 1,
-        formatted_count: AdminScreens::RecordingStudioAIWidgets.number(1)
-      )
-      assert_equal "Unusually high usage today: 1 calls", text
-    end
+  test "high_usage probe renders english for one and many" do
+    get "/i18n_probes/high_usage", params: { count: 1 }
+    assert_response :success
+    assert_equal "Unusually high usage today: 1 calls", response.body
+
+    get "/i18n_probes/high_usage", params: { count: 20 }
+    assert_response :success
+    assert_equal "Unusually high usage today: 20 calls", response.body
   end
 end

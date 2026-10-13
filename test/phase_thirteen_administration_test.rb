@@ -234,30 +234,24 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     source = File.read(
       File.expand_path("../lib/recording_studio_ai/admin/recording_studio_ai_widgets.rb", __dir__)
     )
-    high_usage_block = source[/text: Copy\.t\(\s*"admin\.alerts\.high_usage".*?\n\s*\)/m]
+    helper = source[/def high_usage_alert_text\(usage_today\).*?\n    end/m]
+    warning_call = source[/text: high_usage_alert_text\(usage_today\)/]
 
-    assert high_usage_block, "expected high_usage Copy.t call site"
-    assert_includes high_usage_block, "count: usage_today"
-    assert_includes high_usage_block, "formatted_count: number(usage_today)"
-    refute_includes high_usage_block, "default:"
+    assert helper, "expected high_usage_alert_text helper"
+    assert warning_call, "expected warning_items to call high_usage_alert_text"
+    assert_includes helper, "count: usage_today"
+    assert_includes helper, "formatted_count: number(usage_today)"
+    refute_includes helper, "default:"
   end
 
   def test_warning_items_high_usage_renders_english_for_one_and_other_at_call_site
     # warning_items itself hits Postgres-only ~* on SQLite unit DB; exercise the
-    # same Copy.t arguments the call site uses (numeric count: + formatted_count).
+    # public call-site helper used by warning_items.
     ensure_engine_locale_loaded_for_high_usage!
 
     I18n.with_locale(:en) do
-      one = RecordingStudioAI::Copy.t(
-        "admin.alerts.high_usage",
-        count: 1,
-        formatted_count: AdminScreens::RecordingStudioAIWidgets.number(1)
-      )
-      other = RecordingStudioAI::Copy.t(
-        "admin.alerts.high_usage",
-        count: 20,
-        formatted_count: AdminScreens::RecordingStudioAIWidgets.number(20)
-      )
+      one = AdminScreens::RecordingStudioAIWidgets.high_usage_alert_text(1)
+      other = AdminScreens::RecordingStudioAIWidgets.high_usage_alert_text(20)
 
       assert_equal "Unusually high usage today: 1 calls", one
       assert_equal "Unusually high usage today: 20 calls", other

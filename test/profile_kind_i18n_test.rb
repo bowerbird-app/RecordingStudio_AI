@@ -59,9 +59,21 @@ class ProfileKindI18nTest < ActiveSupport::TestCase
     end
   end
 
+  def test_high_usage_en_yml_uses_one_other_plural_forms
+    # Reverting to main's flat string form must fail this test.
+    tree = YAML.safe_load_file(
+      File.expand_path("../config/locales/en.yml", __dir__),
+      aliases: true
+    )
+    forms = tree.dig("en", "recording_studio", "ai", "admin", "alerts", "high_usage")
+
+    assert_kind_of Hash, forms, "high_usage must be a plural Hash (one/other), not a flat String"
+    assert_equal "Unusually high usage today: %{formatted_count} calls", forms.fetch("one")
+    assert_equal "Unusually high usage today: %{formatted_count} calls", forms.fetch("other")
+  end
+
   def test_high_usage_alert_english_matches_main_for_one
-    # Same Copy.t arguments as warning_items (numeric count: + formatted_count).
-    # Main always rendered "calls"; English :one stays byte-identical.
+    # Same call site as warning_items. Main always rendered "calls".
     I18n.with_locale(:en) do
       text = RecordingStudioAI::Copy.t(
         "admin.alerts.high_usage",

@@ -873,6 +873,16 @@ module AdminScreens
       ActionController::Base.helpers.number_with_delimiter(value.to_i)
     end
 
+    # Numeric count: selects one/other; formatted_count keeps main's delimited number.
+    # English one/other both say "calls" so English stays byte-identical to main.
+    def high_usage_alert_text(usage_today)
+      Copy.t(
+        "admin.alerts.high_usage",
+        count: usage_today,
+        formatted_count: number(usage_today)
+      )
+    end
+
     def duration(milliseconds)
       return Copy.t("common.no_data", default: "No data") if milliseconds.blank?
 
@@ -1220,13 +1230,7 @@ module AdminScreens
       baseline_average = baseline_daily.empty? ? 0 : (baseline_daily.sum.to_f / baseline_daily.size)
       if usage_today >= [20, (baseline_average * 1.8).ceil].max
         warnings << {
-          # Numeric count: selects one/other; formatted_count keeps main's delimited number.
-          # English one/other both say "calls" so English stays byte-identical to main.
-          text: Copy.t(
-            "admin.alerts.high_usage",
-            count: usage_today,
-            formatted_count: number(usage_today)
-          ),
+          text: high_usage_alert_text(usage_today),
           icon: "arrow-trending-up"
         }
       end
