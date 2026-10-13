@@ -5,6 +5,27 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-13
+
+Wave 2 follow-up: proper I18n plural forms for the high-usage admin alert.
+
+### Changed
+
+- `recording_studio.ai.admin.alerts.high_usage` uses I18n `one` / `other` plural
+  forms with a numeric `count:` (formatted display via `formatted_count`).
+  English `one` is now `… %{formatted_count} call` (singular); `other` stays
+  `… calls`. This is the one sanctioned English wording change vs main (main
+  always said `calls`).
+
+### Upgrade notes
+
+- Bump to `0.11.0`. No migration. English hosts see singular `call` when
+  `count` is 1.
+- Host overrides should use `one` / `other` with `%{formatted_count}` to keep
+  the thousands delimiter. A main-style `%{count}` override interpolates the
+  raw Integer (`1000`, not `1,000`).
+- See [UPGRADING.md](UPGRADING.md#upgrading-to-0110).
+
 ## [0.10.0] - 2026-10-12
 
 Wave 2 Rails I18n for Admin DSL chrome and other user-facing copy outside views.
@@ -836,7 +857,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.10.1...v0.11.0
 [0.10.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.8.0...v0.9.0

@@ -1,5 +1,23 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.11.0
+
+Mostly a translation-shape upgrade. English for `count` 1 now says `call`
+instead of main's always-plural `calls`.
+
+### What changed
+
+- `recording_studio.ai.admin.alerts.high_usage` is an I18n plural key (`one` /
+  `other`). Call sites pass numeric `count:` for form selection and
+  `formatted_count` for the delimited number (same as main's
+  `number_with_delimiter`). English `one` uses `call`; `other` uses `calls`.
+
+### Upgrade steps
+
+No migration is required. Host overrides should use `one` / `other` with
+`%{formatted_count}` to keep the thousands delimiter. A main-style `%{count}`
+override interpolates the raw Integer (`1000`, not `1,000`).
+
 ## Upgrading to 0.10.0
 
 This is a translation-only upgrade for English hosts. Rendered English interface

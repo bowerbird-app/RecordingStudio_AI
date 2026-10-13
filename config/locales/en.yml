@@ -213,6 +213,8 @@ en:
           idempotent_yes: "yes"
           idempotent_no: "no"
         alerts:
-          high_usage: "Unusually high usage today: %{count} calls"
+          high_usage:
+            one: "Unusually high usage today: %{formatted_count} call"
+            other: "Unusually high usage today: %{formatted_count} calls"
           error_spike: "Error spike: %{rate}% failures in the last 24h"
           expensive_model: "Expensive model usage elevated: %{share}% in the last 24h"

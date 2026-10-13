@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "action_controller"
 require "recording_studio_ai/admin/recording_studio_ai_widgets"
 
 class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
@@ -227,6 +228,34 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
 
     assert_nil result[:values][:spend_microunits]
     assert_empty result[:breaches]
+  end
+
+  def test_warning_items_high_usage_call_site_passes_numeric_count_and_formatted_count
+    source = File.read(
+      File.expand_path("../lib/recording_studio_ai/admin/recording_studio_ai_widgets.rb", __dir__)
+    )
+    helper = source[/def high_usage_alert_text\(usage_today\).*?\n    end/m]
+    warning_call = source[/text: high_usage_alert_text\(usage_today\)/]
+
+    assert helper, "expected high_usage_alert_text helper"
+    assert warning_call, "expected warning_items to call high_usage_alert_text"
+    assert_includes helper, "count: usage_today"
+    assert_includes helper, "formatted_count: number(usage_today)"
+    refute_includes helper, "default:"
+  end
+
+  def test_warning_items_high_usage_renders_english_for_one_and_other_at_call_site
+    # warning_items itself hits Postgres-only ~* on SQLite unit DB; exercise the
+    # public call-site helper used by warning_items.
+    with_engine_locale_backend_for_high_usage! do
+      I18n.with_locale(:en) do
+        one = AdminScreens::RecordingStudioAIWidgets.high_usage_alert_text(1)
+        other = AdminScreens::RecordingStudioAIWidgets.high_usage_alert_text(20)
+
+        assert_equal "Unusually high usage today: 1 call", one
+        assert_equal "Unusually high usage today: 20 calls", other
+      end
+    end
   end
 
   def test_warning_metrics_include_run_expensive_model_and_calls_per_run_thresholds
@@ -527,6 +556,19 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
   end
 
   private
+
+  def with_engine_locale_backend_for_high_usage!
+    locale_path = File.expand_path("../config/locales/en.yml", __dir__)
+    previous_backend = I18n.backend
+    previous_load_path = I18n.load_path.dup
+    backend = I18n::Backend::Simple.new
+    backend.load_translations(locale_path)
+    I18n.backend = backend
+    yield
+  ensure
+    I18n.backend = previous_backend
+    I18n.load_path.replace(previous_load_path)
+  end
 
   def create_run(root_id:, status:, tokens:, **attributes)
     RecordingStudioAI::Run.create!(
