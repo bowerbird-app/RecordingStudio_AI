@@ -59,14 +59,34 @@ class ProfileKindI18nTest < ActiveSupport::TestCase
     end
   end
 
-  def test_high_usage_alert_english_matches_main
+  def test_high_usage_alert_english_matches_main_for_one
+    # Same Copy.t arguments as warning_items (numeric count: + formatted_count).
+    # Main always rendered "calls"; English :one stays byte-identical.
     I18n.with_locale(:en) do
       text = RecordingStudioAI::Copy.t(
         "admin.alerts.high_usage",
-        count: "20",
-        default: "Unusually high usage today: %{count} calls"
+        count: 1,
+        formatted_count: "1"
       )
+      assert_equal "Unusually high usage today: 1 calls", text
+    end
+  end
+
+  def test_high_usage_alert_english_matches_main_for_other
+    I18n.with_locale(:en) do
+      text = RecordingStudioAI::Copy.t(
+        "admin.alerts.high_usage",
+        count: 20,
+        formatted_count: "20"
+      )
+      delimited = RecordingStudioAI::Copy.t(
+        "admin.alerts.high_usage",
+        count: 1_000,
+        formatted_count: "1,000"
+      )
+
       assert_equal "Unusually high usage today: 20 calls", text
+      assert_equal "Unusually high usage today: 1,000 calls", delimited
     end
   end
 

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "action_controller"
 require "recording_studio_ai/admin/recording_studio_ai_widgets"
 
 class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
@@ -227,6 +228,40 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
 
     assert_nil result[:values][:spend_microunits]
     assert_empty result[:breaches]
+  end
+
+  def test_warning_items_high_usage_call_site_passes_numeric_count_and_formatted_count
+    source = File.read(
+      File.expand_path("../lib/recording_studio_ai/admin/recording_studio_ai_widgets.rb", __dir__)
+    )
+    high_usage_block = source[/text: Copy\.t\(\s*"admin\.alerts\.high_usage".*?\n\s*\)/m]
+
+    assert high_usage_block, "expected high_usage Copy.t call site"
+    assert_includes high_usage_block, "count: usage_today"
+    assert_includes high_usage_block, "formatted_count: number(usage_today)"
+    refute_includes high_usage_block, "default:"
+  end
+
+  def test_warning_items_high_usage_renders_english_for_one_and_other_at_call_site
+    # warning_items itself hits Postgres-only ~* on SQLite unit DB; exercise the
+    # same Copy.t arguments the call site uses (numeric count: + formatted_count).
+    ensure_engine_locale_loaded_for_high_usage!
+
+    I18n.with_locale(:en) do
+      one = RecordingStudioAI::Copy.t(
+        "admin.alerts.high_usage",
+        count: 1,
+        formatted_count: AdminScreens::RecordingStudioAIWidgets.number(1)
+      )
+      other = RecordingStudioAI::Copy.t(
+        "admin.alerts.high_usage",
+        count: 20,
+        formatted_count: AdminScreens::RecordingStudioAIWidgets.number(20)
+      )
+
+      assert_equal "Unusually high usage today: 1 calls", one
+      assert_equal "Unusually high usage today: 20 calls", other
+    end
   end
 
   def test_warning_metrics_include_run_expensive_model_and_calls_per_run_thresholds
@@ -527,6 +562,15 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
   end
 
   private
+
+  def ensure_engine_locale_loaded_for_high_usage!
+    locale_path = File.expand_path("../config/locales/en.yml", __dir__)
+    expanded = I18n.load_path.map { |path| File.expand_path(path) }
+    return if expanded.include?(locale_path)
+
+    I18n.load_path << locale_path
+    I18n.backend.load_translations
+  end
 
   def create_run(root_id:, status:, tokens:, **attributes)
     RecordingStudioAI::Run.create!(

@@ -298,8 +298,10 @@ Static chrome on that page uses English Rails I18n keys under
 `recording_studio.ai.retained_responses` (see `config/locales/en.yml`).
 Admin section, screen, and widget chrome under `lib/recording_studio_ai/admin`
 uses `recording_studio.ai.admin.*` and `recording_studio.ai.common.*` through
-`RecordingStudioAI::Copy` (English defaults; hosts override in their own
-`config/locales`). Admin table column headers stay English literals.
+`RecordingStudioAI::Copy` (hosts override in their own `config/locales`).
+`admin.alerts.high_usage` is an I18n plural key (`one` / `other`) with numeric
+`count:` and `formatted_count` for the delimited number; English still says
+`calls` for both forms. Admin table column headers stay English literals.
 
 Keep `admin_warning_thresholds`, `admin_slow_call_threshold_ms`, and
 `admin_expensive_models` for widget warnings. Engine-admin resolvers
