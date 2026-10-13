@@ -21,9 +21,9 @@ Wave 2 follow-up: proper I18n plural forms for the high-usage admin alert.
 
 - Bump to `0.11.0`. No migration. English hosts see singular `call` when
   `count` is 1.
-- Prefer host overrides with `one` / `other` (and `%{formatted_count}` for the
-  delimited number). A flat-string host override still works: I18n returns a
-  non-Hash entry as-is for every count.
+- Host overrides should use `one` / `other` with `%{formatted_count}` to keep
+  the thousands delimiter. A main-style `%{count}` override interpolates the
+  raw Integer (`1000`, not `1,000`).
 - See [UPGRADING.md](UPGRADING.md#upgrading-to-0110).
 
 ## [0.10.0] - 2026-10-12

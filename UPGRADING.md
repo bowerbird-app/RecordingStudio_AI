@@ -14,9 +14,9 @@ instead of main's always-plural `calls`.
 
 ### Upgrade steps
 
-No migration is required. Prefer host overrides with `one` / `other` (and
-`%{formatted_count}`). A flat-string host override still works: I18n returns a
-non-Hash entry as-is for every count.
+No migration is required. Host overrides should use `one` / `other` with
+`%{formatted_count}` to keep the thousands delimiter. A main-style `%{count}`
+override interpolates the raw Integer (`1000`, not `1,000`).
 
 ## Upgrading to 0.10.0
 
