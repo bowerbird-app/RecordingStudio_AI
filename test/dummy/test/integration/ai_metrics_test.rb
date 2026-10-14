@@ -176,6 +176,63 @@ class AIMetricsTest < ActiveSupport::TestCase
     end
   end
 
+  test "tokens by profile sums tokens per profile_key and honors list filters" do
+    RecordingStudioAI::Run.delete_all
+    create_run!(status: "completed", resolved_model: "m1", total_tokens: 100, latency_ms: 10).update_columns(profile_key: "summary")
+    create_run!(status: "completed", resolved_model: "m2", total_tokens: 50, latency_ms: 10).update_columns(profile_key: "summary")
+    create_run!(status: "failed", resolved_model: "m1", total_tokens: 7, latency_ms: 10).update_columns(profile_key: "draft")
+
+    counts = breakdown_counts(execute("ai_runs.tokens_by_profile"))
+    assert_equal 150, counts["summary"].to_i
+    assert_equal 7, counts["draft"].to_i
+    assert_equal 100, breakdown_counts(execute("ai_runs.tokens_by_profile", filters: { model: "m1" }))["summary"].to_i
+  end
+
+  test "fallback retry rate is the share of runs with a retry or fallback per period" do
+    RecordingStudioAI::Run.delete_all
+    travel_to Time.utc(2026, 10, 8, 12) do
+      create_run!(status: "completed", resolved_model: "m1", total_tokens: 1, latency_ms: 1).update_columns(retry_count: 1)
+      create_run!(status: "completed", resolved_model: "m1", total_tokens: 1, latency_ms: 1).update_columns(fallback_count: 2)
+      create_run!(status: "completed", resolved_model: "m1", total_tokens: 1, latency_ms: 1)
+      create_run!(status: "completed", resolved_model: "m2", total_tokens: 1, latency_ms: 1)
+    end
+    window = { interval: "day", start_at: Time.utc(2026, 10, 7), end_at: Time.utc(2026, 10, 10) }
+
+    rates = timeseries_counts(execute("ai_runs.fallback_retry_rate", **window))
+    assert_in_delta 0.5, rates["2026-10-08"].to_f, 0.0001
+    assert_in_delta 2.0 / 3, timeseries_counts(
+      execute("ai_runs.fallback_retry_rate", **window, filters: { model: "m1" })
+    )["2026-10-08"].to_f, 0.0001
+  end
+
+  test "ai batches by status counts batches per status" do
+    RecordingStudioAI::Batch.delete_all
+    %w[completed completed failed].each do |status|
+      RecordingStudioAI::Batch.create!(
+        status: status, root_recording_id: @root.id, initiator_type: "User", initiator_id: @staff.id,
+        initiator_kind: "user"
+      )
+    end
+    counts = breakdown_counts(execute("ai_batches.by_status"))
+    assert_equal 2, counts["completed"].to_i
+    assert_equal 1, counts["failed"].to_i
+  end
+
+  test "new AI metrics carry unit, title and description" do
+    {
+      "ai_runs.tokens_by_profile" => "tokens",
+      "ai_runs.fallback_retry_rate" => "ratio",
+      "ai_batches.by_status" => "count"
+    }.each do |identifier, unit|
+      metadata = RecordingStudioMetrics.find(identifier).catalog_metadata
+      assert_equal unit, metadata[:unit], identifier
+      assert metadata[:title].present?, identifier
+      assert metadata[:description].present?, identifier
+      assert_equal [:operations], metadata[:exposed_apis], identifier
+    end
+    assert_equal true, RecordingStudioMetrics.find("ai_runs.fallback_retry_rate").catalog_metadata.dig(:date_range, :supported)
+  end
+
   test "api_authorize allows AdminRoot staff and denies non-admins" do
     authorize = RecordingStudioMetrics.registry.api_authorize_for(:ai_runs)
     assert_equal RecordingStudioAI::Metrics::AUTHORIZE, authorize

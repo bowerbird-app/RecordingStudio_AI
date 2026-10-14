@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "api/access"
+require_relative "batch_metrics"
 require "recording_studio_metrics"
 
 module RecordingStudioAI
@@ -26,6 +27,11 @@ module RecordingStudioAI
                          "normalized error_category."
     STUCK_DESCRIPTION = "Pending or running runs whose started_at (or created_at if not started) is older than " \
                         "config.stuck_run_threshold (default 15 minutes)."
+    RETRIED_OR_FELL_BACK_SQL = "CASE WHEN recording_studio_ai_runs.retry_count > 0 OR " \
+                               "recording_studio_ai_runs.fallback_count > 0 THEN 1.0 ELSE 0.0 END"
+    FALLBACK_RETRY_DESCRIPTION = "Share of runs (0 to 1) created in each period that needed at least one retry " \
+                                 "or fallback attempt."
+    TOKENS_BY_PROFILE_DESCRIPTION = "Total tokens per AI profile_key across all runs. Runs with no profile are blank."
     OLDEST_STUCK_DESCRIPTION = "Seconds since the oldest stuck run started (or was created). Empty when none."
 
     module_function
@@ -39,6 +45,7 @@ module RecordingStudioAI
         blast_radius: :site,
         api_authorize: AUTHORIZE
       ) { RecordingStudioAI::Metrics.define_runs(self) }
+      BatchMetrics.register!
     end
 
     def define_runs(dsl)
@@ -62,6 +69,18 @@ module RecordingStudioAI
                      value_field: :total_tokens,
                      expose: EXPOSE
       dsl.average :avg_latency, title: "Average latency", field: :latency_ms, expose: EXPOSE
+      define_profiles_and_retries(dsl)
+    end
+
+    def define_profiles_and_retries(dsl)
+      dsl.breakdown :tokens_by_profile, title: "Tokens by profile", description: TOKENS_BY_PROFILE_DESCRIPTION,
+                                        unit: "tokens", field: :profile_key, measurement: :sum,
+                                        value_field: :total_tokens, filters: list_filters, expose: EXPOSE
+      dsl.timeseries :fallback_retry_rate, title: "Retry or fallback rate", description: FALLBACK_RETRY_DESCRIPTION,
+                                           unit: "ratio", field: :created_at, measurement: :average,
+                                           value_field: Arel.sql(RETRIED_OR_FELL_BACK_SQL),
+                                           semantics: "share_of_records_created_during_period",
+                                           filters: list_filters, expose: EXPOSE
     end
 
     # Filter names match the AI Calls list (operation, prompt, prompt_version, provider, model, status).
