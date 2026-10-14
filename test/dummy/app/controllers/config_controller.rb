@@ -398,6 +398,13 @@ class ConfigController < ApplicationController
       explanation: "Latency that counts as a slow call on admin screens."
     },
     {
+      key: "stuck_run_threshold",
+      required: "No",
+      accepted_values: "ActiveSupport::Duration",
+      default: "15.minutes",
+      explanation: "How long a pending or running run may go before the ai_runs.stuck and oldest_stuck_age metrics count it."
+    },
+    {
       key: "admin_expensive_models",
       required: "No",
       accepted_values: "Array of model name strings",
@@ -535,6 +542,7 @@ class ConfigController < ApplicationController
       # config.admin_warning_thresholds = config.admin_warning_thresholds.merge(error_rate: 0.05)
       config.admin_slow_call_threshold_ms = 10_000
       config.admin_expensive_models = []
+      config.stuck_run_threshold = 15.minutes
     end
   RUBY
 
