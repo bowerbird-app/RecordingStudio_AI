@@ -9,27 +9,28 @@ to loaded English (host overrides included) instead of showing
 
 ### What changed
 
-- New `RecordingStudioAI.t` / `RecordingStudioAI::Translation.t` helper (same
-  contract as `RecordingStudio.t` / `RecordingStudio::Translation` in core
-  4.6.0). Fallback order for gem keys missing in the active locale:
+- Requires RecordingStudio `>= 4.7.0`.
+- The engine registers `config/locales/en.yml` with
+  `RecordingStudio::Translation.register_shipped_english` at boot (before
+  RecordingStudio loads the merged shipped-English table).
+- Saved-reply and other gem chrome use `RecordingStudio.t` (or
+  `RecordingStudioAI::Copy.t` for relative `recording_studio.ai.*` keys). There
+  is no gem-local `RecordingStudioAI::Translation` / `RecordingStudioAI.t`.
+- Fallback order for gem keys missing in the active locale (from core):
   1. loaded `:en` (host English overrides included)
   2. caller's `default:`
-  3. eager-loaded, deep-frozen gem `config/locales/en.yml` (reset on Rails
-     code reload; missing file → `{}`)
-- `RecordingStudioAI::Copy` still prefixes `recording_studio.ai.` and now
-  delegates to that helper.
+  3. merged shipped English table (base `en.yml` plus registered addon paths)
 - Saved-reply view and Admin `Copy.t` call sites no longer pass hand-copied
   English `default:` values.
-- `_html` keys escape interpolation args like view `t`. A missing `_html` key
-  with a non-interpolating caller `default:` stays unsafe like view `t`. An
-  interpolating caller `default:` escapes args and returns `html_safe`
-  (stricter than view `t`).
+- `_html` keys follow `RecordingStudio.t` escaping (non-interpolating caller
+  `default:` stays unsafe like view `t`; interpolating caller `default:` is
+  stricter and returns `html_safe`).
 
 ### Upgrade steps
 
-No migration is required. English hosts need no change. Prefer
-`RecordingStudioAI.t` (full key) or `Copy.t` (relative key) for new gem copy so
-missing locales keep the same fallback. Partial pluralization data in a
+Bump RecordingStudio to `>= 4.7.0` and this gem to `0.12.0`. No migration is
+required. English hosts need no change. Prefer `RecordingStudio.t` (full key)
+or `Copy.t` (relative key) for new gem copy. Partial pluralization data in a
 non-English locale still raises `I18n::InvalidPluralizationData`.
 
 ## Upgrading to 0.11.0

@@ -117,7 +117,7 @@ class LocalesTest < ActiveSupport::TestCase
       RETAINED_RESPONSE_KEYS.each do |key, english|
         full_key = "recording_studio.ai.retained_responses.#{key}"
         refute I18n.exists?(full_key, :de)
-        assert_equal english, RecordingStudioAI.t(full_key),
+        assert_equal english, RecordingStudio.t(full_key),
                      "#{full_key}: missing-locale fallback must match en.yml"
       end
     end
@@ -160,7 +160,7 @@ class LocalesTest < ActiveSupport::TestCase
     end
 
     assert_empty unknown_keys,
-                 "RecordingStudioAI.t / Copy.t keys must exist in en.yml; unknown: #{unknown_keys.join(', ')}"
+                 "RecordingStudio.t / Copy.t keys must exist in en.yml; unknown: #{unknown_keys.join(', ')}"
     assert_empty offenders,
                  "gem recording_studio.ai lookups must not pass default:; found: #{offenders.join(', ')}"
   end
@@ -168,13 +168,13 @@ class LocalesTest < ActiveSupport::TestCase
   test "scanner catches EMPTY_LABEL single-quoted multi-line I18n.translate Array and paren-less defaults" do
     samples = {
       empty_label: <<~RUBY,
-        RecordingStudioAI.t("recording_studio.ai.retained_responses.close", default: EMPTY_LABEL)
+        RecordingStudio.t("recording_studio.ai.retained_responses.close", default: EMPTY_LABEL)
       RUBY
       single_quoted: <<~RUBY,
-        RecordingStudioAI.t('recording_studio.ai.retained_responses.page_title', default: 'Saved reply')
+        RecordingStudio.t('recording_studio.ai.retained_responses.page_title', default: 'Saved reply')
       RUBY
       multi_line: <<~RUBY,
-        RecordingStudioAI.t(
+        RecordingStudio.t(
           "recording_studio.ai.retained_responses.page_subtitle",
           default: "What the model sent back."
         )
@@ -189,7 +189,7 @@ class LocalesTest < ActiveSupport::TestCase
         t("recording_studio.ai.retained_responses.type", default: "Type")
       RUBY
       paren_less: <<~RUBY,
-        RecordingStudioAI.t "recording_studio.ai.retained_responses.close", default: "Close"
+        RecordingStudio.t "recording_studio.ai.retained_responses.close", default: "Close"
       RUBY
       copy_default: <<~RUBY
         Copy.t("admin.section.title", default: "Recording Studio AI")
@@ -234,7 +234,7 @@ class LocalesTest < ActiveSupport::TestCase
 
   def each_translation_call_args(source)
     pattern = /
-      (?:RecordingStudioAI(?:::Translation)?\.t|Copy\.t|I18n\.(?:t|translate)|(?<![\w.:])t)
+      (?:RecordingStudio\.t|Copy\.t|I18n\.(?:t|translate)|(?<![\w.:])t)
       (?:
         \s*\(
         |

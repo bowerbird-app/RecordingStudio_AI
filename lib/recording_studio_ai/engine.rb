@@ -8,8 +8,11 @@ module RecordingStudioAI
       ActiveSupport::Inflector.inflections(:en) { |inflect| inflect.acronym "AI" }
     end
 
-    initializer "recording_studio_ai.load_shipped_english" do
-      RecordingStudioAI::Translation.shipped_english
+    initializer "recording_studio_ai.register_shipped_english",
+                before: "recording_studio.load_shipped_english" do
+      RecordingStudio::Translation.register_shipped_english(
+        root.join("config/locales/en.yml")
+      )
     end
 
     initializer "recording_studio_ai.metrics" do
@@ -17,9 +20,6 @@ module RecordingStudioAI
     end
 
     config.to_prepare do
-      RecordingStudioAI::Translation.reset_shipped_english!
-      RecordingStudioAI::Translation.shipped_english
-
       next unless defined?(RecordingStudioAdmin)
 
       require "recording_studio_ai/admin_screens"

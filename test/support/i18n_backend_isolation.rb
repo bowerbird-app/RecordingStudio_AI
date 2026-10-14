@@ -61,4 +61,25 @@ module I18nBackendIsolation
       value
     end
   end
+
+  # Remove a dotted key from the loaded backend for one locale (mutates in place).
+  # rubocop:disable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+  def delete_key!(locale, full_key)
+    I18n.exists?(full_key, locale)
+    parts = full_key.split(".").map(&:to_sym)
+    leaf = parts.pop
+    translations = translations_hash
+    locale_key = locale.to_sym
+    translations[locale_key] = translations[locale_key].dup if translations[locale_key]&.frozen?
+
+    node = translations[locale_key]
+    parts.each do |part|
+      break unless node.is_a?(Hash) && node[part].is_a?(Hash)
+
+      node[part] = node[part].dup if node[part].frozen?
+      node = node[part]
+    end
+    node.delete(leaf) if node.is_a?(Hash)
+  end
+  # rubocop:enable Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 end

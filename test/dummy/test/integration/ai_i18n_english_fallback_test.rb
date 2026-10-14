@@ -2,10 +2,11 @@
 
 require "test_helper"
 require "devise/test/integration_helpers"
+require_relative "../../../support/i18n_backend_isolation"
 
 # Behavioral renders: a locale without translations shows loaded/shipped English
-# for the saved-reply page. Uses :de so boot-loaded host :en overrides do not
-# interfere with the missing-locale path.
+# for the saved-reply page via RecordingStudio.t. Uses :de so boot-loaded host
+# :en overrides do not interfere with the missing-locale path.
 class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
 
@@ -26,27 +27,15 @@ class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
     I18n.available_locales = @previous_locales if @previous_locales
   end
 
-  test "shipped english table is loaded at boot before any call" do
-    table = RecordingStudioAI::Translation.shipped_english
-    refute_nil table
-    refute_empty table
-    assert_equal "Close", table.fetch("recording_studio.ai.retained_responses.close")
-  end
+  test "this gem en.yml is registered in RecordingStudio shipped english paths" do
+    path = RecordingStudioAI::Engine.root.join("config/locales/en.yml").to_s
+    registered = RecordingStudio::Translation.send(:registered_shipped_english_paths)
 
-  test "rails reloader reset yields a new shipped english table object" do
-    before = RecordingStudioAI::Translation.shipped_english
-    begin
-      Rails.application.reloader.reload!
-    rescue RecordingStudioMetrics::Errors::DuplicateRegistration
-      # Metrics re-registration is unrelated; mirror the engine to_prepare path.
-      RecordingStudioAI::Translation.reset_shipped_english!
-      RecordingStudioAI::Translation.shipped_english
-    end
-    after = RecordingStudioAI::Translation.shipped_english
-
-    refute_same before, after
-    assert_equal before, after
-    assert_predicate after, :frozen?
+    assert_includes registered, File.expand_path(path)
+    assert_equal "Close",
+                 RecordingStudio::Translation.shipped_english.fetch(
+                   "recording_studio.ai.retained_responses.close"
+                 )
   end
 
   test "missing locale without translations renders gem english on saved reply page" do
@@ -82,8 +71,8 @@ class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
   test "deleted english key on saved reply shows shipped Close without translation missing" do
     retained = create_overview_retained_response!
     key = "recording_studio.ai.retained_responses.close"
-    delete_loaded_translation!(:en, key)
-    delete_loaded_translation!(:fr, key)
+    I18nBackendIsolation.delete_key!(:en, key)
+    I18nBackendIsolation.delete_key!(:fr, key)
 
     refute I18n.exists?(key, :en)
     refute I18n.exists?(key, :fr)
@@ -116,7 +105,7 @@ class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
     I18n.t("recording_studio.ai.retained_responses.cut_short") # force init
     assert_equal "HOST Cut short", I18n.t("recording_studio.ai.retained_responses.cut_short")
     assert_equal "HOST Cut short",
-                 RecordingStudioAI.t("recording_studio.ai.retained_responses.cut_short")
+                 RecordingStudio.t("recording_studio.ai.retained_responses.cut_short")
 
     retained = create_overview_retained_response!(complete: false, truncated: true)
     get "/recording_studio_ai/retained_responses/#{retained.id}"
@@ -160,21 +149,4 @@ class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
     )
   end
 
-  def delete_loaded_translation!(locale, full_key)
-    I18n.exists?(full_key, locale)
-    parts = full_key.split(".").map(&:to_sym)
-    leaf = parts.pop
-    translations = I18n.backend.send(:translations)
-    locale_key = locale.to_sym
-    translations[locale_key] = translations[locale_key].dup if translations[locale_key].frozen?
-
-    node = translations[locale_key]
-    parts.each do |part|
-      break unless node.is_a?(Hash) && node[part].is_a?(Hash)
-
-      node[part] = node[part].dup if node[part].frozen?
-      node = node[part]
-    end
-    node.delete(leaf) if node.is_a?(Hash)
-  end
 end

@@ -8,36 +8,37 @@ Versioning and Keep a Changelog.
 ## [0.13.0] - 2026-10-14
 
 English fallback for missing `recording_studio.ai.*` keys when the active locale
-has no translation.
+has no translation, via RecordingStudio `>= 4.7.0`.
 
 ### Added
 
-- `RecordingStudioAI.t` / `RecordingStudioAI::Translation.t` resolve missing
-  gem keys with this fallback order: the loaded `:en` value (host English
-  overrides included), then the caller's `default:`, then an eager-loaded,
-  deep-frozen copy of the gem's own `config/locales/en.yml` (reset on Rails
-  code reload; missing file → empty table)
-- `RecordingStudioAI::Copy` delegates to `RecordingStudioAI.t` with the
-  `recording_studio.ai.` prefix so Admin and call-time labels share the same
-  fallback
-- Behavioral coverage for parity vs `I18n.t`, fallback order, `_html` escaping,
-  boot-loaded shipped English, reloader reset, deleted-key real-page renders,
-  and an en.yml-driven drift guard that rejects hand-copied `default:` on gem
-  call sites
+- Boot-time `RecordingStudio::Translation.register_shipped_english` for this
+  gem's `config/locales/en.yml` so `RecordingStudio.t` can resolve AI English
+  after a key is gone from the loaded `:en` backend
+- Behavioral coverage through `RecordingStudio.t`: deleted-key fallback (en/fr,
+  raise-on-missing on and off), real-page 200 renders, boot-loaded host
+  override, registration of this gem's `en.yml` path, and an en.yml-driven
+  drift guard that rejects hand-copied `default:` on gem call sites
 
 ### Changed
 
-- Saved-reply view lookups use `RecordingStudioAI.t` without hand-copied
-  English `default:` values
-- Admin `Copy.t` call sites drop hand-copied English `default:` values; fallback
-  comes from the loaded English, host overrides included
+- Requires `recording_studio >= 4.7.0`
+- Saved-reply view lookups use `RecordingStudio.t` without hand-copied English
+  `default:` values
+- `RecordingStudioAI::Copy` delegates to `RecordingStudio.t` with the
+  `recording_studio.ai.` prefix; Admin `Copy.t` call sites drop hand-copied
+  English `default:` values; fallback comes from the loaded English, host
+  overrides included
+- Removed the gem-local `RecordingStudioAI::Translation` / `RecordingStudioAI.t`
+  helper in favor of core
 
 ### Upgrade notes
 
-- Bump to `0.13.0`. No migration or host code change is required for English.
+- Install RecordingStudioAI `0.13.0` with RecordingStudio `>= 4.7.0`. No migration
+  or host English change is required.
 - Hosts that enable raise-on-missing translations no longer raise for
   gem-shipped `recording_studio.ai.*` keys looked up through
-  `RecordingStudioAI.t` / `Copy.t` when loaded `:en` or the gem-shipped table
+  `RecordingStudio.t` / `Copy.t` when loaded `:en` or the merged shipped table
   has the key. Host overrides in the active locale still win; host `:en`
   overrides win on the loaded-English fallback step.
 - Partial pluralization in a non-English locale still raises
@@ -46,7 +47,7 @@ has no translation.
 - A missing `_html` key with a non-interpolating caller `default:` stays unsafe
   like view `t`. An interpolating caller `default:` escapes args and returns
   `html_safe` (stricter than view `t`).
-- `en.yml` is unchanged. Prefer `RecordingStudioAI.t` (or `Copy.t` for relative
+- `en.yml` is unchanged. Prefer `RecordingStudio.t` (or `Copy.t` for relative
   keys) when adding new call sites.
 - See [UPGRADING.md](UPGRADING.md#upgrading-to-0130).
 

@@ -214,7 +214,7 @@ module AdminScreens
     def attempt_kind_label(kind)
       english = ATTEMPT_KIND_LABELS.fetch(kind.to_s, kind.to_s.humanize)
       full_key = "recording_studio.ai.admin.attempt_kinds.#{kind}"
-      if RecordingStudioAI::Translation.shipped_english.key?(full_key) ||
+      if RecordingStudio::Translation.shipped_english.key?(full_key) ||
          I18n.exists?(full_key, I18n.locale) ||
          I18n.exists?(full_key, :en)
         Copy.t("admin.attempt_kinds.#{kind}")
@@ -1005,7 +1005,7 @@ module AdminScreens
         # Match main: non-system/user roles use role.humanize ("assistant" => "Assistant").
         english = role.to_s.humanize
         full_key = "recording_studio.ai.common.role.#{role}"
-        if RecordingStudioAI::Translation.shipped_english.key?(full_key) ||
+        if RecordingStudio::Translation.shipped_english.key?(full_key) ||
            I18n.exists?(full_key, I18n.locale) ||
            I18n.exists?(full_key, :en)
           Copy.t("common.role.#{role}")
