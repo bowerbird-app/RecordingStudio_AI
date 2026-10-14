@@ -427,6 +427,49 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, searched.resolved_model
   end
 
+  test "ai calls error category filter keeps only that category" do
+    authenticate_for_admin!
+    create_run!(status: "failed", operation: "generation", resolved_model: "rate-limited-model")
+      .update_columns(error_category: "rate_limited")
+    create_run!(status: "failed", operation: "generation", resolved_model: "timeout-model")
+      .update_columns(error_category: "timeout")
+
+    get "/admin/screens/ai_calls/table", params: { error_category: "rate_limited" }
+
+    assert_response :success
+    assert_includes response.body, "rate-limited-model"
+    refute_includes response.body, "timeout-model"
+  end
+
+  test "ai calls stuck filter matches the ai_runs.stuck metric" do
+    authenticate_for_admin!
+    threshold = RecordingStudioAI.configuration.stuck_run_threshold
+    create_run!(status: "running", operation: "generation", resolved_model: "stuck-running-model")
+      .update_columns(started_at: Time.current - threshold - 1.minute)
+    create_run!(status: "pending", operation: "generation", resolved_model: "stuck-pending-model")
+      .update_columns(started_at: nil, created_at: Time.current - threshold - 1.minute)
+    create_run!(status: "running", operation: "generation", resolved_model: "fresh-running-model")
+      .update_columns(started_at: Time.current)
+    create_run!(status: "failed", operation: "generation", resolved_model: "old-failed-model")
+      .update_columns(started_at: Time.current - threshold - 1.hour)
+
+    get "/admin/screens/ai_calls/table", params: { stuck: "1", start_date: 1.year.ago.to_date.iso8601 }
+
+    assert_response :success
+    assert_includes response.body, "stuck-running-model"
+    assert_includes response.body, "stuck-pending-model"
+    refute_includes response.body, "fresh-running-model"
+    refute_includes response.body, "old-failed-model"
+  end
+
+  test "ai calls run_status filter applies every selected status" do
+    filter = AdminScreens::RecordingStudioAICallsScreen.filters.find { |definition| definition.key == :status }
+    relation = filter.apply(RecordingStudioAI::Run.all, %w[pending running], nil)
+
+    assert_includes relation.to_sql, "IN ('pending', 'running')"
+    assert_includes filter.apply(RecordingStudioAI::Run.all, "failed", nil).to_sql, "= 'failed'"
+  end
+
   test "registered prompts widget and section link to the prompts screen" do
     authenticate_for_admin!
     create_run!(

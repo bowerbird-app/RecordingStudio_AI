@@ -18,7 +18,20 @@ module AdminScreens
            param: :run_status,
            field: :status,
            options: -> { AdminScreens::RecordingStudioAIWidgets.run_distinct_values(:status) },
-           apply: ->(relation, value, _context) { relation.where(status: value.to_s) }
+           # Admin >= 2.4 passes every selected value (run_status[]=pending&run_status[]=running).
+           apply: ->(relation, value, _context) { relation.where(status: Array(value).map(&:to_s)) }
+    filter :error_category,
+           title: "Error category",
+           field: :error_category,
+           values: -> { AdminScreens::RecordingStudioAIWidgets.run_present_distinct_values(:error_category) },
+           apply: ->(relation, value, _context) { relation.where(error_category: Array(value).map(&:to_s)) }
+    # Same definition as the ai_runs.stuck metric: pending/running past stuck_run_threshold
+    # on COALESCE(started_at, created_at).
+    filter :stuck,
+           title: "Stuck",
+           values: [ "1" ],
+           control: :checkbox,
+           apply: ->(relation, _value, _context) { RecordingStudioAI::Metrics::STUCK.call(relation) }
     filter :operation,
            field: :operation,
            values: -> { AdminScreens::RecordingStudioAIWidgets.run_distinct_values(:operation) }
