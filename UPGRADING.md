@@ -1,6 +1,6 @@
 # Upgrading RecordingStudioAI
 
-## Upgrading to 0.12.0
+## Upgrading to 0.13.0
 
 Translation-only upgrade. English hosts keep the same rendered text.
 Missing-locale lookups for gem-shipped `recording_studio.ai.*` keys fall back
@@ -32,7 +32,7 @@ to loaded English (host overrides included) instead of showing
 
 ### Upgrade steps
 
-Install RecordingStudioAI `0.12.0` with RecordingStudio `~> 4.7`. No migration
+Install RecordingStudioAI `0.13.0` with RecordingStudio `~> 4.7`. No migration
 is required. English hosts need no change. Prefer `RecordingStudio.t` (full key)
 or `Copy.t` (relative key) for new gem copy. Partial pluralization data in a
 non-English locale still raises `I18n::InvalidPluralizationData`.

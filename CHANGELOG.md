@@ -924,8 +924,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.12.0...HEAD
-[0.12.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.11.1...v0.12.0
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.12.0...v0.13.0
 [0.11.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.10.1...v0.11.0
 [0.10.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.9.0...v0.9.1

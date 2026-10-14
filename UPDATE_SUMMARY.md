@@ -6,13 +6,16 @@ This branch adds English fallback for missing `recording_studio.ai.*` keys via
 RecordingStudio `~> 4.7` (`v4.7.0` / `613501c`): `RecordingStudio.t` and
 `RecordingStudio::Translation.register_shipped_english`.
 
+Main shipped metrics as `0.12.0`, so this release is `0.13.0`.
+
 ### Dependency changes
 
-- Gemspec requires `recording_studio ~> 4.7`.
+- Gemspec requires `recording_studio ~> 4.7` (keeps main's
+  `recording_studio_metrics ~> 0.3`).
 - Root and dummy Gemfiles pin RecordingStudio to tag `v4.7.0`.
 - Lockfiles differ from `main` only for RecordingStudio `4.7.0` (`613501c`),
-  this gem's version (`0.12.0`), and the `~> 4.7` dependency line.
-- Gem version is `0.12.0`.
+  this gem's version (`0.13.0`), and the `~> 4.7` dependency line.
+- Gem version is `0.13.0`.
 
 ### Behavior
 
@@ -32,13 +35,8 @@ A missing `_html` key with a caller `default:` follows `RecordingStudio.t` /
 view `t` escaping. A plain `default:` with no interpolation is returned as a
 plain (non-`html_safe`) String, so views will escape it.
 
-### Verification (HEAD before push)
+### Verification
 
-| Suite | Seed | Result |
-| --- | --- | --- |
-| `admin_i18n` + `profile_kind_i18n` + `locales` | 8600 | 25 runs, 780 assertions, 0 failures |
-| gem `rake test` | 1 | 491 runs, 4373 assertions, 0 failures, 1 skip |
-| gem `rake test` | 8600 | 491 runs, 4373 assertions, 0 failures, 1 skip |
-| dummy `ai_i18n_english_fallback_test` | 1 | 5 runs, 51 assertions, 0 failures |
-
-Also green locally: seeds `17`, `42`, `99` on admin/profile/locales widget Copy.t coverage.
+Behavior files match pre-rebase `0b46b5e` (engine, Copy, widgets, saved-reply
+view, fallback + translation tests). Version/docs/locks retargeted to `0.13.0`
+after rebase onto main's `0.12.0` metrics release.
