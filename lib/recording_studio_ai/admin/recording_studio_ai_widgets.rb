@@ -486,9 +486,7 @@ module AdminScreens
                  else
                    Copy.t("common.writes")
                  end
-        if definition.destructive
-          safety = Copy.t("common.safety_with_destructive", safety: safety)
-        end
+        safety = Copy.t("common.safety_with_destructive", safety: safety) if definition.destructive
 
         ToolRow.new(
           definition.key,
