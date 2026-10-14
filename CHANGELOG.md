@@ -5,6 +5,22 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-14
+
+### Added
+- `ai_runs.failed_over_time` (timeseries, unit `count`): failed runs by `created_at` with `from` / `to` / `interval`, `group_by=error_category` (the existing stored normalized category column; no schema change).
+- `ai_runs.stuck` (count): `pending` or `running` runs whose `COALESCE(started_at, created_at)` is at least `config.stuck_run_threshold` old. `group_by=status` or `operation`.
+- `ai_runs.oldest_stuck_age` (scalar, unit `seconds`): age of the oldest stuck run; empty when none.
+- `config.stuck_run_threshold` (default `15.minutes`).
+- Filters named like the AI Calls list: `operation`, `prompt`, `prompt_version`, `provider`, `model`, plus `status` on the stuck metrics. Catalog entries carry `unit`, `title` and `description`. Same site scope, `:operations` exposure and AdminRoot `:view` check as the existing AI run metrics. No identifying `group_by` fields.
+
+### Changed
+- Runtime dependency `recording_studio_metrics` `~> 0.3` (GitHub tag `v0.3.1`), up from `~> 0.2`.
+
+### Upgrade notes
+- Bump to `0.12.0`. No migration. Pin `recording_studio_metrics` to tag `v0.3.1`.
+- Optional: set `config.stuck_run_threshold`.
+
 ## [0.11.0] - 2026-10-13
 
 Wave 2 follow-up: proper I18n plural forms for the high-usage admin alert.

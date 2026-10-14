@@ -12,7 +12,7 @@ gem "flat_pack",
     tag: "v0.1.207"
 gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
-    tag: "v0.2.0"
+    tag: "v0.3.1"
 
 gemspec
 

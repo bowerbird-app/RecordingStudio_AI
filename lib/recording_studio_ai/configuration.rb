@@ -7,6 +7,7 @@ module RecordingStudioAI
   class Configuration
     attr_accessor(
       :default_profile,
+      :stuck_run_threshold,
       :authorization_handler,
       :providers,
       :allowed_provider_overrides,
@@ -67,6 +68,7 @@ module RecordingStudioAI
 
     def initialize
       @default_profile = :medium
+      @stuck_run_threshold = 15.minutes
       @authorization_handler = ->(**) { false }
       @usage_handler = nil
       @usage_key_resolver = nil
