@@ -20,18 +20,19 @@ Ruby SDK. Both providers support injected clients.
 
 ## Installation
 
-Add the addon and Recording Studio 4.2 to the host application's `Gemfile`:
+Add the addon and Recording Studio `~> 4.7` to the host application's `Gemfile`:
 
 ```ruby
 gem "recording_studio",
     github: "bowerbird-app/RecordingStudio",
-    tag: "v4.6.0"
+    tag: "v4.7.0"
 gem "recording_studio_ai",
     github: "bowerbird-app/RecordingStudio_AI"
 gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
     tag: "v0.3.1"
 ```
+
 
 AI registers site-wide run metrics. The host exposes them once:
 
@@ -344,8 +345,10 @@ merged shipped English table. Only `recording_studio.ai.*` keys use
 `RecordingStudio.t`; host or other-namespace keys stay on plain `I18n.t` with
 their original `default:`. A missing `_html` key with a caller `default:`
 follows `RecordingStudio.t` / view `t` escaping (args escaped, template markup
-kept). Hosts override keys in their own `config/locales`. Admin table column
-headers stay English literals. Requires RecordingStudio `~> 4.7`.
+kept). A plain `default:` with no interpolation is returned as a plain
+(non-`html_safe`) String, so views will escape it. Hosts override keys in their
+own `config/locales`. Admin table column headers stay English literals.
+Requires RecordingStudio `~> 4.7`.
 
 Keep `admin_warning_thresholds`, `admin_slow_call_threshold_ms`, and
 `admin_expensive_models` for widget warnings. Engine-admin resolvers

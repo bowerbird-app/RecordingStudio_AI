@@ -3,10 +3,11 @@
 require "test_helper"
 require_relative "support/i18n_backend_isolation"
 require_relative "support/engine_locale"
-require "yaml"
 
 # Behavioral coverage for this gem's English via RecordingStudio.t after
 # register_shipped_english. Deep RecordingStudio.t contract tests live in core.
+# Registration-at-boot (without invoking the initializer block) lives in the
+# dummy integration suite so it can fail if the engine initializer is removed.
 class TranslationTest < ActiveSupport::TestCase
   GEM_KEYS = {
     "recording_studio.ai.retained_responses.close" => "Close",
@@ -28,9 +29,6 @@ class TranslationTest < ActiveSupport::TestCase
     I18n.available_locales = @previous_locales if @previous_locales
   end
 
-  # Registration-at-boot (without invoking the initializer block) lives in the
-  # dummy integration suite so it can fail if the engine initializer is removed.
-
   test "deleted loaded english falls back to this gem english via RecordingStudio.t" do
     I18nBackendIsolation.with_snapshot do
       GEM_KEYS.each_key do |key|
@@ -44,11 +42,9 @@ class TranslationTest < ActiveSupport::TestCase
 
         I18n.with_locale(:en) do
           assert_equal english, RecordingStudio.t(key)
-          refute_match(/translation missing/i, RecordingStudio.t(key))
         end
         I18n.with_locale(:fr) do
           assert_equal english, RecordingStudio.t(key)
-          refute_match(/translation missing/i, RecordingStudio.t(key))
         end
       end
     end
@@ -60,7 +56,6 @@ class TranslationTest < ActiveSupport::TestCase
         refute I18n.exists?(key, :de), "#{key} must be absent in :de for this test"
         assert_equal english, RecordingStudio.t(key),
                      "#{key} should fall back to loaded English when :de has no file"
-        refute_match(/translation missing/i, RecordingStudio.t(key))
       end
     end
   end

@@ -10,6 +10,18 @@ require_relative "../../../support/i18n_backend_isolation"
 class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
 
+  PAGE_TITLE = "Saved reply"
+  PAGE_SUBTITLE = "What the model sent back."
+  ABOUT_TITLE = "About this reply"
+  OPEN_CALL = "Open this call"
+  CLOSE = "Close"
+  HOST_CUT_SHORT = "HOST Cut short"
+  GEM_CUT_SHORT = "Cut short"
+  CUT_SHORT_KEY = "recording_studio.ai.retained_responses.cut_short"
+  CLOSE_KEY = "recording_studio.ai.retained_responses.close"
+  PAGE_TITLE_KEY = "recording_studio.ai.retained_responses.page_title"
+  BOOT_OVERRIDE = Rails.root.join("config/locales/recording_studio_ai_boot_override.en.yml").freeze
+
   setup do
     @user = User.create!(email: "ai-fallback-#{SecureRandom.hex(4)}@example.com", password: "Password123!")
     workspace = Workspace.create!(name: "AI fallback workspace")
@@ -27,33 +39,30 @@ class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
     I18n.available_locales = @previous_locales if @previous_locales
   end
 
+  # Must fail on its own if the engine initializer does not register en.yml.
+  # Do not call register_shipped_english or run the initializer block here.
   test "ai en.yml path is registered at boot without invoking the initializer block" do
-    # Dummy boots the engine; this must fail if the register_shipped_english
-    # initializer body is removed (unlike unit tests that re-register in
-    # test_helper or call the block themselves).
     expected = File.expand_path(RecordingStudioAI::Engine.root.join("config/locales/en.yml"))
     paths = RecordingStudio::Translation.send(:registered_shipped_english_paths)
 
     assert_includes paths, expected
-    assert_equal "Close",
-                 RecordingStudio::Translation.shipped_english.fetch(
-                   "recording_studio.ai.retained_responses.close"
-                 )
+    assert_equal CLOSE,
+                 RecordingStudio::Translation.shipped_english.fetch(CLOSE_KEY)
   end
 
   test "missing locale without translations renders gem english on saved reply page" do
     retained = create_overview_retained_response!
 
     I18n.with_locale(:de) do
-      refute I18n.exists?("recording_studio.ai.retained_responses.page_title", :de)
+      refute I18n.exists?(PAGE_TITLE_KEY, :de)
 
       get "/recording_studio_ai/retained_responses/#{retained.id}"
 
       assert_response :success
-      assert_includes @response.body, "Saved reply"
-      assert_includes @response.body, "What the model sent back."
-      assert_includes @response.body, "Open this call"
-      refute_match(/translation missing:.*recording_studio\.ai/i, @response.body)
+      assert_select "h1", text: PAGE_TITLE
+      assert_select "p", text: PAGE_SUBTITLE
+      assert_includes list_item_label_texts, OPEN_CALL
+      assert_equal PAGE_TITLE, RecordingStudio.t(PAGE_TITLE_KEY)
     end
   end
 
@@ -63,22 +72,20 @@ class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
     I18n.with_locale(:en) do
       get "/recording_studio_ai/retained_responses/#{retained.id}"
       assert_response :success
-      assert_includes @response.body, "Saved reply"
-      assert_includes @response.body, "What the model sent back."
-      assert_includes @response.body, "About this reply"
-      assert_includes @response.body, "Open this call"
-      refute_match(/translation missing:.*recording_studio\.ai/i, @response.body)
+      assert_select "h1", text: PAGE_TITLE
+      assert_select "p", text: PAGE_SUBTITLE
+      assert_select "h3", text: ABOUT_TITLE
+      assert_includes list_item_label_texts, OPEN_CALL
     end
   end
 
   test "deleted english key on saved reply shows shipped Close without translation missing" do
     retained = create_overview_retained_response!
-    key = "recording_studio.ai.retained_responses.close"
-    I18nBackendIsolation.delete_key!(:en, key)
-    I18nBackendIsolation.delete_key!(:fr, key)
+    I18nBackendIsolation.delete_key!(:en, CLOSE_KEY)
+    I18nBackendIsolation.delete_key!(:fr, CLOSE_KEY)
 
-    refute I18n.exists?(key, :en)
-    refute I18n.exists?(key, :fr)
+    refute I18n.exists?(CLOSE_KEY, :en)
+    refute I18n.exists?(CLOSE_KEY, :fr)
 
     previous_raise = ActionView::Helpers::TranslationHelper.raise_on_missing_translations
 
@@ -90,8 +97,8 @@ class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
           get "/recording_studio_ai/retained_responses/#{retained.id}"
 
           assert_response :success
-          assert_includes @response.body, "Close"
-          refute_match(/translation missing:.*recording_studio\.ai/i, @response.body)
+          assert_equal CLOSE, close_aria_label
+          assert_equal CLOSE, RecordingStudio.t(CLOSE_KEY)
         end
       end
     end
@@ -101,20 +108,25 @@ class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
   end
 
   test "boot-loaded host override wins on saved reply for rarely shown key" do
-    boot_override = Rails.root.join("config/locales/recording_studio_ai_boot_override.en.yml")
-    assert_path_exists boot_override
-    assert_includes I18n.load_path.map { |path| File.expand_path(path) }, boot_override.to_s
+    assert_path_exists BOOT_OVERRIDE
+    load_path = I18n.load_path.map { |path| File.expand_path(path) }
+    assert_includes load_path, BOOT_OVERRIDE.to_s
 
-    I18n.t("recording_studio.ai.retained_responses.cut_short") # force init
-    assert_equal "HOST Cut short", I18n.t("recording_studio.ai.retained_responses.cut_short")
-    assert_equal "HOST Cut short",
-                 RecordingStudio.t("recording_studio.ai.retained_responses.cut_short")
+    I18n.t(CUT_SHORT_KEY) # force init
+    assert_equal HOST_CUT_SHORT, I18n.t(CUT_SHORT_KEY)
+    assert_equal HOST_CUT_SHORT, RecordingStudio.t(CUT_SHORT_KEY)
 
     retained = create_overview_retained_response!(complete: false, truncated: true)
     get "/recording_studio_ai/retained_responses/#{retained.id}"
     assert_response :success
-    assert_includes response.body, "HOST Cut short"
-    refute_includes response.body, ">Cut short<"
+
+    assert_select "li div.min-w-0.flex-1" do |elements|
+      labels = elements.map { |element| element.text.strip }
+      host_label = labels.find { |text| text == HOST_CUT_SHORT }
+      refute_nil host_label, "expected list label #{HOST_CUT_SHORT.inspect}"
+      assert_equal HOST_CUT_SHORT, host_label
+      refute_includes labels, GEM_CUT_SHORT
+    end
   end
 
   private
@@ -152,4 +164,13 @@ class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
     )
   end
 
+  def list_item_label_texts
+    css_select("li div.min-w-0.flex-1").map { |element| element.text.strip }
+  end
+
+  def close_aria_label
+    node = css_select("a[aria-label]").find { |element| element["aria-label"] == CLOSE }
+    refute_nil node, "expected Close aria-label on page nav"
+    node["aria-label"]
+  end
 end

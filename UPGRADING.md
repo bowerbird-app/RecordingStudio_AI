@@ -26,8 +26,9 @@ to loaded English (host overrides included) instead of showing
   English `default:` values.
 - A missing `_html` key with a caller `default:` now follows
   `RecordingStudio.t` / view `t` escaping (args escaped, template markup kept)
-  instead of main's whole-template escaping on hand-copied defaults. No in-gem
-  call site does this.
+  instead of main's whole-template escaping on hand-copied defaults. A plain
+  `default:` with no interpolation is returned as a plain (non-`html_safe`)
+  String, so views will escape it. No in-gem call site does this.
 
 ### Upgrade steps
 

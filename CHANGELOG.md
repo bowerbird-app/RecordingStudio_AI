@@ -49,7 +49,9 @@ has no translation, via RecordingStudio `~> 4.7`.
   plural keys.
 - A missing `_html` key with a caller `default:` now follows `RecordingStudio.t`
   / view `t` escaping (args escaped, template markup kept) instead of main's
-  whole-template escaping on hand-copied defaults. No in-gem call site does this.
+  whole-template escaping on hand-copied defaults. A plain `default:` with no
+  interpolation is returned as a plain (non-`html_safe`) String, so views will
+  escape it. No in-gem call site does this.
 - `en.yml` is unchanged. Prefer `RecordingStudio.t` (or `Copy.t` for relative
   keys) when adding new call sites.
 - See [UPGRADING.md](UPGRADING.md#upgrading-to-0130).
