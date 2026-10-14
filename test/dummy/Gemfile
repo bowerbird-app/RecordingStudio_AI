@@ -5,7 +5,7 @@ gem "recording_studio_ai", path: "../.."
 
 # RecordingStudio engine
 gem "recording_studio", github: "bowerbird-app/RecordingStudio", tag: "v4.6.0"
-gem "recording_studio_accessible", github: "bowerbird-app/RecordingStudio_accessible", tag: "v0.17.0"
+gem "recording_studio_accessible", github: "bowerbird-app/RecordingStudio_accessible", tag: "v0.18.0"
 gem "recording_studio_admin", github: "bowerbird-app/RecordingStudio_admin", tag: "v2.3.0"
 # Admin 2.3+ query helpers only (Trashable gemspec still lists Metrics for Bundler).
 gem "recording_studio_trashable", github: "bowerbird-app/RecordingStudio_trashable",
