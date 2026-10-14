@@ -27,11 +27,14 @@ class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
     I18n.available_locales = @previous_locales if @previous_locales
   end
 
-  test "this gem en.yml is registered in RecordingStudio shipped english paths" do
-    path = RecordingStudioAI::Engine.root.join("config/locales/en.yml").to_s
-    registered = RecordingStudio::Translation.send(:registered_shipped_english_paths)
+  test "ai en.yml path is registered at boot without invoking the initializer block" do
+    # Dummy boots the engine; this must fail if the register_shipped_english
+    # initializer body is removed (unlike unit tests that re-register in
+    # test_helper or call the block themselves).
+    expected = File.expand_path(RecordingStudioAI::Engine.root.join("config/locales/en.yml"))
+    paths = RecordingStudio::Translation.send(:registered_shipped_english_paths)
 
-    assert_includes registered, File.expand_path(path)
+    assert_includes paths, expected
     assert_equal "Close",
                  RecordingStudio::Translation.shipped_english.fetch(
                    "recording_studio.ai.retained_responses.close"

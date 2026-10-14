@@ -125,6 +125,31 @@ class LocalesTest < ActiveSupport::TestCase
     I18n.available_locales = previous_locales if previous_locales
   end
 
+  test "RecordingStudio.t call sites only use this gem recording_studio.ai keys" do
+    roots = [
+      File.expand_path("../app", __dir__),
+      File.expand_path("../lib", __dir__)
+    ]
+    files = roots.flat_map { |root| Dir[File.join(root, "**", "*.{rb,erb}")] }
+    offenders = []
+
+    files.each do |path|
+      source = File.read(path)
+      source.scan(/RecordingStudio\.t\(\s*["']([^"']+)["']/) do |match|
+        key = match[0]
+        next if key.include?('#{') # interpolated Copy.t → "#{PREFIX}.#{key}"
+        next if key.start_with?("recording_studio.ai.")
+
+        offenders << "#{path}: RecordingStudio.t(#{key.inspect})"
+      end
+    end
+
+    assert_empty offenders,
+                 "only recording_studio.ai.* keys may use RecordingStudio.t; " \
+                 "host or other-namespace keys stay on I18n.t with main's default:; " \
+                 "found: #{offenders.join(', ')}"
+  end
+
   test "every gem translation call site key exists in en.yml and has no default" do
     shipped = shipped_english_keys
     roots = [

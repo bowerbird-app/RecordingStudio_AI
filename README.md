@@ -340,9 +340,12 @@ Static chrome on that page uses English Rails I18n keys under
 `RecordingStudio.t`). The engine registers this gem's `en.yml` with
 `RecordingStudio::Translation.register_shipped_english` so missing active-locale
 keys still fall back to loaded English (host overrides included), then the
-merged shipped English table. Hosts override keys in their own
-`config/locales`. Admin table column headers stay English literals.
-Requires RecordingStudio `>= 4.7.0`.
+merged shipped English table. Only `recording_studio.ai.*` keys use
+`RecordingStudio.t`; host or other-namespace keys stay on plain `I18n.t` with
+their original `default:`. A missing `_html` key with a caller `default:`
+follows `RecordingStudio.t` / view `t` escaping (args escaped, template markup
+kept). Hosts override keys in their own `config/locales`. Admin table column
+headers stay English literals. Requires RecordingStudio `~> 4.7`.
 
 Keep `admin_warning_thresholds`, `admin_slow_call_threshold_ms`, and
 `admin_expensive_models` for widget warnings. Engine-admin resolvers

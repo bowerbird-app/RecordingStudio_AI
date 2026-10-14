@@ -28,16 +28,8 @@ class TranslationTest < ActiveSupport::TestCase
     I18n.available_locales = @previous_locales if @previous_locales
   end
 
-  test "this gem en.yml path is registered for shipped english fallback" do
-    path = File.expand_path("../config/locales/en.yml", __dir__)
-    registered = RecordingStudio::Translation.send(:registered_shipped_english_paths)
-
-    assert_includes registered, path
-    assert_equal "Close",
-                 RecordingStudio::Translation.shipped_english.fetch(
-                   "recording_studio.ai.retained_responses.close"
-                 )
-  end
+  # Registration-at-boot (without invoking the initializer block) lives in the
+  # dummy integration suite so it can fail if the engine initializer is removed.
 
   test "deleted loaded english falls back to this gem english via RecordingStudio.t" do
     I18nBackendIsolation.with_snapshot do

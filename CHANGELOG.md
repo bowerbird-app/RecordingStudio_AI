@@ -8,7 +8,7 @@ Versioning and Keep a Changelog.
 ## [0.13.0] - 2026-10-14
 
 English fallback for missing `recording_studio.ai.*` keys when the active locale
-has no translation, via RecordingStudio `>= 4.7.0`.
+has no translation, via RecordingStudio `~> 4.7`.
 
 ### Added
 
@@ -17,24 +17,27 @@ has no translation, via RecordingStudio `>= 4.7.0`.
   after a key is gone from the loaded `:en` backend
 - Behavioral coverage through `RecordingStudio.t`: deleted-key fallback (en/fr,
   raise-on-missing on and off), real-page 200 renders, boot-loaded host
-  override, registration of this gem's `en.yml` path, and an en.yml-driven
-  drift guard that rejects hand-copied `default:` on gem call sites
+  override, boot registration of this gem's `en.yml` path (dummy assertion that
+  does not invoke the initializer block), and an en.yml-driven drift guard that
+  rejects hand-copied `default:` on gem call sites
 
 ### Changed
 
-- Requires `recording_studio >= 4.7.0`
+- Depends on `recording_studio ~> 4.7` for `register_shipped_english`
 - Saved-reply view lookups use `RecordingStudio.t` without hand-copied English
   `default:` values
 - `RecordingStudioAI::Copy` delegates to `RecordingStudio.t` with the
   `recording_studio.ai.` prefix; Admin `Copy.t` call sites drop hand-copied
   English `default:` values; fallback comes from the loaded English, host
   overrides included
+- Only this gem's `recording_studio.ai.*` keys go through `RecordingStudio.t`;
+  host or other-namespace keys stay on plain `I18n.t` with main's `default:`
 - Removed the gem-local `RecordingStudioAI::Translation` / `RecordingStudioAI.t`
   helper in favor of core
 
 ### Upgrade notes
 
-- Install RecordingStudioAI `0.13.0` with RecordingStudio `>= 4.7.0`. No migration
+- Install RecordingStudioAI `0.13.0` with RecordingStudio `~> 4.7`. No migration
   or host English change is required.
 - Hosts that enable raise-on-missing translations no longer raise for
   gem-shipped `recording_studio.ai.*` keys looked up through
@@ -44,9 +47,9 @@ has no translation, via RecordingStudio `>= 4.7.0`.
 - Partial pluralization in a non-English locale still raises
   `I18n::InvalidPluralizationData` — the English fallback does not fill missing
   plural keys.
-- A missing `_html` key with a non-interpolating caller `default:` stays unsafe
-  like view `t`. An interpolating caller `default:` escapes args and returns
-  `html_safe` (stricter than view `t`).
+- A missing `_html` key with a caller `default:` now follows `RecordingStudio.t`
+  / view `t` escaping (args escaped, template markup kept) instead of main's
+  whole-template escaping on hand-copied defaults. No in-gem call site does this.
 - `en.yml` is unchanged. Prefer `RecordingStudio.t` (or `Copy.t` for relative
   keys) when adding new call sites.
 - See [UPGRADING.md](UPGRADING.md#upgrading-to-0130).
