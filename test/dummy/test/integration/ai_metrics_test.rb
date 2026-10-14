@@ -84,6 +84,98 @@ class AIMetricsTest < ActiveSupport::TestCase
     assert_equal tokens_between(Time.utc(2026, 3, 1), Time.utc(2026, 4, 1)), tokens["2026-03-01"]
   end
 
+  test "failed runs over time group by stored error_category with from, to and list filters" do
+    travel_to Time.utc(2026, 5, 4, 12) do
+      6.times { create_run!(status: "failed", resolved_model: "gpt-test", total_tokens: 1, latency_ms: 1, error_category: "rate_limit") }
+      create_run!(status: "failed", resolved_model: "gpt-test", total_tokens: 1, latency_ms: 1, error_category: "timeout")
+      create_run!(status: "completed", resolved_model: "gpt-test", total_tokens: 1, latency_ms: 1)
+    end
+    travel_to Time.utc(2026, 5, 5, 12) do
+      create_run!(status: "failed", resolved_model: "gemini-test", total_tokens: 1, latency_ms: 1, error_category: "rate_limit")
+    end
+
+    result = execute(
+      "ai_runs.failed_over_time",
+      interval: "day",
+      start_at: Time.utc(2026, 5, 4),
+      end_at: Time.utc(2026, 5, 6),
+      group_by: "error_category"
+    )
+    assert_equal "count", result.unit
+    totals = timeseries_counts(result)
+    assert_equal({ "2026-05-04" => 7, "2026-05-05" => 1 }, totals)
+    assert_equal "error_category", result.group_by.to_s
+    keys = result.groups.map { |row| (row[:key] || row["key"]).to_s }
+    assert_equal %w[rate_limit], keys
+    totals.each do |date, total|
+      grouped = result.groups.sum { |row| series_value(row[:data] || row["data"], date) }
+      grouped += series_value(result.other[:data] || result.other["data"], date) if result.other
+      assert_equal total, grouped
+    end
+
+    filtered = timeseries_counts(
+      execute(
+        "ai_runs.failed_over_time",
+        interval: "day",
+        start_at: Time.utc(2026, 5, 4),
+        end_at: Time.utc(2026, 5, 6),
+        filters: { model: "gemini-test" }
+      )
+    )
+    assert_equal({ "2026-05-04" => 0, "2026-05-05" => 1 }, filtered)
+  end
+
+  test "stuck runs use config.stuck_run_threshold and report the oldest age in seconds" do
+    now = Time.utc(2026, 6, 1, 12)
+    original = RecordingStudioAI.configuration.stuck_run_threshold
+    RecordingStudioAI.configuration.stuck_run_threshold = 15.minutes
+    travel_to(now - 2.hours) { create_run!(status: "running", resolved_model: "gpt-test", total_tokens: 1, latency_ms: 1, started_at: now - 90.minutes) }
+    travel_to(now - 20.minutes) { create_run!(status: "pending", resolved_model: "gpt-test", total_tokens: 1, latency_ms: 1) }
+    travel_to(now - 5.minutes) { create_run!(status: "running", resolved_model: "gpt-test", total_tokens: 1, latency_ms: 1, started_at: now - 5.minutes) }
+    travel_to(now - 3.hours) { create_run!(status: "completed", resolved_model: "gpt-test", total_tokens: 1, latency_ms: 1) }
+
+    travel_to now do
+      assert_equal 2, execute("ai_runs.stuck").value
+      assert_equal 90.minutes.to_i, execute("ai_runs.oldest_stuck_age").value
+      assert_equal 1, execute("ai_runs.stuck", filters: { status: "pending" }).value
+      assert_equal "seconds", execute("ai_runs.oldest_stuck_age").unit
+
+      RecordingStudioAI.configuration.stuck_run_threshold = 1.hour
+      assert_equal 1, execute("ai_runs.stuck").value
+      RecordingStudioAI.configuration.stuck_run_threshold = 3.hours
+      assert_equal 0, execute("ai_runs.stuck").value
+      assert_nil execute("ai_runs.oldest_stuck_age").value
+    end
+  ensure
+    RecordingStudioAI.configuration.stuck_run_threshold = original
+  end
+
+  test "failure and stuck metrics expose catalog fields and refuse identifying group_by" do
+    catalog = RecordingStudioMetrics.definitions.index_by(&:identifier)
+    failed = catalog.fetch("ai_runs.failed_over_time")
+    stuck = catalog.fetch("ai_runs.stuck")
+    oldest = catalog.fetch("ai_runs.oldest_stuck_age")
+
+    assert_equal [:error_category], failed.group_by
+    assert_equal %i[status operation], stuck.group_by
+    assert_equal [], oldest.group_by
+    assert_equal "Failed AI runs", failed.title
+    assert_equal "seconds", oldest.unit
+    [failed, stuck, oldest].each do |definition|
+      assert definition.description.present?
+      assert_equal :site, definition.blast_radius
+      filter_names = definition.filters.map(&:name)
+      assert_equal %i[operation prompt prompt_version provider model], filter_names.first(5)
+    end
+    assert_equal :status, stuck.filters.last.name
+
+    %w[initiator_id root_recording_id request_id error_message].each do |field|
+      assert_raises(RecordingStudioMetrics::Errors::InvalidGroupBy) do
+        execute("ai_runs.failed_over_time", interval: "day", group_by: field)
+      end
+    end
+  end
+
   test "api_authorize allows AdminRoot staff and denies non-admins" do
     authorize = RecordingStudioMetrics.registry.api_authorize_for(:ai_runs)
     assert_equal RecordingStudioAI::Metrics::AUTHORIZE, authorize
@@ -123,10 +215,12 @@ class AIMetricsTest < ActiveSupport::TestCase
     end
   end
 
-  def create_run!(status:, resolved_model:, total_tokens:, latency_ms:)
+  def create_run!(status:, resolved_model:, total_tokens:, latency_ms:, error_category: nil, started_at: nil)
     RecordingStudioAI::Run.create!(
       operation: "generation",
       status: status,
+      error_category: error_category,
+      started_at: started_at,
       resolved_model: resolved_model,
       resolved_provider: "test",
       latency_ms: latency_ms,
@@ -149,6 +243,11 @@ class AIMetricsTest < ActiveSupport::TestCase
 
   def breakdown_counts(result)
     result.data.to_h { |row| [(row[:key] || row["key"]).to_s, row[:value] || row["value"]] }
+  end
+
+  def series_value(data, date)
+    row = data.find { |entry| (entry[:date] || entry["date"]).to_s == date }
+    row ? (row[:value] || row["value"]) : 0
   end
 
   def timeseries_counts(result)

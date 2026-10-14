@@ -30,7 +30,7 @@ gem "recording_studio_ai",
     github: "bowerbird-app/RecordingStudio_AI"
 gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
-    tag: "v0.2.0"
+    tag: "v0.3.1"
 ```
 
 AI registers site-wide run metrics. The host exposes them once:
@@ -48,6 +48,27 @@ Staff with AdminRoot `:view` (`RecordingStudioAI::Api::Access.can_view?`) can re
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/tokens`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/tokens_over_time`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/avg_latency`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/failed_over_time`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/stuck`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/oldest_stuck_age`
+
+Failure and stuck-run metrics (Recording Studio Metrics `~> 0.3`, tag `v0.3.1`):
+
+| Metric | Type / unit | Definition | `group_by` |
+| --- | --- | --- | --- |
+| `ai_runs.failed_over_time` | timeseries / `count` | Runs with `status: "failed"`, bucketed by `created_at` (the AI Calls list date). Takes `from` / `to` and `interval` (`day`, `week`, `month`, `year`). | `error_category` (the stored normalized category, e.g. `rate_limit`, `timeout`) |
+| `ai_runs.stuck` | count / `count` | Runs with `status` `pending` or `running` whose `COALESCE(started_at, created_at)` is at least `config.stuck_run_threshold` ago. | `status`, `operation` |
+| `ai_runs.oldest_stuck_age` | scalar / `seconds` | Seconds since `COALESCE(started_at, created_at)` of the oldest stuck run; `value` omitted when none. | none |
+
+Filters use the AI Calls list names: `operation`, `prompt` (`prompt_key`), `prompt_version`, `provider` (`resolved_provider`), `model` (`resolved_model`), and `status` (`pending` / `running`) on the stuck metrics. Groups under `min_group_size` (5) fold into `other`. There is no grouping by initiator, executor, recording, request or job ids, prompt text, or error message. The stuck metrics skip the Metrics cache so they reflect the threshold at request time. Same AdminRoot `:view` check and site scope as the other AI run metrics.
+
+Set the stuck threshold in the initializer (default 15 minutes):
+
+```ruby
+RecordingStudioAI.configure do |config|
+  config.stuck_run_threshold = 15.minutes
+end
+```
 
 Then install the addon foundation:
 
@@ -293,7 +314,7 @@ gem "recording_studio_admin",
     tag: "v2.3.0"
 gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
-    tag: "v0.2.0",
+    tag: "v0.3.1",
     require: false
 gem "recording_studio_trashable",
     github: "bowerbird-app/RecordingStudio_trashable",
