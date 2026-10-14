@@ -179,6 +179,9 @@ class LocalesTest < ActiveSupport::TestCase
         end
 
         next unless args.match?(/\bdefault:\s*/)
+        # Dynamic keys (unknown attempt kinds / prompt roles) may pass
+        # `default: english` — the same English main already used there.
+        next if args.match?(/\#\{/) && args.match?(/\bdefault:\s*english\b/)
 
         offenders << "#{path}: #{method_name}(... default: ...) args=#{args.gsub(/\s+/, ' ').strip[0, 120]}"
       end

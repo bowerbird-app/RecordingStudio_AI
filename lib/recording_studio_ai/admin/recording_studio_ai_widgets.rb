@@ -213,14 +213,7 @@ module AdminScreens
 
     def attempt_kind_label(kind)
       english = ATTEMPT_KIND_LABELS.fetch(kind.to_s, kind.to_s.humanize)
-      full_key = "recording_studio.ai.admin.attempt_kinds.#{kind}"
-      if RecordingStudio::Translation.shipped_english.key?(full_key) ||
-         I18n.exists?(full_key, I18n.locale) ||
-         I18n.exists?(full_key, :en)
-        Copy.t("admin.attempt_kinds.#{kind}")
-      else
-        english
-      end
+      Copy.t("admin.attempt_kinds.#{kind}", default: english)
     end
 
     def attempt_kind_counts(relation, field, bucket)
@@ -1004,14 +997,7 @@ module AdminScreens
       else
         # Match main: non-system/user roles use role.humanize ("assistant" => "Assistant").
         english = role.to_s.humanize
-        full_key = "recording_studio.ai.common.role.#{role}"
-        if RecordingStudio::Translation.shipped_english.key?(full_key) ||
-           I18n.exists?(full_key, I18n.locale) ||
-           I18n.exists?(full_key, :en)
-          Copy.t("common.role.#{role}")
-        else
-          english
-        end
+        Copy.t("common.role.#{role}", default: english)
       end
     end
 

@@ -12,7 +12,7 @@ six execution infrastructure tables, and a read-only FlatPack admin surface.
 
 - Ruby 3.3 or newer
 - Rails 8.1
-- Recording Studio 4.2
+- Recording Studio `~> 4.7`
 
 The OpenAI provider uses the official `openai` Ruby SDK. Gemini uses its REST API
 behind an internal client because Google does not publish an official Gemini
@@ -902,10 +902,10 @@ cd test/dummy
 bin/dev
 ```
 
-The dummy app preserves Recording Studio 4.2 declarations, actor wiring, root
-recordings, authentication, the host sidebar shell, `UsesDefaultLayout` on gem
-admin screens, and the mounted addon route. See [UPGRADING.md](UPGRADING.md)
-for the 4.2 host pin.
+The dummy app preserves Recording Studio `~> 4.7` declarations, actor wiring,
+root recordings, authentication, the host sidebar shell, `UsesDefaultLayout` on
+gem admin screens, and the mounted addon route. See [UPGRADING.md](UPGRADING.md)
+for the `~> 4.7` host pin.
 
 Dummy credentials (`test/dummy/config/credentials.yml.enc`) are encrypted with
 the shared RecordingStudio_* development master key. Set `RAILS_MASTER_KEY` or

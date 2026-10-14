@@ -20,6 +20,13 @@ class ProfileKindI18nTest < ActiveSupport::TestCase
     end
   end
 
+  def test_prompt_message_title_uses_copy_default_english_for_unknown_role
+    I18n.with_locale(:en) do
+      assert_equal "Tool", Widgets.prompt_message_title("tool")
+      assert_equal "Function call", Widgets.prompt_message_title("function_call")
+    end
+  end
+
   def test_profile_kind_row_keeps_raw_tokens_and_display_translates
     I18n.with_locale(:en) do
       assert_equal "Generative, Decision",

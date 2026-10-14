@@ -61,6 +61,16 @@ class AdminI18nTest < ActiveSupport::TestCase
     I18n.with_locale(:en) do
       assert_equal "1st attempt", widgets.attempt_kind_label("primary")
       assert_equal "After tools", widgets.attempt_kind_label("continuation")
+      assert_equal "Retry", widgets.attempt_kind_label("retry")
+      assert_equal "Fallback", widgets.attempt_kind_label("fallback")
+    end
+  end
+
+  def test_attempt_kind_label_uses_copy_default_english_for_unknown_kind
+    widgets = AdminScreens::RecordingStudioAIWidgets
+
+    I18n.with_locale(:en) do
+      assert_equal "Custom kind", widgets.attempt_kind_label("custom_kind")
     end
   end
 

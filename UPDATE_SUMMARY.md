@@ -23,6 +23,8 @@ RecordingStudio `~> 4.7` (`v4.7.0` / `613501c`): `RecordingStudio.t` and
   `default:`.
 - No gem-local Translation helper.
 - `en.yml` is byte-identical to `main`.
+- Dynamic unknown attempt kinds / prompt roles keep main's
+  `Copy.t(..., default: english)` (same English constants / `humanize`).
 
 ### Upgrade note (`_html`)
 
@@ -30,8 +32,13 @@ A missing `_html` key with a caller `default:` follows `RecordingStudio.t` /
 view `t` escaping. A plain `default:` with no interpolation is returned as a
 plain (non-`html_safe`) String, so views will escape it.
 
-### Verification
+### Verification (HEAD before push)
 
-- Dummy registration assert fails alone if the engine initializer body is removed
-- Host-override assert uses `assert_select` on the saved-reply list label
-- Gem suite + seeds `1` / `8600` / `17` (and more) before merge
+| Suite | Seed | Result |
+| --- | --- | --- |
+| `admin_i18n` + `profile_kind_i18n` + `locales` | 8600 | 25 runs, 780 assertions, 0 failures |
+| gem `rake test` | 1 | 491 runs, 4373 assertions, 0 failures, 1 skip |
+| gem `rake test` | 8600 | 491 runs, 4373 assertions, 0 failures, 1 skip |
+| dummy `ai_i18n_english_fallback_test` | 1 | 5 runs, 51 assertions, 0 failures |
+
+Also green locally: seeds `17`, `42`, `99` on admin/profile/locales widget Copy.t coverage.
