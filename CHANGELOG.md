@@ -5,6 +5,51 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-14
+
+English fallback for missing `recording_studio.ai.*` keys when the active locale
+has no translation.
+
+### Added
+
+- `RecordingStudioAI.t` / `RecordingStudioAI::Translation.t` resolve missing
+  gem keys with this fallback order: the loaded `:en` value (host English
+  overrides included), then the caller's `default:`, then an eager-loaded,
+  deep-frozen copy of the gem's own `config/locales/en.yml` (reset on Rails
+  code reload; missing file → empty table)
+- `RecordingStudioAI::Copy` delegates to `RecordingStudioAI.t` with the
+  `recording_studio.ai.` prefix so Admin and call-time labels share the same
+  fallback
+- Behavioral coverage for parity vs `I18n.t`, fallback order, `_html` escaping,
+  boot-loaded shipped English, reloader reset, deleted-key real-page renders,
+  and an en.yml-driven drift guard that rejects hand-copied `default:` on gem
+  call sites
+
+### Changed
+
+- Saved-reply view lookups use `RecordingStudioAI.t` without hand-copied
+  English `default:` values
+- Admin `Copy.t` call sites drop hand-copied English `default:` values; fallback
+  comes from the loaded English, host overrides included
+
+### Upgrade notes
+
+- Bump to `0.13.0`. No migration or host code change is required for English.
+- Hosts that enable raise-on-missing translations no longer raise for
+  gem-shipped `recording_studio.ai.*` keys looked up through
+  `RecordingStudioAI.t` / `Copy.t` when loaded `:en` or the gem-shipped table
+  has the key. Host overrides in the active locale still win; host `:en`
+  overrides win on the loaded-English fallback step.
+- Partial pluralization in a non-English locale still raises
+  `I18n::InvalidPluralizationData` — the English fallback does not fill missing
+  plural keys.
+- A missing `_html` key with a non-interpolating caller `default:` stays unsafe
+  like view `t`. An interpolating caller `default:` escapes args and returns
+  `html_safe` (stricter than view `t`).
+- `en.yml` is unchanged. Prefer `RecordingStudioAI.t` (or `Copy.t` for relative
+  keys) when adding new call sites.
+- See [UPGRADING.md](UPGRADING.md#upgrading-to-0130).
+
 ## [0.12.0] - 2026-10-14
 
 ### Added
@@ -873,7 +918,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.10.1...v0.11.0
 [0.10.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.9.0...v0.9.1

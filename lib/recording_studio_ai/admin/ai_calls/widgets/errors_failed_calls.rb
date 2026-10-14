@@ -3,10 +3,10 @@
 module AdminScreens
   RecordingStudioAIErrorsFailedCallsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.errors_failed_calls") do
     type :chart
-    title { Copy.t("admin.widgets.errors_failed_calls.title", default: "Errors / failed calls") }
-    subtitle { Copy.t("admin.widgets.errors_failed_calls.subtitle", default: "Weekly failed-call volume for the last 4 weeks.") }
-    description { Copy.t("admin.widgets.errors_failed_calls.description", default: "Failure count trend to monitor reliability and regressions.") }
-    metadata { { period_label: Copy.t("common.last_30_days", default: "Last 30 days") } }
+    title { Copy.t("admin.widgets.errors_failed_calls.title") }
+    subtitle { Copy.t("admin.widgets.errors_failed_calls.subtitle") }
+    description { Copy.t("admin.widgets.errors_failed_calls.description") }
+    metadata { { period_label: Copy.t("common.last_30_days") } }
     value do |context|
       failed_runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context).where(status: "failed")
       AdminScreens::RecordingStudioAIWidgets.number(
@@ -26,7 +26,7 @@ module AdminScreens
       AdminScreens::RecordingStudioAIWidgets.weekly_calls_series(
         failed_runs,
         weeks_back: 4,
-        series_name: Copy.t("common.failed_calls", default: "Failed calls")
+        series_name: Copy.t("common.failed_calls")
       )
     end
     chart_options do

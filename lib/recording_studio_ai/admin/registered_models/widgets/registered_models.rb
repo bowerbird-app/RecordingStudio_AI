@@ -5,9 +5,9 @@ module AdminScreens
     "widgets.recording_studio_ai.registered_models"
   ) do
     type :list
-    title { Copy.t("admin.widgets.registered_models.title", default: "Registered models") }
-    subtitle { Copy.t("admin.widgets.registered_models.subtitle", default: "Top 5 models by call volume in the last 30 days.") }
-    description { Copy.t("admin.widgets.registered_models.description", default: "Open the models screen to inspect every registered model definition.") }
+    title { Copy.t("admin.widgets.registered_models.title") }
+    subtitle { Copy.t("admin.widgets.registered_models.subtitle") }
+    description { Copy.t("admin.widgets.registered_models.description") }
     list_options { { divider: true } }
     items do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.top_model_call_rows(context, limit: 5)
@@ -22,7 +22,7 @@ module AdminScreens
             date_range_preset: :last_30_days
           }.to_query}"
         }
-      end.presence || [{ text: Copy.t("admin.widgets.registered_models.empty", default: "No registered models.") }]
+      end.presence || [{ text: Copy.t("admin.widgets.registered_models.empty") }]
     end
     link_to { |context| context.admin_screen_path("registered_models") }
   end

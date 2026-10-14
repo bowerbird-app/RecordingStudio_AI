@@ -2,6 +2,7 @@
 
 require "test_helper"
 require_relative "support/i18n_backend_isolation"
+require_relative "support/engine_locale"
 require "recording_studio_ai/admin/recording_studio_ai_widgets"
 
 class ProfileKindI18nTest < ActiveSupport::TestCase
@@ -135,11 +136,6 @@ class ProfileKindI18nTest < ActiveSupport::TestCase
   private
 
   def ensure_engine_locale_loaded!
-    locale_path = File.expand_path("../config/locales/en.yml", __dir__)
-    expanded = I18n.load_path.map { |path| File.expand_path(path) }
-    return if expanded.include?(locale_path)
-
-    I18n.load_path << locale_path
-    I18n.backend.load_translations
+    EngineLocale.ensure_loaded!
   end
 end

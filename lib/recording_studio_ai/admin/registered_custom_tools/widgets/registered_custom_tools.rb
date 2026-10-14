@@ -3,9 +3,9 @@
 module AdminScreens
   RecordingStudioAIRegisteredCustomToolsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.registered_custom_tools") do
     type :list
-    title { Copy.t("admin.widgets.registered_custom_tools.title", default: "Custom tools") }
-    subtitle { Copy.t("admin.widgets.registered_custom_tools.subtitle", default: "Most-used tools by calls in the last 30 days.") }
-    description { Copy.t("admin.widgets.registered_custom_tools.description", default: "Open a tool to inspect its definition and recent executions.") }
+    title { Copy.t("admin.widgets.registered_custom_tools.title") }
+    subtitle { Copy.t("admin.widgets.registered_custom_tools.subtitle") }
+    description { Copy.t("admin.widgets.registered_custom_tools.description") }
     list_options { { divider: true } }
     items do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.tool_scope(context)
@@ -25,7 +25,7 @@ module AdminScreens
           trailing: "#{AdminScreens::RecordingStudioAIWidgets.number(calls)} calls",
           href: "#{context.admin_screen_path('tool_calls')}?#{query}"
         }
-      end.compact.presence || [{ text: Copy.t("admin.widgets.registered_custom_tools.empty", default: "No custom tool calls in the last 30 days.") }]
+      end.compact.presence || [{ text: Copy.t("admin.widgets.registered_custom_tools.empty") }]
     end
     link_to { |context| context.admin_screen_path("registered_custom_tools") }
   end

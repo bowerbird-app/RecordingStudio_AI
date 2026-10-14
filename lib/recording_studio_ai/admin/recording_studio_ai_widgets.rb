@@ -213,7 +213,14 @@ module AdminScreens
 
     def attempt_kind_label(kind)
       english = ATTEMPT_KIND_LABELS.fetch(kind.to_s, kind.to_s.humanize)
-      Copy.t("admin.attempt_kinds.#{kind}", default: english)
+      full_key = "recording_studio.ai.admin.attempt_kinds.#{kind}"
+      if RecordingStudioAI::Translation.shipped_english.key?(full_key) ||
+         I18n.exists?(full_key, I18n.locale) ||
+         I18n.exists?(full_key, :en)
+        Copy.t("admin.attempt_kinds.#{kind}")
+      else
+        english
+      end
     end
 
     def attempt_kind_counts(relation, field, bucket)
@@ -268,7 +275,7 @@ module AdminScreens
       when :hour
         timestamp.strftime("%-l%P").strip
       when :week
-        Copy.t("common.week_of", date: timestamp.strftime("%b %-d"), default: "Week of %{date}")
+        Copy.t("common.week_of", date: timestamp.strftime("%b %-d"))
       when :month
         timestamp.strftime("%b")
       when :year
@@ -341,13 +348,13 @@ module AdminScreens
     def latency_row_group_key(row, dimension:)
       model, prompt_name, prompt_key, prompt_version, = row
       if dimension == :model
-        { name: model.presence || Copy.t("common.unknown_model", default: "Unknown model"),
+        { name: model.presence || Copy.t("common.unknown_model"),
           resolved_model: model.presence }
       else
         name = if prompt_name.present?
                  "#{prompt_name}#{" v#{prompt_version}" if prompt_version.present?}"
                else
-                 prompt_key.presence || Copy.t("common.no_prompt", default: "No prompt")
+                 prompt_key.presence || Copy.t("common.no_prompt")
                end
         {
           name: name,
@@ -475,12 +482,12 @@ module AdminScreens
         key = [definition.key, definition.version]
         total = range_counts.fetch(key, 0)
         safety = if definition.read_only
-                   Copy.t("common.read_only_hyphen", default: "Read-only")
+                   Copy.t("common.read_only_hyphen")
                  else
-                   Copy.t("common.writes", default: "Writes")
+                   Copy.t("common.writes")
                  end
         if definition.destructive
-          safety = Copy.t("common.safety_with_destructive", safety: safety, default: "%{safety}, destructive")
+          safety = Copy.t("common.safety_with_destructive", safety: safety)
         end
 
         ToolRow.new(
@@ -541,7 +548,7 @@ module AdminScreens
     end
 
     def average_tokens(value)
-      return Copy.t("common.no_data", default: "No data") if value.blank?
+      return Copy.t("common.no_data") if value.blank?
 
       number(value.round)
     end
@@ -758,7 +765,7 @@ module AdminScreens
     end
 
     def profile_kind_display(kind_string)
-      return Copy.t("common.none", default: "—") if kind_string.blank? || kind_string == "—"
+      return Copy.t("common.none") if kind_string.blank? || kind_string == "—"
 
       kind_string.to_s.split(", ").map { |token| profile_kind_token_label(token) }.join(", ")
     end
@@ -766,9 +773,9 @@ module AdminScreens
     def profile_kind_token_label(token)
       case token.to_s
       when PROFILE_KIND_GENERATIVE
-        Copy.t("common.generative", default: "Generative")
+        Copy.t("common.generative")
       when PROFILE_KIND_DECISION
-        Copy.t("common.decision", default: "Decision")
+        Copy.t("common.decision")
       else
         token.to_s
       end
@@ -884,7 +891,7 @@ module AdminScreens
     end
 
     def duration(milliseconds)
-      return Copy.t("common.no_data", default: "No data") if milliseconds.blank?
+      return Copy.t("common.no_data") if milliseconds.blank?
 
       milliseconds.to_f >= 1_000 ? format("%.1fs", milliseconds.to_f / 1_000) : "#{milliseconds.to_i}ms"
     end
@@ -892,7 +899,7 @@ module AdminScreens
     def mini_chart(series)
       render_flatpack(
         FlatPack::Chart::Component.new(
-          series: [{ name: Copy.t("common.calls", default: "Calls"), data: series }],
+          series: [{ name: Copy.t("common.calls"), data: series }],
           type: :line,
           height: 64,
           card: false,
@@ -916,35 +923,34 @@ module AdminScreens
         modal_id: "custom-tool-definition-#{row.key}-#{row.version}",
         title: "#{definition.name} v#{definition.version}",
         trigger_text: "#{row.name} v#{row.version}",
-        aria_label: Copy.t("common.show_definition_for", name: row.name, default: "Show definition for %{name}"),
+        aria_label: Copy.t("common.show_definition_for", name: row.name),
         fields: {
-          Copy.t("admin.definition_fields.description", default: "Description") => definition.description,
-          Copy.t("admin.definition_fields.use_when", default: "Use when") => definition.use_when,
-          Copy.t("admin.definition_fields.do_not_use_when", default: "Do not use when") => definition.do_not_use_when,
-          Copy.t("admin.definition_fields.returns", default: "Returns") => definition.returns,
-          Copy.t("admin.definition_fields.executor", default: "Executor") => definition.executor_label,
-          Copy.t("admin.definition_fields.safety", default: "Safety") => custom_tool_safety_line(definition)
+          Copy.t("admin.definition_fields.description") => definition.description,
+          Copy.t("admin.definition_fields.use_when") => definition.use_when,
+          Copy.t("admin.definition_fields.do_not_use_when") => definition.do_not_use_when,
+          Copy.t("admin.definition_fields.returns") => definition.returns,
+          Copy.t("admin.definition_fields.executor") => definition.executor_label,
+          Copy.t("admin.definition_fields.safety") => custom_tool_safety_line(definition)
         }
       )
     end
 
     def custom_tool_safety_line(definition)
       mode = if definition.read_only
-               Copy.t("common.read_only", default: "Read only")
+               Copy.t("common.read_only")
              else
-               Copy.t("common.writes", default: "Writes")
+               Copy.t("common.writes")
              end
       Copy.t(
         "admin.safety.line",
         mode: mode,
-        destructive: definition.destructive ? Copy.t("admin.safety.destructive_yes", default: "yes") : Copy.t("admin.safety.destructive_no", default: "no"),
+        destructive: definition.destructive ? Copy.t("admin.safety.destructive_yes") : Copy.t("admin.safety.destructive_no"),
         confirmation: if definition.requires_confirmation
-                        Copy.t("admin.safety.confirmation_required", default: "required")
+                        Copy.t("admin.safety.confirmation_required")
                       else
-                        Copy.t("admin.safety.confirmation_not_required", default: "not required")
+                        Copy.t("admin.safety.confirmation_not_required")
                       end,
-        idempotent: definition.idempotent ? Copy.t("admin.safety.idempotent_yes", default: "yes") : Copy.t("admin.safety.idempotent_no", default: "no"),
-        default: "%{mode}; destructive: %{destructive}; confirmation: %{confirmation}; idempotent: %{idempotent}"
+        idempotent: definition.idempotent ? Copy.t("admin.safety.idempotent_yes") : Copy.t("admin.safety.idempotent_no")
       )
     end
 
@@ -954,24 +960,21 @@ module AdminScreens
         modal_id: "registered-prompt-definition-#{row.key}-#{row.version}",
         title: "#{definition.name} v#{definition.version}",
         trigger_text: "#{row.name} v#{row.version}",
-        aria_label: Copy.t("common.show_definition_for", name: row.name, default: "Show definition for %{name}"),
+        aria_label: Copy.t("common.show_definition_for", name: row.name),
         fields: {
-          Copy.t("admin.definition_fields.prompt_key", default: "Prompt Key") => definition.key,
-          Copy.t("admin.definition_fields.registered_by",
-                 default: "Registered by") => definition.owner.presence || Copy.t("common.none", default: "—"),
-          Copy.t("admin.definition_fields.description", default: "Description") => definition.description,
-          Copy.t("admin.definition_fields.inputs",
-                 default: "Inputs") => definition.inputs.presence&.join(", ") || Copy.t("common.none_word", default: "None"),
-          Copy.t("admin.definition_fields.tools", default: "Tools") => prompt_tool_labels(definition),
-          Copy.t("admin.definition_fields.defaults",
-                 default: "Defaults") => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || Copy.t("common.none_word", default: "None")
+          Copy.t("admin.definition_fields.prompt_key") => definition.key,
+          Copy.t("admin.definition_fields.registered_by") => definition.owner.presence || Copy.t("common.none"),
+          Copy.t("admin.definition_fields.description") => definition.description,
+          Copy.t("admin.definition_fields.inputs") => definition.inputs.presence&.join(", ") || Copy.t("common.none_word"),
+          Copy.t("admin.definition_fields.tools") => prompt_tool_labels(definition),
+          Copy.t("admin.definition_fields.defaults") => definition.defaults.presence&.map { |key, value| "#{key}: #{value}" }&.join(", ") || Copy.t("common.none_word")
         },
         trailing: prompt_messages_markup(definition.messages)
       )
     end
 
     def prompt_tool_labels(definition)
-      return Copy.t("common.none_word", default: "None") if definition.tools.empty?
+      return Copy.t("common.none_word") if definition.tools.empty?
 
       definition.tools.map do |tool|
         tool[:version] ? "#{tool.fetch(:key)} v#{tool[:version]}" : tool.fetch(:key)
@@ -998,12 +1001,19 @@ module AdminScreens
 
     def prompt_message_title(role)
       case role.to_s
-      when "system" then Copy.t("common.system_prompt", default: "System Prompt")
-      when "user" then Copy.t("common.user_prompt", default: "User Prompt")
+      when "system" then Copy.t("common.system_prompt")
+      when "user" then Copy.t("common.user_prompt")
       else
         # Match main: non-system/user roles use role.humanize ("assistant" => "Assistant").
         english = role.to_s.humanize
-        Copy.t("common.role.#{role}", default: english)
+        full_key = "recording_studio.ai.common.role.#{role}"
+        if RecordingStudioAI::Translation.shipped_english.key?(full_key) ||
+           I18n.exists?(full_key, I18n.locale) ||
+           I18n.exists?(full_key, :en)
+          Copy.t("common.role.#{role}")
+        else
+          english
+        end
       end
     end
 
@@ -1091,7 +1101,7 @@ module AdminScreens
     end
 
     def weekly_calls_series(scope, weeks_back: 12, series_name: "AI calls")
-      series_name = Copy.t("common.ai_calls", default: "AI calls") if series_name == "AI calls"
+      series_name = Copy.t("common.ai_calls") if series_name == "AI calls"
       current_week_start = Time.current.beginning_of_week
       start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
       range = start_week..Time.current
@@ -1109,7 +1119,7 @@ module AdminScreens
     end
 
     def weekly_token_series(scope, weeks_back: 12, series_name: "Token usage")
-      series_name = Copy.t("common.token_usage", default: "Token usage") if series_name == "Token usage"
+      series_name = Copy.t("common.token_usage") if series_name == "Token usage"
       current_week_start = Time.current.beginning_of_week
       start_week = (current_week_start - (weeks_back - 1).weeks).beginning_of_week
       range = start_week..Time.current
@@ -1241,8 +1251,7 @@ module AdminScreens
       current_failure_rate = percentage(failed_last_day, last_day.count)
       if failed_last_day >= 3 && current_failure_rate >= [12.0, previous_failure_rate * 1.7].max
         warnings << {
-          text: Copy.t("admin.alerts.error_spike", rate: current_failure_rate,
-                                                   default: "Error spike: %{rate}% failures in the last 24h"),
+          text: Copy.t("admin.alerts.error_spike", rate: current_failure_rate),
           icon: "shield-exclamation"
         }
       end
@@ -1251,8 +1260,7 @@ module AdminScreens
       expensive_share = percentage(expensive_last_day, last_day.count)
       if expensive_last_day >= 3 || expensive_share >= 35.0
         warnings << {
-          text: Copy.t("admin.alerts.expensive_model", share: expensive_share,
-                                                       default: "Expensive model usage elevated: %{share}% in the last 24h"),
+          text: Copy.t("admin.alerts.expensive_model", share: expensive_share),
           icon: "currency-dollar"
         }
       end

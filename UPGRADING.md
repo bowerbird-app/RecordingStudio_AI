@@ -1,5 +1,37 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.12.0
+
+Translation-only upgrade. English hosts keep the same rendered text.
+Missing-locale lookups for gem-shipped `recording_studio.ai.*` keys fall back
+to loaded English (host overrides included) instead of showing
+“Translation missing”.
+
+### What changed
+
+- New `RecordingStudioAI.t` / `RecordingStudioAI::Translation.t` helper (same
+  contract as `RecordingStudio.t` / `RecordingStudio::Translation` in core
+  4.6.0). Fallback order for gem keys missing in the active locale:
+  1. loaded `:en` (host English overrides included)
+  2. caller's `default:`
+  3. eager-loaded, deep-frozen gem `config/locales/en.yml` (reset on Rails
+     code reload; missing file → `{}`)
+- `RecordingStudioAI::Copy` still prefixes `recording_studio.ai.` and now
+  delegates to that helper.
+- Saved-reply view and Admin `Copy.t` call sites no longer pass hand-copied
+  English `default:` values.
+- `_html` keys escape interpolation args like view `t`. A missing `_html` key
+  with a non-interpolating caller `default:` stays unsafe like view `t`. An
+  interpolating caller `default:` escapes args and returns `html_safe`
+  (stricter than view `t`).
+
+### Upgrade steps
+
+No migration is required. English hosts need no change. Prefer
+`RecordingStudioAI.t` (full key) or `Copy.t` (relative key) for new gem copy so
+missing locales keep the same fallback. Partial pluralization data in a
+non-English locale still raises `I18n::InvalidPluralizationData`.
+
 ## Upgrading to 0.11.0
 
 Mostly a translation-shape upgrade. English for `count` 1 now says `call`

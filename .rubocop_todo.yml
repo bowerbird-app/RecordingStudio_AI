@@ -451,6 +451,7 @@ Metrics/ModuleLength:
     - 'lib/recording_studio_ai/attachments.rb'
     - 'lib/recording_studio_ai/contracts/request_validation.rb'
     - 'lib/recording_studio_ai/retention.rb'
+    - 'lib/recording_studio_ai/translation.rb'
 
 # Offense count: 20
 # Configuration parameters: Max, CountKeywordArgs, MaxOptionalParameters.

@@ -2,6 +2,7 @@
 
 require "test_helper"
 require_relative "support/i18n_backend_isolation"
+require_relative "support/engine_locale"
 require "recording_studio_ai/admin/recording_studio_ai_widgets"
 
 class AdminI18nTest < ActiveSupport::TestCase
@@ -13,16 +14,15 @@ class AdminI18nTest < ActiveSupport::TestCase
 
   def test_admin_section_and_screen_chrome_resolve_to_literal_english
     I18n.with_locale(:en) do
-      assert_equal "Recording Studio AI", Copy.t("admin.section.title", default: "Recording Studio AI")
-      assert_equal "Calls, tools, batches, and saved replies",
-                   Copy.t("admin.section.subtitle", default: "Calls, tools, batches, and saved replies")
-      assert_equal "AI Calls", Copy.t("admin.section.links.calls", default: "AI Calls")
-      assert_equal "AI Calls", Copy.t("admin.screens.ai_calls.title", default: "AI Calls")
-      assert_equal "Open saved reply", Copy.t("admin.open_saved_reply", default: "Open saved reply")
-      assert_equal "AI calls", Copy.t("admin.widgets.ai_calls_windows.title", default: "AI calls")
-      assert_equal "Last 30 days", Copy.t("common.last_30_days", default: "Last 30 days")
-      assert_equal "1st attempt", Copy.t("admin.attempt_kinds.primary", default: "1st attempt")
-      assert_equal "After tools", Copy.t("admin.attempt_kinds.continuation", default: "After tools")
+      assert_equal "Recording Studio AI", Copy.t("admin.section.title")
+      assert_equal "Calls, tools, batches, and saved replies", Copy.t("admin.section.subtitle")
+      assert_equal "AI Calls", Copy.t("admin.section.links.calls")
+      assert_equal "AI Calls", Copy.t("admin.screens.ai_calls.title")
+      assert_equal "Open saved reply", Copy.t("admin.open_saved_reply")
+      assert_equal "AI calls", Copy.t("admin.widgets.ai_calls_windows.title")
+      assert_equal "Last 30 days", Copy.t("common.last_30_days")
+      assert_equal "1st attempt", Copy.t("admin.attempt_kinds.primary")
+      assert_equal "After tools", Copy.t("admin.attempt_kinds.continuation")
     end
   end
 
@@ -68,6 +68,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     widgets = AdminScreens::RecordingStudioAIWidgets
 
     I18nBackendIsolation.with_snapshot do
+      I18n.t("recording_studio.ai.admin.attempt_kinds.primary") # force init before store
       I18n.available_locales = I18n.available_locales | [:zz]
       I18n.backend.store_translations(:zz, {
                                         recording_studio: {
@@ -91,12 +92,6 @@ class AdminI18nTest < ActiveSupport::TestCase
   private
 
   def ensure_engine_locale_loaded!
-    locale_path = File.expand_path("../config/locales/en.yml", __dir__)
-    expanded = I18n.load_path.map { |path| File.expand_path(path) }
-    return if expanded.include?(locale_path)
-
-    # Setup-only: gem unit tests boot without Rails auto-loading engine locales.
-    I18n.load_path << locale_path
-    I18n.backend.load_translations
+    EngineLocale.ensure_loaded!
   end
 end

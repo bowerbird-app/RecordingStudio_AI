@@ -333,11 +333,14 @@ uses the Admin surface role (default `:view`) and the current-root match.
 Decrypting still goes through `RecordingStudioAI.read_retained_response` and
 requires `recording_studio_ai.view_retained_response` (Accessible `:admin`).
 Static chrome on that page uses English Rails I18n keys under
-`recording_studio.ai.retained_responses` (see `config/locales/en.yml`).
-Admin section, screen, and widget chrome under `lib/recording_studio_ai/admin`
-uses `recording_studio.ai.admin.*` and `recording_studio.ai.common.*` through
-`RecordingStudioAI::Copy` (English defaults; hosts override in their own
-`config/locales`). Admin table column headers stay English literals.
+`recording_studio.ai.retained_responses` (see `config/locales/en.yml`) via
+`RecordingStudioAI.t`. Admin section, screen, and widget chrome under
+`lib/recording_studio_ai/admin` uses `recording_studio.ai.admin.*` and
+`recording_studio.ai.common.*` through `RecordingStudioAI::Copy` (prefixed
+`RecordingStudioAI.t`). When the active locale is missing a gem key, fallback
+comes from the loaded English, host overrides included, then the gem-shipped
+`en.yml` table. Hosts override keys in their own `config/locales`. Admin table
+column headers stay English literals.
 
 Keep `admin_warning_thresholds`, `admin_slow_call_threshold_ms`, and
 `admin_expensive_models` for widget warnings. Engine-admin resolvers

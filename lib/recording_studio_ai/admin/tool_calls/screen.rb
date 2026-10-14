@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIToolCallsScreen < RecordingStudioAdmin::Screen
     key "tool_calls"
     icon :wrench_screwdriver
-    title { Copy.t("admin.screens.tool_calls.title", default: "Custom Tool Calls") }
-    subtitle { Copy.t("admin.screens.tool_calls.subtitle", default: "Custom tool invocation history with status, confirmation, and latency signals.") }
+    title { Copy.t("admin.screens.tool_calls.title") }
+    subtitle { Copy.t("admin.screens.tool_calls.subtitle") }
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.tool_scope(context).includes(:run).order(created_at: :desc)
@@ -39,12 +39,12 @@ module AdminScreens
     end
 
     chart do
-      title { Copy.t("admin.screens.tool_calls.chart_title", default: "Custom tool calls trend") }
-      subtitle { Copy.t("admin.screens.tool_calls.chart_subtitle", default: "Custom tool call volume over time.") }
+      title { Copy.t("admin.screens.tool_calls.chart_title") }
+      subtitle { Copy.t("admin.screens.tool_calls.chart_subtitle") }
       type :line
       series do |context|
         [{
-          name: Copy.t("common.tool_calls", default: "Tool calls"),
+          name: Copy.t("common.tool_calls"),
           data: RecordingStudioAdmin::AdminActivityLogsSupport.date_series(
             context.query_result.relation.reorder(nil),
             field: "recording_studio_ai_custom_tool_invocations.created_at",
@@ -101,7 +101,7 @@ module AdminScreens
              sortable: false,
              header_tooltip: "The prompt that asked for this tool.",
              value: lambda { |invocation, _context|
-               invocation.run&.prompt_name_snapshot.presence || invocation.run&.prompt_key || Copy.t("common.no_prompt", default: "No prompt")
+               invocation.run&.prompt_name_snapshot.presence || invocation.run&.prompt_key || Copy.t("common.no_prompt")
              }
       column :tool_version, title: "Version",
                             header_tooltip: "Which version of the tool ran."

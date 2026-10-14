@@ -3,10 +3,10 @@
 module AdminScreens
   RecordingStudioAICallsByProviderModelWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.calls_by_provider_model") do
     type :chart
-    title { Copy.t("admin.widgets.calls_by_provider_model.title", default: "Calls by provider/model") }
-    subtitle { Copy.t("admin.widgets.calls_by_provider_model.subtitle", default: "Top 5 models by call volume in the last 30 days.") }
-    description { Copy.t("admin.widgets.calls_by_provider_model.description", default: "Ranks models by call count so usage concentration is easy to compare.") }
-    metadata { { period_label: Copy.t("common.last_30_days", default: "Last 30 days") } }
+    title { Copy.t("admin.widgets.calls_by_provider_model.title") }
+    subtitle { Copy.t("admin.widgets.calls_by_provider_model.subtitle") }
+    description { Copy.t("admin.widgets.calls_by_provider_model.description") }
+    metadata { { period_label: Copy.t("common.last_30_days") } }
     value do |context|
       runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context).where(created_at: 30.days.ago..Time.current)
       AdminScreens::RecordingStudioAIWidgets.number(runs.count)
@@ -23,7 +23,7 @@ module AdminScreens
       rows = AdminScreens::RecordingStudioAIWidgets.top_model_call_volume_rows(context)
 
       [{
-        name: Copy.t("common.call_volume", default: "Call volume"),
+        name: Copy.t("common.call_volume"),
         data: rows.map { |_model, count| count.to_i }
       }]
     end
