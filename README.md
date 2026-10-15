@@ -12,7 +12,7 @@ six execution infrastructure tables, and a read-only FlatPack admin surface.
 
 - Ruby 3.3 or newer
 - Rails 8.1
-- Recording Studio 4.2
+- Recording Studio `~> 4.7`
 
 The OpenAI provider uses the official `openai` Ruby SDK. Gemini uses its REST API
 behind an internal client because Google does not publish an official Gemini
@@ -20,18 +20,19 @@ Ruby SDK. Both providers support injected clients.
 
 ## Installation
 
-Add the addon and Recording Studio 4.2 to the host application's `Gemfile`:
+Add the addon and Recording Studio `~> 4.7` to the host application's `Gemfile`:
 
 ```ruby
 gem "recording_studio",
     github: "bowerbird-app/RecordingStudio",
-    tag: "v4.6.0"
+    tag: "v4.7.0"
 gem "recording_studio_ai",
     github: "bowerbird-app/RecordingStudio_AI"
 gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
     tag: "v0.3.1"
 ```
+
 
 AI registers site-wide run metrics. The host exposes them once:
 
@@ -339,11 +340,21 @@ uses the Admin surface role (default `:view`) and the current-root match.
 Decrypting still goes through `RecordingStudioAI.read_retained_response` and
 requires `recording_studio_ai.view_retained_response` (Accessible `:admin`).
 Static chrome on that page uses English Rails I18n keys under
-`recording_studio.ai.retained_responses` (see `config/locales/en.yml`).
-Admin section, screen, and widget chrome under `lib/recording_studio_ai/admin`
-uses `recording_studio.ai.admin.*` and `recording_studio.ai.common.*` through
-`RecordingStudioAI::Copy` (English defaults; hosts override in their own
-`config/locales`). Admin table column headers stay English literals.
+`recording_studio.ai.retained_responses` (see `config/locales/en.yml`) via
+`RecordingStudio.t`. Admin section, screen, and widget chrome under
+`lib/recording_studio_ai/admin` uses `recording_studio.ai.admin.*` and
+`recording_studio.ai.common.*` through `RecordingStudioAI::Copy` (prefixed
+`RecordingStudio.t`). The engine registers this gem's `en.yml` with
+`RecordingStudio::Translation.register_shipped_english` so missing active-locale
+keys still fall back to loaded English (host overrides included), then the
+merged shipped English table. Only `recording_studio.ai.*` keys use
+`RecordingStudio.t`; host or other-namespace keys stay on plain `I18n.t` with
+their original `default:`. A missing `_html` key with a caller `default:`
+follows `RecordingStudio.t` / view `t` escaping (args escaped, template markup
+kept). A plain `default:` with no interpolation is returned as a plain
+(non-`html_safe`) String, so views will escape it. Hosts override keys in their
+own `config/locales`. Admin table column headers stay English literals.
+Requires RecordingStudio `~> 4.7`.
 
 Keep `admin_warning_thresholds`, `admin_slow_call_threshold_ms`, and
 `admin_expensive_models` for widget warnings. Engine-admin resolvers
@@ -897,10 +908,10 @@ cd test/dummy
 bin/dev
 ```
 
-The dummy app preserves Recording Studio 4.2 declarations, actor wiring, root
-recordings, authentication, the host sidebar shell, `UsesDefaultLayout` on gem
-admin screens, and the mounted addon route. See [UPGRADING.md](UPGRADING.md)
-for the 4.2 host pin.
+The dummy app preserves Recording Studio `~> 4.7` declarations, actor wiring,
+root recordings, authentication, the host sidebar shell, `UsesDefaultLayout` on
+gem admin screens, and the mounted addon route. See [UPGRADING.md](UPGRADING.md)
+for the `~> 4.7` host pin.
 
 Dummy credentials (`test/dummy/config/credentials.yml.enc`) are encrypted with
 the shared RecordingStudio_* development master key. Set `RAILS_MASTER_KEY` or

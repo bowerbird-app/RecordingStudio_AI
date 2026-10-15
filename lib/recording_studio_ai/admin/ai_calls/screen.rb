@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAICallsScreen < RecordingStudioAdmin::Screen
     key "ai_calls"
     icon :cpu_chip
-    title { Copy.t("admin.screens.ai_calls.title", default: "AI Calls") }
-    subtitle { Copy.t("admin.screens.ai_calls.subtitle", default: "Run-level execution history across generation, streaming, batch, decision, and tool operations.") }
+    title { Copy.t("admin.screens.ai_calls.title") }
+    subtitle { Copy.t("admin.screens.ai_calls.subtitle") }
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.runs_scope(context).order(created_at: :desc)
@@ -80,12 +80,12 @@ module AdminScreens
     end
 
     chart do
-      title { Copy.t("admin.screens.ai_calls.chart_title", default: "AI calls trend") }
-      subtitle { Copy.t("admin.screens.ai_calls.chart_subtitle", default: "How many calls landed over time.") }
+      title { Copy.t("admin.screens.ai_calls.chart_title") }
+      subtitle { Copy.t("admin.screens.ai_calls.chart_subtitle") }
       type :line
       series do |context|
         [{
-          name: Copy.t("common.ai_calls", default: "AI calls"),
+          name: Copy.t("common.ai_calls"),
           data: RecordingStudioAdmin::AdminActivityLogsSupport.date_series(
             context.query_result.relation.reorder(nil),
             field: "recording_studio_ai_runs.created_at",

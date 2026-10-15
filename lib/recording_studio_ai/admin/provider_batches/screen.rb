@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIProviderBatchesScreen < RecordingStudioAdmin::Screen
     key "provider_batches"
     icon :rectangle_stack
-    title { Copy.t("admin.screens.provider_batches.title", default: "Provider batches") }
-    subtitle { Copy.t("admin.screens.provider_batches.subtitle", default: "Jobs sent as a pack.") }
+    title { Copy.t("admin.screens.provider_batches.title") }
+    subtitle { Copy.t("admin.screens.provider_batches.subtitle") }
 
     query do |context|
       RecordingStudioAIWidgets.batches_scope(context).order(created_at: :desc)

@@ -50,7 +50,7 @@ class RecordingStudioAITest < Minitest::Test
     assert_equal %w[csv flat_pack json_schemer openai rails recording_studio recording_studio_metrics],
                  dependencies.keys.sort
     assert_equal "~> 0.3", dependencies.fetch("recording_studio_metrics").to_s
-    assert_equal "~> 4.2", dependencies.fetch("recording_studio").to_s
+    assert_equal "~> 4.7", dependencies.fetch("recording_studio").to_s
     refute_includes dependencies.keys, "recording_studio_accessible"
     refute_includes dependencies.keys, "recording_studio_admin"
   end
@@ -124,7 +124,7 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes contents, "FlatPack::Collapse::Component"
     assert_includes contents, "FlatPack::CodeBlock::Component"
     refute_includes contents, "Not kept."
-    assert_includes contents, 't("recording_studio.ai.retained_responses.page_title", default: "Saved reply")'
+    assert_includes contents, 'RecordingStudio.t("recording_studio.ai.retained_responses.page_title")'
     assert_includes contents, "recording_studio_page_nav"
     assert_includes contents, "page_nav_anchor_url"
 

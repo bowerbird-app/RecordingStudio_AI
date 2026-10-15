@@ -3,10 +3,10 @@
 module AdminScreens
   RecordingStudioAIPromptP90LatencyWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.prompt_p90_latency") do
     type :chart
-    title { Copy.t("admin.widgets.prompt_p90_latency.title", default: "AI Prompt P90 latency") }
-    subtitle { Copy.t("admin.widgets.prompt_p90_latency.subtitle", default: "Top 5 prompts by P90 latency over the last 30 days.") }
-    description { Copy.t("admin.widgets.prompt_p90_latency.description", default: "Compares prompt response speed using the latency at or below which 90% of calls completed.") }
-    metadata { { period_label: Copy.t("common.last_30_days", default: "Last 30 days") } }
+    title { Copy.t("admin.widgets.prompt_p90_latency.title") }
+    subtitle { Copy.t("admin.widgets.prompt_p90_latency.subtitle") }
+    description { Copy.t("admin.widgets.prompt_p90_latency.description") }
+    metadata { { period_label: Copy.t("common.last_30_days") } }
     value do |context|
       p90_latency = AdminScreens::RecordingStudioAIWidgets.latency_chart_rows(context, dimension: :prompt)
                                                           .first&.p90_latency_ms.to_i
@@ -26,7 +26,7 @@ module AdminScreens
     chart_type :bar
     series do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.latency_chart_rows(context, dimension: :prompt)
-      [{ name: Copy.t("common.p90_latency_ms", default: "P90 latency (ms)"), data: rows.map(&:p90_latency_ms) }]
+      [{ name: Copy.t("common.p90_latency_ms"), data: rows.map(&:p90_latency_ms) }]
     end
     chart_options do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.latency_chart_rows(context, dimension: :prompt)

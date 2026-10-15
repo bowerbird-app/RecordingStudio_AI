@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIEstimatedSpendScreen < RecordingStudioAdmin::Screen
     key "estimated_spend"
     icon :currency_dollar
-    title { Copy.t("admin.screens.estimated_spend.title", default: "Estimated token usage") }
-    subtitle { Copy.t("admin.screens.estimated_spend.subtitle", default: "How much we sent and got back, by model.") }
+    title { Copy.t("admin.screens.estimated_spend.title") }
+    subtitle { Copy.t("admin.screens.estimated_spend.subtitle") }
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
@@ -46,7 +46,7 @@ module AdminScreens
            }
 
     summary do
-      label { Copy.t("common.tokens", default: "Tokens") }
+      label { Copy.t("common.tokens") }
       change_good_when :down
       value do |context|
         context.query_result.relation.except(:order).sum(:total_tokens)
@@ -59,12 +59,12 @@ module AdminScreens
     end
 
     chart do
-      title { Copy.t("admin.screens.estimated_spend.chart_title", default: "Token usage by model") }
-      subtitle { Copy.t("admin.screens.estimated_spend.chart_subtitle", default: "All models in the selected date range.") }
+      title { Copy.t("admin.screens.estimated_spend.chart_title") }
+      subtitle { Copy.t("admin.screens.estimated_spend.chart_subtitle") }
       type :bar
       series do |context|
         rows = AdminScreens::RecordingStudioAIWidgets.model_token_totals(context.query_result.relation)
-        [{ name: Copy.t("common.tokens", default: "Tokens"), data: rows.map { |_model, total_tokens| total_tokens.to_i } }]
+        [{ name: Copy.t("common.tokens"), data: rows.map { |_model, total_tokens| total_tokens.to_i } }]
       end
       options do |context|
         rows = AdminScreens::RecordingStudioAIWidgets.model_token_totals(context.query_result.relation)
@@ -87,7 +87,7 @@ module AdminScreens
              title: "Prompt",
              sortable: false,
              header_tooltip: "The prompt this call used.",
-             value: ->(run, _context) { run.prompt_name_snapshot.presence || run.prompt_key || Copy.t("common.no_prompt", default: "No prompt") }
+             value: ->(run, _context) { run.prompt_name_snapshot.presence || run.prompt_key || Copy.t("common.no_prompt") }
       column :status,
              header_tooltip: "How the call ended.",
              display: :badge,

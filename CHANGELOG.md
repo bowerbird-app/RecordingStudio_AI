@@ -5,14 +5,64 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
-## [0.13.0] - 2026-10-14
-
 ### Added
 - `ai_runs.tokens_by_profile` (breakdown, unit `tokens`): total tokens per `profile_key`, with the AI Calls list filters.
 - `ai_runs.fallback_retry_rate` (timeseries, unit `ratio`): share of runs created in each period with a retry or fallback attempt (`retry_count > 0 OR fallback_count > 0`). Takes `from` / `to` / `interval` and the AI Calls list filters. No `group_by`.
 - `ai_batches.by_status` (breakdown, unit `count`): a new `:ai_batches` resource, registered from `Metrics.register!`, with the same site scope, `:operations` exposure and AdminRoot `:view` check as `ai_runs`.
 - AI Calls admin list filters so the metrics can drill into the list: `error_category` (matches `ai_runs.failed_over_time` `group_by=error_category`), `stuck` (checkbox; the same `pending`/`running` past `config.stuck_run_threshold` on `COALESCE(started_at, created_at)` scope as `ai_runs.stuck`), and multi-value `run_status` (`run_status[]=pending&run_status[]=running`, needs Admin `>= 2.4`; single values work as before).
 - No migration.
+
+## [0.13.0] - 2026-10-14
+
+English fallback for missing `recording_studio.ai.*` keys when the active locale
+has no translation, via RecordingStudio `~> 4.7`.
+
+### Added
+
+- Boot-time `RecordingStudio::Translation.register_shipped_english` for this
+  gem's `config/locales/en.yml` so `RecordingStudio.t` can resolve AI English
+  after a key is gone from the loaded `:en` backend
+- Behavioral coverage through `RecordingStudio.t`: deleted-key fallback (en/fr,
+  raise-on-missing on and off), real-page 200 renders, boot-loaded host
+  override, boot registration of this gem's `en.yml` path (dummy assertion that
+  does not invoke the initializer block), and an en.yml-driven drift guard that
+  rejects hand-copied `default:` on gem call sites
+
+### Changed
+
+- Depends on `recording_studio ~> 4.7` for `register_shipped_english`
+- Saved-reply view lookups use `RecordingStudio.t` without hand-copied English
+  `default:` values
+- `RecordingStudioAI::Copy` delegates to `RecordingStudio.t` with the
+  `recording_studio.ai.` prefix; Admin `Copy.t` call sites drop hand-copied
+  English `default:` values; fallback comes from the loaded English, host
+  overrides included
+- Only this gem's `recording_studio.ai.*` keys go through `RecordingStudio.t`;
+  host or other-namespace keys stay on plain `I18n.t` with main's `default:`
+- Removed the gem-local `RecordingStudioAI::Translation` / `RecordingStudioAI.t`
+  helper in favor of core
+
+### Upgrade notes
+
+- Install RecordingStudioAI `0.13.0` with RecordingStudio `~> 4.7`. No migration
+  or host English change is required.
+- Hosts that enable raise-on-missing translations no longer raise for
+  gem-shipped `recording_studio.ai.*` keys looked up through
+  `RecordingStudio.t` / `Copy.t` when loaded `:en` or the merged shipped table
+  has the key. Host overrides in the active locale still win; host `:en`
+  overrides win on the loaded-English fallback step.
+- Partial pluralization in a non-English locale still raises
+  `I18n::InvalidPluralizationData` — the English fallback does not fill missing
+  plural keys.
+- A missing `_html` key with a caller `default:` now follows `RecordingStudio.t`
+  / view `t` escaping (args escaped, template markup kept) instead of main's
+  whole-template escaping on hand-copied defaults. A plain `default:` with no
+  interpolation is returned as a plain (non-`html_safe`) String, so views will
+  escape it. No in-gem call site does this.
+- `en.yml` is unchanged. Prefer `RecordingStudio.t` (or `Copy.t` for relative
+  keys) when adding new call sites.
+- See [UPGRADING.md](UPGRADING.md#upgrading-to-0130).
+>>>>>>> origin/main
 
 ## [0.12.0] - 2026-10-14
 
@@ -882,7 +932,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.12.0...v0.13.0
 [0.11.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.10.1...v0.11.0
 [0.10.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.9.0...v0.9.1

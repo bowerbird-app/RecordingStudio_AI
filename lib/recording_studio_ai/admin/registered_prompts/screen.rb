@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIRegisteredPromptsScreen < RecordingStudioAdmin::Screen
     key "registered_prompts"
     icon :document_text
-    title { Copy.t("admin.screens.registered_prompts.title", default: "Registered prompts") }
-    subtitle { Copy.t("admin.screens.registered_prompts.subtitle", default: "Prompt definitions and call volume across visible roots.") }
+    title { Copy.t("admin.screens.registered_prompts.title") }
+    subtitle { Copy.t("admin.screens.registered_prompts.subtitle") }
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.prompt_rows(context)
@@ -15,7 +15,7 @@ module AdminScreens
     filter :date_range, field: :created_at, default: :last_4_weeks
 
     summary do
-      label { Copy.t("common.calls", default: "Calls") }
+      label { Copy.t("common.calls") }
       value do |context|
         Array(context.query_result&.relation).sum { |row| row.respond_to?(:calls) ? row.calls.to_i : 0 }
       end
@@ -27,12 +27,12 @@ module AdminScreens
     end
 
     chart do
-      title { Copy.t("admin.screens.registered_prompts.chart_title", default: "Prompt call volume") }
-      subtitle { Copy.t("admin.screens.registered_prompts.chart_subtitle", default: "All registered prompts by call volume in the selected date range.") }
+      title { Copy.t("admin.screens.registered_prompts.chart_title") }
+      subtitle { Copy.t("admin.screens.registered_prompts.chart_subtitle") }
       type :bar
       series do |context|
         rows = context.query_result.relation
-        [{ name: Copy.t("common.calls", default: "Calls"), data: rows.map(&:calls) }]
+        [{ name: Copy.t("common.calls"), data: rows.map(&:calls) }]
       end
       options do |context|
         rows = context.query_result.relation
@@ -63,7 +63,7 @@ module AdminScreens
       column :owner,
              title: "Registered by",
              header_tooltip: "Which gem or host registered this prompt.",
-             value: ->(row, _context) { row.owner.presence || Copy.t("common.none", default: "—") }
+             value: ->(row, _context) { row.owner.presence || Copy.t("common.none") }
       column :description, title: "Description", header_tooltip: "What this prompt is for."
       column :calls_series,
              title: "Calls",
@@ -74,7 +74,7 @@ module AdminScreens
                  AdminScreens::RecordingStudioAIWidgets.prompt_calls_path(context, row),
                  class: "inline-block",
                  data: { turbo_frame: "_top" },
-                 aria: { label: Copy.t("common.ai_calls_for_name_range", name: row.name, default: "AI calls for %{name} in the selected date range") }
+                 aria: { label: Copy.t("common.ai_calls_for_name_range", name: row.name) }
                )
              }
       column :success_rate, title: "Success rate",

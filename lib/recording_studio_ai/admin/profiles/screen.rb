@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIProfilesScreen < RecordingStudioAdmin::Screen
     key "profiles"
     icon :adjustments_horizontal
-    title { Copy.t("admin.screens.profiles.title", default: "Profiles") }
-    subtitle { Copy.t("admin.screens.profiles.subtitle", default: "Generative and decision models each profile tries, in order.") }
+    title { Copy.t("admin.screens.profiles.title") }
+    subtitle { Copy.t("admin.screens.profiles.subtitle") }
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.profile_rows(context)
@@ -43,7 +43,7 @@ module AdminScreens
       column :default_profile,
              title: "Default",
              header_tooltip: "Whether new calls use this profile when none is named.",
-             value: ->(row, _context) { row.default_profile ? Copy.t("common.yes", default: "Yes") : Copy.t("common.no", default: "No") },
+             value: ->(row, _context) { row.default_profile ? Copy.t("common.yes") : Copy.t("common.no") },
              display: :badge,
              display_options: lambda { |row, _context, value|
                { text: value, style: row.default_profile ? :success : :default, size: :sm }
@@ -55,7 +55,7 @@ module AdminScreens
       column :position,
              title: "Order",
              header_tooltip: "Where this model sits in the profile's list.",
-             value: ->(row, _context) { row.position || Copy.t("common.none", default: "—") }
+             value: ->(row, _context) { row.position || Copy.t("common.none") }
       column :provider, title: "Provider", header_tooltip: "Who this model belongs to."
       column :model,
              title: "Model",
@@ -67,7 +67,7 @@ module AdminScreens
                  row.model,
                  AdminScreens::RecordingStudioAIWidgets.registered_models_path(context, provider: row.provider),
                  data: { turbo_frame: "_top" },
-                 aria: { label: Copy.t("common.registered_models_for", name: row.provider, default: "Registered models for %{name}") }
+                 aria: { label: Copy.t("common.registered_models_for", name: row.provider) }
                )
              }
     end

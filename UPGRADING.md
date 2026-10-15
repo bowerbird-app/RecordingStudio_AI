@@ -1,5 +1,42 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.13.0
+
+Translation-only upgrade. English hosts keep the same rendered text.
+Missing-locale lookups for gem-shipped `recording_studio.ai.*` keys fall back
+to loaded English (host overrides included) instead of showing
+“Translation missing”.
+
+### What changed
+
+- Requires RecordingStudio `~> 4.7`.
+- The engine registers `config/locales/en.yml` with
+  `RecordingStudio::Translation.register_shipped_english` at boot (before
+  RecordingStudio loads the merged shipped-English table).
+- Saved-reply and other gem chrome use `RecordingStudio.t` (or
+  `RecordingStudioAI::Copy.t` for relative `recording_studio.ai.*` keys). There
+  is no gem-local `RecordingStudioAI::Translation` / `RecordingStudioAI.t`.
+- Only this gem's `recording_studio.ai.*` keys go through `RecordingStudio.t`;
+  host or other-namespace keys stay on plain `I18n.t` with main's `default:`.
+- Fallback order for gem keys missing in the active locale (from core):
+  1. loaded `:en` (host English overrides included)
+  2. caller's `default:`
+  3. merged shipped English table (base `en.yml` plus registered addon paths)
+- Saved-reply view and Admin `Copy.t` call sites no longer pass hand-copied
+  English `default:` values.
+- A missing `_html` key with a caller `default:` now follows
+  `RecordingStudio.t` / view `t` escaping (args escaped, template markup kept)
+  instead of main's whole-template escaping on hand-copied defaults. A plain
+  `default:` with no interpolation is returned as a plain (non-`html_safe`)
+  String, so views will escape it. No in-gem call site does this.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.13.0` with RecordingStudio `~> 4.7`. No migration
+is required. English hosts need no change. Prefer `RecordingStudio.t` (full key)
+or `Copy.t` (relative key) for new gem copy. Partial pluralization data in a
+non-English locale still raises `I18n::InvalidPluralizationData`.
+
 ## Upgrading to 0.11.0
 
 Mostly a translation-shape upgrade. English for `count` 1 now says `call`
