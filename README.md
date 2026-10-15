@@ -56,7 +56,7 @@ Staff with AdminRoot `:view` (`RecordingStudioAI::Api::Access.can_view?`) can re
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/fallback_retry_rate`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_batches/by_status`
 
-Failure and stuck-run metrics (Recording Studio Metrics `~> 0.3`, tag `v0.3.1`):
+Failure and stuck-run metrics (Recording Studio Metrics `>= 0.3.0, < 0.4`, tag `v0.3.1`):
 
 | Metric | Type / unit | Definition | `group_by` |
 | --- | --- | --- | --- |

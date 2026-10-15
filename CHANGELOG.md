@@ -5,12 +5,23 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-15
+
 ### Added
 - `ai_runs.tokens_by_profile` (breakdown, unit `tokens`): total tokens per `profile_key`, with the AI Calls list filters.
 - `ai_runs.fallback_retry_rate` (timeseries, unit `ratio`): share of runs created in each period with a retry or fallback attempt (`retry_count > 0 OR fallback_count > 0`). Takes `from` / `to` / `interval` and the AI Calls list filters. No `group_by`.
 - `ai_batches.by_status` (breakdown, unit `count`): a new `:ai_batches` resource, registered from `Metrics.register!`, with the same site scope, `:operations` exposure and AdminRoot `:view` check as `ai_runs`.
 - AI Calls admin list filters so the metrics can drill into the list: `error_category` (matches `ai_runs.failed_over_time` `group_by=error_category`), `stuck` (checkbox; the same `pending`/`running` past `config.stuck_run_threshold` on `COALESCE(started_at, created_at)` scope as `ai_runs.stuck`), and multi-value `run_status` (`run_status[]=pending&run_status[]=running`, needs Admin `>= 2.4`; single values work as before).
 - No migration.
+
+### Changed
+- Runtime dependency `recording_studio_metrics` is now `>= 0.3.0, < 0.4` (GitHub tag `v0.3.1`). Catalog rows use Metrics 0.3 `catalog_metadata` fields (`unit`, `title`, `description`, `exposed_apis`, `date_range`).
+
+### Upgrade notes
+- Bump to `0.14.0`. No migration.
+- Pin `recording_studio_metrics` to `>= 0.3.0, < 0.4` (tag `v0.3.1`).
+- This gem still registers definitions with `RecordingStudioAI::Metrics.register!` and `api_authorize`. It does not call `RecordingStudioMetrics::Api.register!`. The host still calls that once for HTTP. MCP 0.17 discovers one tool per metric from Metrics `DiscoveryHandler`.
+- See [UPGRADING.md](UPGRADING.md#upgrading-to-0140).
 
 ## [0.13.0] - 2026-10-14
 
@@ -932,7 +943,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.12.0...v0.13.0
 [0.11.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.10.1...v0.11.0
 [0.10.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.9.1...v0.10.0

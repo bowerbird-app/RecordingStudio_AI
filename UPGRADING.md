@@ -1,5 +1,19 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.14.0
+
+Adds three operations metrics and pins Metrics to the 0.3 line. No migration.
+
+### What changed
+
+- New metrics: `ai_runs.tokens_by_profile`, `ai_runs.fallback_retry_rate`, `ai_batches.by_status`.
+- Runtime dependency `recording_studio_metrics` is `>= 0.3.0, < 0.4` (tag `v0.3.1`).
+- Definitions still register from `RecordingStudioAI::Metrics.register!` with `api_authorize`. The host still calls `RecordingStudioMetrics::Api.register!(api: :operations)` once. MCP 0.17 builds one tool per metric from Metrics discovery.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.14.0` and pin Metrics `>= 0.3.0, < 0.4`. No migration is required. Keep the host `Api.register!` call. Staff with AdminRoot `:view` can read the new metrics on the operations API.
+
 ## Upgrading to 0.13.0
 
 Translation-only upgrade. English hosts keep the same rendered text.

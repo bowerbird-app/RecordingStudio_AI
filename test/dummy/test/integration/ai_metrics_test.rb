@@ -219,28 +219,55 @@ class AIMetricsTest < ActiveSupport::TestCase
     assert_equal 1, counts["failed"].to_i - before["failed"].to_i
   end
 
-  test "new AI metrics carry unit, title and description" do
-    {
-      "ai_runs.tokens_by_profile" => "tokens",
-      "ai_runs.fallback_retry_rate" => "ratio",
-      "ai_batches.by_status" => "count"
-    }.each do |identifier, unit|
-      metadata = RecordingStudioMetrics.find(identifier).catalog_metadata
-      assert_equal unit, metadata[:unit], identifier
-      assert metadata[:title].present?, identifier
-      assert metadata[:description].present?, identifier
-      assert_equal [:operations], metadata[:exposed_apis], identifier
-    end
-    assert_equal true, RecordingStudioMetrics.find("ai_runs.fallback_retry_rate").catalog_metadata.dig(:date_range, :supported)
+  test "tokens_by_profile catalog_metadata carries Metrics 0.3 fields" do
+    metadata = RecordingStudioMetrics.find("ai_runs.tokens_by_profile").catalog_metadata
+    assert_equal "tokens", metadata[:unit]
+    assert_equal "Tokens by profile", metadata[:title]
+    assert_equal RecordingStudioAI::Metrics::TOKENS_BY_PROFILE_DESCRIPTION, metadata[:description]
+    assert_equal [:operations], metadata[:exposed_apis]
+    assert_equal 5, metadata[:min_group_size]
   end
 
-  test "api_authorize allows AdminRoot staff and denies non-admins" do
-    authorize = RecordingStudioMetrics.registry.api_authorize_for(:ai_runs)
-    assert_equal RecordingStudioAI::Metrics::AUTHORIZE, authorize
+  test "fallback_retry_rate catalog_metadata carries Metrics 0.3 fields" do
+    metadata = RecordingStudioMetrics.find("ai_runs.fallback_retry_rate").catalog_metadata
+    assert_equal "ratio", metadata[:unit]
+    assert_equal "Retry or fallback rate", metadata[:title]
+    assert_equal RecordingStudioAI::Metrics::FALLBACK_RETRY_DESCRIPTION, metadata[:description]
+    assert_equal [:operations], metadata[:exposed_apis]
+    assert_equal true, metadata.dig(:date_range, :supported)
+  end
 
-    assert authorize.call(GrantContext.new(Grant.new(@staff)))
-    refute authorize.call(GrantContext.new(Grant.new(@outsider)))
-    refute authorize.call(GrantContext.new(Grant.new(nil)))
+  test "ai_batches.by_status catalog_metadata carries Metrics 0.3 fields" do
+    metadata = RecordingStudioMetrics.find("ai_batches.by_status").catalog_metadata
+    assert_equal "count", metadata[:unit]
+    assert_equal "AI batches by status", metadata[:title]
+    assert_equal RecordingStudioAI::BatchMetrics::BY_STATUS_DESCRIPTION, metadata[:description]
+    assert_equal [:operations], metadata[:exposed_apis]
+    assert_equal 5, metadata[:min_group_size]
+  end
+
+  test "tokens_by_profile api_authorize allows AdminRoot staff and denies outsiders" do
+    assert_metric_authorize :ai_runs
+  end
+
+  test "fallback_retry_rate api_authorize allows AdminRoot staff and denies outsiders" do
+    assert_metric_authorize :ai_runs
+  end
+
+  test "ai_batches.by_status api_authorize allows AdminRoot staff and denies outsiders" do
+    assert_metric_authorize :ai_batches
+  end
+
+  test "discovery includes tokens_by_profile for staff and hides it from outsiders" do
+    assert_metric_discovery "ai_runs.tokens_by_profile", unit: "tokens"
+  end
+
+  test "discovery includes fallback_retry_rate for staff and hides it from outsiders" do
+    assert_metric_discovery "ai_runs.fallback_retry_rate", unit: "ratio"
+  end
+
+  test "discovery includes ai_batches.by_status for staff and hides it from outsiders" do
+    assert_metric_discovery "ai_batches.by_status", unit: "count"
   end
 
   private
@@ -318,6 +345,51 @@ class AIMetricsTest < ActiveSupport::TestCase
       actor: actor
     )
     raise result.error if result.failure?
+  end
+
+  def assert_metric_authorize(resource)
+    authorize = RecordingStudioMetrics.registry.api_authorize_for(resource)
+    assert_equal RecordingStudioAI::Metrics::AUTHORIZE, authorize
+
+    assert authorize.call(GrantContext.new(Grant.new(@staff)))
+    refute authorize.call(GrantContext.new(Grant.new(@outsider)))
+    refute authorize.call(GrantContext.new(Grant.new(nil)))
+  end
+
+  def assert_metric_discovery(identifier, unit:)
+    denied = RecordingStudioMetrics::Api::DiscoveryHandler.call(build_api_context(@outsider))
+    refute_includes denied.fetch(:metrics).map { |row| row[:identifier] }, identifier
+
+    allowed = RecordingStudioMetrics::Api::DiscoveryHandler.call(build_api_context(@staff))
+    row = allowed.fetch(:metrics).find { |metric| metric[:identifier] == identifier }
+
+    assert row, identifier
+    assert_equal unit, row[:unit]
+    assert row[:title].present?, identifier
+    assert row[:description].present?, identifier
+  end
+
+  def build_api_context(actor)
+    grant = Grant.new(actor)
+    params = {
+      resource: nil,
+      name: nil,
+      interval: nil,
+      start: nil,
+      start_at: nil,
+      end: nil,
+      end_at: nil,
+      timezone: "UTC",
+      filters: {}
+    }
+    context = Object.new
+    context.define_singleton_method(:access_grant) { grant }
+    context.define_singleton_method(:api_client) { actor }
+    context.define_singleton_method(:access_recording) { nil }
+    context.define_singleton_method(:root_recording) { nil }
+    context.define_singleton_method(:api_key) { :operations }
+    context.define_singleton_method(:params) { params }
+    context
   end
 
   def grant!(recording, actor, role)
