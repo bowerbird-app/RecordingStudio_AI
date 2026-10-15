@@ -3,6 +3,16 @@ module ApplicationHelper
 		DummyAccessibleAIAuthorization.admin_operator?(actor: Current.actor)
 	end
 
+	# Admin Close follows anchor_url. Host links must pass the page that opened
+	# admin, or Close falls back to /admin and the operator cannot leave.
+	def admin_href(path)
+		uri = URI.parse(path)
+		query = Rack::Utils.parse_nested_query(uri.query)
+		query["anchor_url"] = request.path.presence || root_path
+		uri.query = query.to_query
+		uri.to_s
+	end
+
 	def recording_tree_root_recording
 		return current_root_recording if respond_to?(:current_root_recording) && current_root_recording.present?
 
