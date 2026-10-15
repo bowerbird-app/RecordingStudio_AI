@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIResponsesScreen < RecordingStudioAdmin::Screen
     key "recording_studio_ai_responses"
     icon :table
-    title { Copy.t("admin.screens.responses.title", default: "AI Responses") }
-    subtitle { Copy.t("admin.screens.responses.subtitle", default: "What came back from each call.") }
+    title { Copy.t("admin.screens.responses.title") }
+    subtitle { Copy.t("admin.screens.responses.subtitle") }
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.responses_scope(context).order(created_at: :desc)
@@ -76,7 +76,7 @@ module AdminScreens
              sortable: false,
              value: lambda { |row, _context|
                run = AdminScreens::RecordingStudioAIWidgets.response_run(row)
-               run&.prompt_name_snapshot.presence || run&.prompt_key || Copy.t("common.no_prompt", default: "No prompt")
+               run&.prompt_name_snapshot.presence || run&.prompt_key || Copy.t("common.no_prompt")
              }
       column :provider
       column :model
@@ -85,11 +85,11 @@ module AdminScreens
              sortable: false,
              value: lambda { |row, _context|
                if row.complete.nil?
-                 Copy.t("common.unknown", default: "Unknown")
+                 Copy.t("common.unknown")
                elsif row.complete
-                 Copy.t("common.yes", default: "Yes")
+                 Copy.t("common.yes")
                else
-                 Copy.t("common.no", default: "No")
+                 Copy.t("common.no")
                end
              },
              display: :badge,

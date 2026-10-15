@@ -4,8 +4,8 @@ module AdminScreens
   class RecordingStudioAIRegisteredModelsScreen < RecordingStudioAdmin::Screen
     key "registered_models"
     icon :cube
-    title { Copy.t("admin.screens.registered_models.title", default: "Registered models") }
-    subtitle { Copy.t("admin.screens.registered_models.subtitle", default: "Model definitions registered through RecordingStudioAI.models.") }
+    title { Copy.t("admin.screens.registered_models.title") }
+    subtitle { Copy.t("admin.screens.registered_models.subtitle") }
 
     query do |context|
       AdminScreens::RecordingStudioAIWidgets.model_rows(context)
@@ -31,15 +31,15 @@ module AdminScreens
       column :streaming,
              title: "Streaming",
              header_tooltip: "Whether answers can arrive live.",
-             value: ->(row, _context) { row.streaming ? Copy.t("common.yes", default: "Yes") : Copy.t("common.no", default: "No") }
+             value: ->(row, _context) { row.streaming ? Copy.t("common.yes") : Copy.t("common.no") }
       column :structured_output,
              title: "Structured",
              header_tooltip: "Whether answers can come back as tidy data.",
-             value: ->(row, _context) { row.structured_output ? Copy.t("common.yes", default: "Yes") : Copy.t("common.no", default: "No") }
+             value: ->(row, _context) { row.structured_output ? Copy.t("common.yes") : Copy.t("common.no") }
       column :batch,
              title: "Batch",
              header_tooltip: "Whether it can run a pile of calls overnight.",
-             value: ->(row, _context) { row.batch ? Copy.t("common.yes", default: "Yes") : Copy.t("common.no", default: "No") }
+             value: ->(row, _context) { row.batch ? Copy.t("common.yes") : Copy.t("common.no") }
       column :tools, title: "Tools", header_tooltip: "Built-in tools this model can use."
       column :input_modalities, title: "Input", header_tooltip: "What you can send it."
       column :output_modalities, title: "Output", header_tooltip: "What it can send back."
@@ -56,7 +56,7 @@ module AdminScreens
                  }.to_query}",
                  class: "inline-block",
                  data: { turbo_frame: "_top" },
-                 aria: { label: Copy.t("common.ai_calls_for_model", provider: row.provider, model: row.model, default: "AI calls for %{provider}/%{model} in the last 30 days") }
+                 aria: { label: Copy.t("common.ai_calls_for_model", provider: row.provider, model: row.model) }
                )
              }
     end

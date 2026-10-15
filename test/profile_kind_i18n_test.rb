@@ -2,6 +2,7 @@
 
 require "test_helper"
 require_relative "support/i18n_backend_isolation"
+require_relative "support/engine_locale"
 require "recording_studio_ai/admin/recording_studio_ai_widgets"
 
 class ProfileKindI18nTest < ActiveSupport::TestCase
@@ -16,6 +17,13 @@ class ProfileKindI18nTest < ActiveSupport::TestCase
       assert_equal "System Prompt", Widgets.prompt_message_title("system")
       assert_equal "User Prompt", Widgets.prompt_message_title("user")
       assert_equal "Assistant", Widgets.prompt_message_title("assistant")
+    end
+  end
+
+  def test_prompt_message_title_uses_copy_default_english_for_unknown_role
+    I18n.with_locale(:en) do
+      assert_equal "Tool", Widgets.prompt_message_title("tool")
+      assert_equal "Function call", Widgets.prompt_message_title("function_call")
     end
   end
 
@@ -135,11 +143,6 @@ class ProfileKindI18nTest < ActiveSupport::TestCase
   private
 
   def ensure_engine_locale_loaded!
-    locale_path = File.expand_path("../config/locales/en.yml", __dir__)
-    expanded = I18n.load_path.map { |path| File.expand_path(path) }
-    return if expanded.include?(locale_path)
-
-    I18n.load_path << locale_path
-    I18n.backend.load_translations
+    EngineLocale.ensure_loaded!
   end
 end

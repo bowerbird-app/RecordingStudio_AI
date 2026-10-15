@@ -41,7 +41,7 @@ class AdminAiI18nTest < ActionDispatch::IntegrationTest
                  I18n.t("recording_studio.ai.admin.screens.ai_calls.chart_title", default: "AI calls trend")
   end
 
-  test "saved reply page still renders wave-1 English with defaults" do
+  test "saved reply page still renders wave-1 English" do
     retained = create_overview_retained_response!
     get "/recording_studio_ai/retained_responses/#{retained.id}"
 

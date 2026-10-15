@@ -3,10 +3,10 @@
 module AdminScreens
   RecordingStudioAIToolCallsWidget = RecordingStudioAdmin::Widget.new("widgets.recording_studio_ai.tool_calls") do
     type :chart
-    title { Copy.t("admin.widgets.tool_calls.title", default: "Custom Tool Calls") }
-    subtitle { Copy.t("admin.widgets.tool_calls.subtitle", default: "Weekly custom tool-call volume for the last 4 weeks.") }
-    description { Copy.t("admin.widgets.tool_calls.description", default: "Tracks how many tool calls were made each day, including today.") }
-    metadata { { period_label: Copy.t("common.last_30_days", default: "Last 30 days") } }
+    title { Copy.t("admin.widgets.tool_calls.title") }
+    subtitle { Copy.t("admin.widgets.tool_calls.subtitle") }
+    description { Copy.t("admin.widgets.tool_calls.description") }
+    metadata { { period_label: Copy.t("common.last_30_days") } }
     value do |context|
       count = AdminScreens::RecordingStudioAIWidgets.tool_scope(context)
                                                     .where(created_at: AdminScreens::RecordingStudioAIWidgets.trailing_weeks_range(weeks_back: 4))
@@ -25,7 +25,7 @@ module AdminScreens
       AdminScreens::RecordingStudioAIWidgets.weekly_calls_series(
         AdminScreens::RecordingStudioAIWidgets.tool_scope(context),
         weeks_back: 4,
-        series_name: Copy.t("common.tool_calls", default: "Tool calls")
+        series_name: Copy.t("common.tool_calls")
       )
     end
     chart_options do
