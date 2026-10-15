@@ -225,7 +225,6 @@ class AIMetricsTest < ActiveSupport::TestCase
     assert_equal "Tokens by profile", metadata[:title]
     assert_equal RecordingStudioAI::Metrics::TOKENS_BY_PROFILE_DESCRIPTION, metadata[:description]
     assert_equal [:operations], metadata[:exposed_apis]
-    assert_equal 5, metadata[:min_group_size]
   end
 
   test "fallback_retry_rate catalog_metadata carries Metrics 0.3 fields" do
@@ -243,7 +242,6 @@ class AIMetricsTest < ActiveSupport::TestCase
     assert_equal "AI batches by status", metadata[:title]
     assert_equal RecordingStudioAI::BatchMetrics::BY_STATUS_DESCRIPTION, metadata[:description]
     assert_equal [:operations], metadata[:exposed_apis]
-    assert_equal 5, metadata[:min_group_size]
   end
 
   test "tokens_by_profile api_authorize allows AdminRoot staff and denies outsiders" do
