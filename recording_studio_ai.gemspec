@@ -27,5 +27,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency "openai", "~> 0.78"
   spec.add_dependency "rails", ">= 8.1", "< 9.0"
   spec.add_dependency "recording_studio", "~> 4.7"
-  spec.add_dependency "recording_studio_metrics", "~> 0.3"
+  spec.add_dependency "recording_studio_metrics", ">= 0.3.0", "< 0.4"
 end

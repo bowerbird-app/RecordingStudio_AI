@@ -52,16 +52,22 @@ Staff with AdminRoot `:view` (`RecordingStudioAI::Api::Access.can_view?`) can re
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/failed_over_time`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/stuck`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/oldest_stuck_age`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/tokens_by_profile`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/fallback_retry_rate`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_batches/by_status`
 
-Failure and stuck-run metrics (Recording Studio Metrics `~> 0.3`, tag `v0.3.1`):
+Failure and stuck-run metrics (Recording Studio Metrics `>= 0.3.0, < 0.4`, tag `v0.3.1`):
 
 | Metric | Type / unit | Definition | `group_by` |
 | --- | --- | --- | --- |
 | `ai_runs.failed_over_time` | timeseries / `count` | Runs with `status: "failed"`, bucketed by `created_at` (the AI Calls list date). Takes `from` / `to` and `interval` (`day`, `week`, `month`, `year`). | `error_category` (the stored normalized category, e.g. `rate_limit`, `timeout`) |
 | `ai_runs.stuck` | count / `count` | Runs with `status` `pending` or `running` whose `COALESCE(started_at, created_at)` is at least `config.stuck_run_threshold` ago. | `status`, `operation` |
 | `ai_runs.oldest_stuck_age` | scalar / `seconds` | Seconds since `COALESCE(started_at, created_at)` of the oldest stuck run; `value` omitted when none. | none |
+| `ai_runs.tokens_by_profile` | breakdown / `tokens` | Sum of `total_tokens` per `profile_key` (blank when a run has no profile). No date window. | not supported |
+| `ai_runs.fallback_retry_rate` | timeseries / `ratio` | Average of "has `retry_count > 0` or `fallback_count > 0`" over runs created in each period (0 to 1; empty bucket when no runs). Takes `from` / `to` and `interval`. | none |
+| `ai_batches.by_status` | breakdown / `count` | Batches per `status`. | not supported |
 
-Filters use the AI Calls list names: `operation`, `prompt` (`prompt_key`), `prompt_version`, `provider` (`resolved_provider`), `model` (`resolved_model`), and `status` (`pending` / `running`) on the stuck metrics. Groups under `min_group_size` (5) fold into `other`. There is no grouping by initiator, executor, recording, request or job ids, prompt text, or error message. The stuck metrics skip the Metrics cache so they reflect the threshold at request time. Same AdminRoot `:view` check and site scope as the other AI run metrics.
+Filters use the AI Calls list names: `operation`, `prompt` (`prompt_key`), `prompt_version`, `provider` (`resolved_provider`), `model` (`resolved_model`), and `status` (`pending` / `running`) on the stuck metrics. `tokens_by_profile` and `fallback_retry_rate` take the same list filters; `ai_batches.by_status` has none (there is no batch list). Groups under `min_group_size` (5) fold into `other`. There is no grouping by initiator, executor, recording, request or job ids, prompt text, or error message. The stuck metrics skip the Metrics cache so they reflect the threshold at request time. Same AdminRoot `:view` check and site scope as the other AI run metrics.
 
 Set the stuck threshold in the initializer (default 15 minutes):
 
