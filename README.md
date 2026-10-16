@@ -325,7 +325,7 @@ gem "recording_studio_metrics",
     require: false
 gem "recording_studio_trashable",
     github: "bowerbird-app/RecordingStudio_trashable",
-    tag: "v0.10.0",
+    tag: "v0.11.0",
     require: false
 
 mount RecordingStudioAI::Engine, at: "/recording_studio_ai"
