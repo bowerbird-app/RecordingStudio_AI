@@ -7,6 +7,8 @@ require "stringio"
 module RecordingStudioAI
   module Providers
     class OpenAI < Base
+      include OpenAIHostedAgent
+
       provider_key :openai
 
       RETRYABLE_STREAM_ERROR_CODES = %w[

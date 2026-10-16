@@ -3,7 +3,13 @@
 $LOAD_PATH.unshift File.expand_path("../lib", __dir__)
 
 # Host provider credentials must not leak into gem unit tests. Contract tests
-# expect the default configuration to resolve as unimplemented.
+# expect the default configuration to resolve as unimplemented. The opt-in live
+# Agents test stashes the key only when that test is explicitly enabled.
+module RecordingStudioAI
+  module Test
+    LIVE_OPENAI_API_KEY = ENV["RECORDING_STUDIO_AI_LIVE_AGENTS"] == "1" ? ENV.fetch("OPENAI_API_KEY", nil) : nil
+  end
+end
 ENV.delete("OPENAI_API_KEY")
 ENV.delete("GEMINI_API_KEY")
 ENV.delete("TYPESAFE_API_KEY")

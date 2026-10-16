@@ -25,6 +25,15 @@ module RecordingStudioAI
         )
       end
 
+      def self.for_hosted_agent_turn(run, attribution:)
+        assemble(
+          subject: run, id_label: "run", attribution: attribution, operation: "hosted_agent",
+          purpose: run.purpose, tools: [], quantity: run.total_tokens.to_i,
+          idempotency_key: "ai-hosted-agent-turn:#{run.provider_turn_id}",
+          extra: hosted_turn_extra(run), snapshot: hosted_turn_snapshot(run)
+        )
+      end
+
       def resolver_arguments
         { attribution:, operation:, provider:, model:, profile:, purpose:, provider_native_tools: }
       end
@@ -44,7 +53,7 @@ module RecordingStudioAI
 
         def assemble(options)
           tools = Usage.send(:normalize_provider_native_tools, options.fetch(:tools))
-          snapshot = string_snapshot(options.fetch(:subject), options.fetch(:operation))
+          snapshot = options[:snapshot] || string_snapshot(options.fetch(:subject), options.fetch(:operation))
           new(charge_fields(options, tools, snapshot))
         end
 
@@ -63,6 +72,23 @@ module RecordingStudioAI
 
         def charge_metadata(snapshot, purpose, tools, extra)
           { **snapshot, purpose: purpose, **extra, provider_native_tools: tools.map(&:to_s).freeze }.freeze
+        end
+
+        def hosted_turn_extra(run)
+          {
+            ai_run_id: run.id,
+            provider_session_id: run.provider_session_id,
+            provider_turn_id: run.provider_turn_id
+          }
+        end
+
+        def hosted_turn_snapshot(run)
+          {
+            operation: "hosted_agent",
+            provider: run.resolved_provider.to_s,
+            model: run.resolved_model.to_s,
+            profile: run.profile_key&.to_s
+          }
         end
 
         def string_snapshot(record, operation)

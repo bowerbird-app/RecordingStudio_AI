@@ -5,6 +5,21 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-16
+
+### Added
+- `RecordingStudioAI::Agents` for provider-neutral hosted agent sessions: create, follow-up input, stream (block or Enumerator), cancel, delete, and recover.
+- `:hosted_agent` capability. Only models registered with that operation resolve. `gpt-6-astra` is the built-in OpenAI model and is listed on the default profiles.
+- One `hosted_agent` run per turn, with nullable `provider_session_id` and `provider_turn_id`.
+- Usage charged from the turn's `total_tokens`, idempotent on `ai-hosted-agent-turn:<provider turn id>`.
+- OpenAI Agents API adapter (`openai` `~> 0.103`) using environment `type: "none"`.
+
+### Upgrade notes
+- Bump to `0.15.0` and run the migration `AllowRecordingStudioAIHostedAgentRuns`.
+- Bump the `openai` gem to `~> 0.103`.
+- Hosted sessions are stored on OpenAI and are not Zero Data Retention eligible. Responses generation still sends `store: false`.
+- See [UPGRADING.md](UPGRADING.md#upgrading-to-0150).
+
 ## [0.14.0] - 2026-10-15
 
 ### Added
@@ -73,7 +88,6 @@ has no translation, via RecordingStudio `~> 4.7`.
 - `en.yml` is unchanged. Prefer `RecordingStudio.t` (or `Copy.t` for relative
   keys) when adding new call sites.
 - See [UPGRADING.md](UPGRADING.md#upgrading-to-0130).
->>>>>>> origin/main
 
 ## [0.12.0] - 2026-10-14
 

@@ -12,7 +12,7 @@ module RecordingStudioAI
     class Definition
       KEY_FORMAT = /\A[a-z0-9]+(?:-[a-z0-9]+)*\z/
 
-      OPERATIONS = %i[generation decision].freeze
+      OPERATIONS = %i[generation decision hosted_agent].freeze
       DECISION_TYPES = %i[choice score noul].freeze
 
       DELIVERY_KEYS = %i[streaming structured_output batch batch_cancellation].freeze

@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.14.0", RecordingStudioAI::VERSION
+    assert_equal "0.15.0", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -51,30 +51,37 @@ class RecordingStudioAITest < Minitest::Test
                  dependencies.keys.sort
     assert_equal ">= 0.3.0, < 0.4", dependencies.fetch("recording_studio_metrics").to_s
     assert_equal "~> 4.7", dependencies.fetch("recording_studio").to_s
+    assert_equal "~> 0.103", dependencies.fetch("openai").to_s
     refute_includes dependencies.keys, "recording_studio_accessible"
     refute_includes dependencies.keys, "recording_studio_admin"
   end
 
   def test_phase_six_ships_concrete_providers_without_example_surfaces
     root = File.expand_path("..", __dir__)
-
     migration_files = Dir[File.join(root, "db/migrate/*.rb")]
 
-    assert_equal 10, migration_files.size
-    assert migration_files.any? { |file| file.include?("create_recording_studio_ai_persistence_tables") }
-    assert migration_files.any? { |file| file.include?("harden_recording_studio_ai_persistence") }
-    assert migration_files.any? { |file| file.include?("enforce_recording_studio_ai_history_integrity") }
-    assert migration_files.any? { |file| file.include?("allow_recording_studio_ai_decision_executions") }
-    assert migration_files.any? { |file| file.include?("allow_recording_studio_ai_tool_executions") }
-    assert migration_files.any? { |file| file.include?("add_prompt_attribution_to_recording_studio_ai_runs") }
-    assert migration_files.any? do |file|
-      file.include?("remove_prompt_namespace_and_short_name_from_recording_studio_ai_runs")
+    assert_equal 11, migration_files.size
+    expected_migration_fragments.each do |fragment|
+      assert migration_files.any? { |file| file.include?(fragment) }, fragment
     end
     assert File.exist?(File.join(root, "lib/recording_studio_ai/providers/base.rb"))
     assert File.exist?(File.join(root, "lib/recording_studio_ai/providers/openai.rb"))
     assert File.exist?(File.join(root, "lib/recording_studio_ai/providers/gemini.rb"))
     refute File.exist?(File.join(root, "lib/recording_studio_ai/services/example_service.rb"))
     refute File.exist?(File.join(root, "app/controllers/recording_studio_ai/home_controller.rb"))
+  end
+
+  def expected_migration_fragments
+    %w[
+      create_recording_studio_ai_persistence_tables
+      harden_recording_studio_ai_persistence
+      enforce_recording_studio_ai_history_integrity
+      allow_recording_studio_ai_decision_executions
+      allow_recording_studio_ai_tool_executions
+      allow_recording_studio_ai_hosted_agent_runs
+      add_prompt_attribution_to_recording_studio_ai_runs
+      remove_prompt_namespace_and_short_name_from_recording_studio_ai_runs
+    ]
   end
 
   def test_dummy_host_mounts_addon_and_preserves_recording_studio

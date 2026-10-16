@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_12_044041) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -329,6 +329,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_044041) do
     t.string "prompt_key"
     t.string "prompt_name_snapshot"
     t.integer "prompt_version"
+    t.string "provider_session_id"
+    t.string "provider_turn_id"
     t.string "purpose"
     t.bigint "reasoning_tokens"
     t.string "request_id"
@@ -349,6 +351,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_044041) do
     t.index ["job_id"], name: "index_recording_studio_ai_runs_on_job_id"
     t.index ["profile_key", "created_at"], name: "index_recording_studio_ai_runs_on_profile_key_and_created_at"
     t.index ["prompt_key", "prompt_version", "created_at"], name: "idx_rsai_runs_prompt_created_at"
+    t.index ["provider_session_id"], name: "index_recording_studio_ai_runs_on_provider_session_id"
+    t.index ["provider_turn_id"], name: "index_recording_studio_ai_runs_on_provider_turn_id"
     t.index ["purpose", "created_at"], name: "index_recording_studio_ai_runs_on_purpose_and_created_at"
     t.index ["request_id"], name: "index_recording_studio_ai_runs_on_request_id"
     t.index ["resolved_provider", "resolved_model", "created_at"], name: "idx_rsai_runs_provider_model_created_at"
@@ -358,7 +362,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_044041) do
     t.check_constraint "attachment_count >= 0 AND attachment_total_bytes >= 0 AND citation_count >= 0", name: "chk_rsai_runs_nonnegative_attachment_counts"
     t.check_constraint "attempt_count >= 0 AND retry_count >= 0 AND fallback_count >= 0 AND custom_tool_invocation_count >= 0", name: "chk_rsai_runs_nonnegative_counts"
     t.check_constraint "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at", name: "chk_rsai_runs_timeline"
-    t.check_constraint "operation::text = ANY (ARRAY['generation'::character varying::text, 'stream'::character varying::text, 'batch'::character varying::text, 'decision'::character varying::text, 'tool'::character varying::text])", name: "chk_rsai_runs_operation"
+    t.check_constraint "operation::text = ANY (ARRAY['generation'::character varying, 'stream'::character varying, 'batch'::character varying, 'decision'::character varying, 'tool'::character varying, 'hosted_agent'::character varying]::text[])", name: "chk_rsai_runs_operation"
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "chk_rsai_runs_status"
   end
 

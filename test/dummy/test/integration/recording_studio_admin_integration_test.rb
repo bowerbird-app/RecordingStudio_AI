@@ -522,7 +522,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       [
         ["openai", "gpt-5-mini", "Generative", 1, false],
         ["gemini", "gemini-2.5-flash", "Generative", 2, false],
-        ["typesafe", "jev-latest", "Decision", 3, false]
+        ["openai", "gpt-6-astra", "—", 3, false],
+        ["typesafe", "jev-latest", "Decision", 4, false]
       ],
       low.map { |row| [row.provider, row.model, row.kind, row.position, row.default_profile] }
     )
@@ -531,8 +532,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_equal "gpt-5", medium.find { |row| row.kind == "Generative" && row.provider == "openai" }.model
     assert_equal "Decision", medium.find { |row| row.model == "jev-latest" }.kind
     high = rows.select { |row| row.profile == "high" }
-    assert_equal %w[gpt-5-pro gemini-2.5-pro jev-latest], high.map(&:model)
-    assert_equal ["Generative", "Generative", "Decision"], high.map(&:kind)
+    assert_equal %w[gpt-5-pro gemini-2.5-pro gpt-6-astra jev-latest], high.map(&:model)
+    assert_equal ["Generative", "Generative", "—", "Decision"], high.map(&:kind)
     refute high.any?(&:default_profile)
 
     get "/admin/screens/profiles"

@@ -26,6 +26,10 @@ module RecordingStudioAI
       charge!(Event.for_batch_submission(batch, attribution: attribution, provider_native_tools: provider_native_tools))
     end
 
+    def spend_hosted_agent_turn!(run:, attribution:)
+      charge!(Event.for_hosted_agent_turn(run, attribution: attribution))
+    end
+
     def charge!(event)
       handler = RecordingStudioAI.configuration.usage_handler
       return if handler.nil?
