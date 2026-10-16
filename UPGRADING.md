@@ -1,5 +1,21 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.15.0
+
+Adds provider-neutral hosted agent sessions. This release includes a migration.
+
+### What changed
+
+- `RecordingStudioAI::Agents` creates a session, sends follow-up input, streams events, cancels the active turn, deletes the session, and recovers after a dropped stream.
+- Runs gain nullable `provider_session_id` and `provider_turn_id`. `operation` may be `hosted_agent`.
+- The `openai` dependency is `~> 0.103` because the Agents API is not in 0.80.
+- Default profiles include `gpt-6-astra` for hosted sessions. Generation and decision resolution skip it.
+- Each turn with reported tokens spends `total_tokens` under idempotency key `ai-hosted-agent-turn:<provider turn id>`.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.15.0`, bundle `openai` `~> 0.103`, and run migrations. Hosted sessions are stored on OpenAI and are not Zero Data Retention eligible. The Responses path still sends `store: false`. The adapter uses environment `type: "none"` (no sandbox) and requires the first input when the session is created.
+
 ## Upgrading to 0.14.0
 
 Adds three operations metrics and pins Metrics to the 0.3 line. No migration.

@@ -53,6 +53,30 @@ module RecordingStudioAI
         raise NotImplementedError, "#{self.class} must implement #cancel_batch"
       end
 
+      def create_hosted_agent_session(**)
+        unsupported_hosted_agent!
+      end
+
+      def submit_hosted_agent_input(**)
+        unsupported_hosted_agent!
+      end
+
+      def stream_hosted_agent_session(**)
+        unsupported_hosted_agent!
+      end
+
+      def cancel_hosted_agent_turn(**)
+        unsupported_hosted_agent!
+      end
+
+      def delete_hosted_agent_session(**)
+        unsupported_hosted_agent!
+      end
+
+      def recover_hosted_agent_session(**)
+        unsupported_hosted_agent!
+      end
+
       private
 
       def configuration_client
@@ -107,6 +131,10 @@ module RecordingStudioAI
 
       def present?(value)
         !value.nil? && !value.to_s.empty?
+      end
+
+      def unsupported_hosted_agent!
+        raise UnsupportedCapabilityError.new(capability: :hosted_agent, provider: self.class.provider_key)
       end
     end
   end

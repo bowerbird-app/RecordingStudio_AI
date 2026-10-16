@@ -179,6 +179,15 @@ class ModelsRegistryTest < Minitest::Test
     end
   end
 
+  def test_builtin_gpt_6_astra_is_hosted_agent_only
+    definition = RecordingStudioAI.models.fetch(:openai, "gpt-6-astra")
+
+    assert_equal [:hosted_agent], definition.operations
+    assert_equal [:hosted_agent], definition.capabilities
+    refute_includes definition.capabilities, :generation
+    refute_includes definition.capabilities, :decision
+  end
+
   def test_duplicate_registration_raises_without_override
     @registry.register(provider: :openai, key: "gpt-5", model: "gpt-5")
 

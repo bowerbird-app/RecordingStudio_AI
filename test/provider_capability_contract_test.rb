@@ -149,8 +149,7 @@ class ProviderCapabilityContractTest < Minitest::Test
       capabilities = attributes[:capabilities] ||
                      RecordingStudioAI.models.fetch(attributes.fetch(:provider), attributes.fetch(:model))&.capabilities
       assert capabilities, "#{attributes.fetch(:provider)} #{attributes.fetch(:model)} is missing capabilities"
-      expected = attributes.fetch(:provider) == :typesafe ? DECISION_CONTRACT_CAPABILITIES : CONTRACT_CAPABILITIES
-      assert_equal expected.sort, capabilities.sort,
+      assert_equal expected_profile_capabilities(attributes).sort, capabilities.sort,
                    "#{attributes.fetch(:provider)} #{attributes.fetch(:model)} changed the shared capability contract"
     end
   end
@@ -163,6 +162,13 @@ class ProviderCapabilityContractTest < Minitest::Test
         "usage" => { "input_tokens" => 10, "output_tokens" => 2 }
       }
     end
+  end
+
+  def expected_profile_capabilities(attributes)
+    return [:hosted_agent] if attributes.fetch(:model) == "gpt-6-astra"
+    return DECISION_CONTRACT_CAPABILITIES if attributes.fetch(:provider) == :typesafe
+
+    CONTRACT_CAPABILITIES
   end
 
   def test_typesafe_satisfies_the_decision_operation_contract

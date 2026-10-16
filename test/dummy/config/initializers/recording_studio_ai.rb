@@ -11,16 +11,19 @@ RecordingStudioAI.configure do |config|
     low: [
       { provider: :openai, model: "gpt-5-mini" },
       { provider: :gemini, model: "gemini-2.5-flash" },
+      { provider: :openai, model: "gpt-6-astra" },
       { provider: :typesafe, model: "jev-latest" }
     ],
     medium: [
       { provider: :openai, model: "gpt-5" },
       { provider: :gemini, model: "gemini-2.5-pro" },
+      { provider: :openai, model: "gpt-6-astra" },
       { provider: :typesafe, model: "jev-latest" }
     ],
     high: [
       { provider: :openai, model: "gpt-5-pro" },
       { provider: :gemini, model: "gemini-2.5-pro" },
+      { provider: :openai, model: "gpt-6-astra" },
       { provider: :typesafe, model: "jev-latest" }
     ]
   }

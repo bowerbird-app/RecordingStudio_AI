@@ -14,7 +14,8 @@ six execution infrastructure tables, and a read-only FlatPack admin surface.
 - Rails 8.1
 - Recording Studio `~> 4.7`
 
-The OpenAI provider uses the official `openai` Ruby SDK. Gemini uses its REST API
+The OpenAI provider uses the official `openai` Ruby SDK (`~> 0.103`, which includes
+the Agents API). Gemini uses its REST API
 behind an internal client because Google does not publish an official Gemini
 Ruby SDK. Both providers support injected clients.
 
@@ -243,6 +244,8 @@ Each attempt spends once. That includes retries, fallbacks, and tool continuatio
 
 A batch submission uses quantity equal to the item count. The idempotency key is `ai-batch:<batch id>:submission`. The operation is `batch`. Purpose is nil. `provider_native_tools` is the union of requested tools. A mixed batch shares one key. Hosts who need different tariffs submit separate batches. One combined key is enough. Separate events per tool could be added later.
 
+A hosted agent turn spends when that turn reports token usage, after the provider call, not before it. Quantity is `total_tokens`. The idempotency key is `ai-hosted-agent-turn:<provider turn id>`. Reconnects and retries repeat that key. A turn with no reported tokens is not metered. Metadata names the operation, provider, model, profile, purpose, run id, provider session id, and provider turn id. It does not include instructions, input, or output text. `provider_native_tools` is `[]`.
+
 A handler exception from `submit_batch` propagates unchanged. The provider is not called. The batch, items, and runs are `usage` / `usage_declined`. A nil handler leaves batch submit unmetered. A nil resolver result leaves that submission unmetered. There is no refund if the provider fails after the handler returns.
 
 Refresh, cancel, polling, webhook sync, `perform_tool`, and local tool execution stay unmetered.
@@ -396,6 +399,12 @@ Phase 2 introduced validation and normalized return contracts for:
 - `RecordingStudioAI.refresh_batch_from_webhook(...)`
 - `RecordingStudioAI.cancel_batch(...)`
 - `RecordingStudioAI.read_retained_response(...)`
+- `RecordingStudioAI::Agents.create_session(...)`
+- `RecordingStudioAI::Agents.send_input(...)`
+- `RecordingStudioAI::Agents.stream(...)`
+- `RecordingStudioAI::Agents.cancel(...)`
+- `RecordingStudioAI::Agents.delete_session(...)`
+- `RecordingStudioAI::Agents.recover(...)`
 - `RecordingStudioAI.tools.register(...)`
 - `RecordingStudioAI.tools.fetch(...)`
 - `RecordingStudioAI.tools.all`
@@ -425,6 +434,69 @@ Flat generation parameters (`temperature`, `verbosity`, `max_output_tokens`,
 explicit fallback hops they stay when the next model supports them and are
 omitted when it does not. `RecordingStudioAI.stream` / `stream!` were removed —
 use `generate(stream: true)`.
+
+## Hosted agent sessions
+
+`RecordingStudioAI::Agents` runs a hosted agent session through the same
+credentials, run records, and usage handler as generation. The public objects
+are provider-neutral. OpenAI's Agents API is the first adapter. Other providers
+can implement the same methods on `Providers::Base`.
+
+Only models registered with the `hosted_agent` operation resolve. A name that is
+not in the registry raises a configuration error (`missing_model`). A registered
+generation model such as `gpt-5` raises `unsupported_capability`. The default
+profiles include `gpt-6-astra` for this operation. `generate` and `decide` skip
+it because it does not declare those operations.
+
+```ruby
+session = RecordingStudioAI::Agents.create_session(
+  instructions: "Answer in one sentence.",
+  profile: :medium,
+  input: "What is a session?",
+  idempotency_key: "session-1",
+  purpose: "agent_chat",
+  root_recording: root_recording,
+  initiator: current_user
+)
+
+turn = RecordingStudioAI::Agents.stream(
+  session: session,
+  root_recording: root_recording,
+  initiator: current_user
+) { |event| print event.text_delta }
+
+RecordingStudioAI::Agents.send_input(
+  session: session,
+  input: "Say that again.",
+  idempotency_key: "turn-2",
+  root_recording: root_recording,
+  initiator: current_user
+)
+
+RecordingStudioAI::Agents.cancel(session: session, root_recording: root_recording, initiator: current_user)
+RecordingStudioAI::Agents.delete_session(session: session, root_recording: root_recording, initiator: current_user)
+```
+
+`stream` without a block returns an Enumerator of the same events. Each turn is
+one `hosted_agent` run, attributed with the caller's `root_recording` and
+authorized with `recording_studio_ai.execute`. A follow-up while that turn is
+still active steers it and keeps the same run. A follow-up after the turn is
+terminal records a new run.
+
+Pass `idempotency_key` on create and on every `send_input`. Follow-up submits
+send that key as the provider `Idempotency-Key`. Session create has no typed
+idempotency field, so the adapter sends the same header. A dropped stream
+fetches the saved session, turn, and items.
+It does not send the input again. A timeout raises `Agents::Failure` and leaves
+the run running.
+
+Hosted sessions are stored on the provider. OpenAI's Agents API is not Zero
+Data Retention eligible. The Responses adapter still sends `store: false`;
+hosted sessions do not. The OpenAI adapter uses environment `type: "none"` (no
+sandbox). That environment requires the first input at create time.
+
+`Turn#cost` is computed when read from `CostCalculator` and the configured
+catalog. Token totals are stored on the run. Cost is not stored.
 
 ## Decisions (TypeSafe Jev)
 

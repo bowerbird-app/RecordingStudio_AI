@@ -45,7 +45,11 @@ module RecordingStudioAI
             ]
           end
 
-          classes + [AllowRecordingStudioAIDecisionExecutions, AllowRecordingStudioAIToolExecutions]
+          classes + [
+            AllowRecordingStudioAIDecisionExecutions,
+            AllowRecordingStudioAIToolExecutions,
+            AllowRecordingStudioAIHostedAgentRuns
+          ]
         end
       end
 

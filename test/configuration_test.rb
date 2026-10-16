@@ -86,7 +86,7 @@ class ConfigurationTest < Minitest::Test
     end
     low_models = configuration.profiles.fetch(:low).map { |entry| entry.fetch(:model) }
 
-    assert_equal ["gpt-5-mini", "gemini-2.5-flash", "jev-latest"], low_models
+    assert_equal ["gpt-5-mini", "gemini-2.5-flash", "gpt-6-astra", "jev-latest"], low_models
   end
 
   def test_provider_credentials_default_from_environment

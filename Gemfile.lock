@@ -29,11 +29,11 @@ GIT
 PATH
   remote: .
   specs:
-    recording_studio_ai (0.14.0)
+    recording_studio_ai (0.15.0)
       csv (>= 3.2)
       flat_pack (~> 0.1)
       json_schemer (~> 2.4)
-      openai (~> 0.78)
+      openai (~> 0.103)
       rails (>= 8.1, < 9.0)
       recording_studio (~> 4.7)
       recording_studio_metrics (>= 0.3.0, < 0.4)
@@ -119,7 +119,6 @@ GEM
     base64 (0.3.0)
     bigdecimal (4.1.2)
     builder (3.3.0)
-    cgi (0.5.2)
     concurrent-ruby (1.3.8)
     connection_pool (3.0.2)
     crass (1.0.7)
@@ -179,9 +178,7 @@ GEM
     nio4r (2.7.5)
     nokogiri (1.19.4-x86_64-linux-gnu)
       racc (~> 1.4)
-    openai (0.80.0)
-      base64
-      cgi
+    openai (0.104.0)
       connection_pool (>= 2.2.3)
       logger
     pagy (9.4.0)
@@ -343,7 +340,6 @@ CHECKSUMS
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
   bigdecimal (4.1.2) sha256=53d217666027eab4280346fba98e7d5b66baaae1b9c3c1c0ffe89d48188a3fbd
   builder (3.3.0) sha256=497918d2f9dca528fdca4b88d84e4ef4387256d984b8154e9d5d3fe5a9c8835f
-  cgi (0.5.2) sha256=61ca30298171190fd4fa0d8018e57ada456eae9b7a2b78526debf7f0a0e6f8bb
   concurrent-ruby (1.3.8) sha256=b2f1be836e968ccc78ccfce277ea79c72a88633f22306782c16ff23fb415d1e1
   connection_pool (3.0.2) sha256=33fff5ba71a12d2aa26cb72b1db8bba2a1a01823559fb01d29eb74c286e62e0a
   crass (1.0.7) sha256=94868719948664c89ddcaf0a37c65048413dfcb1c869470a5f7a7ceb5390b295
@@ -377,7 +373,7 @@ CHECKSUMS
   net-smtp (0.5.1) sha256=ed96a0af63c524fceb4b29b0d352195c30d82dd916a42f03c62a3a70e5b70736
   nio4r (2.7.5) sha256=6c90168e48fb5f8e768419c93abb94ba2b892a1d0602cb06eef16d8b7df1dca1
   nokogiri (1.19.4-x86_64-linux-gnu) sha256=379fae440b28915e3f19d752ce2dcf8465ed2b2fbefd2a7ca0dd497bc981a06a
-  openai (0.80.0) sha256=aa82a69f43a2d140039be89a37f12742cc90e9f5bfcf2d48f14805d0905d5ded
+  openai (0.104.0) sha256=45e58e1e3100ed3d11a4951d341a0a93022202606a1a5d9e59a95ed68ff42f24
   pagy (9.4.0) sha256=db3f2e043f684155f18f78be62a81e8d033e39b9f97b1e1a8d12ad38d7bce738
   parallel (1.27.0) sha256=4ac151e1806b755fb4e2dc2332cbf0e54f2e24ba821ff2d3dcf86bf6dc4ae130
   parser (3.3.10.0) sha256=ce3587fa5cc55a88c4ba5b2b37621b3329aadf5728f9eafa36bbd121462aabd6
@@ -399,7 +395,7 @@ CHECKSUMS
   rbs (4.2.0) sha256=51f7b886dcc05bc09e10b901daa6a81829f6adc03101d6ca9ea4aac6103e0674
   rdoc (8.0.0) sha256=03bf8c08a9639658855a0cfd77c0abca8325c227693f7f33f82957811348c469
   recording_studio (4.7.0)
-  recording_studio_ai (0.14.0)
+  recording_studio_ai (0.15.0)
   recording_studio_metrics (0.3.0)
   regexp_parser (2.12.0) sha256=35a916a1d63190ab5c9009457136ae5f3c0c7512d60291d0d1378ba18ce08ebb
   reline (0.7.0) sha256=5b012d8e55dbf9d450f12bde2cf7d15ff546ae80b3f8f3b30e570d431815583d

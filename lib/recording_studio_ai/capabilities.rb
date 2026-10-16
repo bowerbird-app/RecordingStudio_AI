@@ -16,6 +16,7 @@ module RecordingStudioAI
       custom_tools
       provider_batch
       provider_batch_cancellation
+      hosted_agent
     ].freeze
 
     DECISION_BY_TYPE = {

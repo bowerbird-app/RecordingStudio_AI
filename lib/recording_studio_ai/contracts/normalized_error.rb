@@ -29,6 +29,8 @@ module RecordingStudioAI
         usage
         configuration
         internal
+        unsupported_model
+        invalid_session
       ].freeze
 
       attr_reader :category, :code, :message, :provider, :provider_code
