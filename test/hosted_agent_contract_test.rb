@@ -286,6 +286,44 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal :barehosted, bare_error.provider
   end
 
+  def test_the_owning_root_can_use_every_session_entry_point
+    session = create_session
+    @fake.default_turn = active_turn
+
+    RecordingStudioAI::Agents.send_input(**session_args(session), input: "more", idempotency_key: "own-1")
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    RecordingStudioAI::Agents.cancel(**session_args(session))
+    RecordingStudioAI::Agents.recover(**session_args(session))
+    RecordingStudioAI::Agents.delete_session(**session_args(session))
+
+    assert_equal 1, @fake.submits.length
+    assert_equal 1, @fake.streams
+    assert_equal ["sess_1"], @fake.cancels
+    refute_empty @fake.recoveries
+    assert_equal ["sess_1"], @fake.deletes
+  end
+
+  def test_another_root_cannot_use_a_session
+    session = create_session
+
+    assert_entry_points_denied(session, Actor.new(create_recording_id))
+  end
+
+  def test_a_session_with_no_run_on_the_caller_is_denied
+    session = RecordingStudioAI::Agents::Session.new(
+      provider: :openai, provider_session_id: "sess_unknown", model: "gpt-6-astra"
+    )
+
+    assert_entry_points_denied(session, @root)
+  end
+
+  def test_a_session_shared_with_another_root_is_denied
+    session = create_session
+    copy_run(session, Actor.new(create_recording_id))
+
+    assert_entry_points_denied(session, @root)
+  end
+
   def test_authorization_denial_does_not_create_a_run
     @configuration.authorization_handler = ->(**) { false }
 
@@ -313,6 +351,51 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
 
   def session_args(session)
     { session: session, root_recording: @root, initiator: @initiator }
+  end
+
+  def assert_entry_points_denied(session, root)
+    baseline = provider_activity
+    runs = RecordingStudioAI::Run.count
+    messages = %i[send_input stream cancel delete_session recover].map do |name|
+      denied_message(name, session, root)
+    end
+
+    assert_equal [messages.first], messages.uniq
+    assert_equal baseline, provider_activity
+    assert_equal runs, RecordingStudioAI::Run.count
+    refute_includes messages.first, session.provider_session_id
+  end
+
+  def denied_message(name, session, root)
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      call_entry_point(name, session, root)
+    end
+    assert_equal "authorization", error.code
+    error.message
+  end
+
+  def call_entry_point(name, session, root)
+    args = { session: session, root_recording: root, initiator: @initiator }
+    if name == :send_input
+      RecordingStudioAI::Agents.send_input(**args, input: "follow-up", idempotency_key: "denied-#{root.id}")
+    elsif name == :stream
+      RecordingStudioAI::Agents.stream(**args) { |_event| }
+    else
+      RecordingStudioAI::Agents.public_send(name, **args)
+    end
+  end
+
+  def provider_activity
+    [
+      @fake.creates.length, @fake.submits.length, @fake.streams,
+      @fake.cancels.length, @fake.deletes.length, @fake.recoveries.length
+    ]
+  end
+
+  def copy_run(session, root)
+    copy = RecordingStudioAI::Run.find(session.run_id).dup
+    copy.root_recording_id = root.id
+    copy.save!
   end
 
   def usage

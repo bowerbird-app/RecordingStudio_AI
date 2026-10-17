@@ -5,6 +5,14 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-10-17
+
+### Fixed
+- `send_input`, `stream`, `cancel`, `delete_session`, and `recover` reject a hosted agent session that has no `hosted_agent` run on the caller's root, or that has one on any other root. Both cases raise the existing authorization error and do not call the provider.
+
+### Upgrade notes
+- Bump to `0.15.1`. No migration.
+
 ## [0.15.0] - 2026-10-16
 
 ### Added

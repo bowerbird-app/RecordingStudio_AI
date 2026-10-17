@@ -7,7 +7,7 @@ require "recording_studio_ai/agents/runner"
 
 module RecordingStudioAI
   # Provider-neutral hosted agent sessions. Credentials, runs, and usage stay here.
-  # Session ownership belongs to the host (Recording Studio Agents).
+  # Follow-up calls require a hosted_agent run on the caller's root and none on any other root.
   module Agents
     module_function
 
