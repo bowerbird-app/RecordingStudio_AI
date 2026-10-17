@@ -479,9 +479,12 @@ RecordingStudioAI::Agents.delete_session(session: session, root_recording: root_
 
 `stream` without a block returns an Enumerator of the same events. Each turn is
 one `hosted_agent` run, attributed with the caller's `root_recording` and
-authorized with `recording_studio_ai.execute`. A follow-up while that turn is
-still active steers it and keeps the same run. A follow-up after the turn is
-terminal records a new run.
+authorized with `recording_studio_ai.execute`. `send_input`, `stream`, `cancel`,
+`delete_session`, and `recover` also require a `hosted_agent` run for that
+provider session on the caller's root and none on any other root. Otherwise
+they raise that same authorization error and do not call the provider. A
+follow-up while that turn is still active steers it and keeps the same run. A
+follow-up after the turn is terminal records a new run.
 
 Pass `idempotency_key` on create and on every `send_input`. Follow-up submits
 send that key as the provider `Idempotency-Key`. Session create has no typed

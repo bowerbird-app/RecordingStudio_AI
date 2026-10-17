@@ -29,6 +29,7 @@ module RecordingStudioAI
         request = Request.input!(**raw)
         authorize!(request)
         session = request.fetch(:session)
+        guard_session!(session, request)
         run = run_for_input(session, request)
         call_provider(run) do
           adapter_for(session.provider).submit_hosted_agent_input(
@@ -43,6 +44,7 @@ module RecordingStudioAI
         request = Request.session!(**raw)
         authorize!(request)
         session = request.fetch(:session)
+        guard_session!(session, request)
         run = running_run(session, request) || latest_run(session, request)
         return recovered_turn(session, run, &) if terminal_snapshot?(session, run)
 
@@ -53,6 +55,7 @@ module RecordingStudioAI
         request = Request.session!(**raw)
         authorize!(request)
         session = request.fetch(:session)
+        guard_session!(session, request)
         call_provider(nil) do
           adapter_for(session.provider).cancel_hosted_agent_turn(provider_session_id: session.provider_session_id)
         end
@@ -64,6 +67,7 @@ module RecordingStudioAI
         request = Request.session!(**raw)
         authorize!(request)
         session = request.fetch(:session)
+        guard_session!(session, request)
         call_provider(nil) do
           adapter_for(session.provider).delete_hosted_agent_session(provider_session_id: session.provider_session_id)
         end
@@ -74,6 +78,7 @@ module RecordingStudioAI
         request = Request.session!(**raw)
         authorize!(request)
         session = request.fetch(:session)
+        guard_session!(session, request)
         run = running_run(session, request) || latest_run(session, request)
         snapshot = fetch_recovery(session, run)
         apply_recovery(run, snapshot)
@@ -85,6 +90,21 @@ module RecordingStudioAI
       def authorize!(request)
         Authorization.authorize!(
           :execute, attribution: request.fetch(:attribution), context: { operation: "hosted_agent" }
+        )
+      end
+
+      # The handle is not proof of ownership. Allow the call only when every
+      # hosted_agent run for this provider session belongs to the caller's root.
+      def guard_session!(session, request)
+        root_id = Orchestration::Support.identifier(request.fetch(:attribution).root_recording)
+        runs = RecordingStudioAI::Run.where(
+          operation: "hosted_agent", provider_session_id: session.provider_session_id
+        )
+        return if runs.where(root_recording_id: root_id).exists? && runs.where.not(root_recording_id: root_id).none?
+
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          "Not authorized for action #{Authorization::ACTIONS.fetch(:execute)}",
+          code: "authorization"
         )
       end
 

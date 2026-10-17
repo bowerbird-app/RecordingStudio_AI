@@ -1,5 +1,17 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.15.1
+
+Closes a cross-root hole in hosted agent sessions. No migration.
+
+### What changed
+
+`send_input`, `stream`, `cancel`, `delete_session`, and `recover` now require a `hosted_agent` run for that provider session on the caller's root, and no `hosted_agent` run for it on any other root. A missing run and a run on another root both raise the existing authorization error. The provider is not called.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.15.1`. No migration is required.
+
 ## Upgrading to 0.15.0
 
 Adds provider-neutral hosted agent sessions. This release includes a migration.
