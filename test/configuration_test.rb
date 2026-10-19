@@ -246,7 +246,7 @@ class ConfigurationTest < Minitest::Test
         { server_url: "https://mcp.example.com/mcp", server_label: "not a label" }
       ]
     end
-    assert_includes error.message, "unknown hosted agent MCP server label"
+    assert_includes error.message, "must use letters, numbers, underscores, or hyphens"
 
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
       configuration.hosted_agent_mcp_servers = [
@@ -271,13 +271,18 @@ class ConfigurationTest < Minitest::Test
     ]
 
     text = configuration.inspect
-    refute_includes text, "sk-live-secret"
-    refute_includes text, "gem-secret"
-    refute_includes text, "ts-secret"
-    refute_includes text, "whsec-secret"
-    refute_includes text, "mcp-secret"
-    refute_includes text, "header-secret"
+    rendered = configuration.to_s
+    raw = configuration.hosted_agent_mcp_servers
+    [text, rendered, raw.inspect, raw.to_s].each do |output|
+      refute_includes output, "sk-live-secret"
+      refute_includes output, "gem-secret"
+      refute_includes output, "ts-secret"
+      refute_includes output, "whsec-secret"
+      refute_includes output, "mcp-secret"
+      refute_includes output, "header-secret"
+    end
     assert_includes text, "[REDACTED]"
     assert_includes text, "mcp.example.com"
+    assert_equal "Bearer mcp-secret", raw.first[:authorization]
   end
 end

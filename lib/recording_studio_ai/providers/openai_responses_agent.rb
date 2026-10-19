@@ -13,8 +13,9 @@ module RecordingStudioAI
         "response.output_text.delta" => "text_delta",
         "response.output_text.done" => "message_completed"
       }.freeze
-      LOCKS = {} # rubocop:disable Style/MutableConstant -- one mutex per live session id
-      LOCK_GUARD = Mutex.new
+      POLL_DELAYS = [0.5, 1, 2, 4, 8].freeze
+      CURSOR_BATCH = 20
+      EXCLUDED_TOOL_CALLS = %w[function_call custom_tool_call].freeze
       TERMINAL_EVENT_TYPES = %w[turn_completed failed cancelled].freeze
       TERMINAL_RESPONSE_EVENTS = %w[response.completed response.failed response.incomplete].freeze
 
@@ -39,22 +40,30 @@ module RecordingStudioAI
 
       # idempotency_key stays on the run. Responses creates are not deduped with Idempotency-Key.
       def responses_submit_input(provider_session_id:, input:, idempotency_key:) # rubocop:disable Lint/UnusedMethodArgument
-        with_session_lock(provider_session_id) do
+        started = { response_id: nil }
+        RecordingStudioAI::HostedResponse.with_session_lock(provider_session_id) do
           hosted_request(session_lookup: true) do
             state = responses_state(provider_session_id)
             raise_turn_active! if response_active?(state[:response])
             response_id, sequence = open_responses_turn(
               conversation_id: provider_session_id, model: state[:model],
-              instructions: state[:instructions], input: input
+              instructions: state[:instructions], input: input, started: started
             )
-            remember_response!(provider_session_id, state[:model], response_id, sequence, state[:response_ids])
+            remember_response!(
+              provider_session_id, state[:model], response_id, sequence, state[:response_id]
+            )
             nil
+          rescue StandardError
+            cancel_response_quietly(started[:response_id])
+            raise
           end
         end
       end
 
       def responses_stream_session(provider_session_id:, &)
-        state = with_session_lock(provider_session_id) { responses_state(provider_session_id) }
+        state = RecordingStudioAI::HostedResponse.with_session_lock(provider_session_id) do
+          responses_state(provider_session_id)
+        end
         missing_turn! if state[:response_id].blank?
         resume_responses(provider_session_id, state, &)
       rescue StandardError => e
@@ -62,7 +71,7 @@ module RecordingStudioAI
       end
 
       def responses_cancel_turn(provider_session_id:)
-        with_session_lock(provider_session_id) do
+        RecordingStudioAI::HostedResponse.with_session_lock(provider_session_id) do
           hosted_request(session_lookup: true) do
             responses_state(provider_session_id)[:response_ids].each do |response_id|
               response = client.responses.retrieve(response_id)
@@ -73,18 +82,17 @@ module RecordingStudioAI
         end
       end
 
-      # Deletes every response id stored on the conversation, then the conversation.
-      # Response ids that never made it into that list, and OpenAI's own logs, remain.
+      # Cancels and deletes every response id stored for the conversation, then
+      # the conversation. A failed call returns status "partial" instead of
+      # "deleted". Unstored response ids and OpenAI's logs remain.
       def responses_delete_session(provider_session_id:)
-        with_session_lock(provider_session_id) do
+        RecordingStudioAI::HostedResponse.with_session_lock(provider_session_id) do
           hosted_request(session_lookup: true) do
             state = responses_state(provider_session_id)
-            state[:response_ids].each do |response_id|
-              cancel_response_quietly(response_id)
-              delete_response_quietly(response_id)
-            end
-            delete_conversation_quietly(provider_session_id)
-            responses_session(provider_session_id, "deleted", nil)
+            failures = delete_tracked_responses(state[:response_ids])
+            failures << delete_conversation(provider_session_id)
+            status = failures.compact.empty? ? "deleted" : "partial"
+            responses_session(provider_session_id, status, nil)
           end
         end
       end
@@ -149,31 +157,33 @@ module RecordingStudioAI
         stream&.close if stream.respond_to?(:close)
       end
 
-      def remember_response!(conversation_id, model, response_id, sequence, earlier_ids = [])
-        ids = (Array(earlier_ids) + [response_id.to_s]).map(&:to_s).reject(&:empty?).uniq
-        metadata = {
-          "model" => model.to_s,
-          "response_id" => response_id.to_s,
-          "response_ids" => ids.join(","),
-          "sequence_number" => sequence.to_s
-        }
-        metadata["text_emitted"] = "false"
-        client.conversations.update(conversation_id, metadata: metadata)
+      def remember_response!(conversation_id, model, response_id, sequence, previous_response_id = nil)
+        claimed = RecordingStudioAI::HostedResponse.claim!(
+          provider_session_id: conversation_id, response_id: response_id,
+          previous_response_id: previous_response_id, sequence: sequence
+        )
+        return unless claimed
+
+        client.conversations.update(
+          conversation_id,
+          metadata: { "model" => model.to_s, "response_id" => response_id.to_s }
+        )
       end
 
       def responses_state(conversation_id)
         conversation = client.conversations.retrieve(conversation_id)
-        response_id = metadata_value(conversation, "response_id").to_s
+        stored = RecordingStudioAI::HostedResponse.latest_for(conversation_id)
+        response_id = stored&.response_id.presence || metadata_value(conversation, "response_id").to_s.presence
         response = response_id.present? ? client.responses.retrieve(response_id) : nil
         stored_model = metadata_value(conversation, "model").to_s.presence
         {
           model: stored_model || read_value(response, :model).to_s.presence,
           instructions: read_value(response, :instructions),
-          response_id: response_id.presence,
+          response_id: response_id,
           response: response,
-          response_ids: responses_id_list(conversation, response_id),
-          sequence: metadata_value(conversation, "sequence_number").to_s.presence,
-          text_emitted: metadata_value(conversation, "text_emitted").to_s == "true",
+          response_ids: RecordingStudioAI::HostedResponse.response_ids_for(conversation_id),
+          sequence: stored&.sequence_number,
+          text_emitted: stored&.text_emitted || false,
           conversation: conversation
         }
       end
@@ -193,6 +203,8 @@ module RecordingStudioAI
 
       def each_responses_event(stream, conversation_id, state)
         cursor = state[:sequence].to_i
+        pending = 0
+        saw_text = state[:text_emitted]
         stream.each do |event|
           sequence = event_sequence(event)
           next if sequence && sequence <= cursor
@@ -201,21 +213,29 @@ module RecordingStudioAI
           neutral = responses_event(event, state[:response_id])
           next unless neutral
 
-          remember_response_chain!(conversation_id, state, neutral, cursor)
           yield neutral
-          break if TERMINAL_EVENT_TYPES.include?(neutral.type)
+          pending += 1
+          saw_text ||= %w[text_delta message_completed].include?(neutral.type)
+          terminal = TERMINAL_EVENT_TYPES.include?(neutral.type)
+          if terminal || pending >= CURSOR_BATCH
+            state[:text_emitted] = saw_text
+            remember_response_chain!(conversation_id, state, neutral, cursor)
+            pending = 0
+          end
+          break if terminal
         end
+        return unless pending.positive?
+
+        state[:text_emitted] = saw_text
+        remember_response_chain!(
+          conversation_id, state, responses_stream_event("text_delta", state[:response_id]), cursor
+        )
       end
 
       def poll_responses(conversation_id, state)
-        response = nil
-        5.times do
-          response = client.responses.retrieve(state[:response_id])
-          break unless response_active?(response)
+        response = poll_until_terminal(state[:response_id])
+        return if response.nil? || response_active?(response)
 
-          sleeper = @configuration&.retry_sleeper
-          sleeper&.call(0)
-        end
         message = nil
         unless state[:text_emitted]
           text = read_value(response, :output_text).to_s
@@ -228,6 +248,22 @@ module RecordingStudioAI
         yield terminal if terminal
         remember_response_chain!(conversation_id, state, message, state[:sequence]) if message
         remember_response_chain!(conversation_id, state, terminal, state[:sequence]) if terminal
+      end
+
+      def poll_until_terminal(response_id)
+        response = nil
+        POLL_DELAYS.each_with_index do |delay, index|
+          response = client.responses.retrieve(response_id)
+          return response unless response_active?(response)
+
+          wait_for_response(delay) if index < POLL_DELAYS.length - 1
+        end
+        response
+      end
+
+      def wait_for_response(delay)
+        sleeper = @configuration&.retry_sleeper
+        sleeper ? sleeper.call(delay) : sleep(delay)
       end
 
       def responses_event(event, fallback_id)
@@ -305,26 +341,27 @@ module RecordingStudioAI
         return unless event
 
         response_id = event.metadata["provider_turn_id"].to_s
-        if response_id.present? && response_id != state[:response_id].to_s
-          state[:response_id] = response_id
-          state[:response_ids] = (Array(state[:response_ids]) + [response_id]).uniq
+        previous = state[:response_id].to_s
+        if response_id.present? && response_id != previous
+          claimed = RecordingStudioAI::HostedResponse.claim!(
+            provider_session_id: conversation_id, response_id: response_id,
+            previous_response_id: previous, sequence: cursor
+          )
+          if claimed
+            state[:response_id] = response_id
+            state[:response_ids] = RecordingStudioAI::HostedResponse.response_ids_for(conversation_id)
+            client.conversations.update(
+              conversation_id,
+              metadata: { "model" => state[:model].to_s, "response_id" => response_id }
+            )
+          end
         end
-        note_responses_progress(conversation_id, state, cursor, event)
-      end
-
-      def note_responses_progress(conversation_id, state, cursor, event)
-        return unless event
-
-        metadata = {
-          "model" => state[:model].to_s,
-          "response_id" => state[:response_id].to_s,
-          "response_ids" => state[:response_ids].join(","),
-          "sequence_number" => cursor.to_s,
-          "text_emitted" => (state[:text_emitted] || %w[text_delta message_completed].include?(event.type)).to_s
-        }
-        state[:text_emitted] = metadata["text_emitted"] == "true"
-        state[:sequence] = cursor.to_s
-        client.conversations.update(conversation_id, metadata: metadata)
+        text_emitted = state[:text_emitted] || %w[text_delta message_completed].include?(event.type)
+        RecordingStudioAI::HostedResponse.advance_cursor!(
+          response_id: state[:response_id], sequence: cursor, text_emitted: text_emitted
+        )
+        state[:text_emitted] = text_emitted
+        state[:sequence] = cursor
       end
 
       def response_id_from(event, fallback_id)
@@ -352,13 +389,14 @@ module RecordingStudioAI
       end
 
       def tool_step_limit?(response)
-        reason = read_value(read_value(response, :incomplete_details), :reason).to_s
-        return true if reason == "max_tool_calls"
+        builtin_tool_calls(response) >= MAX_TOOL_CALLS
+      end
 
-        tool_calls = Array(read_value(response, :output)).count do |item|
-          read_value(item, :type).to_s.match?(/_call\z|tool_call/)
+      def builtin_tool_calls(response)
+        Array(read_value(response, :output)).count do |item|
+          type = read_value(item, :type).to_s
+          type.end_with?("_call") && EXCLUDED_TOOL_CALLS.exclude?(type)
         end
-        tool_calls > MAX_TOOL_CALLS
       end
 
       def responses_turn_items(response)
@@ -397,12 +435,6 @@ module RecordingStudioAI
           usage: nil,
           error: nil
         )
-      end
-
-      def responses_id_list(conversation, response_id)
-        ids = metadata_value(conversation, "response_ids").to_s.split(",")
-        ids << response_id if response_id.present?
-        ids.map(&:to_s).reject(&:empty?).uniq
       end
 
       def responses_session(conversation_id, status, model)
@@ -477,9 +509,32 @@ module RecordingStudioAI
         nil
       end
 
-      def with_session_lock(provider_session_id, &)
-        mutex = LOCK_GUARD.synchronize { LOCKS[provider_session_id.to_s] ||= Mutex.new }
-        mutex.synchronize(&)
+      def delete_tracked_responses(response_ids)
+        Array(response_ids).flat_map do |response_id|
+          [cancel_response(response_id), delete_response(response_id)]
+        end
+      end
+
+      def cancel_response(response_id)
+        response = client.responses.retrieve(response_id)
+        client.responses.cancel(response_id) if response_active?(response)
+        nil
+      rescue StandardError => e
+        e
+      end
+
+      def delete_response(response_id)
+        client.responses.delete(response_id)
+        nil
+      rescue StandardError => e
+        e
+      end
+
+      def delete_conversation(conversation_id)
+        client.conversations.delete(conversation_id)
+        nil
+      rescue StandardError => e
+        e
       end
     end
   end

@@ -60,7 +60,7 @@ class RecordingStudioAITest < Minitest::Test
     root = File.expand_path("..", __dir__)
     migration_files = Dir[File.join(root, "db/migrate/*.rb")]
 
-    assert_equal 11, migration_files.size
+    assert_equal 12, migration_files.size
     expected_migration_fragments.each do |fragment|
       assert migration_files.any? { |file| file.include?(fragment) }, fragment
     end
@@ -79,6 +79,7 @@ class RecordingStudioAITest < Minitest::Test
       allow_recording_studio_ai_decision_executions
       allow_recording_studio_ai_tool_executions
       allow_recording_studio_ai_hosted_agent_runs
+      add_recording_studio_ai_hosted_turns
       add_prompt_attribution_to_recording_studio_ai_runs
       remove_prompt_namespace_and_short_name_from_recording_studio_ai_runs
     ]

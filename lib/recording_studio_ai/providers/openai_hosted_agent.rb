@@ -5,10 +5,11 @@ require_relative "openai_responses_agent"
 module RecordingStudioAI
   module Providers
     # OpenAI hosted sessions. The default backend is the beta Agents API.
-    # config.hosted_agent_backend :responses uses the Responses API instead.
-    # A stored id routes the call: sess_ stays on the beta adapter, conv_
-    # uses Responses. Hosted sessions are stored on OpenAI and are not Zero
-    # Data Retention eligible. Responses generation still sends store: false.
+    # config.hosted_agent_backend chooses the API for new sessions only.
+    # A stored sess_ id always uses the beta adapter. A stored conv_ id always
+    # uses Responses. Any other stored id raises legacy_beta_session.
+    # Hosted sessions are stored on OpenAI and are not Zero Data Retention
+    # eligible. Responses generation still sends store: false.
     module OpenAIHostedAgent
       include OpenAIResponsesAgent
 
@@ -151,20 +152,17 @@ module RecordingStudioAI
 
       def backend_for(provider_session_id)
         session_id = provider_session_id.to_s
-        if responses_backend?
-          legacy_beta_session! unless session_id.start_with?("conv_")
-          return :responses
-        end
         return :responses if session_id.start_with?("conv_")
+        return :agents_beta if session_id.start_with?("sess_")
 
-        :agents_beta
+        legacy_beta_session!
       end
 
       def legacy_beta_session!
         raise HostedAgentFailure, Contracts::NormalizedError.new(
           category: "invalid_session",
           code: "legacy_beta_session",
-          message: "This session id is from the beta Agents API. The Responses backend only accepts conversation ids.",
+          message: "This session id is neither a beta session (sess_) nor a Responses conversation (conv_).",
           retryable: false,
           provider: self.class.provider_key.to_s
         )

@@ -2,28 +2,27 @@
 
 ## Upgrading to 0.17.0
 
-Adds an opt-in Responses backend for hosted sessions. The Agents API beta stays the default. No migration.
+Adds an opt-in Responses backend for hosted sessions. The Agents API beta stays the default. This release adds `recording_studio_ai_hosted_turns` and a partial unique index on running hosted runs.
 
 ### What changed
 
 The Agents API beta has no announced shutdown. OpenAI's deprecations page lists Agent Builder, not this beta. `config.hosted_agent_backend` defaults to `:agents_beta`. Set `:responses` only for new sessions you want on the Responses API. This gem removes the beta adapter only after OpenAI announces a deprecation.
 
-Stored ids route the call:
+`hosted_agent_backend` chooses the API for new sessions. An existing id always routes by prefix:
 
-| Backend | Stored id | Adapter |
-| --- | --- | --- |
-| `:agents_beta` (default) | `sess_` or any id other than `conv_` | Agents API beta |
-| `:agents_beta` | `conv_` | Responses |
-| `:responses` | `conv_` | Responses |
-| `:responses` | anything else, including `sess_` | raises `invalid_session` / `legacy_beta_session` |
+| Stored id | Adapter |
+| --- | --- |
+| `sess_` | Agents API beta |
+| `conv_` | Responses |
+| anything else | raises `invalid_session` / `legacy_beta_session` |
 
 `resolved_model` is unchanged from 0.16.0: host names stay `gpt-5`, `gpt-5-mini`, and `gpt-5-pro`. OpenAI bills `gpt-5.6-sol` or `gpt-5.6-terra`. A Responses conversation stores the host name and the adapter prefers that over `response.model`.
 
-Responses sessions are still stored on OpenAI and are not Zero Data Retention eligible. Each turn sends `context_management` compaction with a 200,000 token threshold, and `max_tool_calls` of 4. Compaction trims the model's context. It does not delete the conversation. `delete_session` cancels and deletes the response ids stored on the conversation, then deletes the conversation. Ids that never made it onto that list, and OpenAI's logs, remain.
+Responses sessions are still stored on OpenAI and are not Zero Data Retention eligible. Each turn sends `context_management` compaction with a 200,000 token threshold, and `max_tool_calls` of 4. Compaction trims the model's context. It does not delete the conversation. Response ids and the stream cursor are rows in `recording_studio_ai_hosted_turns`. Conversation metadata keeps the host model and the latest response id. `delete_session` cancels and deletes those stored response ids, then deletes the conversation. If one of those calls fails, the returned status is `partial`. Ids that were never stored, and OpenAI's logs, remain.
 
 A follow-up while the latest Responses turn is still running raises `turn_active`. Cancel the turn, then send input. The beta adapter still accepts a follow-up as a steer.
 
-`require_approval` may be `never` or `always` (the default). `never` asks OpenAI not to pause. If a response still contains `mcp_approval_request`, the turn fails with `mcp_approval_required`. The gem does not approve it.
+`require_approval` may be `never` or `always`. The default is `always`. With `always`, every MCP call asks for approval, the response includes `mcp_approval_request`, and the turn fails with `mcp_approval_required`. The gem does not approve it. `never` asks OpenAI not to pause. A response that still contains `mcp_approval_request` fails the same way.
 
 Conversation and response creates do not send `Idempotency-Key`. Keep passing `idempotency_key` on `Agents.create_session` and `send_input`; the beta adapter still sends it, and the run record still stores it.
 
@@ -31,7 +30,7 @@ Put an MCP bearer token in `authorization`. Do not copy it into `headers`.
 
 ### Upgrade steps
 
-Install RecordingStudioAI `0.17.0` and bundle `openai` `~> 0.106`. No migration is required. Leave `hosted_agent_backend` at `:agents_beta` until you are ready to create new `conv_` sessions.
+Install RecordingStudioAI `0.17.0`, bundle `openai` `~> 0.106`, and run migrations. `AddRecordingStudioAIHostedTurns` creates the hosted-turns table and builds `idx_rsai_runs_one_running_hosted_session` with `CONCURRENTLY` on Postgres. It checks `pg_index.indisvalid` before the migration finishes. The index build needs Marco's approval before this draft merges. Leave `hosted_agent_backend` at `:agents_beta` until you are ready to create new `conv_` sessions. A stored `sess_` id keeps using the beta adapter.
 
 ## Upgrading to 0.16.0
 

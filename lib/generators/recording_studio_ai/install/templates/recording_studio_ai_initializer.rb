@@ -18,6 +18,8 @@ RecordingStudioAI.configure do |config|
   # Responses API. The beta stays until OpenAI announces a deprecation.
   # config.hosted_agent_backend = :agents_beta
   # Put the bearer token in authorization. Do not copy it into headers.
+  # require_approval defaults to always, so every MCP call fails the turn
+  # until a host sets never.
   # config.hosted_agent_mcp_servers = [
   #   { server_url: "https://mcp.example.com/mcp", server_label: "example", authorization: "Bearer …" }
   # ]

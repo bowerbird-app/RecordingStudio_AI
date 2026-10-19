@@ -13,6 +13,7 @@ module RecordingStudioAI
         app/models/recording_studio_ai/batch
         app/models/recording_studio_ai/batch_item
         app/models/recording_studio_ai/response
+        app/models/recording_studio_ai/hosted_response
       ].freeze
       JOB_REQUIRES = %w[
         app/jobs/recording_studio_ai/batch_synchronization_job
@@ -48,7 +49,8 @@ module RecordingStudioAI
           classes + [
             AllowRecordingStudioAIDecisionExecutions,
             AllowRecordingStudioAIToolExecutions,
-            AllowRecordingStudioAIHostedAgentRuns
+            AllowRecordingStudioAIHostedAgentRuns,
+            AddRecordingStudioAIHostedTurns
           ]
         end
       end
@@ -88,7 +90,8 @@ module RecordingStudioAI
           RecordingStudioAI::CustomToolInvocation,
           RecordingStudioAI::Batch,
           RecordingStudioAI::BatchItem,
-          RecordingStudioAI::Response
+          RecordingStudioAI::Response,
+          RecordingStudioAI::HostedResponse
         ].each(&:reset_column_information)
       end
 

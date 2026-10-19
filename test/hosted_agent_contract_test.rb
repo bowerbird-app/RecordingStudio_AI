@@ -168,8 +168,25 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "turn-2", @fake.submits.last[:idempotency_key]
   end
 
-  def test_stream_follows_a_later_provider_turn_id
+  def test_beta_stream_keeps_the_original_turn_id
     session = create_session
+    RecordingStudioAI::Run.find(session.run_id).update!(provider_turn_id: "turn_1")
+    @fake.events = [
+      RecordingStudioAI::Providers::StreamEvent.new(
+        type: "text_delta", text_delta: "Hi", metadata: { provider_turn_id: "turn_1" }
+      ),
+      RecordingStudioAI::Providers::StreamEvent.new(
+        type: "text_delta", text_delta: " there", metadata: { provider_turn_id: "turn_2" }
+      )
+    ]
+
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+
+    assert_equal "turn_1", RecordingStudioAI::Run.find(session.run_id).provider_turn_id
+  end
+
+  def test_stream_follows_a_later_provider_turn_id
+    session = responses_session
     @fake.events = [
       RecordingStudioAI::Providers::StreamEvent.new(
         type: "text_delta", text_delta: "Hi", metadata: { provider_turn_id: "resp_1" }
@@ -395,6 +412,16 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     RecordingStudioAI::Agents.create_session(**args)
   end
 
+  def responses_session
+    session = create_session
+    run = RecordingStudioAI::Run.find(session.run_id)
+    run.update!(provider_session_id: "conv_1")
+    RecordingStudioAI::Agents::Session.new(
+      provider: session.provider, provider_session_id: "conv_1", model: session.model,
+      profile: session.profile, status: session.status, run_id: session.run_id
+    )
+  end
+
   def session_args(session)
     { session: session, root_recording: @root, initiator: @initiator }
   end
@@ -441,6 +468,10 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
   def copy_run(session, root)
     copy = RecordingStudioAI::Run.find(session.run_id).dup
     copy.root_recording_id = root.id
+    # A second running row for the same session is rejected by the partial
+    # unique index. A finished copy is enough to show the session on another root.
+    copy.status = "completed"
+    copy.completed_at = Time.current
     copy.save!
   end
 

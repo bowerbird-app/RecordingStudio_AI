@@ -460,9 +460,10 @@ implement the same methods on `Providers::Base`.
 
 OpenAI has two backends. `config.hosted_agent_backend` defaults to
 `:agents_beta`, the Agents API beta. That beta is not deprecated. This gem
-removes it only after OpenAI announces a deprecation. Set `:responses` to
-create new sessions on the Responses API (`conv_` ids). A stored `sess_` id
-keeps using the beta adapter. On the Responses backend, a non-`conv_` id raises
+removes it only after OpenAI announces a deprecation. The setting chooses the
+API for new sessions. Set `:responses` to create those sessions on the
+Responses API (`conv_` ids). A stored id always routes by its prefix: `sess_`
+stays on the beta adapter, `conv_` uses Responses, and any other id raises
 `legacy_beta_session`.
 
 Only models registered with the `hosted_agent` operation resolve. A name that is
@@ -505,11 +506,12 @@ one `hosted_agent` run, attributed with the caller's `root_recording` and
 authorized with `recording_studio_ai.execute`. `send_input`, `stream`, `cancel`,
 `delete_session`, and `recover` also require a `hosted_agent` run for that
 provider session on the caller's root and none on any other root. Otherwise
-they raise that same authorization error and do not call the provider. On the
-beta adapter, a follow-up while that turn is still active steers it and keeps
-the same run. On the Responses backend, that follow-up raises `turn_active`;
-cancel the turn before sending more input. A follow-up after the turn is
-terminal records a new run.
+they raise that same authorization error and do not call the provider. Submit
+takes a database lock, and one running hosted run is allowed per provider
+session. On the beta adapter, a follow-up while that turn is still active
+steers it and keeps the same run. On Responses, that follow-up raises
+`turn_active`; cancel the turn before sending more input. A follow-up after
+the turn is terminal records a new run.
 
 Pass `idempotency_key` on create and on every `send_input`. The beta adapter
 sends it as `Idempotency-Key`. Responses conversation and response creates do
@@ -522,19 +524,26 @@ environment `type: "none"` (no sandbox) and requires the first input at create
 time.
 
 Responses turns are created with `background: true` and `stream: true`. The
-adapter keeps the `sequence_number` from `response.created` and resumes with
-`starting_after`, so a reconnect does not repeat deltas. If that stream drops,
-it polls `GET /responses/:id`. Each request sends `max_tool_calls` (4) and
-`context_management` compaction at 200,000 tokens. Compaction limits how much
-of the conversation the model sees. It does not delete the conversation.
-`delete_session` cancels and deletes the response ids stored for that
-conversation, then deletes the conversation. Response ids that were never
-stored, and OpenAI's logs, remain.
+response id and the stream cursor live in `recording_studio_ai_hosted_turns`.
+Conversation metadata keeps the host model and the latest response id. The
+adapter writes the cursor after events are yielded, in batches, and when the
+turn finishes. A reconnect resumes with `starting_after`, so it does not
+repeat deltas. If that stream drops, it polls `GET /responses/:id` with a
+short backoff and emits text only once the response is terminal. Each request
+sends `max_tool_calls` (4) and `context_management` compaction at 200,000
+tokens. Compaction limits how much of the conversation the model sees. It does
+not delete the conversation. `delete_session` cancels and deletes the response
+ids stored for that conversation, then deletes the conversation. If a cancel
+or delete fails, the status is `partial`. Response ids that were never stored,
+and OpenAI's logs, remain.
 
 An `mcp_approval_request` finishes the turn as `failed` with
-`mcp_approval_required`. The gem does not approve it, including when
-`require_approval` is `never`. A turn that hits the tool step cap finishes as
-`failed` with `tool_step_limit`.
+`mcp_approval_required`. The gem does not approve it. The default
+`require_approval` is `always`, so every MCP call fails the turn until a host
+sets `never`. `never` asks OpenAI not to pause. A response that still contains
+`mcp_approval_request` fails the same way. A turn whose output contains at
+least 4 built-in tool calls finishes as `failed` with `tool_step_limit`.
+`function_call` and `custom_tool_call` items do not count.
 
 ```ruby
 config.hosted_agent_backend = :responses

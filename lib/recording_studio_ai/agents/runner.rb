@@ -30,14 +30,17 @@ module RecordingStudioAI
         authorize!(request)
         session = request.fetch(:session)
         guard_session!(session, request)
-        existing_id = running_run(session, request)&.id
-        run = run_for_input(session, request)
-        preserve = run.id == existing_id ? ["turn_active"] : []
-        call_provider(run, preserve_codes: preserve) do
-          adapter_for(session.provider).submit_hosted_agent_input(
-            provider_session_id: session.provider_session_id,
-            input: request[:input], idempotency_key: request[:idempotency_key]
-          )
+        run = nil
+        RecordingStudioAI::HostedResponse.with_session_lock(session.provider_session_id) do
+          existing_id = running_run(session, request)&.id
+          run = run_for_input(session, request)
+          preserve = run.id == existing_id ? ["turn_active"] : []
+          call_provider(run, preserve_codes: preserve) do
+            adapter_for(session.provider).submit_hosted_agent_input(
+              provider_session_id: session.provider_session_id,
+              input: request[:input], idempotency_key: request[:idempotency_key]
+            )
+          end
         end
         turn_from(run.reload)
       end
@@ -70,10 +73,10 @@ module RecordingStudioAI
         authorize!(request)
         session = request.fetch(:session)
         guard_session!(session, request)
-        call_provider(nil) do
+        hosted = call_provider(nil) do
           adapter_for(session.provider).delete_hosted_agent_session(provider_session_id: session.provider_session_id)
         end
-        replace_status(session, "deleted")
+        replace_status(session, hosted&.status || "deleted")
       end
 
       def recover(raw)
@@ -270,6 +273,16 @@ module RecordingStudioAI
         run = insert_run(merged, candidate_for(session), request[:input])
         run.update!(provider_session_id: session.provider_session_id)
         run
+      rescue ActiveRecord::RecordNotUnique
+        raise_turn_active!
+      end
+
+      def raise_turn_active!
+        raise Failure, Contracts::NormalizedError.new(
+          category: "invalid_request", code: "turn_active",
+          message: "A hosted agent turn is still running. Cancel it before sending more input.",
+          retryable: false
+        )
       end
 
       def insert_run(request, candidate, input)
@@ -318,9 +331,19 @@ module RecordingStudioAI
       end
 
       def remember_turn(run, turn_id)
-        return if turn_id.blank? || run.provider_turn_id == turn_id.to_s
+        turn_id = turn_id.to_s
+        return if turn_id.empty? || run.provider_turn_id == turn_id
+        return if run.provider_turn_id.present? && !run.provider_session_id.to_s.start_with?("conv_")
 
-        run.update!(provider_turn_id: turn_id.to_s)
+        current = run.provider_turn_id
+        scope = run.class.where(id: run.id)
+        scope = current.blank? ? scope.where(provider_turn_id: [nil, ""]) : scope.where(provider_turn_id: current)
+        return unless scope.update_all(provider_turn_id: turn_id).positive?
+
+        run.provider_turn_id = turn_id
+        # update_all bumps lock_version in the database. Keep this object on that version.
+        run.lock_version = run.lock_version.to_i + 1 if run.class.locking_enabled?
+        run.clear_attribute_changes(%w[provider_turn_id lock_version])
       end
 
       def running_run(session, request)

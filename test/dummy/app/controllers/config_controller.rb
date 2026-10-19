@@ -45,7 +45,7 @@ class ConfigController < ApplicationController
                        "allowed_tools, require_approval",
       default: "[]",
       explanation: "Remote MCP servers for Responses hosted sessions. Put a bearer token in authorization, not in headers. " \
-                   "Labels must be unique. require_approval is never or always."
+                   "Labels must be unique. require_approval defaults to always, which fails every MCP call until you set never."
     },
     {
       key: "gemini_client",

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_19_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -263,6 +263,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
     t.check_constraint "status::text = ANY (ARRAY['requested'::character varying::text, 'awaiting_confirmation'::character varying::text, 'authorized'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'denied'::character varying::text, 'rejected'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "chk_rsai_tool_invocations_status"
   end
 
+  create_table "recording_studio_ai_hosted_turns", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "provider_session_id", null: false
+    t.string "response_id", null: false
+    t.integer "sequence_number"
+    t.boolean "text_emitted", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["provider_session_id"], name: "idx_rsai_hosted_turns_session"
+    t.index ["response_id"], name: "idx_rsai_hosted_turns_response_id", unique: true
+  end
+
   create_table "recording_studio_ai_responses", force: :cascade do |t|
     t.bigint "attempt_id"
     t.bigint "batch_item_id"
@@ -352,6 +363,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
     t.index ["profile_key", "created_at"], name: "index_recording_studio_ai_runs_on_profile_key_and_created_at"
     t.index ["prompt_key", "prompt_version", "created_at"], name: "idx_rsai_runs_prompt_created_at"
     t.index ["provider_session_id"], name: "index_recording_studio_ai_runs_on_provider_session_id"
+    t.index ["provider_session_id"], name: "idx_rsai_runs_one_running_hosted_session", unique: true, where: "((operation)::text = 'hosted_agent'::text) AND ((status)::text = 'running'::text) AND (provider_session_id IS NOT NULL)"
     t.index ["provider_turn_id"], name: "index_recording_studio_ai_runs_on_provider_turn_id"
     t.index ["purpose", "created_at"], name: "index_recording_studio_ai_runs_on_purpose_and_created_at"
     t.index ["request_id"], name: "index_recording_studio_ai_runs_on_request_id"

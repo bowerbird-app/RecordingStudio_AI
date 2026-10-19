@@ -248,6 +248,10 @@ module RecordingStudioAI
       "#<#{self.class.name} #{parts.join(' ')}>"
     end
 
+    def to_s
+      inspect
+    end
+
     def model_fallbacks_for(provider, model)
       Array(@model_fallbacks[[provider.to_sym, model.to_s]])
     end
@@ -377,7 +381,10 @@ module RecordingStudioAI
       invalid_configuration!("hosted agent MCP server_url is required") if url.empty?
       label = raw[:server_label].to_s.strip.presence || derived_mcp_label(url)
       unless label.match?(/\A[A-Za-z0-9][A-Za-z0-9_-]*\z/)
-        invalid_configuration!("unknown hosted agent MCP server label #{label}")
+        invalid_configuration!(
+          "hosted agent MCP server label must use letters, numbers, underscores, or hyphens " \
+          "(got #{label.inspect})"
+        )
       end
       if labels.include?(label)
         invalid_configuration!("hosted agent MCP server label #{label} is already used")
@@ -391,12 +398,26 @@ module RecordingStudioAI
       if headers && !headers.is_a?(Hash)
         invalid_configuration!("hosted agent MCP headers must be a Hash")
       end
-      {
+      McpServer[
         server_url: url, server_label: label, authorization: raw[:authorization]&.to_s.presence,
         headers: headers&.transform_keys(&:to_s),
         allowed_tools: raw[:allowed_tools].nil? ? nil : Array(raw[:allowed_tools]).map(&:to_s),
         require_approval: approval
-      }
+      ]
+    end
+
+    # The reader returns these hashes. inspect and to_s hide the bearer token
+    # and header values; callers still read the real authorization.
+    class McpServer < Hash
+      def inspect
+        redacted = {}
+        each { |key, value| redacted[key] = value }
+        redacted[:authorization] = "[REDACTED]" if self[:authorization]
+        redacted[:headers] = "[REDACTED]" if self[:headers]
+        redacted.inspect
+      end
+
+      alias to_s inspect
     end
 
     def derived_mcp_label(url)

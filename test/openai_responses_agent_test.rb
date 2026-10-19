@@ -3,9 +3,10 @@
 require "test_helper"
 require "json"
 require "webmock"
-WebMock.allow_net_connect!
 
 class OpenAIResponsesAgentTest < Minitest::Test
+  include RecordingStudioAI::Test::Persistence
+
   class Stream
     attr_reader :closed
 
@@ -118,13 +119,15 @@ class OpenAIResponsesAgentTest < Minitest::Test
 
     def delete(response_id)
       @world.log << [:delete_response, response_id]
+      raise "delete failed" if @world.fail_delete
+
       nil
     end
   end
 
   class World
-    attr_accessor :metadata, :fail_update, :stream_error, :resume_events, :statuses, :output, :output_text,
-                  :incomplete_reason, :response_model, :holds_left, :hold, :held
+    attr_accessor :metadata, :fail_update, :fail_delete, :stream_error, :resume_events, :statuses, :output,
+                  :output_text, :incomplete_reason, :response_model, :holds_left, :hold, :held
     attr_reader :log
 
     def initialize
@@ -158,16 +161,63 @@ class OpenAIResponsesAgentTest < Minitest::Test
     end
   end
 
-  Client = Struct.new(:conversations, :responses)
+  class BetaEvents
+    def initialize(world)
+      @world = world
+    end
+
+    def create(*)
+      @world.log << [:beta_submit]
+      nil
+    end
+  end
+
+  class BetaSessions
+    def initialize(world)
+      @events = BetaEvents.new(world)
+    end
+
+    attr_reader :events
+  end
+
+  class BetaAgents
+    def initialize(world)
+      @sessions = BetaSessions.new(world)
+    end
+
+    attr_reader :sessions
+  end
+
+  class BetaClient
+    def initialize(world)
+      @agents = BetaAgents.new(world)
+    end
+
+    attr_reader :agents
+  end
+
+  Client = Struct.new(:conversations, :responses, :beta)
 
   def setup
+    RecordingStudioAI::Test::Persistence.load!
+    connect_shared_sqlite!
+    bootstrap_host_tables!
+    migrate_persistence!
+    RecordingStudioAI::HostedResponse.reset_column_information
     @world = World.new
     configuration = RecordingStudioAI::Configuration.new
     configuration.hosted_agent_backend = :responses
-    configuration.openai_client = Client.new(Conversations.new(@world), Responses.new(@world))
+    configuration.openai_client = Client.new(
+      Conversations.new(@world), Responses.new(@world), BetaClient.new(@world)
+    )
     configuration.retry_sleeper = ->(_seconds) {}
     @adapter = RecordingStudioAI::Providers::OpenAI.new(configuration: configuration)
     @configuration = configuration
+  end
+
+  def teardown
+    disconnect_sqlite!
+    FileUtils.rm_f(@sqlite_path) if @sqlite_path
   end
 
   def test_create_streams_in_the_background_and_stores_the_created_sequence
@@ -183,9 +233,14 @@ class OpenAIResponsesAgentTest < Minitest::Test
     refute params.key?(:request_options)
     assert_equal "conv_1", session.provider_session_id
     assert_equal "gpt-6-astra", session.model
+    stored = RecordingStudioAI::HostedResponse.latest_for("conv_1")
+    assert_equal "resp_1", stored.response_id
+    assert_equal 2, stored.sequence_number
+    assert_equal false, stored.text_emitted
     assert_equal "resp_1", @world.metadata["response_id"]
-    assert_equal "2", @world.metadata["sequence_number"]
-    assert_equal "false", @world.metadata["text_emitted"]
+    refute @world.metadata.key?("response_ids")
+    refute @world.metadata.key?("sequence_number")
+    assert_operator @world.metadata.values.join.bytesize, :<, 512
   end
 
   def test_create_prefers_the_stored_host_model_over_the_billed_model
@@ -237,7 +292,7 @@ class OpenAIResponsesAgentTest < Minitest::Test
     first = Thread.new do
       @adapter.submit_hosted_agent_input(provider_session_id: "conv_1", input: "One", idempotency_key: "a")
     end
-    assert_equal :blocked, @world.held.pop
+    assert_equal :blocked, @world.held.pop(timeout: 2)
     second = Thread.new do
       @adapter.submit_hosted_agent_input(provider_session_id: "conv_1", input: "Two", idempotency_key: "b")
     end
@@ -264,7 +319,7 @@ class OpenAIResponsesAgentTest < Minitest::Test
     assert_equal({ starting_after: 2 }, streaming.last[2])
     assert_equal %w[text_delta turn_completed], events.map(&:type)
     assert_equal "new", events[0].text_delta
-    assert_equal "4", @world.metadata["sequence_number"]
+    assert_equal 4, RecordingStudioAI::HostedResponse.latest_for("conv_1").sequence_number
   end
 
   def test_reconnect_does_not_repeat_text_after_a_poll
@@ -275,7 +330,7 @@ class OpenAIResponsesAgentTest < Minitest::Test
     events = []
     @adapter.stream_hosted_agent_session(provider_session_id: "conv_1") { |event| events << event }
     assert_equal %w[message_completed turn_completed], events.map(&:type)
-    assert_equal "true", @world.metadata["text_emitted"]
+    assert_equal true, RecordingStudioAI::HostedResponse.latest_for("conv_1").text_emitted
 
     again = []
     @adapter.stream_hosted_agent_session(provider_session_id: "conv_1") { |event| again << event }
@@ -312,8 +367,10 @@ class OpenAIResponsesAgentTest < Minitest::Test
 
     assert_equal(%w[resp_2 resp_2], events.map { |event| event.metadata["provider_turn_id"] })
     assert_equal "resp_2", @world.metadata["response_id"]
-    assert_includes @world.metadata["response_ids"].split(","), "resp_1"
-    assert_includes @world.metadata["response_ids"].split(","), "resp_2"
+    ids = RecordingStudioAI::HostedResponse.response_ids_for("conv_1")
+    assert_includes ids, "resp_1"
+    assert_includes ids, "resp_2"
+    refute @world.metadata.key?("response_ids")
   end
 
   def test_approval_and_tool_step_limit_fail_the_turn
@@ -333,14 +390,19 @@ class OpenAIResponsesAgentTest < Minitest::Test
     assert_equal "mcp_approval_required", events.last.error.code
     refute_includes events.map(&:type), "turn_completed"
 
-    @world.metadata["sequence_number"] = "2"
+    RecordingStudioAI::HostedResponse.latest_for("conv_1").update!(sequence_number: 2, text_emitted: false)
     @world.resume_events = [
       {
-        type: "response.incomplete", sequence_number: 5,
+        type: "response.completed", sequence_number: 5,
         response: completed_response("resp_1").merge(
-          status: "incomplete",
-          incomplete_details: { reason: "max_tool_calls" },
-          output: [{ type: "mcp_call" }]
+          status: "completed",
+          output: [
+            { type: "mcp_call", id: "call_1" },
+            { type: "web_search_call", id: "call_2" },
+            { type: "file_search_call", id: "call_3" },
+            { type: "code_interpreter_call", id: "call_4" },
+            { type: "function_call", id: "fn_1" }
+          ]
         )
       }
     ]
@@ -352,7 +414,7 @@ class OpenAIResponsesAgentTest < Minitest::Test
 
   def test_cancel_and_delete_reach_the_stored_responses
     create_session
-    @world.metadata["response_ids"] = "resp_old,resp_1"
+    RecordingStudioAI::HostedResponse.record!(provider_session_id: "conv_1", response_id: "resp_old")
     @world.statuses["resp_old"] = "completed"
     @world.statuses["resp_1"] = "in_progress"
 
@@ -362,7 +424,8 @@ class OpenAIResponsesAgentTest < Minitest::Test
     deleted = @adapter.delete_hosted_agent_session(provider_session_id: "conv_1")
     cancelled = log_values(:cancel)
     removed = log_values(:delete_response)
-    assert_includes cancelled, "resp_old"
+    assert_includes cancelled, "resp_1"
+    refute_includes cancelled, "resp_old"
     assert_includes removed, "resp_old"
     assert_includes removed, "resp_1"
     refute_includes removed, "resp_untracked"
@@ -370,14 +433,73 @@ class OpenAIResponsesAgentTest < Minitest::Test
     assert_equal "deleted", deleted.status
   end
 
-  def test_responses_backend_rejects_a_beta_session_id
+  def test_responses_backend_rejects_an_id_that_is_not_a_known_prefix
     error = assert_raises(RecordingStudioAI::Providers::HostedAgentFailure) do
-      @adapter.submit_hosted_agent_input(provider_session_id: "sess_1", input: "Hi", idempotency_key: "k")
+      @adapter.submit_hosted_agent_input(provider_session_id: "legacy_1", input: "Hi", idempotency_key: "k")
     end
 
     assert_equal "invalid_session", error.error.category
     assert_equal "legacy_beta_session", error.error.code
     assert_empty @world.log
+  end
+
+  def test_sess_id_stays_on_the_beta_adapter
+    @configuration.hosted_agent_backend = :responses
+
+    @adapter.submit_hosted_agent_input(provider_session_id: "sess_9", input: "Hi", idempotency_key: "k")
+
+    assert_includes @world.log.map(&:first), :beta_submit
+    refute_includes @world.log.map(&:first), :stream_raw
+  end
+
+  def test_submit_cancels_the_response_when_remember_fails
+    create_session
+    @world.statuses["resp_1"] = "completed"
+    @world.fail_update = true
+
+    assert_raises(RuntimeError) do
+      @adapter.submit_hosted_agent_input(provider_session_id: "conv_1", input: "Next", idempotency_key: "turn-2")
+    end
+
+    assert_includes log_values(:cancel), "resp_2"
+    refute(@world.log.any? { |entry| entry[0] == :conversation_delete })
+  end
+
+  def test_delete_reports_partial_when_a_response_delete_fails
+    create_session
+    @world.fail_delete = true
+
+    deleted = @adapter.delete_hosted_agent_session(provider_session_id: "conv_1")
+
+    assert_equal "partial", deleted.status
+  end
+
+  def test_many_response_ids_stay_out_of_conversation_metadata
+    create_session
+    ids = Array.new(40) { |index| "resp_#{index.to_s.rjust(4, '0')}_padding" }
+    ids.each do |response_id|
+      RecordingStudioAI::HostedResponse.record!(provider_session_id: "conv_1", response_id: response_id)
+    end
+
+    joined = RecordingStudioAI::HostedResponse.response_ids_for("conv_1").join(",")
+    assert_operator joined.bytesize, :>, 512
+    refute @world.metadata.key?("response_ids")
+    assert_operator @world.metadata.values.join.bytesize, :<, 512
+  end
+
+  def test_polling_waits_and_skips_text_while_the_response_is_in_progress
+    create_session
+    @world.stream_error = Timeout::Error.new("raw")
+    @world.statuses["resp_1"] = "in_progress"
+    @world.output_text = "not yet"
+    delays = []
+    @configuration.retry_sleeper = ->(seconds) { delays << seconds }
+
+    events = []
+    @adapter.stream_hosted_agent_session(provider_session_id: "conv_1") { |event| events << event }
+
+    assert_empty events
+    assert_equal [0.5, 1, 2, 4], delays
   end
 
   def test_mcp_tools_send_authorization_and_do_not_auto_approve
@@ -400,6 +522,13 @@ class OpenAIResponsesAgentTest < Minitest::Test
   end
 
   private
+
+  # A file database lets a second thread see the migrated tables and wait on
+  # the writer lock. :memory: is private to one connection.
+  def connect_shared_sqlite!
+    @sqlite_path = File.join(Dir.tmpdir, "rsai-responses-#{object_id}.sqlite3")
+    ActiveRecord::Base.establish_connection(adapter: "sqlite3", database: @sqlite_path, pool: 5)
+  end
 
   def create_session(model: "gpt-6-astra")
     @adapter.create_hosted_agent_session(
@@ -436,8 +565,14 @@ end
 
 class OpenAIResponsesWebMockTest < Minitest::Test
   include WebMock::API
+  include RecordingStudioAI::Test::Persistence
 
   def setup
+    RecordingStudioAI::Test::Persistence.load!
+    connect_sqlite_memory!
+    bootstrap_host_tables!
+    migrate_persistence!
+    RecordingStudioAI::HostedResponse.reset_column_information
     WebMock.enable!
     WebMock.disable_net_connect!
     WebMock.reset!
@@ -449,8 +584,8 @@ class OpenAIResponsesWebMockTest < Minitest::Test
 
   def teardown
     WebMock.reset!
-    WebMock.allow_net_connect!
     WebMock.disable!
+    disconnect_sqlite!
   end
 
   def test_create_body_sets_stream_and_background
