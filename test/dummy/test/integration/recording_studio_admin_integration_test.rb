@@ -518,6 +518,37 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "error_message"
   end
 
+  test "provider batches table matches the site-wide by_status chart" do
+    authenticate_for_admin!
+    other_root = RecordingStudio.root_recording_for(Workspace.create!(name: "Other #{SecureRandom.hex(4)}"))
+    RecordingStudioAI::Batch.create!(
+      status: "failed",
+      provider: "openai",
+      model: "other-root-batch",
+      root_recording_id: other_root.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 2
+    )
+    old = RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "older-than-four-weeks",
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 1
+    )
+    old.update_columns(created_at: 6.weeks.ago)
+
+    get "/admin/screens/provider_batches/table"
+    assert_response :success
+    assert_includes response.body, "other-root-batch"
+    assert_includes response.body, "older-than-four-weeks"
+  end
+
   test "ai calls web search filter keeps only searched calls" do
     authenticate_for_admin!
     searched = create_run!(

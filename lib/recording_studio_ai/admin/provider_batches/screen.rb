@@ -8,11 +8,11 @@ module AdminScreens
     subtitle { Copy.t("admin.screens.provider_batches.subtitle") }
 
     query do |context|
-      RecordingStudioAIWidgets.batches_scope(context).order(created_at: :desc)
+      RecordingStudioAIWidgets.site_batches_scope(context).order(created_at: :desc)
     end
 
     filter_presentation :modal, inline_count: 3
-    filter :date_range, field: :created_at, default: :last_4_weeks
+    filter :date_range, field: :created_at
     filter :status, field: :status, values: -> { RecordingStudioAI::Batch::STATUSES.values }
     filter :provider, field: :provider,
            values: -> { RecordingStudioAIWidgets.batch_distinct_values(:provider) }

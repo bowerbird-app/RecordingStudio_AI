@@ -150,18 +150,56 @@ class AIMetricsTest < ActiveSupport::TestCase
     RecordingStudioAI.configuration.stuck_run_threshold = original
   end
 
+  test "stuck over time counts runs that were stuck at each UTC day end" do
+    now = Time.utc(2026, 6, 10, 12)
+    original = RecordingStudioAI.configuration.stuck_run_threshold
+    RecordingStudioAI.configuration.stuck_run_threshold = 15.minutes
+    travel_to Time.utc(2026, 6, 8, 10) do
+      create_run!(
+        status: "running", resolved_model: "gpt-test", total_tokens: 1, latency_ms: 1,
+        started_at: Time.utc(2026, 6, 8, 10)
+      )
+      recovered = create_run!(
+        status: "running", resolved_model: "gpt-test", total_tokens: 1, latency_ms: 1,
+        started_at: Time.utc(2026, 6, 8, 10)
+      )
+      recovered.update_columns(status: "completed", completed_at: Time.utc(2026, 6, 9, 8))
+    end
+    travel_to(now - 5.minutes) do
+      create_run!(
+        status: "running", resolved_model: "gpt-test", total_tokens: 1, latency_ms: 1,
+        started_at: now - 5.minutes
+      )
+    end
+
+    travel_to now do
+      counts = timeseries_counts(execute("ai_runs.stuck_over_time"))
+      assert_equal 30, counts.length
+      assert_equal 0, counts.fetch("2026-06-07")
+      assert_equal 2, counts.fetch("2026-06-08")
+      assert_equal 1, counts.fetch("2026-06-09")
+      assert_equal 1, counts.fetch("2026-06-10")
+      assert_equal 1, execute("ai_runs.stuck").value
+    end
+  ensure
+    RecordingStudioAI.configuration.stuck_run_threshold = original
+  end
+
   test "failure and stuck metrics expose catalog fields and refuse identifying group_by" do
     catalog = RecordingStudioMetrics.definitions.index_by(&:identifier)
     failed = catalog.fetch("ai_runs.failed_over_time")
     stuck = catalog.fetch("ai_runs.stuck")
+    stuck_over_time = catalog.fetch("ai_runs.stuck_over_time")
     oldest = catalog.fetch("ai_runs.oldest_stuck_age")
 
     assert_equal [:error_category], failed.group_by
     assert_equal %i[status operation], stuck.group_by
+    assert_equal [], stuck_over_time.group_by
+    assert_equal :timeseries, stuck_over_time.result_type
     assert_equal [], oldest.group_by
     assert_equal "Failed AI runs", failed.title
     assert_equal "seconds", oldest.unit
-    [failed, stuck, oldest].each do |definition|
+    [failed, stuck, stuck_over_time, oldest].each do |definition|
       assert definition.description.present?
       assert_equal :site, definition.blast_radius
       filter_names = definition.filters.map(&:name)

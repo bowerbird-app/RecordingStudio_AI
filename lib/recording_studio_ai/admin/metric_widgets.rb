@@ -56,6 +56,16 @@ module AdminScreens
             RecordingStudioAI::Admin::MetricRead.scalar(card.identifier, admin_context: context).to_i
           )
         end
+        if card.identifier == "ai_runs.stuck"
+          chart_type :line
+          series do |context|
+            RecordingStudioAI::Admin::MetricRead.chart_series(
+              "ai_runs.stuck_over_time",
+              admin_context: context,
+              kind: :timeseries
+            )
+          end
+        end
       else
         value do |context|
           AdminScreens.metric_widget_value(card, context)

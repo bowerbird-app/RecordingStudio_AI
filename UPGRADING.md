@@ -7,7 +7,8 @@ Adds Admin screens and dashboard widgets for the existing AI metrics. No migrati
 ### What changed
 
 - `/admin/screens/ai_runs_health` shows failed runs by error category, stuck run count, tokens by profile, and the retry or fallback widget.
-- Provider batches shows `ai_batches.by_status` as a chart above the existing list.
+- The Stuck runs card keeps the live count and adds a 30-day line from `ai_runs.stuck_over_time`.
+- Provider batches shows `ai_batches.by_status` as a chart above the list. The list is the same site-wide set as that metric.
 - The AI Admin section dashboard adds five widgets that link to those screens. Values come from `RecordingStudioMetrics.execute`.
 
 ### Upgrade steps

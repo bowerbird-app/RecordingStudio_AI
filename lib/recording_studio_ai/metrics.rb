@@ -2,6 +2,7 @@
 
 require_relative "api/access"
 require_relative "batch_metrics"
+require_relative "stuck_over_time"
 require "recording_studio_metrics"
 
 module RecordingStudioAI
@@ -21,12 +22,18 @@ module RecordingStudioAI
       oldest = relation.minimum(Arel.sql(STUCK_SINCE_SQL))
       oldest && (Time.current - oldest).to_i
     end
+    STUCK_OVER_TIME = lambda do |relation, context|
+      RecordingStudioAI::StuckOverTime.rows(relation, timestamp: context.timestamp)
+    end
     FAILED_GROUPS = %i[error_category].freeze
     STUCK_GROUPS = %i[status operation].freeze
     FAILED_DESCRIPTION = "Runs that ended failed, by created_at (the AI Calls list date), grouped by the stored " \
                          "normalized error_category."
     STUCK_DESCRIPTION = "Pending or running runs whose started_at (or created_at if not started) is older than " \
                         "config.stuck_run_threshold (default 15 minutes)."
+    STUCK_OVER_TIME_DESCRIPTION = "Count of runs that were pending or running longer than " \
+                                  "config.stuck_run_threshold at each UTC day end (last 30 days). " \
+                                  "Rebuilt from started_at, created_at, and completed_at. Not a snapshot table."
     RETRIED_OR_FELL_BACK_SQL = "CASE WHEN recording_studio_ai_runs.retry_count > 0 OR " \
                                "recording_studio_ai_runs.fallback_count > 0 THEN 1.0 ELSE 0.0 END"
     FALLBACK_RETRY_DESCRIPTION = "Share of runs (0 to 1) created in each period that needed at least one retry " \
@@ -102,8 +109,16 @@ module RecordingStudioAI
       dsl.timeseries :failed_over_time, title: "Failed AI runs", description: FAILED_DESCRIPTION, unit: "count",
                                         field: :created_at, scope: FAILED, group_by: FAILED_GROUPS,
                                         filters: list_filters, expose: EXPOSE
+      define_stuck(dsl)
+    end
+
+    def define_stuck(dsl)
       dsl.count :stuck, title: "Stuck AI runs", description: STUCK_DESCRIPTION, unit: "count", scope: STUCK,
                         group_by: STUCK_GROUPS, filters: list_filters(status: true), cacheable: false, expose: EXPOSE
+      dsl.custom :stuck_over_time, title: "Stuck AI runs over time", description: STUCK_OVER_TIME_DESCRIPTION,
+                                   result_type: :timeseries, unit: "count", grouping: :time, intervals: %i[day],
+                                   preferred_chart: :line, cacheable: false, filters: list_filters,
+                                   expose: EXPOSE, &STUCK_OVER_TIME
       dsl.custom :oldest_stuck_age, title: "Oldest stuck AI run age", description: OLDEST_STUCK_DESCRIPTION,
                                     result_type: :scalar, unit: "seconds", scope: STUCK, cacheable: false,
                                     filters: list_filters(status: true), expose: EXPOSE, &OLDEST_STUCK_AGE

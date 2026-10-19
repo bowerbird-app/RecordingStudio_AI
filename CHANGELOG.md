@@ -10,6 +10,8 @@ Versioning and Keep a Changelog.
 ### Added
 - Admin run-health screen and five dashboard widgets that read the existing metrics: `ai_runs.failed_over_time` (by `error_category`), `ai_runs.stuck`, `ai_runs.tokens_by_profile`, `ai_runs.fallback_retry_rate`, and `ai_batches.by_status` on the provider-batches screen.
 - Each widget links to the screen that shows that metric. Numbers come from `RecordingStudioMetrics.execute`, not a second query.
+- `ai_runs.stuck_over_time`: daily stuck counts for the last 30 UTC days, rebuilt from run timestamps. The Stuck runs card keeps the live `ai_runs.stuck` number and draws this series beside it.
+- Provider batches table lists the same site-wide batches as `ai_batches.by_status` (no default last-4-weeks cutoff).
 
 ### Upgrade notes
 - Bump to `0.16.0`. No migration.

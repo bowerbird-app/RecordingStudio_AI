@@ -150,6 +150,17 @@ module AdminScreens
       RecordingStudioAI::Batch.where(root_recording_id: root_id)
     end
 
+    def site_batches_scope(context = admin_context)
+      bind_admin_context!(context) if context
+      return RecordingStudioAI::Batch.none if context.blank?
+
+      missing_access = context.try(:access_recording).blank?
+      missing_root = context.try(:root_recording).blank?
+      return RecordingStudioAI::Batch.none if missing_access && missing_root
+
+      RecordingStudioAI::Batch.all
+    end
+
     def responses_scope(context = admin_context)
       bind_admin_context!(context) if context
       root_id = context&.root_recording&.id
@@ -172,7 +183,7 @@ module AdminScreens
     end
 
     def batch_distinct_values(column)
-      batches_scope.distinct.order(column).pluck(column).compact_blank
+      site_batches_scope.distinct.order(column).pluck(column).compact_blank
     end
 
     def run_distinct_values(column)

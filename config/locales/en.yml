@@ -209,7 +209,7 @@ en:
           stuck:
             title: "Stuck runs"
             subtitle: "Pending or running past the wait."
-            description: "Opens run health. These are still going after the stuck threshold."
+            description: "The number is right now. The line is how many were stuck at the end of each day."
           tokens_by_profile:
             title: "Tokens by profile"
             subtitle: "Where the tokens went."
