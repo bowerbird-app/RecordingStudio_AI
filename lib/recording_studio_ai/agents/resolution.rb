@@ -28,12 +28,17 @@ module RecordingStudioAI
       end
 
       def registry_entries(model, provider)
-        RecordingStudioAI.models.all.filter_map do |definition|
-          next unless definition.model == model.to_s
-          next if provider && definition.provider != provider.to_sym
+        identifier = model.to_s
+        matches = RecordingStudioAI.models.all.select do |definition|
+          next false if provider && definition.provider != provider.to_sym
 
-          { provider: definition.provider, model: definition.model }
+          definition.key == identifier || definition.matches?(identifier)
         end
+        chosen = matches.find { |definition| definition.key == identifier || definition.aliases.include?(identifier) }
+        chosen ||= matches.min_by { |definition| definition.metadata["reasoning_mode"] == "pro" ? 1 : 0 }
+        return [] unless chosen
+
+        [{ provider: chosen.provider, model: identifier }]
       end
 
       def configured?(provider)

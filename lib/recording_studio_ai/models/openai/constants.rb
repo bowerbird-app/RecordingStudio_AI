@@ -29,7 +29,9 @@ module RecordingStudioAI
         end
 
         def reasoning_effort(default:)
-          { type: :string, values: %w[minimal low medium high], default: default }
+          # minimal is the GPT-5 lowest effort. GPT-5.6 has no minimal value;
+          # the OpenAI provider sends it as none.
+          { type: :string, values: %w[minimal none low medium high xhigh max], default: default }
         end
 
         def max_output_tokens(default:)

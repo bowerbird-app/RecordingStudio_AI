@@ -5,6 +5,16 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-19
+
+### Changed
+- Registered `gpt-5`, `gpt-5-mini`, and `gpt-5-pro` keep those keys. Requests send the replacements for the snapshots that shut down on December 11, 2026: `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-sol` with `reasoning.mode` `pro`. Dated snapshot names still resolve. `reasoning_effort` `minimal` is sent as `none` on `gpt-5` and `gpt-5-mini`. `gpt-5-pro` accepts only `medium`, `high`, `xhigh`, and `max`.
+
+### Upgrade notes
+- Bump to `0.16.0`. No migration.
+- `resolved_model` stays the host name (`gpt-5`, `gpt-5-mini`, or `gpt-5-pro`). OpenAI bills `gpt-5.6-sol` or `gpt-5.6-terra`.
+- See [UPGRADING.md](UPGRADING.md#upgrading-to-0160).
+
 ## [0.15.1] - 2026-10-17
 
 ### Fixed

@@ -1,5 +1,23 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.16.0
+
+Profile names stay `gpt-5`, `gpt-5-mini`, and `gpt-5-pro`. The OpenAI provider sends the replacements OpenAI lists for the December 11, 2026 shutdown:
+
+| Host name | Retired snapshot | Sent to the API |
+| --- | --- | --- |
+| `gpt-5` | `gpt-5-2025-08-07` | `gpt-5.6-sol` |
+| `gpt-5-mini` | `gpt-5-mini-2025-08-07` | `gpt-5.6-terra` |
+| `gpt-5-pro` | `gpt-5-pro-2025-10-06` | `gpt-5.6-sol` with `reasoning.mode` `pro` |
+
+`resolved_model` on runs, attempts, and usage stays the host name (`gpt-5`, `gpt-5-mini`, or `gpt-5-pro`). OpenAI bills `gpt-5.6-sol` or `gpt-5.6-terra`. Cost catalogs stay keyed by the host name.
+
+Source: [OpenAI deprecations](https://developers.openai.com/api/docs/deprecations) (also published at <https://platform.openai.com/docs/deprecations>). The dated snapshot names still resolve to the same definitions. On `gpt-5` and `gpt-5-mini`, `reasoning_effort` may be `none`, `low`, `medium`, `high`, `xhigh`, or `max`. `minimal` is still accepted and is sent as `none`. On `gpt-5-pro`, the only accepted efforts are `medium`, `high`, `xhigh`, and `max`. A lower effort raises. A request with no effort is sent as `high`.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.16.0`. No migration is required.
+
 ## Upgrading to 0.15.1
 
 Closes a cross-root hole in hosted agent sessions. No migration.

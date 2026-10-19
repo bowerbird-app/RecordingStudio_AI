@@ -31,6 +31,21 @@ class GenerationParametersTest < RecordingStudioAI::Test::IsolatedCase
     assert_equal "minimal", request[:reasoning_effort]
   end
 
+  def test_pinned_gpt5_pro_rejects_reasoning_effort_below_medium
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Contracts::RequestValidation.validate_generation_request!(
+        root_recording: @root_recording,
+        initiator: @initiator,
+        prompt: "hello",
+        provider: :openai,
+        model: "gpt-5-pro",
+        reasoning_effort: "low"
+      )
+    end
+
+    assert_match(/reasoning_effort/, error.message)
+  end
+
   def test_rejects_unsupported_parameter_for_registered_model
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
       RecordingStudioAI::Contracts::RequestValidation.validate_generation_request!(

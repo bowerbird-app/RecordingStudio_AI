@@ -536,6 +536,8 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     keys = AdminScreens::RecordingStudioAIWidgets.registered_model_keys
 
     assert_includes keys, "gpt-5-mini"
+    assert_includes keys, "gpt-5.6-terra"
+    assert_includes keys, "gpt-5-mini-2025-08-07"
     assert_includes keys, "gemini-2.5-flash"
     refute_includes keys, "calls-screen-one"
     assert_equal keys, keys.uniq.sort

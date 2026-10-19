@@ -19,9 +19,11 @@ RecordingStudioAI.configure do |config|
 
   config.default_profile = :medium
   # Route each tier to ordered provider/model candidates. Reference models by
-  # their provider API model string. Capabilities, tunable parameters, native
-  # tools, and modalities come from the model registry (see the /config guide
-  # and RecordingStudioAI.models.register). Edit this map for your own cost and
+  # their registry key. gpt-5, gpt-5-mini, and gpt-5-pro stay those names;
+  # the provider sends gpt-5.6-sol, gpt-5.6-terra, and gpt-5.6-sol with
+  # reasoning.mode pro. Capabilities, tunable parameters, native tools, and
+  # modalities come from the model registry (see the /config guide and
+  # RecordingStudioAI.models.register). Edit this map for your own cost and
   # quality targets.
   # Each tier lists generation, hosted-agent, and decision candidates together.
   # Resolution matches the operation's capabilities, so `decide` only ever sees

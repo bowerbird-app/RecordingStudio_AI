@@ -5,8 +5,9 @@ require_relative "constants"
 RecordingStudioAI.models.register(
   provider: :openai,
   key: "gpt-5",
-  model: "gpt-5",
-  display_name: "GPT-5",
+  model: "gpt-5.6-sol",
+  aliases: ["gpt-5-2025-08-07"],
+  display_name: "GPT-5.6 Sol",
   operations: [:generation],
   delivery: RecordingStudioAI::Models::Openai::Constants::DELIVERY,
   parameters: {

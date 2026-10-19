@@ -429,11 +429,20 @@ RecordingStudioAI.generate(
 )
 ```
 
+The built-in names `gpt-5`, `gpt-5-mini`, and `gpt-5-pro` stay valid. Runs store
+those names in `resolved_model`. The OpenAI provider sends `gpt-5.6-sol`,
+`gpt-5.6-terra`, and `gpt-5.6-sol` with `reasoning.mode` set to `pro`, which is
+what OpenAI bills. The retired snapshot ids (`gpt-5-2025-08-07`,
+`gpt-5-mini-2025-08-07`, `gpt-5-pro-2025-10-06`) resolve to those same
+definitions.
+
 Flat generation parameters (`temperature`, `verbosity`, `max_output_tokens`,
 `reasoning_effort`) are validated against the model registry. On profile or
 explicit fallback hops they stay when the next model supports them and are
-omitted when it does not. `RecordingStudioAI.stream` / `stream!` were removed —
-use `generate(stream: true)`.
+omitted when it does not. `reasoning_effort` `minimal` is still accepted on
+`gpt-5` and `gpt-5-mini` and is sent as `none`. `gpt-5-pro` accepts only
+`medium`, `high`, `xhigh`, and `max`. `RecordingStudioAI.stream` / `stream!`
+were removed — use `generate(stream: true)`.
 
 ## Hosted agent sessions
 

@@ -694,7 +694,7 @@ module AdminScreens
 
       rows = RecordingStudioAI.models.all.map do |definition|
         provider_key = definition.provider.to_s
-        model_key = definition.model
+        model_key = host_model_name(definition)
         ModelRow.new(
           provider_key,
           model_key,
@@ -707,9 +707,9 @@ module AdminScreens
           definition.tools.map(&:to_s).join(", "),
           definition.modalities.fetch(:input, []).map(&:to_s).join(", "),
           definition.modalities.fetch(:output, []).map(&:to_s).join(", "),
-          call_counts.fetch([provider_key, model_key], 0),
+          model_call_count(call_counts, provider_key, definition),
           (date_range.begin.to_date..date_range.end.to_date).map do |date|
-            { x: date.strftime("%b %-d"), y: daily_counts.fetch([provider_key, model_key, date], 0) }
+            { x: date.strftime("%b %-d"), y: model_daily_count(daily_counts, provider_key, definition, date) }
           end
         )
       end
@@ -799,7 +799,7 @@ module AdminScreens
     end
 
     def registered_model_keys
-      RecordingStudioAI.models.all.map { |definition| definition.model.to_s }.uniq.sort
+      RecordingStudioAI.models.all.flat_map { |definition| countable_model_names(definition) }.uniq.sort
     end
 
     def registered_models_path(context, provider:)
@@ -827,6 +827,33 @@ module AdminScreens
       return rows if provider.blank?
 
       rows.select { |row| row.provider.to_s == provider }
+    end
+
+    def host_model_name(definition)
+      definition.aliases.any? ? definition.key : definition.model
+    end
+
+    def countable_model_names(definition)
+      names = [definition.key, *definition.aliases]
+      names << definition.model unless pro_api_model_shared?(definition)
+      names.map(&:to_s).uniq
+    end
+
+    def pro_api_model_shared?(definition)
+      return false unless definition.metadata["reasoning_mode"] == "pro"
+
+      RecordingStudioAI.models.all.any? do |other|
+        other.provider == definition.provider && other.model == definition.model &&
+          other.metadata["reasoning_mode"] != "pro"
+      end
+    end
+
+    def model_call_count(counts, provider_key, definition)
+      countable_model_names(definition).sum { |name| counts.fetch([provider_key, name], 0) }
+    end
+
+    def model_daily_count(counts, provider_key, definition, date)
+      countable_model_names(definition).sum { |name| counts.fetch([provider_key, name, date], 0) }
     end
 
     def parameter_default_label(definition, name)
@@ -859,9 +886,9 @@ module AdminScreens
       rows = RecordingStudioAI.models.all.map do |definition|
         [
           definition.provider.to_s,
-          definition.model,
+          host_model_name(definition),
           definition.display_name,
-          counts.fetch([definition.provider.to_s, definition.model], 0)
+          model_call_count(counts, definition.provider.to_s, definition)
         ]
       end
       rows.sort_by { |_provider, _model, _name, calls| -calls }.first(limit)

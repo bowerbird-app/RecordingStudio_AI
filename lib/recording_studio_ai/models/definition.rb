@@ -25,14 +25,17 @@ module RecordingStudioAI
 
       MODALITIES = %i[text image audio video file].freeze
 
-      attr_reader :provider, :key, :model, :display_name, :operations, :decision_types, :delivery, :parameters,
-                  :tools, :modalities, :metadata
+      ALIAS_FORMAT = /\A[a-z0-9]+(?:[.-][a-z0-9]+)*\z/
+
+      attr_reader :provider, :key, :model, :aliases, :display_name, :operations, :decision_types, :delivery,
+                  :parameters, :tools, :modalities, :metadata
 
       def initialize(provider:, key:, model:, display_name: nil, operations: [:generation], decision_types: [],
-                     delivery: {}, parameters: {}, tools: [], modalities: {}, metadata: {})
+                     delivery: {}, parameters: {}, tools: [], modalities: {}, metadata: {}, aliases: [])
         @provider = normalize_provider(provider)
         @key = normalize_key(key)
         @model = normalize_model(model)
+        @aliases = normalize_aliases(aliases)
         @display_name = display_name.to_s.strip.presence || @key.tr("-", " ").split.map(&:capitalize).join(" ")
         @operations = normalize_operations(operations)
         @decision_types = normalize_decision_types(decision_types)
@@ -73,11 +76,16 @@ module RecordingStudioAI
         tools.include?(tool.to_sym)
       end
 
+      def matches?(identifier)
+        model == identifier.to_s || aliases.include?(identifier.to_s)
+      end
+
       def to_h
         {
           provider: provider,
           key: key,
           model: model,
+          aliases: aliases,
           display_name: display_name,
           operations: operations,
           decision_types: decision_types,
@@ -113,6 +121,17 @@ module RecordingStudioAI
         validation_error!("model identifier is required") if model.empty?
 
         model
+      end
+
+      def normalize_aliases(value)
+        names = Array(value).map { |name| name.to_s.strip }
+        names.each do |name|
+          unless name.match?(ALIAS_FORMAT)
+            validation_error!("model alias must be a lowercase model id (got #{name.inspect})")
+          end
+        end
+
+        names.uniq.freeze
       end
 
       def normalize_operations(value)
