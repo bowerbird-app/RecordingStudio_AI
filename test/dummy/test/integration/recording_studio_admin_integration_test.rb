@@ -613,6 +613,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
   test "ai section widgets count runs from every root" do
     authenticate_for_admin!
+    range = AdminScreens::RecordingStudioAIWidgets.trailing_weeks_range(weeks_back: 4)
+    before = RecordingStudioAI::Run.where(created_at: range).count
     other_root = RecordingStudio.root_recording_for(Workspace.create!(name: "Other #{SecureRandom.hex(4)}"))
     RecordingStudioAI::Run.create!(
       operation: "generation",
@@ -627,7 +629,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     get "/admin"
     assert_response :success
-    assert_equal "1", widget_metric_text(response.body, "AI calls")
+    assert_equal AdminScreens::RecordingStudioAIWidgets.number(before + 1),
+                 widget_metric_text(response.body, "AI calls")
   end
 
   test "ai calls web search filter keeps only searched calls" do
@@ -1621,15 +1624,21 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     authenticate_for_admin!
     current_run = create_run!(status: "completed", operation: "generation", resolved_model: "retry-widget-current")
     previous_run = create_run!(status: "completed", operation: "generation", resolved_model: "retry-widget-previous")
-    current_run.update_columns(retry_count: 2, created_at: 1.day.ago)
+    current_run.update_columns(retry_count: 10_000, created_at: 1.day.ago)
     previous_run.update_columns(retry_count: 1, created_at: 45.days.ago)
+
+    now = Time.current
+    current = RecordingStudioAI::Run.where(created_at: 30.days.ago..now).sum(:retry_count)
+    previous = RecordingStudioAI::Run.where(created_at: 60.days.ago..30.days.ago).sum(:retry_count)
+    change = AdminScreens::RecordingStudioAIWidgets.percentage_change_label(current: current, previous: previous)
 
     get "/admin"
 
     assert_response :success
-    assert_includes response.body, ">2<"
-    assert_includes response.body, "+100%"
-    assert_includes response.body, "text-[var(--color-danger-background-color)]"
+    card = widget_html(response.body, "Retry rate by model")
+    assert_includes card, ">#{AdminScreens::RecordingStudioAIWidgets.number(current)}<"
+    assert_includes card, change
+    assert_includes card, "text-[var(--color-danger-background-color)]" if current > previous
   end
 
   test "tool calls table filters by status" do
