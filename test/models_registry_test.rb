@@ -242,18 +242,24 @@ class ModelsRegistryTest < Minitest::Test
     pro = RecordingStudioAI.models.fetch(:openai, "gpt-5-pro")
 
     assert_equal "gpt-5.6-sol", sol.model
+    assert_equal "GPT-5.6 Sol", sol.display_name
+    assert_equal "none", sol.metadata["minimal_effort"]
+    assert_equal "GPT-5.6 Terra", mini.display_name
+    assert_equal "none", mini.metadata["minimal_effort"]
     assert_equal ["gpt-5-2025-08-07"], sol.aliases
     assert_equal sol, RecordingStudioAI.models.fetch(:openai, "gpt-5-2025-08-07")
     assert_equal "gpt-5.6-terra", mini.model
     assert_equal mini, RecordingStudioAI.models.fetch(:openai, "gpt-5-mini-2025-08-07")
     assert_equal "gpt-5.6-sol", pro.model
     assert_equal "pro", pro.metadata["reasoning_mode"]
+    assert_nil pro.metadata["minimal_effort"]
+    assert_equal "GPT-5.6 Sol Pro", pro.display_name
     assert_equal pro, RecordingStudioAI.models.fetch(:openai, "gpt-5-pro-2025-10-06")
     assert_equal sol, RecordingStudioAI.models.fetch(:openai, "gpt-5.6-sol")
     assert_includes sol.parameter(:reasoning_effort)[:values], "none"
     assert_includes sol.parameter(:reasoning_effort)[:values], "minimal"
     assert_includes sol.parameter(:reasoning_effort)[:values], "max"
-    assert_equal %w[medium high xhigh max], pro.parameter(:reasoning_effort)[:values]
+    assert_equal %w[high], pro.parameter(:reasoning_effort)[:values]
   end
 
   def test_invalid_alias_raises

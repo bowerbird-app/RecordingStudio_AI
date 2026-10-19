@@ -50,6 +50,8 @@ RecordingStudioAI.configure do |config|
     ]
   }
   # Rates are integer microunits per one million tokens, keyed by provider/model.
+  # gpt-5, gpt-5-mini, and gpt-5-pro still use those keys. Re-price them for
+  # the billed models (gpt-5.6-sol and gpt-5.6-terra). See UPGRADING.md.
   config.cost_catalogs = {}
   # Polling runs through ActiveJob. Configure Rails with :sidekiq to use Sidekiq.
   config.batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"

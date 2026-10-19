@@ -16,7 +16,7 @@ RecordingStudioAI.models.register(
     verbosity: RecordingStudioAI::Models::Openai::Constants.verbosity(default: "high"),
     max_output_tokens: RecordingStudioAI::Models::Openai::Constants.max_output_tokens(default: 16_384),
     reasoning_effort: {
-      type: :string, values: %w[medium high xhigh max], default: "high"
+      type: :string, values: %w[high], default: "high"
     }
   },
   tools: RecordingStudioAI::Models::Openai::Constants::FULL_TOOLS,

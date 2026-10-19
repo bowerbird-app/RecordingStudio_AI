@@ -4,19 +4,44 @@
 
 Profile names stay `gpt-5`, `gpt-5-mini`, and `gpt-5-pro`. The OpenAI provider sends the replacements OpenAI lists for the December 11, 2026 shutdown:
 
-| Host name | Retired snapshot | Sent to the API |
-| --- | --- | --- |
-| `gpt-5` | `gpt-5-2025-08-07` | `gpt-5.6-sol` |
-| `gpt-5-mini` | `gpt-5-mini-2025-08-07` | `gpt-5.6-terra` |
-| `gpt-5-pro` | `gpt-5-pro-2025-10-06` | `gpt-5.6-sol` with `reasoning.mode` `pro` |
+| Host name | Retired snapshot | Sent to the API | Display name |
+| --- | --- | --- | --- |
+| `gpt-5` | `gpt-5-2025-08-07` | `gpt-5.6-sol` | GPT-5.6 Sol |
+| `gpt-5-mini` | `gpt-5-mini-2025-08-07` | `gpt-5.6-terra` | GPT-5.6 Terra |
+| `gpt-5-pro` | `gpt-5-pro-2025-10-06` | `gpt-5.6-sol` with `reasoning.mode` `pro` | GPT-5.6 Sol Pro |
 
-`resolved_model` on runs, attempts, and usage stays the host name (`gpt-5`, `gpt-5-mini`, or `gpt-5-pro`). OpenAI bills `gpt-5.6-sol` or `gpt-5.6-terra`. Cost catalogs stay keyed by the host name.
+`resolved_model` on runs, attempts, and usage stays the host name (`gpt-5`, `gpt-5-mini`, or `gpt-5-pro`). OpenAI bills `gpt-5.6-sol` or `gpt-5.6-terra`. Cost catalogs stay keyed by the host name, so re-price those entries (below).
 
-Source: [OpenAI deprecations](https://developers.openai.com/api/docs/deprecations) (also published at <https://platform.openai.com/docs/deprecations>). The dated snapshot names still resolve to the same definitions. On `gpt-5` and `gpt-5-mini`, `reasoning_effort` may be `none`, `low`, `medium`, `high`, `xhigh`, or `max`. `minimal` is still accepted and is sent as `none`. On `gpt-5-pro`, the only accepted efforts are `medium`, `high`, `xhigh`, and `max`. A lower effort raises. A request with no effort is sent as `high`.
+These pages name `gpt-5.6-sol` and the Terra replacement:
+
+- [GPT-5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
+- [GPT-5.6 Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra)
+- [Reasoning models](https://developers.openai.com/api/docs/guides/reasoning) names `gpt-5.6-sol`, `gpt-5.6-terra`, and `reasoning.mode` `pro` for GPT-5.6
+- [Deprecations](https://developers.openai.com/api/docs/deprecations) (also at <https://platform.openai.com/docs/deprecations>), section 2026-06-11, shutdown December 11, 2026
+
+Dated snapshot names still resolve to the same definitions. Admin model rows show the host key. Call counts add the host key, the dated aliases, and the API model. The pro row skips the shared `gpt-5.6-sol` slug, so those calls stay on the `gpt-5` row. The playground model payload is keyed by `provider|registry key`, and its model field is the registry key.
+
+`reasoning_effort` `minimal` stays valid on `gpt-5` and `gpt-5-mini`. Those definitions set metadata `minimal_effort` to `none`, and the provider sends `none`. A model without that metadata keeps `minimal`. `gpt-5-pro` accepts only `high`, which is the only effort [GPT-5 Pro](https://developers.openai.com/api/docs/models/gpt-5-pro) supports. A request with no effort is sent as `high`.
+
+### Re-price cost catalogs
+
+Re-price `cost_catalogs` entries for `gpt-5`, `gpt-5-mini`, and `gpt-5-pro`. The catalog key stays the host name. OpenAI bills the replacement. Standard text-token rates checked on 2026-10-19:
+
+| Host name | Billed model | Input / 1M | Output / 1M | Previous list price |
+| --- | --- | --- | --- | --- |
+| `gpt-5` | `gpt-5.6-sol` | $4 | $20 | `gpt-5` $1.25 / $10 |
+| `gpt-5-mini` | `gpt-5.6-terra` | $2 | $12 | `gpt-5-mini` $0.25 / $2 |
+| `gpt-5-pro` | `gpt-5.6-sol` with `reasoning.mode` `pro` | $4 | $20 per token | `gpt-5-pro` $15 / $120 |
+
+Prompts with more than 272K input tokens bill at 2× input and 1.5× output for the whole request. On the pricing page that is $8 / $30 for `gpt-5.6-sol` and $4 / $18 for `gpt-5.6-terra`.
+
+Short-context list prices, from those pages: Terra is 8× the GPT-5 Mini input rate ($2 / $0.25) and 6× the output rate ($12 / $2). Sol is 3.2× the GPT-5 input rate ($4 / $1.25) and 2× the output rate ($20 / $10). The Sol model page says the $4 / $20 rate is promotional at least through November 21, 2026. Pro mode bills the extra model work at Sol's token rates, which replaces the old $15 / $120 GPT-5 Pro rate. Re-check the pricing page before locking a catalog.
+
+Sources: [GPT-5.6 Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol), [GPT-5.6 Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [pricing](https://developers.openai.com/api/docs/pricing), [GPT-5](https://developers.openai.com/api/docs/models/gpt-5), [GPT-5 Mini](https://developers.openai.com/api/docs/models/gpt-5-mini), [GPT-5 Pro](https://developers.openai.com/api/docs/models/gpt-5-pro), and [Reasoning models](https://developers.openai.com/api/docs/guides/reasoning) (pro mode bills at the selected model's standard token rates).
 
 ### Upgrade steps
 
-Install RecordingStudioAI `0.16.0`. No migration is required.
+Install RecordingStudioAI `0.16.0`. No migration is required. Update the `gpt-5`, `gpt-5-mini`, and `gpt-5-pro` rows in `cost_catalogs`.
 
 ## Upgrading to 0.15.1
 

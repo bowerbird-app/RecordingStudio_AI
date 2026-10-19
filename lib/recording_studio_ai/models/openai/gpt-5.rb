@@ -8,6 +8,7 @@ RecordingStudioAI.models.register(
   model: "gpt-5.6-sol",
   aliases: ["gpt-5-2025-08-07"],
   display_name: "GPT-5.6 Sol",
+  metadata: { minimal_effort: "none" },
   operations: [:generation],
   delivery: RecordingStudioAI::Models::Openai::Constants::DELIVERY,
   parameters: {

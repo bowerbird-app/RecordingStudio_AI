@@ -17,7 +17,6 @@ module RecordingStudioAI
         timeout
         connection_error
       ].freeze
-      PRO_REASONING_EFFORTS = %w[medium high xhigh max].freeze
 
       def generate(request:, candidate:)
         response = client.responses.create(**request_parameters(request, candidate))
@@ -346,10 +345,10 @@ module RecordingStudioAI
       end
 
       def reasoning_parameters(model, effort)
-        return { mode: "pro", effort: pro_reasoning_effort(effort) } if pro_model?(model)
+        return { mode: "pro", effort: pro_reasoning_effort(model, effort) } if pro_model?(model)
         return if effort.blank?
 
-        { effort: generation_reasoning_effort(effort) }
+        { effort: generation_reasoning_effort(model, effort) }
       end
 
       def model_definition(model)
@@ -360,19 +359,30 @@ module RecordingStudioAI
         model_definition(model)&.metadata&.[]("reasoning_mode") == "pro"
       end
 
-      def generation_reasoning_effort(effort)
-        effort.to_s == "minimal" ? "none" : effort.to_s
+      def generation_reasoning_effort(model, effort)
+        value = effort.to_s
+        return value unless value == "minimal"
+
+        mapped = model_definition(model)&.metadata&.[]("minimal_effort").to_s
+        mapped.empty? ? value : mapped
       end
 
-      def pro_reasoning_effort(effort)
+      def pro_reasoning_effort(model, effort)
+        allowed = pro_reasoning_efforts(model)
         value = effort.to_s
         return "high" if value.empty?
-        return value if PRO_REASONING_EFFORTS.include?(value)
+        return value if allowed.include?(value)
 
         raise RecordingStudioAI::Errors::ContractValidationError.new(
-          "parameter reasoning_effort must be one of: #{PRO_REASONING_EFFORTS.join(', ')}",
+          "parameter reasoning_effort must be one of: #{allowed.join(', ')}",
           code: "invalid_request"
         )
+      end
+
+      def pro_reasoning_efforts(model)
+        values = model_definition(model)&.parameter(:reasoning_effort)&.[](:values)
+        list = Array(values).map(&:to_s)
+        list.empty? ? %w[high] : list
       end
 
       def normalize_input(request)

@@ -49,11 +49,39 @@ class OpenAIModelWireTest < Minitest::Test
     assert_nil @client.params
   end
 
-  def test_pro_sends_an_allowed_effort
-    @adapter.generate(request: request(reasoning_effort: "xhigh"), candidate: candidate("gpt-5-pro"))
+  def test_pro_sends_only_high
+    @adapter.generate(request: request(reasoning_effort: "high"), candidate: candidate("gpt-5-pro"))
 
     assert_equal "gpt-5.6-sol", @client.params[:model]
-    assert_equal({ mode: "pro", effort: "xhigh" }, @client.params[:reasoning])
+    assert_equal({ mode: "pro", effort: "high" }, @client.params[:reasoning])
+  end
+
+  def test_pro_rejects_an_effort_other_than_high
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      @adapter.generate(request: request(reasoning_effort: "xhigh"), candidate: candidate("gpt-5-pro"))
+    end
+
+    assert_equal "invalid_request", error.code
+    assert_match(/high/, error.message)
+    assert_nil @client.params
+  end
+
+  def test_a_model_without_minimal_effort_metadata_keeps_minimal
+    key = "effort-probe"
+    RecordingStudioAI.models.register(
+      provider: :openai,
+      key: key,
+      model: "effort-probe",
+      parameters: {
+        reasoning_effort: { type: :string, values: %w[minimal low medium high], default: "medium" }
+      }
+    )
+    @adapter.generate(request: request(reasoning_effort: "minimal"), candidate: candidate(key))
+
+    assert_equal "effort-probe", @client.params[:model]
+    assert_equal({ effort: "minimal" }, @client.params[:reasoning])
+  ensure
+    RecordingStudioAI.models.instance_variable_get(:@definitions)&.delete("openai:#{key}")
   end
 
   def test_pro_keeps_an_explicit_high_effort_when_none_is_given
