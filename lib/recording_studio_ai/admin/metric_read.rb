@@ -108,7 +108,9 @@ module RecordingStudioAI
         end
         if result.other
           other_data = result.other[:data] || result.other["data"]
-          series << { name: RecordingStudioAI::Copy.t("common.other"), data: timeseries_points(other_data) } if other_data.present?
+          if other_data.present?
+            series << { name: RecordingStudioAI::Copy.t("common.other"), data: timeseries_points(other_data) }
+          end
         end
         series.presence || timeseries_series(result)
       end

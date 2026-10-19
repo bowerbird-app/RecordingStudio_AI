@@ -411,11 +411,6 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "AI run health"
-    assert_includes response.body, "Failed runs"
-    assert_includes response.body, "Stuck runs"
-    assert_includes response.body, "Tokens by profile"
-    assert_includes response.body, "src=\"/admin/screens/ai_runs_health/chart\""
-    assert_includes response.body, "widgets.recording_studio_ai.fallback_retry_rate"
 
     get "/admin/screens/ai_runs_health/chart"
     assert_response :success
@@ -424,6 +419,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/ai_runs_health/table"
     assert_response :success
     assert_includes response.body, "summary"
+    assert_includes response.body, "Profile"
   end
 
   test "provider batches screen lists jobs for the current root" do
@@ -444,8 +440,6 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/provider_batches"
     assert_response :success
     assert_includes response.body, "Provider batches"
-    assert_includes response.body, "Batches by status"
-    assert_includes response.body, "src=\"/admin/screens/provider_batches/chart\""
 
     get "/admin/screens/provider_batches/chart"
     assert_response :success

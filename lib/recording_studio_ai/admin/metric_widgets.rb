@@ -46,7 +46,9 @@ module AdminScreens
       subtitle { Copy.t("admin.widgets.#{copy}.subtitle") }
       description { Copy.t("admin.widgets.#{copy}.description") }
       metadata { { period_label: Copy.t("common.last_30_days") } } unless card.kind == :scalar
-      change_good_when :down if %w[ai_runs.failed_over_time ai_runs.stuck ai_runs.fallback_retry_rate].include?(card.identifier)
+      if %w[ai_runs.failed_over_time ai_runs.stuck ai_runs.fallback_retry_rate].include?(card.identifier)
+        change_good_when :down
+      end
 
       if card.widget_type == :number
         value do |context|
@@ -88,7 +90,11 @@ module AdminScreens
     when :timeseries, :timeseries_groups
       last = Array(result.data).last
       value = last ? (last[:value] || last["value"]).to_f : 0
-      card.identifier == "ai_runs.fallback_retry_rate" ? format("%.0f%%", value * 100) : AdminScreens::RecordingStudioAIWidgets.number(value.to_i)
+      if card.identifier == "ai_runs.fallback_retry_rate"
+        format("%.0f%%", value * 100)
+      else
+        AdminScreens::RecordingStudioAIWidgets.number(value.to_i)
+      end
     else
       AdminScreens::RecordingStudioAIWidgets.number(result.value.to_i)
     end
