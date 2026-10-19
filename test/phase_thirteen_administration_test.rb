@@ -532,10 +532,29 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
+  def test_model_call_counts_include_aliases_without_double_counting_shared_sol
+    widgets = AdminScreens::RecordingStudioAIWidgets
+    sol = RecordingStudioAI.models.fetch(:openai, "gpt-5")
+    pro = RecordingStudioAI.models.fetch(:openai, "gpt-5-pro")
+    counts = {
+      %w[openai gpt-5] => 1,
+      %w[openai gpt-5-2025-08-07] => 2,
+      %w[openai gpt-5.6-sol] => 4,
+      %w[openai gpt-5-pro] => 8
+    }
+
+    assert_equal 7, widgets.model_call_count(counts, "openai", sol)
+    assert_equal 8, widgets.model_call_count(counts, "openai", pro)
+    assert_equal "gpt-5", widgets.host_model_name(sol)
+    assert_equal "gpt-5-pro", widgets.host_model_name(pro)
+  end
+
   def test_registered_model_keys_lists_registered_definitions
     keys = AdminScreens::RecordingStudioAIWidgets.registered_model_keys
 
     assert_includes keys, "gpt-5-mini"
+    assert_includes keys, "gpt-5.6-terra"
+    assert_includes keys, "gpt-5-mini-2025-08-07"
     assert_includes keys, "gemini-2.5-flash"
     refute_includes keys, "calls-screen-one"
     assert_equal keys, keys.uniq.sort

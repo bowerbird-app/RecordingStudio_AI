@@ -250,12 +250,14 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
   end
 
   def test_generation_model_is_not_hosted_agent_capable
-    error = assert_raises(RecordingStudioAI::Errors::ResolutionError) do
-      create_session(model: "gpt-5", profile: nil)
-    end
+    ["gpt-5", "gpt-5-2025-08-07", "gpt-5.6-sol"].each do |model|
+      error = assert_raises(RecordingStudioAI::Errors::ResolutionError) do
+        create_session(model: model, profile: nil)
+      end
 
-    assert_equal "unsupported_capability", error.category
-    assert_equal "unsupported_capability", error.code
+      assert_equal "unsupported_capability", error.category, model
+      assert_equal "unsupported_capability", error.code, model
+    end
   end
 
   def test_generation_resolution_skips_the_hosted_agent_model

@@ -5,6 +5,21 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-19
+
+### Changed
+- Registered `gpt-5`, `gpt-5-mini`, and `gpt-5-pro` keep those keys. Requests send the replacements for the snapshots that shut down on December 11, 2026: `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-sol` with `reasoning.mode` `pro`. Dated snapshot names still resolve. Display names are GPT-5.6 Sol, GPT-5.6 Terra, and GPT-5.6 Sol Pro.
+- Admin model rows show the host key. Call counts add the host key, the dated aliases, and the API model. The pro row skips the shared `gpt-5.6-sol` slug, so those calls stay on the `gpt-5` row.
+- The playground model payload is keyed by `provider|registry key` (for example `openai|gpt-5`). The model field is the registry key.
+- `reasoning_effort` `minimal` is sent as `none` only when the model definition sets metadata `minimal_effort` to `none` (`gpt-5` and `gpt-5-mini`). Other models keep `minimal`.
+- `gpt-5-pro` accepts only `high`.
+
+### Upgrade notes
+- Bump to `0.16.0`. No migration.
+- `resolved_model` stays the host name (`gpt-5`, `gpt-5-mini`, or `gpt-5-pro`). OpenAI bills `gpt-5.6-sol` or `gpt-5.6-terra`.
+- Re-price `cost_catalogs` entries for `gpt-5`, `gpt-5-mini`, and `gpt-5-pro`. Rates are in [UPGRADING.md](UPGRADING.md#upgrading-to-0160).
+- See [UPGRADING.md](UPGRADING.md#upgrading-to-0160).
+
 ## [0.15.1] - 2026-10-17
 
 ### Fixed

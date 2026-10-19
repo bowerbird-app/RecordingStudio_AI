@@ -400,10 +400,10 @@ class AIPlaygroundController < ApplicationController
   def model_definitions_payload
     RecordingStudioAI.models.all.to_h do |definition|
       [
-        "#{definition.provider}|#{definition.model}",
+        "#{definition.provider}|#{definition.key}",
         {
           provider: definition.provider.to_s,
-          model: definition.model,
+          model: definition.key,
           display_name: definition.display_name,
           delivery: definition.delivery,
           parameters: definition.parameters,

@@ -236,6 +236,39 @@ class ModelsRegistryTest < Minitest::Test
     assert_match(/unknown modalities/, error.message)
   end
 
+  def test_builtin_gpt5_models_keep_host_names_and_point_at_replacements
+    sol = RecordingStudioAI.models.fetch(:openai, "gpt-5")
+    mini = RecordingStudioAI.models.fetch(:openai, "gpt-5-mini")
+    pro = RecordingStudioAI.models.fetch(:openai, "gpt-5-pro")
+
+    assert_equal "gpt-5.6-sol", sol.model
+    assert_equal "GPT-5.6 Sol", sol.display_name
+    assert_equal "none", sol.metadata["minimal_effort"]
+    assert_equal "GPT-5.6 Terra", mini.display_name
+    assert_equal "none", mini.metadata["minimal_effort"]
+    assert_equal ["gpt-5-2025-08-07"], sol.aliases
+    assert_equal sol, RecordingStudioAI.models.fetch(:openai, "gpt-5-2025-08-07")
+    assert_equal "gpt-5.6-terra", mini.model
+    assert_equal mini, RecordingStudioAI.models.fetch(:openai, "gpt-5-mini-2025-08-07")
+    assert_equal "gpt-5.6-sol", pro.model
+    assert_equal "pro", pro.metadata["reasoning_mode"]
+    assert_nil pro.metadata["minimal_effort"]
+    assert_equal "GPT-5.6 Sol Pro", pro.display_name
+    assert_equal pro, RecordingStudioAI.models.fetch(:openai, "gpt-5-pro-2025-10-06")
+    assert_equal sol, RecordingStudioAI.models.fetch(:openai, "gpt-5.6-sol")
+    assert_includes sol.parameter(:reasoning_effort)[:values], "none"
+    assert_includes sol.parameter(:reasoning_effort)[:values], "minimal"
+    assert_includes sol.parameter(:reasoning_effort)[:values], "max"
+    assert_equal %w[high], pro.parameter(:reasoning_effort)[:values]
+  end
+
+  def test_invalid_alias_raises
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      @registry.register(provider: :openai, key: "gpt-5", model: "gpt-5.6-sol", aliases: ["GPT 5"])
+    end
+    assert_match(/model alias/, error.message)
+  end
+
   def test_builtin_models_are_registered_for_default_profiles
     registry = RecordingStudioAI.models
 

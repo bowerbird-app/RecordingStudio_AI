@@ -29,7 +29,9 @@ module RecordingStudioAI
         end
 
         def reasoning_effort(default:)
-          { type: :string, values: %w[minimal low medium high], default: default }
+          # minimal stays a caller-facing value. The OpenAI provider sends none
+          # only when the definition metadata minimal_effort is "none".
+          { type: :string, values: %w[minimal none low medium high xhigh max], default: default }
         end
 
         def max_output_tokens(default:)

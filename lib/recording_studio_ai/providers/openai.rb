@@ -320,7 +320,7 @@ module RecordingStudioAI
 
       def request_parameters(request, candidate)
         parameters = {
-          model: candidate.model,
+          model: api_model(candidate.model),
           input: normalize_input(request),
           instructions: request[:system_instruction],
           store: false
@@ -331,12 +331,58 @@ module RecordingStudioAI
         text[:verbosity] = request[:verbosity] if request[:verbosity]
         text.merge!(structured_output_config(request[:schema])) if request[:schema]
         parameters[:text] = text unless text.empty?
-        parameters[:reasoning] = { effort: request[:reasoning_effort] } if request[:reasoning_effort]
+        reasoning = reasoning_parameters(candidate.model, request[:reasoning_effort])
+        parameters[:reasoning] = reasoning if reasoning
         tools = []
         tools << { type: "web_search" } if request[:provider_native_tools].include?(:web_search)
         tools.concat(custom_tool_definitions(request))
         parameters[:tools] = tools unless tools.empty?
         parameters.compact
+      end
+
+      def api_model(model)
+        model_definition(model)&.model || model.to_s
+      end
+
+      def reasoning_parameters(model, effort)
+        return { mode: "pro", effort: pro_reasoning_effort(model, effort) } if pro_model?(model)
+        return if effort.blank?
+
+        { effort: generation_reasoning_effort(model, effort) }
+      end
+
+      def model_definition(model)
+        RecordingStudioAI.models.fetch(self.class.provider_key, model)
+      end
+
+      def pro_model?(model)
+        model_definition(model)&.metadata&.[]("reasoning_mode") == "pro"
+      end
+
+      def generation_reasoning_effort(model, effort)
+        value = effort.to_s
+        return value unless value == "minimal"
+
+        mapped = model_definition(model)&.metadata&.[]("minimal_effort").to_s
+        mapped.empty? ? value : mapped
+      end
+
+      def pro_reasoning_effort(model, effort)
+        allowed = pro_reasoning_efforts(model)
+        value = effort.to_s
+        return "high" if value.empty?
+        return value if allowed.include?(value)
+
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          "parameter reasoning_effort must be one of: #{allowed.join(', ')}",
+          code: "invalid_request"
+        )
+      end
+
+      def pro_reasoning_efforts(model)
+        values = model_definition(model)&.parameter(:reasoning_effort)&.[](:values)
+        list = Array(values).map(&:to_s)
+        list.empty? ? %w[high] : list
       end
 
       def normalize_input(request)

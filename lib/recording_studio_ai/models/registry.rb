@@ -32,9 +32,7 @@ module RecordingStudioAI
         identifier = key_or_model.to_s
 
         @definitions[storage_key(provider, identifier)] ||
-          @definitions.values.find do |definition|
-            definition.provider == provider && definition.model == identifier
-          end
+          matching_definitions(provider, identifier).min_by { |definition| pro_definition?(definition) ? 1 : 0 }
       end
 
       def fetch_by_key(provider, key)
@@ -62,6 +60,16 @@ module RecordingStudioAI
 
       def storage_key(provider, key)
         "#{provider}:#{key}"
+      end
+
+      def matching_definitions(provider, identifier)
+        @definitions.values.select do |definition|
+          definition.provider == provider && definition.matches?(identifier)
+        end
+      end
+
+      def pro_definition?(definition)
+        definition.metadata["reasoning_mode"] == "pro"
       end
     end
   end
