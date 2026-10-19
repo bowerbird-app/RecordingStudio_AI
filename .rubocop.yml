@@ -44,6 +44,7 @@ Metrics/ModuleLength:
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/agents/**/*'
     - 'lib/recording_studio_ai/providers/openai_hosted_agent.rb'
+    - 'lib/recording_studio_ai/providers/openai_responses_agent.rb'
 
 Metrics/MethodLength:
   Exclude:
@@ -56,6 +57,7 @@ Metrics/MethodLength:
     - 'lib/recording_studio_ai/webhooks/**/*'
     - 'lib/recording_studio_ai/agents/**/*'
     - 'lib/recording_studio_ai/providers/openai_hosted_agent.rb'
+    - 'lib/recording_studio_ai/providers/openai_responses_agent.rb'
 
 Metrics/AbcSize:
   Exclude:
@@ -67,6 +69,7 @@ Metrics/AbcSize:
     - 'lib/recording_studio_ai/webhooks/**/*'
     - 'lib/recording_studio_ai/agents/**/*'
     - 'lib/recording_studio_ai/providers/openai_hosted_agent.rb'
+    - 'lib/recording_studio_ai/providers/openai_responses_agent.rb'
 
 Metrics/BlockLength:
   Exclude:
@@ -81,6 +84,7 @@ Metrics/CyclomaticComplexity:
     - 'lib/recording_studio_ai/webhooks/**/*'
     - 'lib/recording_studio_ai/agents/**/*'
     - 'lib/recording_studio_ai/providers/openai_hosted_agent.rb'
+    - 'lib/recording_studio_ai/providers/openai_responses_agent.rb'
 
 Metrics/PerceivedComplexity:
   Exclude:
@@ -90,6 +94,7 @@ Metrics/PerceivedComplexity:
     - 'lib/recording_studio_ai/webhooks/**/*'
     - 'lib/recording_studio_ai/agents/**/*'
     - 'lib/recording_studio_ai/providers/openai_hosted_agent.rb'
+    - 'lib/recording_studio_ai/providers/openai_responses_agent.rb'
 
 Metrics/ParameterLists:
   Exclude:

@@ -5,6 +5,27 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-19
+
+### Added
+- Responses API backend for hosted sessions, beside the beta Agents adapter. `config.hosted_agent_backend` defaults to `:agents_beta`. New Responses sessions use a `conv_` id. A stored `sess_` id stays on the beta adapter. On the Responses backend, any other id raises `invalid_session` / `legacy_beta_session`.
+- Responses turns are created with `background: true` and `stream: true`. The adapter stores `sequence_number` from `response.created` and resumes with `starting_after`. A dropped stream falls back to `GET /responses/:id`.
+- Remote MCP servers via `config.hosted_agent_mcp_servers`. The bearer token belongs in `authorization`. `Configuration#inspect` redacts API keys, the webhook secret, MCP authorization, and MCP headers.
+- Responses requests send `max_tool_calls` and `context_management` compaction (threshold 200,000 tokens).
+
+### Changed
+- The `openai` dependency is `~> 0.106`.
+- A Responses follow-up while the latest response is still `queued` or `in_progress` raises `turn_active`. Cancel that turn before sending more input. The beta adapter still steers an active turn.
+- An `mcp_approval_request` ends the turn as `failed` with code `mcp_approval_required`. The adapter does not approve it, including when `require_approval` is `never`.
+- A turn that hits the tool step cap ends as `failed` with code `tool_step_limit`, not `turn_completed`.
+- `delete_session` on a Responses session cancels and deletes each stored response id, then deletes the conversation. Response ids that were never stored, and OpenAI's logs, remain.
+- Responses conversation and response creates do not send `Idempotency-Key`.
+
+### Upgrade notes
+- Bump to `0.17.0` and bundle `openai` `~> 0.106`. No migration.
+- The Agents API beta is not deprecated. This gem removes that adapter only after OpenAI announces a deprecation.
+- See [UPGRADING.md](UPGRADING.md#upgrading-to-0170).
+
 ## [0.16.0] - 2026-10-19
 
 ### Changed

@@ -1,5 +1,38 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.17.0
+
+Adds an opt-in Responses backend for hosted sessions. The Agents API beta stays the default. No migration.
+
+### What changed
+
+The Agents API beta has no announced shutdown. OpenAI's deprecations page lists Agent Builder, not this beta. `config.hosted_agent_backend` defaults to `:agents_beta`. Set `:responses` only for new sessions you want on the Responses API. This gem removes the beta adapter only after OpenAI announces a deprecation.
+
+Stored ids route the call:
+
+| Backend | Stored id | Adapter |
+| --- | --- | --- |
+| `:agents_beta` (default) | `sess_` or any id other than `conv_` | Agents API beta |
+| `:agents_beta` | `conv_` | Responses |
+| `:responses` | `conv_` | Responses |
+| `:responses` | anything else, including `sess_` | raises `invalid_session` / `legacy_beta_session` |
+
+`resolved_model` is unchanged from 0.16.0: host names stay `gpt-5`, `gpt-5-mini`, and `gpt-5-pro`. OpenAI bills `gpt-5.6-sol` or `gpt-5.6-terra`. A Responses conversation stores the host name and the adapter prefers that over `response.model`.
+
+Responses sessions are still stored on OpenAI and are not Zero Data Retention eligible. Each turn sends `context_management` compaction with a 200,000 token threshold, and `max_tool_calls` of 4. Compaction trims the model's context. It does not delete the conversation. `delete_session` cancels and deletes the response ids stored on the conversation, then deletes the conversation. Ids that never made it onto that list, and OpenAI's logs, remain.
+
+A follow-up while the latest Responses turn is still running raises `turn_active`. Cancel the turn, then send input. The beta adapter still accepts a follow-up as a steer.
+
+`require_approval` may be `never` or `always` (the default). `never` asks OpenAI not to pause. If a response still contains `mcp_approval_request`, the turn fails with `mcp_approval_required`. The gem does not approve it.
+
+Conversation and response creates do not send `Idempotency-Key`. Keep passing `idempotency_key` on `Agents.create_session` and `send_input`; the beta adapter still sends it, and the run record still stores it.
+
+Put an MCP bearer token in `authorization`. Do not copy it into `headers`.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.17.0` and bundle `openai` `~> 0.106`. No migration is required. Leave `hosted_agent_backend` at `:agents_beta` until you are ready to create new `conv_` sessions.
+
 ## Upgrading to 0.16.0
 
 Profile names stay `gpt-5`, `gpt-5-mini`, and `gpt-5-pro`. The OpenAI provider sends the replacements OpenAI lists for the December 11, 2026 shutdown:

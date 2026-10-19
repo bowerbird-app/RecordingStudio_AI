@@ -30,8 +30,10 @@ module RecordingStudioAI
         authorize!(request)
         session = request.fetch(:session)
         guard_session!(session, request)
+        existing_id = running_run(session, request)&.id
         run = run_for_input(session, request)
-        call_provider(run) do
+        preserve = run.id == existing_id ? ["turn_active"] : []
+        call_provider(run, preserve_codes: preserve) do
           adapter_for(session.provider).submit_hosted_agent_input(
             provider_session_id: session.provider_session_id,
             input: request[:input], idempotency_key: request[:idempotency_key]
@@ -207,10 +209,10 @@ module RecordingStudioAI
         scope.any? { |record| record.metadata.to_h["usage_charged"] == true }
       end
 
-      def call_provider(run)
+      def call_provider(run, preserve_codes: [])
         yield
       rescue Providers::HostedAgentFailure => e
-        raise Failure, e.error if e.timeout?
+        raise Failure, e.error if e.timeout? || preserve_codes.include?(e.error.code)
 
         fail_and_raise(run, e)
       end
@@ -316,7 +318,7 @@ module RecordingStudioAI
       end
 
       def remember_turn(run, turn_id)
-        return if turn_id.blank? || run.provider_turn_id.present?
+        return if turn_id.blank? || run.provider_turn_id == turn_id.to_s
 
         run.update!(provider_turn_id: turn_id.to_s)
       end

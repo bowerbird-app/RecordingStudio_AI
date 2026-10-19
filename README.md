@@ -14,8 +14,8 @@ six execution infrastructure tables, and a read-only FlatPack admin surface.
 - Rails 8.1
 - Recording Studio `~> 4.7`
 
-The OpenAI provider uses the official `openai` Ruby SDK (`~> 0.103`, which includes
-the Agents API). Gemini uses its REST API
+The OpenAI provider uses the official `openai` Ruby SDK (`~> 0.106`, which includes
+the Agents API and the Responses API). Gemini uses its REST API
 behind an internal client because Google does not publish an official Gemini
 Ruby SDK. Both providers support injected clients.
 
@@ -455,8 +455,15 @@ only `high`. `RecordingStudioAI.stream` / `stream!` were removed — use
 
 `RecordingStudioAI::Agents` runs a hosted agent session through the same
 credentials, run records, and usage handler as generation. The public objects
-are provider-neutral. OpenAI's Agents API is the first adapter. Other providers
-can implement the same methods on `Providers::Base`.
+are provider-neutral. OpenAI is the first provider. Other providers can
+implement the same methods on `Providers::Base`.
+
+OpenAI has two backends. `config.hosted_agent_backend` defaults to
+`:agents_beta`, the Agents API beta. That beta is not deprecated. This gem
+removes it only after OpenAI announces a deprecation. Set `:responses` to
+create new sessions on the Responses API (`conv_` ids). A stored `sess_` id
+keeps using the beta adapter. On the Responses backend, a non-`conv_` id raises
+`legacy_beta_session`.
 
 Only models registered with the `hosted_agent` operation resolve. A name that is
 not in the registry raises a configuration error (`missing_model`). A registered
@@ -498,21 +505,50 @@ one `hosted_agent` run, attributed with the caller's `root_recording` and
 authorized with `recording_studio_ai.execute`. `send_input`, `stream`, `cancel`,
 `delete_session`, and `recover` also require a `hosted_agent` run for that
 provider session on the caller's root and none on any other root. Otherwise
-they raise that same authorization error and do not call the provider. A
-follow-up while that turn is still active steers it and keeps the same run. A
-follow-up after the turn is terminal records a new run.
+they raise that same authorization error and do not call the provider. On the
+beta adapter, a follow-up while that turn is still active steers it and keeps
+the same run. On the Responses backend, that follow-up raises `turn_active`;
+cancel the turn before sending more input. A follow-up after the turn is
+terminal records a new run.
 
-Pass `idempotency_key` on create and on every `send_input`. Follow-up submits
-send that key as the provider `Idempotency-Key`. Session create has no typed
-idempotency field, so the adapter sends the same header. A dropped stream
-fetches the saved session, turn, and items.
-It does not send the input again. A timeout raises `Agents::Failure` and leaves
-the run running.
+Pass `idempotency_key` on create and on every `send_input`. The beta adapter
+sends it as `Idempotency-Key`. Responses conversation and response creates do
+not. A dropped stream fetches the saved turn. It does not send the input again.
+A timeout raises `Agents::Failure` and leaves the run running.
 
-Hosted sessions are stored on the provider. OpenAI's Agents API is not Zero
-Data Retention eligible. The Responses adapter still sends `store: false`;
-hosted sessions do not. The OpenAI adapter uses environment `type: "none"` (no
-sandbox). That environment requires the first input at create time.
+Hosted sessions are stored on the provider and are not Zero Data Retention
+eligible. Generation still sends `store: false`. The beta adapter uses
+environment `type: "none"` (no sandbox) and requires the first input at create
+time.
+
+Responses turns are created with `background: true` and `stream: true`. The
+adapter keeps the `sequence_number` from `response.created` and resumes with
+`starting_after`, so a reconnect does not repeat deltas. If that stream drops,
+it polls `GET /responses/:id`. Each request sends `max_tool_calls` (4) and
+`context_management` compaction at 200,000 tokens. Compaction limits how much
+of the conversation the model sees. It does not delete the conversation.
+`delete_session` cancels and deletes the response ids stored for that
+conversation, then deletes the conversation. Response ids that were never
+stored, and OpenAI's logs, remain.
+
+An `mcp_approval_request` finishes the turn as `failed` with
+`mcp_approval_required`. The gem does not approve it, including when
+`require_approval` is `never`. A turn that hits the tool step cap finishes as
+`failed` with `tool_step_limit`.
+
+```ruby
+config.hosted_agent_backend = :responses
+config.hosted_agent_mcp_servers = [
+  {
+    server_url: "https://mcp.example.com/mcp",
+    server_label: "example",
+    authorization: "Bearer token-from-the-mcp-server",
+    require_approval: "always"
+  }
+]
+```
+
+Put the bearer token in `authorization` only. Do not copy it into `headers`.
 
 `Turn#cost` is computed when read from `CostCalculator` and the configured
 catalog. Token totals are stored on the run. Cost is not stored.
