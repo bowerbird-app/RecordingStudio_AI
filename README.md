@@ -338,6 +338,13 @@ recording_studio_admin_for :admin, at: "/admin", root_section: :recording_studio
 Lists (calls, attempts, tool calls, saved replies, provider batches) are Admin
 screens scoped to the current Admin root. They fail closed without a root.
 
+The dashboard also shows five cards that read the site metrics already
+registered with Recording Studio Metrics: failed runs over time (by error
+category), stuck runs, tokens by profile, retry or fallback rate, and batches
+by status. Failed, stuck, tokens, and retry share `/admin/screens/ai_runs_health`.
+Batches by status lives on the provider-batches screen. The cards do not
+recompute those metrics.
+
 Saved replies open at `/recording_studio_ai/retained_responses/:id`. Listing
 uses the Admin surface role (default `:view`) and the current-root match.
 Decrypting still goes through `RecordingStudioAI.read_retained_response` and

@@ -24,6 +24,7 @@ en:
         "yes": "Yes"
         "no": "No"
         unknown: "Unknown"
+        other: "Other"
         none: "—"
         none_word: "None"
         no_data: "No data"
@@ -63,6 +64,7 @@ en:
             tool_calls: "Custom Tool Calls"
             attempts: "Attempts"
             provider_batches: "Provider batches"
+            ai_runs_health: "AI run health"
             custom_tools: "Registered Tools"
             registered_prompts: "Registered Prompts"
             estimated_spend: "Estimated token usage"
@@ -93,6 +95,15 @@ en:
           provider_batches:
             title: "Provider batches"
             subtitle: "Jobs sent as a pack."
+            chart_title: "Batches by status"
+            chart_subtitle: "How the packs ended."
+          ai_runs_health:
+            title: "AI run health"
+            subtitle: "Failures, stuck work, tokens, and retries."
+            stuck_label: "Stuck runs"
+            chart_title: "Failed runs"
+            chart_subtitle: "Failures by category over the last 30 days."
+            table_title: "Tokens by profile"
           tool_calls:
             title: "Custom Tool Calls"
             subtitle: "Custom tool invocation history with status, confirmation, and latency signals."
@@ -192,6 +203,26 @@ en:
             title: "AI Prompt P90 latency"
             subtitle: "Top 5 prompts by P90 latency over the last 30 days."
             description: "Compares prompt response speed using the latency at or below which 90% of calls completed."
+          failed_over_time:
+            title: "Failed runs"
+            subtitle: "Failures by category over the last 30 days."
+            description: "Opens run health so you can see which failure kinds are climbing."
+          stuck:
+            title: "Stuck runs"
+            subtitle: "Pending or running past the wait."
+            description: "Opens run health. These are still going after the stuck threshold."
+          tokens_by_profile:
+            title: "Tokens by profile"
+            subtitle: "Where the tokens went."
+            description: "Opens run health. Totals by profile, including calls with no profile."
+          fallback_retry_rate:
+            title: "Retry or fallback rate"
+            subtitle: "Share of runs that needed another try."
+            description: "Opens run health. A rising share means models are missing on the first try."
+          batches_by_status:
+            title: "Batches by status"
+            subtitle: "How the packs ended."
+            description: "Opens provider batches. Spot failed or stalled packs at a glance."
         definition_fields:
           description: "Description"
           use_when: "Use when"

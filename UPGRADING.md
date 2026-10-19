@@ -1,5 +1,19 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.16.0
+
+Adds Admin screens and dashboard widgets for the existing AI metrics. No migration.
+
+### What changed
+
+- `/admin/screens/ai_runs_health` shows failed runs by error category, stuck run count, tokens by profile, and the retry or fallback widget.
+- Provider batches shows `ai_batches.by_status` as a chart above the existing list.
+- The AI Admin section dashboard adds five widgets that link to those screens. Values come from `RecordingStudioMetrics.execute`.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.16.0`. No migration is required. Keep mounting Admin with the `recording_studio_ai` section and grant Accessible `:view` as before.
+
 ## Upgrading to 0.15.1
 
 Closes a cross-root hole in hosted agent sessions. No migration.

@@ -17,6 +17,29 @@ module AdminScreens
     filter :provider, field: :provider,
            values: -> { RecordingStudioAIWidgets.batch_distinct_values(:provider) }
 
+    chart do
+      title { Copy.t("admin.screens.provider_batches.chart_title") }
+      subtitle { Copy.t("admin.screens.provider_batches.chart_subtitle") }
+      type :bar
+      series do |context|
+        RecordingStudioAI::Admin::MetricRead.chart_series(
+          "ai_batches.by_status",
+          admin_context: context,
+          kind: :breakdown
+        )
+      end
+      options do |context|
+        result = RecordingStudioAI::Admin::MetricRead.call("ai_batches.by_status", admin_context: context)
+        categories = RecordingStudioAI::Admin::MetricRead.breakdown_categories(result)
+        {
+          height: [240, (categories.length * 40) + 80].max,
+          plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
+          xaxis: { categories: categories, min: 0 },
+          dataLabels: { enabled: false }
+        }
+      end
+    end
+
     table do
       column :created_at, title: "Created"
       column :status,

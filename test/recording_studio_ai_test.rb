@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.15.1", RecordingStudioAI::VERSION
+    assert_equal "0.16.0", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -20,6 +20,11 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes manifest, "RecordingStudioAdmin.register_resource"
     assert_includes manifest, "RecordingStudioAdmin.register_section"
     assert File.exist?(File.join(admin_root, "provider_batches/screen.rb"))
+    assert File.exist?(File.join(admin_root, "ai_runs_health/screen.rb"))
+    assert File.exist?(File.join(admin_root, "metric_read.rb"))
+    assert File.exist?(File.join(admin_root, "metric_widgets.rb"))
+    assert_includes manifest, "RecordingStudioAIRunsHealthScreen"
+    assert_includes manifest, "RecordingStudioAIFailedOverTimeWidget"
     resource = File.read(File.join(admin_root, "recording_studio_ai_retained_responses/resource.rb"))
     assert_includes resource, "Engine.routes.url_helpers.retained_response_path"
     refute_includes resource, "main_app.recording_studio_ai"

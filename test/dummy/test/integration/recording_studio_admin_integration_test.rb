@@ -378,6 +378,54 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "/admin/screens/tool_calls"
   end
 
+  test "ai metric widgets on the dashboard link to grouped screens" do
+    authenticate_for_admin!
+
+    get "/admin"
+
+    assert_response :success
+    assert_includes response.body, "AI run health"
+    assert_includes response.body, "href=\"/admin/screens/ai_runs_health\""
+    assert_includes response.body, "href=\"/admin/screens/provider_batches\""
+    assert_includes response.body, "Failed runs"
+    assert_includes response.body, "Stuck runs"
+    assert_includes response.body, "Tokens by profile"
+    assert_includes response.body, "Retry or fallback rate"
+    assert_includes response.body, "Batches by status"
+    widget_keys = AdminScreens::RecordingStudioAISection.widget_keys
+    assert_includes widget_keys, "widgets.recording_studio_ai.failed_over_time"
+    assert_includes widget_keys, "widgets.recording_studio_ai.stuck"
+    assert_includes widget_keys, "widgets.recording_studio_ai.tokens_by_profile"
+    assert_includes widget_keys, "widgets.recording_studio_ai.fallback_retry_rate"
+    assert_includes widget_keys, "widgets.recording_studio_ai.batches_by_status"
+  end
+
+  test "ai run health screen reads failed stuck tokens and retry metrics" do
+    authenticate_for_admin!
+    create_run!(status: "failed", operation: "generation", resolved_model: "health-fail", total_tokens: 9)
+      .update_columns(error_category: "timeout", profile_key: "summary")
+    create_run!(status: "running", operation: "generation", resolved_model: "health-stuck", total_tokens: 3)
+      .update_columns(started_at: 2.hours.ago, created_at: 2.hours.ago)
+
+    get "/admin/screens/ai_runs_health"
+
+    assert_response :success
+    assert_includes response.body, "AI run health"
+    assert_includes response.body, "Failed runs"
+    assert_includes response.body, "Stuck runs"
+    assert_includes response.body, "Tokens by profile"
+    assert_includes response.body, "src=\"/admin/screens/ai_runs_health/chart\""
+    assert_includes response.body, "widgets.recording_studio_ai.fallback_retry_rate"
+
+    get "/admin/screens/ai_runs_health/chart"
+    assert_response :success
+    assert_includes response.body, "Failed runs"
+
+    get "/admin/screens/ai_runs_health/table"
+    assert_response :success
+    assert_includes response.body, "summary"
+  end
+
   test "provider batches screen lists jobs for the current root" do
     authenticate_for_admin!
     RecordingStudioAI::Batch.create!(
@@ -396,6 +444,12 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/provider_batches"
     assert_response :success
     assert_includes response.body, "Provider batches"
+    assert_includes response.body, "Batches by status"
+    assert_includes response.body, "src=\"/admin/screens/provider_batches/chart\""
+
+    get "/admin/screens/provider_batches/chart"
+    assert_response :success
+    assert_includes response.body, "Batches by status"
 
     get "/admin/screens/provider_batches/table"
     assert_response :success
@@ -969,7 +1023,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       AdminScreens::RecordingStudioAICallsByProviderModelScreen,
       AdminScreens::RecordingStudioAIRegisteredProvidersScreen,
       AdminScreens::RecordingStudioAIRegisteredModelsScreen,
-      AdminScreens::RecordingStudioAIProfilesScreen
+      AdminScreens::RecordingStudioAIProfilesScreen,
+      AdminScreens::RecordingStudioAIRunsHealthScreen
     ]
 
     screens.each do |screen|
