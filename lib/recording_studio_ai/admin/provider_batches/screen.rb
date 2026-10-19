@@ -17,6 +17,15 @@ module AdminScreens
     filter :provider, field: :provider,
            values: -> { RecordingStudioAIWidgets.batch_distinct_values(:provider) }
 
+    summary do
+      hide_change
+      value do |context|
+        Array(
+          RecordingStudioAI::Admin::MetricRead.call("ai_batches.by_status", admin_context: context).data
+        ).sum { |row| (row[:value] || row["value"]).to_i }
+      end
+    end
+
     chart do
       title { Copy.t("admin.screens.provider_batches.chart_title") }
       subtitle { Copy.t("admin.screens.provider_batches.chart_subtitle") }

@@ -11,13 +11,17 @@ module AdminScreens
       RecordingStudioAI::Admin::MetricRead.profile_token_rows(context)
     end
 
+    widget "widgets.recording_studio_ai.stuck"
+    widget "widgets.recording_studio_ai.fallback_retry_rate"
+
     summary do
-      label { Copy.t("admin.screens.ai_runs_health.stuck_label") }
-      change_good_when :down
-      value do |context|
-        RecordingStudioAI::Admin::MetricRead.scalar("ai_runs.stuck", admin_context: context).to_i
-      end
       hide_change
+      value do |context|
+        last = Array(
+          RecordingStudioAI::Admin::MetricRead.call("ai_runs.failed_over_time", admin_context: context).data
+        ).last
+        last ? (last[:value] || last["value"]).to_i : 0
+      end
     end
 
     chart do
@@ -41,8 +45,6 @@ module AdminScreens
         }
       end
     end
-
-    widget "widgets.recording_studio_ai.fallback_retry_rate"
 
     table do
       title { Copy.t("admin.screens.ai_runs_health.table_title") }

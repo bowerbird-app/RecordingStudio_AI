@@ -100,7 +100,6 @@ en:
           ai_runs_health:
             title: "AI run health"
             subtitle: "Failures, stuck work, tokens, and retries."
-            stuck_label: "Stuck runs"
             chart_title: "Failed runs"
             chart_subtitle: "Failures by category over the last 30 days."
             table_title: "Tokens by profile"

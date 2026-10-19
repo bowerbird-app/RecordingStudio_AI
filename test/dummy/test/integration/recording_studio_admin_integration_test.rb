@@ -422,6 +422,72 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Profile"
   end
 
+  test "ai metric widget counts match the screens they open" do
+    authenticate_for_admin!
+    create_run!(status: "failed", operation: "generation", resolved_model: "match-fail", total_tokens: 11)
+      .update_columns(error_category: "timeout", profile_key: "match-profile")
+    create_run!(status: "running", operation: "generation", resolved_model: "match-stuck", total_tokens: 4)
+      .update_columns(started_at: 2.hours.ago, created_at: 2.hours.ago)
+    RecordingStudioAI::Batch.create!(
+      status: "failed",
+      provider: "openai",
+      model: "match-batch",
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 1
+    )
+
+    controller = Object.new
+    root = @root_recording
+    controller.define_singleton_method(:current_root_recording) { root }
+    dashboard = RecordingStudioAdmin::Context.new(current_actor: @user, controller: controller)
+
+    stuck = RecordingStudioAI::Admin::MetricRead.scalar("ai_runs.stuck", admin_context: dashboard).to_i
+    tokens = RecordingStudioAI::Admin::MetricRead.profile_token_rows(dashboard).sum(&:tokens)
+    failed_last_day = last_day_failed_count(dashboard)
+    batches = Array(
+      RecordingStudioAI::Admin::MetricRead.call("ai_batches.by_status", admin_context: dashboard).data
+    ).sum { |row| (row[:value] || row["value"]).to_i }
+    retry_rate = AdminScreens.metric_widget_value(
+      AdminScreens::RecordingStudioAIMetricCards.card_for("ai_runs.fallback_retry_rate"),
+      dashboard
+    )
+
+    get "/admin"
+    assert_response :success
+    assert_equal stuck.to_s, widget_metric_text(response.body, "Stuck runs")
+    assert_equal AdminScreens::RecordingStudioAIWidgets.number(tokens),
+                 widget_metric_text(response.body, "Tokens by profile")
+    assert_equal failed_last_day.to_s, widget_metric_text(response.body, "Failed runs")
+    assert_equal batches.to_s, widget_metric_text(response.body, "Batches by status")
+    assert_equal retry_rate, widget_metric_text(response.body, "Retry or fallback rate")
+
+    get "/admin/screens/ai_runs_health"
+    assert_response :success
+    assert_equal stuck.to_s, widget_metric_text(response.body, "Stuck runs")
+    assert_equal retry_rate, widget_metric_text(response.body, "Retry or fallback rate")
+
+    get "/admin/screens/ai_runs_health/table"
+    assert_response :success
+    assert_includes response.body, "match-profile"
+    assert_includes response.body, "11"
+
+    get "/admin/screens/ai_runs_health/chart"
+    assert_response :success
+    grouped_last_day = last_day_failed_count_from_chart(response.body)
+    assert_equal failed_last_day, grouped_last_day
+    assert_includes response.body,
+                    %(<p class="text-5xl font-bold leading-none text-(--surface-content-color)">#{AdminScreens::RecordingStudioAIWidgets.number(failed_last_day)}</p>)
+
+    get "/admin/screens/provider_batches/chart"
+    assert_response :success
+    assert_equal batches, batches_chart_total(response.body)
+    assert_includes response.body,
+                    %(<p class="text-5xl font-bold leading-none text-(--surface-content-color)">#{AdminScreens::RecordingStudioAIWidgets.number(batches)}</p>)
+  end
+
   test "provider batches screen lists jobs for the current root" do
     authenticate_for_admin!
     RecordingStudioAI::Batch.create!(
@@ -2060,6 +2126,53 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
   def configuration_accessor_names
     RecordingStudioAI::Configuration.instance_methods(false).grep(/=\z/).map { |name| name.to_s.chomp("=") }
+  end
+
+  def last_day_failed_count(admin_context)
+    result = RecordingStudioAI::Admin::MetricRead.call(
+      "ai_runs.failed_over_time",
+      admin_context: admin_context,
+      group_by: :error_category
+    )
+    last = Array(result.data).last
+    last ? (last[:value] || last["value"]).to_i : 0
+  end
+
+  def last_day_failed_count_from_chart(html)
+    series = chart_series(html)
+    last_x = series.flat_map { |row| Array(row["data"] || row[:data]).map { |point| point["x"] || point[:x] } }.max
+    return 0 unless last_x
+
+    series.sum do |row|
+      Array(row["data"] || row[:data]).sum do |point|
+        next 0 unless (point["x"] || point[:x]) == last_x
+
+        (point["y"] || point[:y]).to_i
+      end
+    end
+  end
+
+  def batches_chart_total(html)
+    series = chart_series(html).first
+    Array(series && (series["data"] || series[:data])).sum(&:to_i)
+  end
+
+  def chart_series(html)
+    match = html.match(/data-flat-pack--chart-series-value="([^"]+)"/)
+    return [] unless match
+
+    JSON.parse(CGI.unescapeHTML(match[1]))
+  end
+
+  def widget_metric_text(html, title)
+    document = Nokogiri::HTML(html)
+    heading = document.css("h3").find { |node| node.text.strip == title }
+    assert heading, "expected heading #{title}"
+    container = heading.ancestors.find do |node|
+      node.css("span").any? { |span| span["class"].to_s.include?("font-bold") && span.text.match?(/[\d%]/) }
+    end
+    span = container.css("span").find { |node| node["class"].to_s.include?("font-bold") && node.text.match?(/[\d%]/) }
+    span.text.strip
   end
 
   def create_run!(status:, operation:, prompt_key: nil, prompt_name_snapshot: nil,
