@@ -16,6 +16,8 @@ module AdminScreens
     filter :status, field: :status, values: -> { RecordingStudioAI::Batch::STATUSES.values }
     filter :provider, field: :provider,
            values: -> { RecordingStudioAIWidgets.batch_distinct_values(:provider) }
+    filter :model, field: :model,
+           values: -> { RecordingStudioAIWidgets.batch_distinct_values(:model) }
 
     summary do
       hide_change
@@ -82,7 +84,7 @@ module AdminScreens
              }
       column :failed_item_count, title: "Failed"
       column :total_tokens, title: "Tokens"
-      column :expires_at, title: "Expires"
+      column :expires_at, title: "Expires", display: :timestamp
       default_sort :created_at, direction: :desc
       paginate per_page: 25
     end

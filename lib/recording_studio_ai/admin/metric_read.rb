@@ -31,6 +31,27 @@ module RecordingStudioAI
         call(identifier, admin_context: admin_context, **params).value
       end
 
+      def window_sum(identifier, admin_context:, group_by: nil, **params)
+        Array(call(identifier, admin_context: admin_context, group_by: group_by, **params).data).sum do |row|
+          (row[:value] || row["value"]).to_f
+        end
+      end
+
+      def window_ratio(identifier, admin_context:, **params)
+        window = timeseries_window(admin_context, params)
+        result = call(
+          identifier,
+          admin_context: admin_context,
+          interval: :year,
+          start_at: window[:start_at],
+          end_at: window[:end_at]
+        )
+        rows = Array(result.data)
+        return 0.0 if rows.empty?
+
+        rows.sum { |row| (row[:value] || row["value"]).to_f } / rows.size
+      end
+
       def chart_series(identifier, admin_context:, kind:, group_by: nil, **params)
         series_from_result(
           call(identifier, admin_context: admin_context, group_by: group_by, **params),

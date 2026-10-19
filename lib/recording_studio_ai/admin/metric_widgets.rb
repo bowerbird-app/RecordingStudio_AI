@@ -10,7 +10,7 @@ module AdminScreens
       Card.new("ai_runs.failed_over_time", "widgets.recording_studio_ai.failed_over_time",
                "ai_runs_health", :timeseries_groups, :error_category, :chart),
       Card.new("ai_runs.stuck", "widgets.recording_studio_ai.stuck",
-               "ai_runs_health", :scalar, nil, :number),
+               "ai_runs_health", :scalar, nil, :chart),
       Card.new("ai_runs.tokens_by_profile", "widgets.recording_studio_ai.tokens_by_profile",
                "ai_runs_health", :breakdown, nil, :chart),
       Card.new("ai_runs.fallback_retry_rate", "widgets.recording_studio_ai.fallback_retry_rate",
@@ -45,26 +45,33 @@ module AdminScreens
       title { Copy.t("admin.widgets.#{copy}.title") }
       subtitle { Copy.t("admin.widgets.#{copy}.subtitle") }
       description { Copy.t("admin.widgets.#{copy}.description") }
-      metadata { { period_label: Copy.t("common.last_30_days") } } unless card.kind == :scalar
+      metadata { { period_label: Copy.t("common.last_30_days") } } unless card.identifier == "ai_runs.stuck"
       if %w[ai_runs.failed_over_time ai_runs.stuck ai_runs.fallback_retry_rate].include?(card.identifier)
         change_good_when :down
       end
 
-      if card.widget_type == :number
+      if card.identifier == "ai_runs.stuck"
         value do |context|
           AdminScreens::RecordingStudioAIWidgets.number(
-            RecordingStudioAI::Admin::MetricRead.scalar(card.identifier, admin_context: context).to_i
+            RecordingStudioAI::Admin::MetricRead.scalar("ai_runs.stuck", admin_context: context).to_i
           )
         end
-        if card.identifier == "ai_runs.stuck"
-          chart_type :line
-          series do |context|
-            RecordingStudioAI::Admin::MetricRead.chart_series(
-              "ai_runs.stuck_over_time",
-              admin_context: context,
-              kind: :timeseries
-            )
-          end
+        chart_type :line
+        series do |context|
+          RecordingStudioAI::Admin::MetricRead.chart_series(
+            "ai_runs.stuck_over_time",
+            admin_context: context,
+            kind: :timeseries
+          )
+        end
+        chart_options do
+          {
+            height: 240,
+            stroke: { curve: "smooth", width: 3 },
+            yaxis: { min: 0 },
+            dataLabels: { enabled: false },
+            grid: { xaxis: { lines: { show: false } } }
+          }
         end
       else
         value do |context|
@@ -89,25 +96,20 @@ module AdminScreens
   end
 
   def self.metric_widget_value(card, context)
-    result = RecordingStudioAI::Admin::MetricRead.call(
-      card.identifier,
-      admin_context: context,
-      group_by: card.group_by
-    )
-    case card.kind
-    when :breakdown
-      AdminScreens::RecordingStudioAIWidgets.number(Array(result.data).sum { |row| (row[:value] || row["value"]).to_i })
-    when :timeseries, :timeseries_groups
-      last = Array(result.data).last
-      value = last ? (last[:value] || last["value"]).to_f : 0
-      if card.identifier == "ai_runs.fallback_retry_rate"
-        format("%.0f%%", value * 100)
-      else
-        AdminScreens::RecordingStudioAIWidgets.number(value.to_i)
-      end
-    else
-      AdminScreens::RecordingStudioAIWidgets.number(result.value.to_i)
+    if card.identifier == "ai_runs.fallback_retry_rate"
+      return format(
+        "%.0f%%",
+        RecordingStudioAI::Admin::MetricRead.window_ratio(card.identifier, admin_context: context) * 100
+      )
     end
+
+    AdminScreens::RecordingStudioAIWidgets.number(
+      RecordingStudioAI::Admin::MetricRead.window_sum(
+        card.identifier,
+        admin_context: context,
+        group_by: card.group_by
+      ).to_i
+    )
   end
 
   def self.metric_chart_options(card, context)

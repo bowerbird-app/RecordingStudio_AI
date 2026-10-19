@@ -8,13 +8,13 @@ module AdminScreens
     description { Copy.t("admin.widgets.errors_failed_calls.description") }
     metadata { { period_label: Copy.t("common.last_30_days") } }
     value do |context|
-      failed_runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context).where(status: "failed")
+      failed_runs = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context).where(status: "failed")
       AdminScreens::RecordingStudioAIWidgets.number(
         failed_runs.where(created_at: AdminScreens::RecordingStudioAIWidgets.trailing_weeks_range(weeks_back: 4)).count
       )
     end
     change do |context|
-      failed_runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context).where(status: "failed")
+      failed_runs = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context).where(status: "failed")
       current = failed_runs.where(created_at: AdminScreens::RecordingStudioAIWidgets.this_week_range).count
       previous = failed_runs.where(created_at: AdminScreens::RecordingStudioAIWidgets.previous_week_range).count
       AdminScreens::RecordingStudioAIWidgets.percentage_change_label(current: current, previous: previous)
@@ -22,7 +22,7 @@ module AdminScreens
     change_good_when :down
     chart_type :line
     series do |context|
-      failed_runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context).where(status: "failed")
+      failed_runs = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context).where(status: "failed")
       AdminScreens::RecordingStudioAIWidgets.weekly_calls_series(
         failed_runs,
         weeks_back: 4,

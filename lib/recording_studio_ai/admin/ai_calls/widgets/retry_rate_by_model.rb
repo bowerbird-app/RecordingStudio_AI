@@ -8,13 +8,13 @@ module AdminScreens
     description { Copy.t("admin.widgets.retry_rate_by_model.description") }
     metadata { { period_label: Copy.t("common.last_30_days") } }
     value do |context|
-      retries = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+      retries = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context)
                                                       .where(created_at: 30.days.ago..Time.current)
                                                       .sum(:retry_count)
       AdminScreens::RecordingStudioAIWidgets.number(retries)
     end
     change do |context|
-      scope = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+      scope = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context)
       now = Time.current
       AdminScreens::RecordingStudioAIWidgets.percentage_change_label(
         current: scope.where(created_at: 30.days.ago..now).sum(:retry_count),

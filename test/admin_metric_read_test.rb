@@ -49,4 +49,43 @@ class AdminMetricReadTest < Minitest::Test
     assert_equal [RecordingStudioAI::Copy.t("common.none")],
                  RecordingStudioAI::Admin::MetricRead.breakdown_categories(result)
   end
+
+  def test_window_sum_adds_every_bucket
+    result = RecordingStudioMetrics::Result.new(
+      metric: "ai_runs.failed_over_time",
+      type: :timeseries,
+      data: [{ date: "2026-05-03", value: 2 }, { date: "2026-05-04", value: 5 }]
+    )
+    RecordingStudioAI::Admin::MetricRead.stub(:call, result) do
+      assert_equal 7.0, RecordingStudioAI::Admin::MetricRead.window_sum(
+        "ai_runs.failed_over_time",
+        admin_context: Object.new
+      )
+    end
+  end
+
+  def test_window_ratio_uses_one_year_bucket_over_the_same_window
+    captured = nil
+    year_result = RecordingStudioMetrics::Result.new(
+      metric: "ai_runs.fallback_retry_rate",
+      type: :timeseries,
+      data: [{ date: "2026-01-01", value: 0.25 }]
+    )
+    stub = lambda do |_identifier, **params|
+      captured = params
+      year_result
+    end
+
+    RecordingStudioAI::Admin::MetricRead.stub(:call, stub) do
+      ratio = RecordingStudioAI::Admin::MetricRead.window_ratio(
+        "ai_runs.fallback_retry_rate",
+        admin_context: Object.new
+      )
+      assert_in_delta 0.25, ratio
+    end
+
+    assert_equal :year, captured[:interval]
+    assert captured[:start_at]
+    assert captured[:end_at]
+  end
 end

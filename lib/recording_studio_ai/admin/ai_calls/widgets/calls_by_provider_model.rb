@@ -8,11 +8,11 @@ module AdminScreens
     description { Copy.t("admin.widgets.calls_by_provider_model.description") }
     metadata { { period_label: Copy.t("common.last_30_days") } }
     value do |context|
-      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context).where(created_at: 30.days.ago..Time.current)
+      runs = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context).where(created_at: 30.days.ago..Time.current)
       AdminScreens::RecordingStudioAIWidgets.number(runs.count)
     end
     change do |context|
-      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+      runs = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context)
       current = runs.where(created_at: 30.days.ago..Time.current).count
       previous = runs.where(created_at: 60.days.ago..30.days.ago).count
       AdminScreens::RecordingStudioAIWidgets.percentage_change_label(current: current, previous: previous)

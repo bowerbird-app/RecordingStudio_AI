@@ -11,16 +11,13 @@ module AdminScreens
       RecordingStudioAI::Admin::MetricRead.profile_token_rows(context)
     end
 
-    widget "widgets.recording_studio_ai.stuck"
-    widget "widgets.recording_studio_ai.fallback_retry_rate"
-
     summary do
       hide_change
       value do |context|
-        last = Array(
-          RecordingStudioAI::Admin::MetricRead.call("ai_runs.failed_over_time", admin_context: context).data
-        ).last
-        last ? (last[:value] || last["value"]).to_i : 0
+        RecordingStudioAI::Admin::MetricRead.window_sum(
+          "ai_runs.failed_over_time",
+          admin_context: context
+        ).to_i
       end
     end
 

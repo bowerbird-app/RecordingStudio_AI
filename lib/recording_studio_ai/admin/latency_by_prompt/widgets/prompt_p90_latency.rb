@@ -13,7 +13,7 @@ module AdminScreens
       "#{AdminScreens::RecordingStudioAIWidgets.number(p90_latency)} ms"
     end
     change do |context|
-      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context).where.not(latency_ms: nil)
+      runs = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context).where.not(latency_ms: nil)
       current_p90 = AdminScreens::RecordingStudioAIWidgets.latency_rows_for_runs(
         runs.where(created_at: 30.days.ago..Time.current), dimension: :prompt
       ).first&.p90_latency_ms.to_i

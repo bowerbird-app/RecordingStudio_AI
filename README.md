@@ -337,15 +337,17 @@ mount RecordingStudioAI::Engine, at: "/recording_studio_ai"
 recording_studio_admin_for :admin, at: "/admin", root_section: :recording_studio_ai
 ```
 
-Lists (calls, attempts, tool calls, saved replies, provider batches) are Admin
-screens scoped to the current Admin root. They fail closed without a root.
+Call, attempt, tool-call, and saved-reply lists stay on the current Admin
+root and fail closed without one. Provider batches is the exception. That
+list is site-wide, like `ai_batches.by_status`, and can filter by model.
+Expires uses Flatpack Timestamp (time ago, exact time in the tooltip).
 
-The dashboard also shows five cards that read the site metrics already
-registered with Recording Studio Metrics: failed runs over time (by error
-category), stuck runs, tokens by profile, retry or fallback rate, and batches
-by status. Failed, stuck, tokens, and retry share `/admin/screens/ai_runs_health`.
-Batches by status lives on the provider-batches screen. The cards do not
-recompute those metrics.
+Every widget on the AI section is site-wide too, including calls, tools,
+latency, spend, failed runs, stuck, tokens, retry or fallback, and batches.
+`/admin/screens/ai_runs_health` is the failed-run chart plus tokens-by-profile
+table. Stuck and retry stay on the section, not inside that screen. Headlines
+on the health screen and on the failed/retry cards are the same window as
+their charts, not today's last bucket.
 
 Saved replies open at `/recording_studio_ai/retained_responses/:id`. Listing
 uses the Admin surface role (default `:view`) and the current-root match.

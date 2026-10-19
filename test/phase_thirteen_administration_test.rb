@@ -223,6 +223,7 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal %w[openai], widgets.batches_scope(context).pluck(:provider)
     assert_equal %w[gemini openai], widgets.site_batches_scope(context).pluck(:provider).sort
     assert_equal %w[gemini openai], widgets.batch_distinct_values(:provider)
+    assert_equal [visible_run.id, hidden_run.id].sort, widgets.site_runs_scope(context).pluck(:id).sort
     assert_equal %w[completed], widgets.run_distinct_values(:status)
     assert_equal %w[visible-prompt], widgets.run_present_distinct_values(:prompt_key)
     assert_equal %w[openai], widgets.run_distinct_values(:resolved_provider)
