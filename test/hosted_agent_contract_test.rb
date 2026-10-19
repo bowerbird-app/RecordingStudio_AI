@@ -9,7 +9,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     provider_key :openai
 
     attr_reader :creates, :submits, :streams, :cancels, :deletes, :recoveries
-    attr_accessor :events, :items, :stream_failure, :default_turn
+    attr_accessor :events, :items, :stream_failure, :default_turn, :raise_turn_active
 
     def initialize(configuration: nil)
       super
@@ -34,6 +34,12 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     end
 
     def submit_hosted_agent_input(provider_session_id:, input:, idempotency_key:)
+      if raise_turn_active
+        raise RecordingStudioAI::Providers::HostedAgentFailure, RecordingStudioAI::Contracts::NormalizedError.new(
+          category: "invalid_request", code: "turn_active", message: "still running", retryable: false
+        )
+      end
+
       submits << {
         provider_session_id: provider_session_id, input: input, idempotency_key: idempotency_key
       }
@@ -160,6 +166,61 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     refute_equal session.run_id, follow_up.run_id
     assert_equal "sess_1", follow_up.provider_session_id
     assert_equal "turn-2", @fake.submits.last[:idempotency_key]
+  end
+
+  def test_beta_stream_keeps_the_original_turn_id
+    session = create_session
+    RecordingStudioAI::Run.find(session.run_id).update!(provider_turn_id: "turn_1")
+    @fake.events = [
+      RecordingStudioAI::Providers::StreamEvent.new(
+        type: "text_delta", text_delta: "Hi", metadata: { provider_turn_id: "turn_1" }
+      ),
+      RecordingStudioAI::Providers::StreamEvent.new(
+        type: "text_delta", text_delta: " there", metadata: { provider_turn_id: "turn_2" }
+      )
+    ]
+
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+
+    assert_equal "turn_1", RecordingStudioAI::Run.find(session.run_id).provider_turn_id
+  end
+
+  def test_stream_follows_a_later_provider_turn_id
+    session = responses_session
+    @fake.events = [
+      RecordingStudioAI::Providers::StreamEvent.new(
+        type: "text_delta", text_delta: "Hi", metadata: { provider_turn_id: "resp_1" }
+      ),
+      RecordingStudioAI::Providers::StreamEvent.new(
+        type: "text_delta", text_delta: " there", metadata: { provider_turn_id: "resp_2" }
+      )
+    ]
+    @fake.default_turn = RecordingStudioAI::Providers::HostedTurn.new(
+      provider_turn_id: "resp_2", status: "in_progress", usage: nil, error: nil
+    )
+
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+
+    assert_equal "resp_2", @fake.recoveries.last[:provider_turn_id]
+    run = RecordingStudioAI::Run.find(session.run_id)
+    assert_equal "resp_2", run.provider_turn_id
+    assert_equal "running", run.status
+  end
+
+  def test_turn_active_leaves_the_running_turn_in_place
+    session = create_session
+    @fake.recovery_turns = [active_turn]
+    @fake.raise_turn_active = true
+
+    error = assert_raises(RecordingStudioAI::Agents::Failure) do
+      RecordingStudioAI::Agents.send_input(
+        **session_args(session), input: "steer", idempotency_key: "steer-1"
+      )
+    end
+
+    assert_equal "turn_active", error.error.code
+    assert_equal "running", RecordingStudioAI::Run.find(session.run_id).status
+    assert_empty @fake.submits
   end
 
   def test_stream_without_a_block_is_an_enumerator
@@ -351,6 +412,16 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     RecordingStudioAI::Agents.create_session(**args)
   end
 
+  def responses_session
+    session = create_session
+    run = RecordingStudioAI::Run.find(session.run_id)
+    run.update!(provider_session_id: "conv_1")
+    RecordingStudioAI::Agents::Session.new(
+      provider: session.provider, provider_session_id: "conv_1", model: session.model,
+      profile: session.profile, status: session.status, run_id: session.run_id
+    )
+  end
+
   def session_args(session)
     { session: session, root_recording: @root, initiator: @initiator }
   end
@@ -397,6 +468,10 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
   def copy_run(session, root)
     copy = RecordingStudioAI::Run.find(session.run_id).dup
     copy.root_recording_id = root.id
+    # A second running row for the same session is rejected by the partial
+    # unique index. A finished copy is enough to show the session on another root.
+    copy.status = "completed"
+    copy.completed_at = Time.current
     copy.save!
   end
 

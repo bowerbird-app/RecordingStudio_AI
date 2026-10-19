@@ -14,6 +14,15 @@ RecordingStudioAI.configure do |config|
   # config.openai_client = MyOpenAIClientFactory.build
   # config.gemini_client = MyGeminiClientFactory.build
   # config.typesafe_client = MyTypeSafeClientFactory.build
+  # Hosted sessions default to the Agents API beta. :responses opts into the
+  # Responses API. The beta stays until OpenAI announces a deprecation.
+  # config.hosted_agent_backend = :agents_beta
+  # Put the bearer token in authorization. Do not copy it into headers.
+  # require_approval defaults to always, so every MCP call fails the turn
+  # until a host sets never.
+  # config.hosted_agent_mcp_servers = [
+  #   { server_url: "https://mcp.example.com/mcp", server_label: "example", authorization: "Bearer …" }
+  # ]
   # Additional providers use the same names: config.<provider_key>_api_key and
   # config.<provider_key>_client, then RecordingStudioAI.register_provider.
 

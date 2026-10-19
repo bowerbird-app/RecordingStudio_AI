@@ -193,4 +193,96 @@ class ConfigurationTest < Minitest::Test
     assert_equal "configuration", error.code
     assert_includes error.message, "usage_key_resolver"
   end
+
+  def test_hosted_agent_backend_defaults_to_the_beta
+    configuration = RecordingStudioAI::Configuration.new
+
+    assert_equal :agents_beta, configuration.hosted_agent_backend
+    assert_empty configuration.hosted_agent_mcp_servers
+    configuration.hosted_agent_backend = "responses"
+    assert_equal :responses, configuration.hosted_agent_backend
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      configuration.hosted_agent_backend = "elsewhere"
+    end
+    assert_includes error.message, "hosted_agent_backend"
+  end
+
+  def test_mcp_server_label_collision_raises
+    configuration = RecordingStudioAI::Configuration.new
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      configuration.hosted_agent_mcp_servers = [
+        { server_url: "https://tools.example.com/one", server_label: "tools" },
+        { server_url: "https://other.example.com/two", server_label: "tools" }
+      ]
+    end
+    assert_includes error.message, "already used"
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      configuration.hosted_agent_mcp_servers = [
+        { server_url: "https://tools.example.com/one", server_label: "tools-example-com" },
+        { server_url: "https://tools.example.com/two" }
+      ]
+    end
+    assert_includes error.message, "tools-example-com"
+  end
+
+  def test_mcp_server_hash_form_derives_the_host_label
+    configuration = RecordingStudioAI::Configuration.new
+    configuration.hosted_agent_mcp_servers = [
+      { "server_url" => "https://API.Example.com/mcp", "authorization" => "Bearer tok" }
+    ]
+
+    server = configuration.hosted_agent_mcp_servers.first
+    assert_equal "api-example-com", server[:server_label]
+    assert_equal "Bearer tok", server[:authorization]
+    assert_equal "always", server[:require_approval]
+  end
+
+  def test_unknown_mcp_server_label_raises
+    configuration = RecordingStudioAI::Configuration.new
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      configuration.hosted_agent_mcp_servers = [
+        { server_url: "https://mcp.example.com/mcp", server_label: "not a label" }
+      ]
+    end
+    assert_includes error.message, "must use letters, numbers, underscores, or hyphens"
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      configuration.hosted_agent_mcp_servers = [
+        { server_url: "https://mcp.example.com/mcp", label: "example" }
+      ]
+    end
+    assert_includes error.message, "unknown hosted agent MCP keys"
+  end
+
+  def test_inspect_redacts_api_keys_and_mcp_secrets
+    configuration = RecordingStudioAI::Configuration.new
+    configuration.openai_api_key = "sk-live-secret"
+    configuration.gemini_api_key = "gem-secret"
+    configuration.typesafe_api_key = "ts-secret"
+    configuration.openai_webhook_secret = "whsec-secret"
+    configuration.hosted_agent_mcp_servers = [
+      {
+        server_url: "https://mcp.example.com/mcp",
+        authorization: "Bearer mcp-secret",
+        headers: { "X-Token" => "header-secret" }
+      }
+    ]
+
+    text = configuration.inspect
+    rendered = configuration.to_s
+    raw = configuration.hosted_agent_mcp_servers
+    [text, rendered, raw.inspect, raw.to_s].each do |output|
+      refute_includes output, "sk-live-secret"
+      refute_includes output, "gem-secret"
+      refute_includes output, "ts-secret"
+      refute_includes output, "whsec-secret"
+      refute_includes output, "mcp-secret"
+      refute_includes output, "header-secret"
+    end
+    assert_includes text, "[REDACTED]"
+    assert_includes text, "mcp.example.com"
+    assert_equal "Bearer mcp-secret", raw.first[:authorization]
+  end
 end

@@ -136,6 +136,8 @@ module RecordingStudioAI
       @openai_api_key = ENV.fetch("OPENAI_API_KEY", nil)
       @openai_client = nil
       @openai_webhook_secret = ENV.fetch("OPENAI_WEBHOOK_SECRET", nil)
+      @hosted_agent_backend = :agents_beta
+      @hosted_agent_mcp_servers = []
       # Returns the initiator used when refresh_batch_from_webhook omits initiator:.
       # Example: ->(root_recording:, **) { SystemActor.instance }
       @webhook_batch_initiator = nil
@@ -221,8 +223,33 @@ module RecordingStudioAI
         invalid_configuration!("webhook_batch_initiator must be nil or respond to call")
       end
       validate_usage_meter!
+      self.hosted_agent_backend = hosted_agent_backend
+      self.hosted_agent_mcp_servers = hosted_agent_mcp_servers
       normalize_model_fallbacks!
       self
+    end
+
+    attr_reader :hosted_agent_backend, :hosted_agent_mcp_servers
+
+    SECRET_INSPECT_IVARS = %i[
+      @openai_api_key @gemini_api_key @typesafe_api_key @openai_webhook_secret
+    ].freeze
+
+    def hosted_agent_backend=(value)
+      @hosted_agent_backend = normalize_hosted_backend!(value)
+    end
+
+    def hosted_agent_mcp_servers=(value)
+      @hosted_agent_mcp_servers = normalize_mcp_servers!(value)
+    end
+
+    def inspect
+      parts = instance_variables.sort.map { |name| "#{name}=#{inspected_configuration_value(name)}" }
+      "#<#{self.class.name} #{parts.join(' ')}>"
+    end
+
+    def to_s
+      inspect
     end
 
     def model_fallbacks_for(provider, model)
@@ -325,6 +352,102 @@ module RecordingStudioAI
 
     def present_but_not_callable?(value)
       !value.nil? && !value.respond_to?(:call)
+    end
+
+    def normalize_hosted_backend!(value)
+      backend = value.to_sym
+      return backend if %i[agents_beta responses].include?(backend)
+
+      invalid_configuration!("hosted_agent_backend must be :agents_beta or :responses")
+    end
+
+    def normalize_mcp_servers!(value)
+      invalid_configuration!("hosted_agent_mcp_servers must be an Array") unless value.is_a?(Array)
+
+      labels = []
+      value.map { |server| normalize_mcp_server!(server, labels) }
+    end
+
+    def normalize_mcp_server!(server, labels)
+      invalid_configuration!("hosted agent MCP server must be a Hash") unless server.is_a?(Hash)
+
+      raw = server.to_h.transform_keys(&:to_sym)
+      allowed = %i[server_url server_label authorization headers allowed_tools require_approval]
+      unknown = raw.keys - allowed
+      if unknown.any?
+        invalid_configuration!("unknown hosted agent MCP keys: #{unknown.join(', ')}")
+      end
+      url = raw[:server_url].to_s.strip
+      invalid_configuration!("hosted agent MCP server_url is required") if url.empty?
+      label = raw[:server_label].to_s.strip.presence || derived_mcp_label(url)
+      unless label.match?(/\A[A-Za-z0-9][A-Za-z0-9_-]*\z/)
+        invalid_configuration!(
+          "hosted agent MCP server label must use letters, numbers, underscores, or hyphens " \
+          "(got #{label.inspect})"
+        )
+      end
+      if labels.include?(label)
+        invalid_configuration!("hosted agent MCP server label #{label} is already used")
+      end
+      labels << label
+      approval = (raw[:require_approval].presence || "always").to_s
+      unless %w[never always].include?(approval)
+        invalid_configuration!("hosted agent MCP require_approval must be never or always")
+      end
+      headers = raw[:headers]
+      if headers && !headers.is_a?(Hash)
+        invalid_configuration!("hosted agent MCP headers must be a Hash")
+      end
+      McpServer[
+        server_url: url, server_label: label, authorization: raw[:authorization]&.to_s.presence,
+        headers: headers&.transform_keys(&:to_s),
+        allowed_tools: raw[:allowed_tools].nil? ? nil : Array(raw[:allowed_tools]).map(&:to_s),
+        require_approval: approval
+      ]
+    end
+
+    # The reader returns these hashes. inspect and to_s hide the bearer token
+    # and header values; callers still read the real authorization.
+    class McpServer < Hash
+      def inspect
+        redacted = {}
+        each { |key, value| redacted[key] = value }
+        redacted[:authorization] = "[REDACTED]" if self[:authorization]
+        redacted[:headers] = "[REDACTED]" if self[:headers]
+        redacted.inspect
+      end
+
+      alias to_s inspect
+    end
+
+    def derived_mcp_label(url)
+      host = url[%r{\A[a-z][a-z0-9+.-]*://([^/:?#]+)}i, 1].to_s.downcase.tr(".", "-")
+      invalid_configuration!("hosted agent MCP server_url must include a host") if host.empty?
+
+      host
+    end
+
+    def inspected_configuration_value(name)
+      value = instance_variable_get(name)
+      return "[REDACTED]".inspect if redact_inspect?(name, value)
+      return inspected_mcp_servers(value).inspect if name == :@hosted_agent_mcp_servers
+
+      value.inspect
+    end
+
+    def redact_inspect?(name, value)
+      SECRET_INSPECT_IVARS.include?(name) && !value.nil? && !value.to_s.empty?
+    end
+
+    def inspected_mcp_servers(servers)
+      Array(servers).map do |server|
+        next server unless server.is_a?(Hash)
+
+        redacted = server.dup
+        redacted[:authorization] = "[REDACTED]" if redacted[:authorization]
+        redacted[:headers] = "[REDACTED]" if redacted[:headers]
+        redacted
+      end
     end
 
     def invalid_configuration!(message)

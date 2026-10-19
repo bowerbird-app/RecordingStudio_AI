@@ -24,6 +24,7 @@ group :development, :test do
   gem "minitest-mock", require: false
   gem "simplecov", require: false
   gem "sqlite3"
+  gem "webmock", require: false
 end
 
 group :development do

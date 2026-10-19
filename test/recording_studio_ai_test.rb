@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.16.0", RecordingStudioAI::VERSION
+    assert_equal "0.17.0", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -51,7 +51,7 @@ class RecordingStudioAITest < Minitest::Test
                  dependencies.keys.sort
     assert_equal ">= 0.3.0, < 0.4", dependencies.fetch("recording_studio_metrics").to_s
     assert_equal "~> 4.7", dependencies.fetch("recording_studio").to_s
-    assert_equal "~> 0.103", dependencies.fetch("openai").to_s
+    assert_equal "~> 0.106", dependencies.fetch("openai").to_s
     refute_includes dependencies.keys, "recording_studio_accessible"
     refute_includes dependencies.keys, "recording_studio_admin"
   end
@@ -60,7 +60,7 @@ class RecordingStudioAITest < Minitest::Test
     root = File.expand_path("..", __dir__)
     migration_files = Dir[File.join(root, "db/migrate/*.rb")]
 
-    assert_equal 11, migration_files.size
+    assert_equal 12, migration_files.size
     expected_migration_fragments.each do |fragment|
       assert migration_files.any? { |file| file.include?(fragment) }, fragment
     end
@@ -79,6 +79,7 @@ class RecordingStudioAITest < Minitest::Test
       allow_recording_studio_ai_decision_executions
       allow_recording_studio_ai_tool_executions
       allow_recording_studio_ai_hosted_agent_runs
+      add_recording_studio_ai_hosted_turns
       add_prompt_attribution_to_recording_studio_ai_runs
       remove_prompt_namespace_and_short_name_from_recording_studio_ai_runs
     ]

@@ -31,6 +31,23 @@ class ConfigController < ApplicationController
       explanation: "Swap in your own OpenAI client for tests or custom transport."
     },
     {
+      key: "hosted_agent_backend",
+      required: "No",
+      accepted_values: ":agents_beta or :responses",
+      default: ":agents_beta",
+      explanation: "Which OpenAI hosted-agent API new sessions use. :agents_beta is the Agents API beta. " \
+                   ":responses uses the Responses API. The beta is not deprecated; keep it until OpenAI announces a shutdown."
+    },
+    {
+      key: "hosted_agent_mcp_servers",
+      required: "No",
+      accepted_values: "Array of hashes with server_url, and optional server_label, authorization, headers, " \
+                       "allowed_tools, require_approval",
+      default: "[]",
+      explanation: "Remote MCP servers for Responses hosted sessions. Put a bearer token in authorization, not in headers. " \
+                   "Labels must be unique. require_approval defaults to always, which fails every MCP call until you set never."
+    },
+    {
       key: "gemini_client",
       required: "No",
       accepted_values: "Client object or nil",
@@ -423,6 +440,8 @@ class ConfigController < ApplicationController
 
       # Optional provider client injection for custom transport/testing.
       config.openai_client = nil
+      config.hosted_agent_backend = :agents_beta
+      config.hosted_agent_mcp_servers = []
       config.gemini_client = nil
       config.typesafe_client = nil
 

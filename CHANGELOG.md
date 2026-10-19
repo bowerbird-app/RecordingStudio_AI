@@ -5,6 +5,28 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-19
+
+### Added
+- Responses API backend for hosted sessions, beside the beta Agents adapter. `config.hosted_agent_backend` defaults to `:agents_beta` and chooses the API for new sessions. A stored `sess_` id always stays on the beta adapter. A stored `conv_` id always uses Responses. Any other stored id raises `invalid_session` / `legacy_beta_session`.
+- Responses turns are created with `background: true` and `stream: true`. The response id and `sequence_number` from `response.created` are stored in `recording_studio_ai_hosted_turns`. A reconnect resumes with `starting_after`. A dropped stream polls `GET /responses/:id` with a backoff, and emits text only once the response is terminal.
+- Remote MCP servers via `config.hosted_agent_mcp_servers`. The bearer token belongs in `authorization`. `Configuration#inspect` redacts API keys, the webhook secret, MCP authorization, and MCP headers.
+- Responses requests send `max_tool_calls` and `context_management` compaction (threshold 200,000 tokens).
+
+### Changed
+- The `openai` dependency is `~> 0.106`.
+- A Responses follow-up while the latest response is still `queued` or `in_progress` raises `turn_active`. Cancel that turn before sending more input. The beta adapter still steers an active turn.
+- An `mcp_approval_request` ends the turn as `failed` with code `mcp_approval_required`. The adapter does not approve it. The default `require_approval` is `always`, so every MCP call fails the turn until a host sets `never`.
+- A turn whose output contains at least 4 built-in tool calls ends as `failed` with code `tool_step_limit`, not `turn_completed`. `function_call` and `custom_tool_call` items do not count.
+- `delete_session` on a Responses session cancels and deletes each stored response id, then deletes the conversation. A failed delete returns status `partial`. Response ids that were never stored, and OpenAI's logs, remain.
+- One running `hosted_agent` run per `provider_session_id`. Submit takes a Postgres advisory lock, and the partial unique index is the backstop.
+- Responses conversation and response creates do not send `Idempotency-Key`.
+
+### Upgrade notes
+- Bump to `0.17.0`, bundle `openai` `~> 0.106`, and run `AddRecordingStudioAIHostedTurns`.
+- The Agents API beta is not deprecated. This gem removes that adapter only after OpenAI announces a deprecation.
+- See [UPGRADING.md](UPGRADING.md#upgrading-to-0170).
+
 ## [0.16.0] - 2026-10-19
 
 ### Changed

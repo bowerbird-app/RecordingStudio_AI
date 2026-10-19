@@ -1,11 +1,18 @@
 # frozen_string_literal: true
 
+require_relative "openai_responses_agent"
+
 module RecordingStudioAI
   module Providers
-    # OpenAI Agents API sessions. Hosted sessions are stored on OpenAI and are
-    # not Zero Data Retention eligible. Responses generation still sends
-    # store: false; this module does not change that.
+    # OpenAI hosted sessions. The default backend is the beta Agents API.
+    # config.hosted_agent_backend chooses the API for new sessions only.
+    # A stored sess_ id always uses the beta adapter. A stored conv_ id always
+    # uses Responses. Any other stored id raises legacy_beta_session.
+    # Hosted sessions are stored on OpenAI and are not Zero Data Retention
+    # eligible. Responses generation still sends store: false.
     module OpenAIHostedAgent
+      include OpenAIResponsesAgent
+
       ENVIRONMENT = { type: "none" }.freeze
       EVENT_TYPES = {
         "agent.session.turn.output_text.delta" => "text_delta",
@@ -31,6 +38,12 @@ module RecordingStudioAI
       }.freeze
 
       def create_hosted_agent_session(instructions:, model:, input:, idempotency_key:)
+        return responses_create_session(instructions:, model:, input:, idempotency_key:) if responses_backend?
+
+        beta_create_session(instructions:, model:, input:, idempotency_key:)
+      end
+
+      def beta_create_session(instructions:, model:, input:, idempotency_key:)
         response = hosted_request(session_lookup: false) do
           client.beta.agents.sessions.create(
             **session_create_params(instructions, model, input, idempotency_key)
@@ -40,6 +53,15 @@ module RecordingStudioAI
       end
 
       def submit_hosted_agent_input(provider_session_id:, input:, idempotency_key:)
+        if responses_session?(provider_session_id)
+          return responses_submit_input(provider_session_id:, input:,
+                                        idempotency_key:)
+        end
+
+        beta_submit_input(provider_session_id:, input:, idempotency_key:)
+      end
+
+      def beta_submit_input(provider_session_id:, input:, idempotency_key:)
         hosted_request(session_lookup: true) do
           client.beta.agents.sessions.events.create(
             provider_session_id,
@@ -51,6 +73,12 @@ module RecordingStudioAI
       end
 
       def stream_hosted_agent_session(provider_session_id:, &)
+        return responses_stream_session(provider_session_id:, &) if responses_session?(provider_session_id)
+
+        beta_stream_session(provider_session_id:, &)
+      end
+
+      def beta_stream_session(provider_session_id:, &)
         stream = client.beta.agents.sessions.events.stream_streaming(provider_session_id)
         each_hosted_event(stream, &)
       rescue StandardError => e
@@ -60,6 +88,12 @@ module RecordingStudioAI
       end
 
       def cancel_hosted_agent_turn(provider_session_id:)
+        return responses_cancel_turn(provider_session_id:) if responses_session?(provider_session_id)
+
+        beta_cancel_turn(provider_session_id:)
+      end
+
+      def beta_cancel_turn(provider_session_id:)
         hosted_request(session_lookup: true) do
           client.beta.agents.sessions.events.create(
             provider_session_id,
@@ -70,6 +104,12 @@ module RecordingStudioAI
       end
 
       def delete_hosted_agent_session(provider_session_id:)
+        return responses_delete_session(provider_session_id:) if responses_session?(provider_session_id)
+
+        beta_delete_session(provider_session_id:)
+      end
+
+      def beta_delete_session(provider_session_id:)
         hosted_request(session_lookup: true) do
           client.beta.agents.sessions.delete(provider_session_id)
         end
@@ -77,6 +117,15 @@ module RecordingStudioAI
       end
 
       def recover_hosted_agent_session(provider_session_id:, provider_turn_id: nil)
+        if responses_session?(provider_session_id)
+          return responses_recover_session(provider_session_id:,
+                                           provider_turn_id:)
+        end
+
+        beta_recover_session(provider_session_id:, provider_turn_id:)
+      end
+
+      def beta_recover_session(provider_session_id:, provider_turn_id: nil)
         hosted_request(session_lookup: true) do
           session = client.beta.agents.sessions.retrieve(provider_session_id)
           turn = fetch_hosted_turn(provider_session_id, provider_turn_id)
@@ -88,7 +137,36 @@ module RecordingStudioAI
         end
       end
 
+      private :beta_create_session, :beta_submit_input, :beta_stream_session,
+              :beta_cancel_turn, :beta_delete_session, :beta_recover_session
+
       private
+
+      def responses_backend?
+        @configuration&.hosted_agent_backend&.to_sym == :responses
+      end
+
+      def responses_session?(provider_session_id)
+        backend_for(provider_session_id) == :responses
+      end
+
+      def backend_for(provider_session_id)
+        session_id = provider_session_id.to_s
+        return :responses if session_id.start_with?("conv_")
+        return :agents_beta if session_id.start_with?("sess_")
+
+        legacy_beta_session!
+      end
+
+      def legacy_beta_session!
+        raise HostedAgentFailure, Contracts::NormalizedError.new(
+          category: "invalid_session",
+          code: "legacy_beta_session",
+          message: "This session id is neither a beta session (sess_) nor a Responses conversation (conv_).",
+          retryable: false,
+          provider: self.class.provider_key.to_s
+        )
+      end
 
       def session_create_params(instructions, model, input, idempotency_key)
         params = {
