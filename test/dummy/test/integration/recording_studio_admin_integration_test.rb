@@ -451,12 +451,14 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
   test "ai run health screen filters date range group by and profile on chart and table" do
     authenticate_for_admin!
+    keep_profile = "keep-#{SecureRandom.hex(4)}"
+    drop_profile_key = "drop-#{SecureRandom.hex(4)}"
     keep = create_run!(status: "failed", operation: "generation", resolved_model: "health-keep", total_tokens: 11)
-    keep.update_columns(error_category: "timeout", profile_key: "summary", created_at: 2.days.ago)
+    keep.update_columns(error_category: "timeout", profile_key: keep_profile, created_at: 2.days.ago)
     drop_profile = create_run!(status: "failed", operation: "generation", resolved_model: "health-other", total_tokens: 8)
-    drop_profile.update_columns(error_category: "rate_limit", profile_key: "draft", created_at: 2.days.ago)
+    drop_profile.update_columns(error_category: "rate_limit", profile_key: drop_profile_key, created_at: 2.days.ago)
     drop_date = create_run!(status: "failed", operation: "generation", resolved_model: "health-old", total_tokens: 5)
-    drop_date.update_columns(error_category: "timeout", profile_key: "summary", created_at: 8.weeks.ago)
+    drop_date.update_columns(error_category: "timeout", profile_key: keep_profile, created_at: 8.weeks.ago)
 
     filters = AdminScreens::RecordingStudioAIRunsHealthScreen.filters
     assert_equal %i[date_range group_by profile], filters.first(3).map(&:key)
@@ -469,18 +471,18 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "name=\"group_by\""
     assert_includes response.body, "name=\"profile\""
 
-    params = { profile: "summary", group_by: "day", date_range_preset: "last_4_weeks" }
+    params = { profile: keep_profile, group_by: "day", date_range_preset: "last_4_weeks" }
     get "/admin/screens/ai_runs_health", params: params
     assert_response :success
     assert_includes response.body, "group_by=day"
-    assert_includes response.body, "profile=summary"
+    assert_includes response.body, "profile=#{keep_profile}"
     assert_includes response.body, "value=\"last_4_weeks\""
 
     get "/admin/screens/ai_runs_health/table", params: params
     assert_response :success
-    assert_includes response.body, "summary"
+    assert_includes response.body, keep_profile
     assert_includes response.body, "11"
-    refute_includes response.body, "draft"
+    refute_includes response.body, drop_profile_key
     refute_includes response.body, ">8<"
 
     get "/admin/screens/ai_runs_health/chart", params: params
@@ -538,7 +540,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "deep-fail-profile"
     refute_includes response.body, "deep-ok-profile"
 
-    get "/admin/screens/ai_runs_health/chart", params: { stuck: "1", date_range_preset: "last_30_days" }
+    get "/admin/screens/ai_runs_health/chart", params: { stuck: "1", date_range_preset: "last_30_days", profile: "deep-stuck-profile" }
     assert_response :success
     assert_equal 1, chart_series_total(response.body)
   end
@@ -549,30 +551,32 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     span_days = (current.end_date - current.start_date).to_i + 1
     previous_end = current.start_date - 1.day
     previous_start = previous_end - (span_days - 1).days
+    profile = "delta-#{SecureRandom.hex(4)}"
+    params = { date_range_preset: "last_4_weeks", profile: profile }
 
     more = create_run!(status: "failed", operation: "generation", resolved_model: "health-more")
-    more.update_columns(error_category: "timeout", created_at: current.start_date.beginning_of_day + 1.hour)
-    get "/admin/screens/ai_runs_health/chart", params: { date_range_preset: "last_4_weeks" }
+    more.update_columns(error_category: "timeout", profile_key: profile, created_at: current.start_date.beginning_of_day + 1.hour)
+    get "/admin/screens/ai_runs_health/chart", params: params
     assert_response :success
     assert_includes response.body, RecordingStudioAI::Copy.t("common.none")
     assert_includes response.body, RecordingStudioAI::Admin::RunsHealth::MUTED_CLASS
 
     prior = create_run!(status: "failed", operation: "generation", resolved_model: "health-prior")
-    prior.update_columns(error_category: "timeout", created_at: previous_start.beginning_of_day + 1.hour)
-    get "/admin/screens/ai_runs_health/chart", params: { date_range_preset: "last_4_weeks" }
+    prior.update_columns(error_category: "timeout", profile_key: profile, created_at: previous_start.beginning_of_day + 1.hour)
+    get "/admin/screens/ai_runs_health/chart", params: params
     assert_response :success
     assert_includes response.body, %(<span class="#{RecordingStudioAI::Admin::RunsHealth::MUTED_CLASS}">#{RecordingStudioAI::Copy.t("common.none")}</span>)
 
     extra = create_run!(status: "failed", operation: "generation", resolved_model: "health-extra")
-    extra.update_columns(error_category: "timeout", created_at: current.start_date.beginning_of_day + 2.hours)
-    get "/admin/screens/ai_runs_health/chart", params: { date_range_preset: "last_4_weeks" }
+    extra.update_columns(error_category: "timeout", profile_key: profile, created_at: current.start_date.beginning_of_day + 2.hours)
+    get "/admin/screens/ai_runs_health/chart", params: params
     assert_response :success
     assert_includes response.body, "+100%"
     assert_includes response.body, RecordingStudioAI::Admin::RunsHealth::DANGER_CLASS
 
     extra.update_columns(created_at: previous_start.beginning_of_day + 2.hours)
     more.update_columns(created_at: previous_start.beginning_of_day + 3.hours)
-    get "/admin/screens/ai_runs_health/chart", params: { date_range_preset: "last_4_weeks" }
+    get "/admin/screens/ai_runs_health/chart", params: params
     assert_response :success
     assert_includes response.body, "-100%"
     assert_includes response.body, RecordingStudioAI::Admin::RunsHealth::SUCCESS_CLASS
@@ -634,7 +638,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "match-profile"
     assert_includes response.body, "11"
 
-    get "/admin/screens/ai_runs_health/chart"
+    get "/admin/screens/ai_runs_health/chart", params: { date_range_preset: "last_30_days" }
     assert_response :success
     assert_equal failed_window, chart_series_total(response.body)
     assert_includes response.body,
