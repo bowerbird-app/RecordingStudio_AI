@@ -5,6 +5,15 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-10-20
+
+### Changed
+- Failed runs and Stuck runs Admin charts hide x-axis tick labels (`xaxis.labels.show: false`) and read the last 30 days (`widget_time_range` default `:last_30_days`).
+- Retry or fallback rate Admin chart y-axis labels use two decimal places (`yaxis.decimalsInFloat: 2`).
+
+### Upgrade notes
+- Bump to `0.17.1`. No migration.
+
 ## [0.17.0] - 2026-10-20
 
 ### Added
@@ -1004,7 +1013,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.17.1...HEAD
+[0.17.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.15.1...v0.16.0

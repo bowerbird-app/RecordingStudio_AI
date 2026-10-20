@@ -1,5 +1,18 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.17.1
+
+Admin AI section chart tick labels. No migration.
+
+### What changed
+
+- Failed runs and Stuck runs charts hide x-axis labels and default to the last 30 days.
+- Retry or fallback rate y-axis labels round to two decimal places.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.17.1`. No migration is required.
+
 ## Upgrading to 0.17.0
 
 Admin AI run health and provider batches screens. No migration.

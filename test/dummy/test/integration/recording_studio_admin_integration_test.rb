@@ -401,6 +401,29 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes widget_keys, "widgets.recording_studio_ai.tokens_by_profile"
     assert_includes widget_keys, "widgets.recording_studio_ai.fallback_retry_rate"
     assert_includes widget_keys, "widgets.recording_studio_ai.batches_by_status"
+
+    failed_options = widget_chart_options(response.body, "Failed runs")
+    stuck_options = widget_chart_options(response.body, "Stuck runs")
+    retry_options = widget_chart_options(response.body, "Retry or fallback rate")
+    assert_equal false, failed_options.dig("xaxis", "labels", "show")
+    assert_equal false, stuck_options.dig("xaxis", "labels", "show")
+    assert_equal 2, retry_options.dig("yaxis", "decimalsInFloat")
+  end
+
+  test "failed runs chart window is the last 30 days" do
+    authenticate_for_admin!
+    inside = create_run!(status: "failed", operation: "generation", resolved_model: "failed-inside")
+    inside.update_columns(created_at: 2.days.ago, error_category: "timeout")
+    outside = create_run!(status: "failed", operation: "generation", resolved_model: "failed-outside")
+    outside.update_columns(created_at: 40.days.ago, error_category: "timeout")
+
+    get "/admin"
+    assert_response :success
+
+    series = chart_series(widget_html(response.body, "Failed runs"))
+    dates = series.flat_map { |row| Array(row["data"] || row[:data]).map { |point| (point["x"] || point[:x]).to_s } }
+    assert_includes dates, inside.created_at.to_date.iso8601
+    refute_includes dates, outside.created_at.to_date.iso8601
   end
 
   test "ai run health screen reads failed stuck tokens and retry metrics" do
@@ -2459,6 +2482,13 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     match = html.match(/data-flat-pack--chart-series-value="([^"]+)"/)
     return [] unless match
 
+    JSON.parse(CGI.unescapeHTML(match[1]))
+  end
+
+  def widget_chart_options(html, title)
+    fragment = widget_html(html, title)
+    match = fragment.match(/data-flat-pack--chart-options-value="([^"]+)"/)
+    assert match, "expected chart options on #{title}"
     JSON.parse(CGI.unescapeHTML(match[1]))
   end
 
