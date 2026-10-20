@@ -62,7 +62,8 @@ module AdminScreens
           RecordingStudioAI::Admin::MetricRead.chart_series(
             "ai_runs.stuck_over_time",
             admin_context: context,
-            kind: :timeseries
+            kind: :timeseries,
+            **RecordingStudioAI::Admin::MetricChart.window_params(context)
           )
         end
         chart_options do

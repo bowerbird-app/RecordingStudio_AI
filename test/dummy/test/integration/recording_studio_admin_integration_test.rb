@@ -441,6 +441,40 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_equal false, widget_chart_options(response.body, "Failed runs").dig("xaxis", "labels", "show")
   end
 
+  test "stuck runs chart window is the last 30 days" do
+    authenticate_for_admin!
+    create_run!(status: "running", operation: "generation", resolved_model: "stuck-inside")
+      .update_columns(started_at: 2.hours.ago, created_at: 2.hours.ago)
+
+    controller = Object.new
+    root = @root_recording
+    controller.define_singleton_method(:current_root_recording) { root }
+    dashboard = RecordingStudioAdmin::Context.new(current_actor: @user, controller: controller)
+    expected = RecordingStudioAI::Admin::MetricChart.window_params(dashboard)
+    captured = nil
+    reader = RecordingStudioAI::Admin::MetricRead
+    singleton = class << reader; self; end
+    original = reader.method(:chart_series)
+    singleton.send(:define_method, :chart_series) do |identifier, **params|
+      captured = params.merge(identifier: identifier)
+      original.call(identifier, **params)
+    end
+
+    series = begin
+      AdminScreens::RecordingStudioAIStuckWidget.series.call(dashboard)
+    ensure
+      singleton.send(:define_method, :chart_series, original)
+    end
+    dates = series.flat_map { |row| Array(row[:data] || row["data"]).map { |point| Date.iso8601((point[:x] || point["x"]).to_s) } }
+
+    assert_equal "ai_runs.stuck_over_time", captured[:identifier]
+    assert_equal expected[:start_at], captured[:start_at]
+    assert_equal expected[:end_at], captured[:end_at]
+    assert_equal :day, captured[:interval]
+    assert dates.min >= expected[:start_at].to_date
+    assert dates.max <= expected[:end_at].to_date
+  end
+
   test "ai run health screen reads failed stuck tokens and retry metrics" do
     authenticate_for_admin!
     create_run!(status: "failed", operation: "generation", resolved_model: "health-fail", total_tokens: 9)
