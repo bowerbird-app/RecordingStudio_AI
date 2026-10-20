@@ -36,14 +36,15 @@ class AdminRunsHealthTest < Minitest::Test
   def test_failed_chart_folds_small_categories_into_other
     health = RecordingStudioAI::Admin::RunsHealth
     counts = {
-      ["timeout", "2026-05-04"] => 6,
-      ["rate_limit", "2026-05-04"] => 1,
-      ["provider", "2026-05-04"] => 4
+      %w[timeout 2026-05-04] => 6,
+      %w[rate_limit 2026-05-04] => 1,
+      %w[provider 2026-05-04] => 4
     }
 
     collapsed = health.collapsed_failed_counts(counts)
+    named = collapsed.keys.reject { |key| key == health::OTHER_CATEGORY }
 
-    assert_equal %w[timeout], collapsed.keys.reject { |key| key == health::OTHER_CATEGORY }
+    assert_equal %w[timeout], named
     assert_equal 6, collapsed.fetch("timeout").fetch("2026-05-04")
     assert_equal 5, collapsed.fetch(health::OTHER_CATEGORY).fetch("2026-05-04")
     assert_equal RecordingStudioAI::Copy.t("common.other"), health.failed_series_name(health::OTHER_CATEGORY)
