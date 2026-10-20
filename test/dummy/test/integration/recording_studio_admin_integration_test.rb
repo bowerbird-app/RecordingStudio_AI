@@ -417,13 +417,28 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     outside = create_run!(status: "failed", operation: "generation", resolved_model: "failed-outside")
     outside.update_columns(created_at: 40.days.ago, error_category: "timeout")
 
+    controller = Object.new
+    root = @root_recording
+    controller.define_singleton_method(:current_root_recording) { root }
+    dashboard = RecordingStudioAdmin::Context.new(current_actor: @user, controller: controller)
+    window = RecordingStudioAI::Admin::MetricChart.window_params(dashboard)
+    series = RecordingStudioAI::Admin::MetricRead.chart_series(
+      "ai_runs.failed_over_time",
+      admin_context: dashboard,
+      kind: :timeseries_groups,
+      group_by: :error_category,
+      **window
+    )
+    dates = series.flat_map { |row| Array(row[:data] || row["data"]).map { |point| (point[:x] || point["x"]).to_s } }
+
     get "/admin"
     assert_response :success
-
-    series = chart_series(widget_html(response.body, "Failed runs"))
-    dates = series.flat_map { |row| Array(row["data"] || row[:data]).map { |point| (point["x"] || point[:x]).to_s } }
+    assert_equal :last_30_days, RecordingStudioAI::Admin::MetricChart::DEFAULT_WINDOW
+    assert window[:start_at]
+    assert window[:end_at]
     assert_includes dates, inside.created_at.to_date.iso8601
     refute_includes dates, outside.created_at.to_date.iso8601
+    assert_equal false, widget_chart_options(response.body, "Failed runs").dig("xaxis", "labels", "show")
   end
 
   test "ai run health screen reads failed stuck tokens and retry metrics" do
@@ -2486,10 +2501,13 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
   end
 
   def widget_chart_options(html, title)
-    fragment = widget_html(html, title)
-    match = fragment.match(/data-flat-pack--chart-options-value="([^"]+)"/)
-    assert match, "expected chart options on #{title}"
-    JSON.parse(CGI.unescapeHTML(match[1]))
+    document = Nokogiri::HTML(html)
+    heading = document.css("h3").find { |node| node.text.strip == title }
+    assert heading, "expected heading #{title}"
+    container = heading.ancestors.find { |node| node.at_css("[data-flat-pack--chart-options-value]") }
+    chart = container&.at_css("[data-flat-pack--chart-options-value]")
+    assert chart, "expected chart options on #{title}"
+    JSON.parse(chart["data-flat-pack--chart-options-value"])
   end
 
   def widget_metric_text(html, title)

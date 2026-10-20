@@ -16,7 +16,7 @@ module RecordingStudioAI
         range = context.widget_time_range(default_preset_key: DEFAULT_WINDOW)
         return {} unless range.respond_to?(:begin) && range.begin && range.end
 
-        { start_at: range.begin, end_at: range.end }
+        { interval: :day, start_at: range.begin, end_at: range.end }
       end
 
       def timeseries_options(identifier)

@@ -37,6 +37,7 @@ class AdminMetricChartTest < Minitest::Test
 
     assert_equal :last_30_days, RecordingStudioAI::Admin::MetricChart::DEFAULT_WINDOW
     assert_equal :last_30_days, context.default_preset_key
+    assert_equal :day, params[:interval]
     assert_equal range.begin, params[:start_at]
     assert_equal range.end, params[:end_at]
   end
@@ -46,6 +47,7 @@ class AdminMetricChartTest < Minitest::Test
 
     params = RecordingStudioAI::Admin::MetricChart.window_params(context)
 
+    refute params.key?(:interval)
     refute params.key?(:start_at)
     refute params.key?(:end_at)
   end
