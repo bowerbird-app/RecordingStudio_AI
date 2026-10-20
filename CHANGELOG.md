@@ -17,7 +17,7 @@ Versioning and Keep a Changelog.
 
 ### Upgrade notes
 - Bump to `0.17.0`. No migration.
-- Health screen defaults to the last four weeks, like the other AI list screens. Widget deep links still pass last 30 days.
+- Health screen defaults to the last 30 days, matching the Failed and Stuck widgets. Widget deep links still pass last 30 days.
 - Keep `recording_studio_metrics` at `>= 0.3.0, < 0.6`. These screens no longer depend on Metrics 0.5-only chart helpers.
 
 ## [0.16.1] - 2026-10-20

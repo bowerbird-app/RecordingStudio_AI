@@ -467,7 +467,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     get "/admin/screens/ai_runs_health"
     assert_response :success
-    assert_includes response.body, "value=\"last_4_weeks\""
+    assert_includes response.body, "value=\"last_30_days\""
     assert_includes response.body, "name=\"group_by\""
     assert_includes response.body, "name=\"profile\""
 
@@ -638,7 +638,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "match-profile"
     assert_includes response.body, "11"
 
-    get "/admin/screens/ai_runs_health/chart", params: { date_range_preset: "last_30_days" }
+    get "/admin/screens/ai_runs_health/chart"
     assert_response :success
     assert_equal failed_window, chart_series_total(response.body)
     assert_includes response.body,

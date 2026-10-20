@@ -9,7 +9,9 @@ module RecordingStudioAI
       SUCCESS_CLASS = "text-[var(--color-success-background-color)]"
       DANGER_CLASS = "text-[var(--color-danger-background-color)]"
       MUTED_CLASS = "text-[var(--surface-muted-content-color)]"
-      DEFAULT_RANGE = :last_4_weeks
+      DEFAULT_RANGE = :last_30_days
+      MIN_GROUP_SIZE = 5
+      OTHER_CATEGORY = "__other__"
 
       module_function
 
@@ -110,7 +112,7 @@ module RecordingStudioAI
         end
 
         AdminScreens::RecordingStudioAIWidgets::DateRangeWindow.new(
-          27.days.ago.to_date, Date.current, DEFAULT_RANGE
+          29.days.ago.to_date, Date.current, DEFAULT_RANGE
         )
       end
 
@@ -171,22 +173,42 @@ module RecordingStudioAI
 
           counts[[category.to_s, AdminScreens::RecordingStudioAIWidgets.attempt_kind_bucket_key(created_at, bucket)]] += 1
         end
-        names = counts.keys.map(&:first).uniq.sort
-        series = names.filter_map do |category|
+        series = collapsed_failed_counts(counts).filter_map do |category, category_counts|
           data = buckets.map do |bucket_key|
             {
               x: AdminScreens::RecordingStudioAIWidgets.attempt_kind_bucket_label(bucket_key, bucket),
-              y: counts.fetch([category, bucket_key], 0)
+              y: category_counts.fetch(bucket_key, 0)
             }
           end
           next if data.all? { |point| point[:y].zero? }
 
-          { name: MetricRead.group_label(category), data: data }
+          { name: failed_series_name(category), data: data }
         end
         series.presence || [{
           name: RecordingStudioAI::Copy.t("admin.screens.ai_runs_health.chart_title"),
           data: bucketed_counts(runs.none, bucket: bucket, range: range)
         }]
+      end
+
+      def collapsed_failed_counts(counts)
+        totals = Hash.new(0)
+        counts.each { |(category, _), value| totals[category] += value }
+
+        collapsed = Hash.new { |hash, key| hash[key] = Hash.new(0) }
+        counts.each do |(category, bucket_key), value|
+          dest = totals[category] < MIN_GROUP_SIZE ? OTHER_CATEGORY : category
+          collapsed[dest][bucket_key] += value
+        end
+
+        named = collapsed.keys.reject { |category| category == OTHER_CATEGORY }.sort
+        named << OTHER_CATEGORY if collapsed.key?(OTHER_CATEGORY)
+        named.to_h { |category| [category, collapsed[category]] }
+      end
+
+      def failed_series_name(category)
+        return RecordingStudioAI::Copy.t("common.other") if category == OTHER_CATEGORY
+
+        MetricRead.group_label(category)
       end
 
       def bucketed_counts(runs, bucket:, range:)
