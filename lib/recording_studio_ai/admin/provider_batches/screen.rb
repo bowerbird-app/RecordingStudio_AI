@@ -22,9 +22,7 @@ module AdminScreens
     summary do
       hide_change
       value do |context|
-        Array(
-          RecordingStudioAI::Admin::MetricRead.call("ai_batches.by_status", admin_context: context).data
-        ).sum { |row| (row[:value] || row["value"]).to_i }
+        RecordingStudioAI::Admin::ProviderBatchesChart.total(context.query_result.relation)
       end
     end
 
@@ -33,15 +31,10 @@ module AdminScreens
       subtitle { Copy.t("admin.screens.provider_batches.chart_subtitle") }
       type :bar
       series do |context|
-        RecordingStudioAI::Admin::MetricRead.chart_series(
-          "ai_batches.by_status",
-          admin_context: context,
-          kind: :breakdown
-        )
+        RecordingStudioAI::Admin::ProviderBatchesChart.series(context.query_result.relation)
       end
       options do |context|
-        result = RecordingStudioAI::Admin::MetricRead.call("ai_batches.by_status", admin_context: context)
-        categories = RecordingStudioAI::Admin::MetricRead.breakdown_categories(result)
+        categories = RecordingStudioAI::Admin::ProviderBatchesChart.categories(context.query_result.relation)
         {
           height: [240, (categories.length * 40) + 80].max,
           plotOptions: { bar: { horizontal: true, barHeight: "55%" } },

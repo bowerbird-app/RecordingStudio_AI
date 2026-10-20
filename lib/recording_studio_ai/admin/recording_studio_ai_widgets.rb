@@ -207,6 +207,14 @@ module AdminScreens
       runs_scope.where.not(column => nil).distinct.order(column).pluck(column).compact_blank
     end
 
+    def site_run_distinct_values(column)
+      site_runs_scope.distinct.order(column).pluck(column).compact_blank
+    end
+
+    def site_run_present_distinct_values(column)
+      site_runs_scope.where.not(column => nil).distinct.order(column).pluck(column).compact_blank
+    end
+
     def attempt_distinct_values(column)
       attempts_scope.distinct.order(column).pluck(column).compact_blank
     end

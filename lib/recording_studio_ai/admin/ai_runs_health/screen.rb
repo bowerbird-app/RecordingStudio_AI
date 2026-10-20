@@ -8,16 +8,35 @@ module AdminScreens
     subtitle { Copy.t("admin.screens.ai_runs_health.subtitle") }
 
     query do |context|
-      RecordingStudioAI::Admin::MetricRead.profile_token_rows(context)
+      RecordingStudioAI::Admin::RunsHealth.profile_token_rows(context)
     end
+
+    filter_presentation :modal, inline_count: 3
+    filter :date_range, field: :created_at, default: :last_30_days
+    filter :group_by, values: %i[hour day week month year], default: :day
+    filter :profile,
+           title: "Profile",
+           field: :profile_key,
+           values: -> { AdminScreens::RecordingStudioAIWidgets.site_run_present_distinct_values(:profile_key) },
+           apply: ->(relation, _value, _context) { relation }
+    filter :status,
+           param: :run_status,
+           field: :status,
+           options: -> { AdminScreens::RecordingStudioAIWidgets.site_run_distinct_values(:status) },
+           apply: ->(relation, _value, _context) { relation }
+    filter :stuck,
+           title: "Stuck",
+           values: [ "1" ],
+           control: :checkbox,
+           apply: ->(relation, _value, _context) { relation }
 
     summary do
       hide_change
       value do |context|
-        RecordingStudioAI::Admin::MetricRead.window_sum(
-          "ai_runs.failed_over_time",
-          admin_context: context
-        ).to_i
+        RecordingStudioAI::Admin::RunsHealth.headline_count(context)
+      end
+      period_label do |context|
+        RecordingStudioAI::Admin::RunsHealth.change_markup(context)
       end
     end
 
@@ -26,12 +45,7 @@ module AdminScreens
       subtitle { Copy.t("admin.screens.ai_runs_health.chart_subtitle") }
       type :line
       series do |context|
-        RecordingStudioAI::Admin::MetricRead.chart_series(
-          "ai_runs.failed_over_time",
-          admin_context: context,
-          kind: :timeseries_groups,
-          group_by: :error_category
-        )
+        RecordingStudioAI::Admin::RunsHealth.chart_series(context)
       end
       options do
         {

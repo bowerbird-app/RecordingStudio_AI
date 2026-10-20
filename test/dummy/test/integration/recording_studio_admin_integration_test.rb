@@ -386,6 +386,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "AI run health"
     assert_includes response.body, "href=\"/admin/screens/ai_runs_health\""
+    assert_includes response.body, "run_status=failed"
+    assert_includes response.body, "stuck=1"
+    assert_includes response.body, "date_range_preset=last_30_days"
     assert_includes response.body, "href=\"/admin/screens/provider_batches\""
     assert_includes response.body, "Failed runs"
     assert_includes response.body, "Stuck runs"
@@ -444,6 +447,139 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     get "/admin/screens/ai_runs_health/table",
         headers: { "Turbo-Frame" => "screen-table", "Sec-Fetch-Dest" => "empty" }
     assert_response :success
+  end
+
+  test "ai run health screen filters date range group by and profile on chart and table" do
+    authenticate_for_admin!
+    keep_profile = "keep-#{SecureRandom.hex(4)}"
+    drop_profile_key = "drop-#{SecureRandom.hex(4)}"
+    keep = create_run!(status: "failed", operation: "generation", resolved_model: "health-keep", total_tokens: 11)
+    keep.update_columns(error_category: "timeout", profile_key: keep_profile, created_at: 2.days.ago)
+    drop_profile = create_run!(status: "failed", operation: "generation", resolved_model: "health-other", total_tokens: 8)
+    drop_profile.update_columns(error_category: "rate_limit", profile_key: drop_profile_key, created_at: 2.days.ago)
+    drop_date = create_run!(status: "failed", operation: "generation", resolved_model: "health-old", total_tokens: 5)
+    drop_date.update_columns(error_category: "timeout", profile_key: keep_profile, created_at: 8.weeks.ago)
+
+    filters = AdminScreens::RecordingStudioAIRunsHealthScreen.filters
+    assert_equal %i[date_range group_by profile], filters.first(3).map(&:key)
+    assert_includes filters.map(&:key), :status
+    assert_includes filters.map(&:key), :stuck
+
+    get "/admin/screens/ai_runs_health"
+    assert_response :success
+    assert_includes response.body, "value=\"last_30_days\""
+    assert_includes response.body, "name=\"group_by\""
+    assert_includes response.body, "name=\"profile\""
+
+    params = { profile: keep_profile, group_by: "day", date_range_preset: "last_4_weeks" }
+    get "/admin/screens/ai_runs_health", params: params
+    assert_response :success
+    assert_includes response.body, "group_by=day"
+    assert_includes response.body, "profile=#{keep_profile}"
+    assert_includes response.body, "value=\"last_4_weeks\""
+
+    get "/admin/screens/ai_runs_health/table", params: params
+    assert_response :success
+    assert_includes response.body, keep_profile
+    assert_includes response.body, "11"
+    refute_includes response.body, drop_profile_key
+    refute_includes response.body, ">8<"
+
+    get "/admin/screens/ai_runs_health/chart", params: params
+    assert_response :success
+    assert_equal 1, chart_series_total(response.body)
+    assert_match(/text-5xl[^>]*>1</, response.body)
+    day_points = Array(chart_series(response.body).first&.fetch("data", []))
+
+    get "/admin/screens/ai_runs_health/chart", params: params.merge(group_by: "month")
+    assert_response :success
+    assert_equal 1, chart_series_total(response.body)
+    month_points = Array(chart_series(response.body).first&.fetch("data", []))
+    assert_operator day_points.length, :>, month_points.length
+  end
+
+  test "failed and stuck widgets deep-link to preselected health filters" do
+    authenticate_for_admin!
+    failed = create_run!(status: "failed", operation: "generation", resolved_model: "deep-fail", total_tokens: 6)
+    failed.update_columns(error_category: "timeout", profile_key: "deep-fail-profile")
+    stuck = create_run!(status: "running", operation: "generation", resolved_model: "deep-stuck", total_tokens: 3)
+    stuck.update_columns(started_at: 2.hours.ago, created_at: 2.hours.ago, profile_key: "deep-stuck-profile")
+    fresh = create_run!(status: "completed", operation: "generation", resolved_model: "deep-ok", total_tokens: 9)
+    fresh.update_columns(profile_key: "deep-ok-profile")
+
+    ["/admin", "/admin/sections/recording_studio_ai"].each do |path|
+      get path
+      assert_response :success
+      failed_href = response.body[%r{href="(/admin/screens/ai_runs_health\?[^"]*run_status=failed[^"]*)"}]
+      stuck_href = response.body[%r{href="(/admin/screens/ai_runs_health\?[^"]*stuck=1[^"]*)"}]
+      assert failed_href, "expected Failed runs widget on #{path} to link to filtered health"
+      assert stuck_href, "expected Stuck runs widget on #{path} to link to filtered health"
+      assert_includes failed_href, "date_range_preset=last_30_days"
+      assert_includes stuck_href, "date_range_preset=last_30_days"
+    end
+
+    get "/admin/screens/ai_runs_health", params: { run_status: "failed", date_range_preset: "last_30_days" }
+    assert_response :success
+    assert_includes response.body, "run_status=failed"
+    assert_includes response.body, "value=\"last_30_days\""
+
+    get "/admin/screens/ai_runs_health/table", params: { run_status: "failed", date_range_preset: "last_30_days" }
+    assert_response :success
+    assert_includes response.body, "deep-fail-profile"
+    refute_includes response.body, "deep-ok-profile"
+    refute_includes response.body, "deep-stuck-profile"
+
+    get "/admin/screens/ai_runs_health", params: { stuck: "1", date_range_preset: "last_30_days" }
+    assert_response :success
+    assert_includes response.body, "stuck=1"
+    assert_includes response.body, "value=\"last_30_days\""
+
+    get "/admin/screens/ai_runs_health/table", params: { stuck: "1", date_range_preset: "last_30_days" }
+    assert_response :success
+    assert_includes response.body, "deep-stuck-profile"
+    refute_includes response.body, "deep-fail-profile"
+    refute_includes response.body, "deep-ok-profile"
+
+    get "/admin/screens/ai_runs_health/chart", params: { stuck: "1", date_range_preset: "last_30_days", profile: "deep-stuck-profile" }
+    assert_response :success
+    assert_equal 1, chart_series_total(response.body)
+  end
+
+  test "ai run health failed count colours previous-period change by meaning" do
+    authenticate_for_admin!
+    current = RecordingStudioAdmin::Period.from_preset_key(:last_4_weeks)
+    span_days = (current.end_date - current.start_date).to_i + 1
+    previous_end = current.start_date - 1.day
+    previous_start = previous_end - (span_days - 1).days
+    profile = "delta-#{SecureRandom.hex(4)}"
+    params = { date_range_preset: "last_4_weeks", profile: profile }
+
+    more = create_run!(status: "failed", operation: "generation", resolved_model: "health-more")
+    more.update_columns(error_category: "timeout", profile_key: profile, created_at: current.start_date.beginning_of_day + 1.hour)
+    get "/admin/screens/ai_runs_health/chart", params: params
+    assert_response :success
+    assert_includes response.body, RecordingStudioAI::Copy.t("common.none")
+    assert_includes response.body, RecordingStudioAI::Admin::RunsHealth::MUTED_CLASS
+
+    prior = create_run!(status: "failed", operation: "generation", resolved_model: "health-prior")
+    prior.update_columns(error_category: "timeout", profile_key: profile, created_at: previous_start.beginning_of_day + 1.hour)
+    get "/admin/screens/ai_runs_health/chart", params: params
+    assert_response :success
+    assert_includes response.body, %(<span class="#{RecordingStudioAI::Admin::RunsHealth::MUTED_CLASS}">#{RecordingStudioAI::Copy.t("common.none")}</span>)
+
+    extra = create_run!(status: "failed", operation: "generation", resolved_model: "health-extra")
+    extra.update_columns(error_category: "timeout", profile_key: profile, created_at: current.start_date.beginning_of_day + 2.hours)
+    get "/admin/screens/ai_runs_health/chart", params: params
+    assert_response :success
+    assert_includes response.body, "+100%"
+    assert_includes response.body, RecordingStudioAI::Admin::RunsHealth::DANGER_CLASS
+
+    extra.update_columns(created_at: previous_start.beginning_of_day + 2.hours)
+    more.update_columns(created_at: previous_start.beginning_of_day + 3.hours)
+    get "/admin/screens/ai_runs_health/chart", params: params
+    assert_response :success
+    assert_includes response.body, "-100%"
+    assert_includes response.body, RecordingStudioAI::Admin::RunsHealth::SUCCESS_CLASS
   end
 
   test "ai metric widget counts match the screens they open" do
@@ -578,6 +714,56 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "keep-this-model"
     refute_includes response.body, "drop-this-model"
     assert_includes response.body, 'data-controller="flat-pack--timestamp"'
+  end
+
+  test "provider batches chart uses the same filtered scope as the table" do
+    authenticate_for_admin!
+    RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "keep-this-model",
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 1
+    )
+    RecordingStudioAI::Batch.create!(
+      status: "failed",
+      provider: "openai",
+      model: "drop-this-model",
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 1
+    )
+    old = RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "keep-this-model",
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 1
+    )
+    old.update_columns(created_at: 6.weeks.ago)
+
+    get "/admin/screens/provider_batches/chart", params: { model: "keep-this-model" }
+    assert_response :success
+    assert_equal 2, batches_chart_total(response.body)
+    assert_match(/text-5xl[^>]*>2</, response.body)
+
+    get "/admin/screens/provider_batches/chart", params: {
+      model: "keep-this-model",
+      status: "completed",
+      start_date: 1.week.ago.to_date.iso8601,
+      end_date: Date.current.iso8601
+    }
+    assert_response :success
+    assert_equal 1, batches_chart_total(response.body)
+    assert_match(/text-5xl[^>]*>1</, response.body)
   end
 
   test "provider batches table matches the site-wide by_status chart" do

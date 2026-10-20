@@ -345,9 +345,11 @@ Expires uses Flatpack Timestamp (time ago, exact time in the tooltip).
 Every widget on the AI section is site-wide too, including calls, tools,
 latency, spend, failed runs, stuck, tokens, retry or fallback, and batches.
 `/admin/screens/ai_runs_health` is the failed-run chart plus tokens-by-profile
-table. Stuck and retry stay on the section, not inside that screen. Headlines
-on the health screen and on the failed/retry cards are the same window as
-their charts, not today's last bucket.
+table, with date range, group by, and AI profile filters (plus status and
+stuck, so the Failed and Stuck widgets can open an already-filtered view).
+Stuck and retry cards stay on the section. The failed-run headline is the
+filtered window total, with percent change versus the previous period of the
+same length. Provider batches chart uses the same filtered jobs as the table.
 
 Saved replies open at `/recording_studio_ai/retained_responses/:id`. Listing
 uses the Admin surface role (default `:view`) and the current-root match.

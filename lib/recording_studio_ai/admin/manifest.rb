@@ -7,6 +7,8 @@ module AdminScreens
 
   DEFINITION_FILES = %w[
     recording_studio_ai_widgets
+    runs_health
+    provider_batches_chart
     ai_calls/widgets/ai_calls_windows
     ai_calls/widgets/retry_rate_by_model
     ai_calls/widgets/errors_failed_calls

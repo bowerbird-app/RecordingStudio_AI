@@ -1,5 +1,19 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.17.0
+
+Admin AI run health and provider batches screens. No migration.
+
+### What changed
+
+- `/admin/screens/ai_runs_health` filters by date range, group by, and AI profile. Failed and Stuck widgets open that screen with the matching status or stuck filter and the widget date range.
+- The failed-run headline compares the previous period of the same length. Fewer failures are green, more are red, and no change or no prior data is an em dash.
+- Provider batches chart totals come from the filtered table relation, so date, status, provider, and model match the list.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.17.0`. No migration is required. Keep Metrics at `>= 0.3.0, < 0.6`.
+
 ## Upgrading to 0.16.1
 
 Widens Metrics so the gem can run on RecordingStudio_metrics 0.5.0. No migration.

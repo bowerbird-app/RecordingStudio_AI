@@ -91,8 +91,18 @@ module AdminScreens
         end
       end
 
-      link_to { |context| context.admin_screen_path(card.screen_key) }
+      link_to { |context| AdminScreens.metric_widget_path(card, context) }
     end
+  end
+
+  def self.metric_widget_path(card, context)
+    extra = case card.identifier
+            when "ai_runs.failed_over_time" then { run_status: "failed" }
+            when "ai_runs.stuck" then { stuck: "1" }
+            end
+    return context.admin_screen_path(card.screen_key) if extra.nil?
+
+    RecordingStudioAI::Admin::RunsHealth.health_screen_path(context, extra: extra)
   end
 
   def self.metric_widget_value(card, context)
