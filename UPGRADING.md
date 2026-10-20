@@ -1,5 +1,18 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.16.1
+
+Widens Metrics so the gem can run on RecordingStudio_metrics 0.5.0. No migration.
+
+### What changed
+
+- Runtime dependency `recording_studio_metrics` is `>= 0.3.0, < 0.6` (tag `v0.5.0`).
+- Admin charts still hand `{ x:, y: }` points to Flatpack. Metrics 0.5.0 `Admin.chart_series` already returns that shape; this gem still maps execute rows (`date` / `value`) into those points.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.16.1` and pin Metrics `>= 0.3.0, < 0.6` (tag `v0.5.0`). No migration is required.
+
 ## Upgrading to 0.16.0
 
 Adds Admin screens and dashboard widgets for the existing AI metrics. No migration.

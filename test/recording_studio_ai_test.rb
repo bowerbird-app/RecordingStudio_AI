@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.16.0", RecordingStudioAI::VERSION
+    assert_equal "0.16.1", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -54,7 +54,7 @@ class RecordingStudioAITest < Minitest::Test
 
     assert_equal %w[csv flat_pack json_schemer openai rails recording_studio recording_studio_metrics],
                  dependencies.keys.sort
-    assert_equal ">= 0.3.0, < 0.4", dependencies.fetch("recording_studio_metrics").to_s
+    assert_equal ">= 0.3.0, < 0.6", dependencies.fetch("recording_studio_metrics").to_s
     assert_equal "~> 4.7", dependencies.fetch("recording_studio").to_s
     assert_equal "~> 0.103", dependencies.fetch("openai").to_s
     refute_includes dependencies.keys, "recording_studio_accessible"
