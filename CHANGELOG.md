@@ -5,6 +5,21 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-20
+
+### Added
+- AI run health (`ai_runs_health`) filters for date range, group by, and AI profile, plus the same status and stuck controls the Failed and Stuck widgets deep-link with.
+- Failed runs and Stuck runs widgets open health already filtered to that view, including the widget date range (`last_30_days`).
+- Failed-run headline shows percent change versus the previous period of the same length. Fewer failures are green, more are red, and no change or no prior data is a muted em dash.
+
+### Fixed
+- Provider batches chart uses the same filtered relation as the table (date, status, provider, and model). Metrics `ai_batches.by_status` is a breakdown without those screen filters, so the chart no longer reads that unfiltered metric.
+
+### Upgrade notes
+- Bump to `0.17.0`. No migration.
+- Health screen defaults to the last four weeks, like the other AI list screens. Widget deep links still pass last 30 days.
+- Keep `recording_studio_metrics` at `>= 0.3.0, < 0.6`. These screens no longer depend on Metrics 0.5-only chart helpers.
+
 ## [0.16.1] - 2026-10-20
 
 ### Changed
@@ -989,7 +1004,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.15.1...v0.16.0
 [0.14.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.13.0...v0.14.0

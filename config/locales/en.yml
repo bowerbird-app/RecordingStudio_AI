@@ -101,7 +101,7 @@ en:
             title: "AI run health"
             subtitle: "Failures, stuck work, tokens, and retries."
             chart_title: "Failed runs"
-            chart_subtitle: "Failures by category over the last 30 days."
+            chart_subtitle: "Failures by category in the selected date range."
             table_title: "Tokens by profile"
           tool_calls:
             title: "Custom Tool Calls"
