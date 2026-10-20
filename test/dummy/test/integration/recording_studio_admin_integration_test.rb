@@ -401,6 +401,78 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes widget_keys, "widgets.recording_studio_ai.tokens_by_profile"
     assert_includes widget_keys, "widgets.recording_studio_ai.fallback_retry_rate"
     assert_includes widget_keys, "widgets.recording_studio_ai.batches_by_status"
+
+    failed_options = widget_chart_options(response.body, "Failed runs")
+    stuck_options = widget_chart_options(response.body, "Stuck runs")
+    retry_options = widget_chart_options(response.body, "Retry or fallback rate")
+    assert_equal false, failed_options.dig("xaxis", "labels", "show")
+    assert_equal false, stuck_options.dig("xaxis", "labels", "show")
+    assert_equal 2, retry_options.dig("yaxis", "decimalsInFloat")
+  end
+
+  test "failed runs chart window is the last 30 days" do
+    authenticate_for_admin!
+    inside = create_run!(status: "failed", operation: "generation", resolved_model: "failed-inside")
+    inside.update_columns(created_at: 2.days.ago, error_category: "timeout")
+    outside = create_run!(status: "failed", operation: "generation", resolved_model: "failed-outside")
+    outside.update_columns(created_at: 40.days.ago, error_category: "timeout")
+
+    controller = Object.new
+    root = @root_recording
+    controller.define_singleton_method(:current_root_recording) { root }
+    dashboard = RecordingStudioAdmin::Context.new(current_actor: @user, controller: controller)
+    window = RecordingStudioAI::Admin::MetricChart.window_params(dashboard)
+    series = RecordingStudioAI::Admin::MetricRead.chart_series(
+      "ai_runs.failed_over_time",
+      admin_context: dashboard,
+      kind: :timeseries_groups,
+      group_by: :error_category,
+      **window
+    )
+    dates = series.flat_map { |row| Array(row[:data] || row["data"]).map { |point| (point[:x] || point["x"]).to_s } }
+
+    get "/admin"
+    assert_response :success
+    assert_equal :last_30_days, RecordingStudioAI::Admin::MetricChart::DEFAULT_WINDOW
+    assert window[:start_at]
+    assert window[:end_at]
+    assert_includes dates, inside.created_at.to_date.iso8601
+    refute_includes dates, outside.created_at.to_date.iso8601
+    assert_equal false, widget_chart_options(response.body, "Failed runs").dig("xaxis", "labels", "show")
+  end
+
+  test "stuck runs chart window is the last 30 days" do
+    authenticate_for_admin!
+    create_run!(status: "running", operation: "generation", resolved_model: "stuck-inside")
+      .update_columns(started_at: 2.hours.ago, created_at: 2.hours.ago)
+
+    controller = Object.new
+    root = @root_recording
+    controller.define_singleton_method(:current_root_recording) { root }
+    dashboard = RecordingStudioAdmin::Context.new(current_actor: @user, controller: controller)
+    expected = RecordingStudioAI::Admin::MetricChart.window_params(dashboard)
+    captured = nil
+    reader = RecordingStudioAI::Admin::MetricRead
+    singleton = class << reader; self; end
+    original = reader.method(:chart_series)
+    singleton.send(:define_method, :chart_series) do |identifier, **params|
+      captured = params.merge(identifier: identifier)
+      original.call(identifier, **params)
+    end
+
+    series = begin
+      AdminScreens::RecordingStudioAIStuckWidget.series.call(dashboard)
+    ensure
+      singleton.send(:define_method, :chart_series, original)
+    end
+    dates = series.flat_map { |row| Array(row[:data] || row["data"]).map { |point| Date.iso8601((point[:x] || point["x"]).to_s) } }
+
+    assert_equal "ai_runs.stuck_over_time", captured[:identifier]
+    assert_equal expected[:start_at], captured[:start_at]
+    assert_equal expected[:end_at], captured[:end_at]
+    assert_equal :day, captured[:interval]
+    assert dates.min >= expected[:start_at].to_date
+    assert dates.max <= expected[:end_at].to_date
   end
 
   test "ai run health screen reads failed stuck tokens and retry metrics" do
@@ -2460,6 +2532,16 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     return [] unless match
 
     JSON.parse(CGI.unescapeHTML(match[1]))
+  end
+
+  def widget_chart_options(html, title)
+    document = Nokogiri::HTML(html)
+    heading = document.css("h3").find { |node| node.text.strip == title }
+    assert heading, "expected heading #{title}"
+    container = heading.ancestors.find { |node| node.at_css("[data-flat-pack--chart-options-value]") }
+    chart = container&.at_css("[data-flat-pack--chart-options-value]")
+    assert chart, "expected chart options on #{title}"
+    JSON.parse(chart["data-flat-pack--chart-options-value"])
   end
 
   def widget_metric_text(html, title)

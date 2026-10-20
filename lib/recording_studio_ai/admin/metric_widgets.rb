@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "metric_chart"
 require_relative "metric_read"
 
 module AdminScreens
@@ -61,17 +62,12 @@ module AdminScreens
           RecordingStudioAI::Admin::MetricRead.chart_series(
             "ai_runs.stuck_over_time",
             admin_context: context,
-            kind: :timeseries
+            kind: :timeseries,
+            **RecordingStudioAI::Admin::MetricChart.window_params(context)
           )
         end
         chart_options do
-          {
-            height: 240,
-            stroke: { curve: "smooth", width: 3 },
-            yaxis: { min: 0 },
-            dataLabels: { enabled: false },
-            grid: { xaxis: { lines: { show: false } } }
-          }
+          RecordingStudioAI::Admin::MetricChart.timeseries_options(card.identifier)
         end
       else
         value do |context|
@@ -79,11 +75,17 @@ module AdminScreens
         end
         chart_type(card.kind == :breakdown ? :bar : :line)
         series do |context|
+          extra = if card.identifier == "ai_runs.failed_over_time"
+                    RecordingStudioAI::Admin::MetricChart.window_params(context)
+                  else
+                    {}
+                  end
           RecordingStudioAI::Admin::MetricRead.chart_series(
             card.identifier,
             admin_context: context,
             kind: card.kind,
-            group_by: card.group_by
+            group_by: card.group_by,
+            **extra
           )
         end
         chart_options do |context|
@@ -123,20 +125,18 @@ module AdminScreens
   end
 
   def self.metric_chart_options(card, context)
-    base = {
-      height: 240,
-      dataLabels: { enabled: false },
-      grid: { xaxis: { lines: { show: false } } }
-    }
-    return base.merge(stroke: { curve: "smooth", width: 3 }, yaxis: { min: 0 }) unless card.kind == :breakdown
+    return RecordingStudioAI::Admin::MetricChart.timeseries_options(card.identifier) unless card.kind == :breakdown
 
     result = RecordingStudioAI::Admin::MetricRead.call(card.identifier, admin_context: context)
     categories = RecordingStudioAI::Admin::MetricRead.breakdown_categories(result)
-    base.merge(
+    {
+      height: 240,
+      dataLabels: { enabled: false },
+      grid: { xaxis: { lines: { show: false } } },
       plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
       xaxis: { categories: categories, labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false } },
       yaxis: { labels: { show: true } }
-    )
+    }
   end
 
   RecordingStudioAIFailedOverTimeWidget = build_metric_widget(RecordingStudioAIMetricCards.card_for("ai_runs.failed_over_time"))
