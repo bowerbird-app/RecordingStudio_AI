@@ -487,6 +487,13 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal 1, chart_series_total(response.body)
     assert_match(/text-5xl[^>]*>1</, response.body)
+    day_points = Array(chart_series(response.body).first&.fetch("data", []))
+
+    get "/admin/screens/ai_runs_health/chart", params: params.merge(group_by: "month")
+    assert_response :success
+    assert_equal 1, chart_series_total(response.body)
+    month_points = Array(chart_series(response.body).first&.fetch("data", []))
+    assert_operator day_points.length, :>, month_points.length
   end
 
   test "failed and stuck widgets deep-link to preselected health filters" do
@@ -498,14 +505,16 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     fresh = create_run!(status: "completed", operation: "generation", resolved_model: "deep-ok", total_tokens: 9)
     fresh.update_columns(profile_key: "deep-ok-profile")
 
-    get "/admin"
-    assert_response :success
-    failed_href = response.body[%r{href="(/admin/screens/ai_runs_health\?[^"]*run_status=failed[^"]*)"}]
-    stuck_href = response.body[%r{href="(/admin/screens/ai_runs_health\?[^"]*stuck=1[^"]*)"}]
-    assert failed_href, "expected Failed runs widget to link to filtered health"
-    assert stuck_href, "expected Stuck runs widget to link to filtered health"
-    assert_includes failed_href, "date_range_preset=last_30_days"
-    assert_includes stuck_href, "date_range_preset=last_30_days"
+    ["/admin", "/admin/sections/recording_studio_ai"].each do |path|
+      get path
+      assert_response :success
+      failed_href = response.body[%r{href="(/admin/screens/ai_runs_health\?[^"]*run_status=failed[^"]*)"}]
+      stuck_href = response.body[%r{href="(/admin/screens/ai_runs_health\?[^"]*stuck=1[^"]*)"}]
+      assert failed_href, "expected Failed runs widget on #{path} to link to filtered health"
+      assert stuck_href, "expected Stuck runs widget on #{path} to link to filtered health"
+      assert_includes failed_href, "date_range_preset=last_30_days"
+      assert_includes stuck_href, "date_range_preset=last_30_days"
+    end
 
     get "/admin/screens/ai_runs_health", params: { run_status: "failed", date_range_preset: "last_30_days" }
     assert_response :success

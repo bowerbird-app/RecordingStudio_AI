@@ -54,9 +54,7 @@ module RecordingStudioAI
 
       def change_display(current:, previous:)
         none = RecordingStudioAI::Copy.t("common.none")
-        if previous.to_i <= 0 || current.to_i == previous.to_i
-          return { text: none, css_class: MUTED_CLASS }
-        end
+        return { text: none, css_class: MUTED_CLASS } if previous.to_i <= 0 || current.to_i == previous.to_i
 
         percent = ((current.to_f - previous.to_f) / previous.to_f) * 100
         text = format("%+.1f%%", percent).sub(".0%", "%")
@@ -70,8 +68,7 @@ module RecordingStudioAI
         relation = relation.where(created_at: range) if range
         relation = apply_profile(relation, admin_context)
         relation = apply_status(relation, admin_context)
-        relation = apply_stuck(relation, admin_context)
-        relation
+        apply_stuck(relation, admin_context)
       end
 
       def health_screen_path(admin_context, extra: {})
@@ -96,7 +93,7 @@ module RecordingStudioAI
       end
 
       def date_range_window(admin_context)
-        selected = admin_context.try(:filter_value, :date_range)
+        selected = normalized_filter(admin_context, :date_range)
         return selected if selected.respond_to?(:start_date) && selected.start_date && selected.end_date
 
         default_date_range_window
@@ -118,21 +115,31 @@ module RecordingStudioAI
       end
 
       def group_by_bucket(admin_context)
-        value = admin_context.try(:filter_value, :group_by)
+        value = normalized_filter(admin_context, :group_by)
         value.present? ? value.to_sym : :day
       end
 
       def stuck?(admin_context)
-        value = admin_context.try(:filter_value, :stuck)
-        Array(value).any? { |item| item.to_s == "1" || item == true }
+        Array(normalized_filter(admin_context, :stuck)).any? { |item| item.to_s == "1" || item == true }
       end
 
       def selected_statuses(admin_context)
-        Array(admin_context.try(:filter_value, :status)).map(&:to_s).compact_blank
+        Array(normalized_filter(admin_context, :status)).map(&:to_s).compact_blank
       end
 
       def selected_profiles(admin_context)
-        Array(admin_context.try(:filter_value, :profile)).map(&:to_s).compact_blank
+        Array(normalized_filter(admin_context, :profile)).map(&:to_s).compact_blank
+      end
+
+      # Screen query runs before Admin stores filter_value. Read params the same
+      # way latency screens do, then prefer filter_value once it exists.
+      def normalized_filter(admin_context, key)
+        value = admin_context.try(:filter_value, key)
+        return value unless value.nil?
+        return unless admin_context.respond_to?(:params)
+
+        filter = AdminScreens::RecordingStudioAIRunsHealthScreen.filters.find { |item| item.key == key }
+        filter&.normalize(admin_context.params)
       end
 
       def apply_profile(relation, admin_context)
