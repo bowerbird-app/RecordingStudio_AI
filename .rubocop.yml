@@ -43,6 +43,7 @@ Metrics/ModuleLength:
   Exclude:
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/agents/**/*'
+    - 'lib/recording_studio_ai/metrics.rb'
     - 'lib/recording_studio_ai/providers/openai_hosted_agent.rb'
 
 Metrics/MethodLength:

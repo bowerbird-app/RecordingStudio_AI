@@ -52,6 +52,7 @@ Staff with AdminRoot `:view` (`RecordingStudioAI::Api::Access.can_view?`) can re
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/avg_latency`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/failed_over_time`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/stuck`
+- `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/stuck_over_time`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/oldest_stuck_age`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/tokens_by_profile`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/fallback_retry_rate`
@@ -63,12 +64,13 @@ Failure and stuck-run metrics (Recording Studio Metrics `>= 0.3.0, < 0.4`, tag `
 | --- | --- | --- | --- |
 | `ai_runs.failed_over_time` | timeseries / `count` | Runs with `status: "failed"`, bucketed by `created_at` (the AI Calls list date). Takes `from` / `to` and `interval` (`day`, `week`, `month`, `year`). | `error_category` (the stored normalized category, e.g. `rate_limit`, `timeout`) |
 | `ai_runs.stuck` | count / `count` | Runs with `status` `pending` or `running` whose `COALESCE(started_at, created_at)` is at least `config.stuck_run_threshold` ago. | `status`, `operation` |
+| `ai_runs.stuck_over_time` | timeseries / `count` | Runs that were pending or running longer than `config.stuck_run_threshold` at each UTC day end, last 30 days. Rebuilt from `started_at` / `created_at` / `completed_at`. | none |
 | `ai_runs.oldest_stuck_age` | scalar / `seconds` | Seconds since `COALESCE(started_at, created_at)` of the oldest stuck run; `value` omitted when none. | none |
 | `ai_runs.tokens_by_profile` | breakdown / `tokens` | Sum of `total_tokens` per `profile_key` (blank when a run has no profile). No date window. | not supported |
 | `ai_runs.fallback_retry_rate` | timeseries / `ratio` | Average of "has `retry_count > 0` or `fallback_count > 0`" over runs created in each period (0 to 1; empty bucket when no runs). Takes `from` / `to` and `interval`. | none |
 | `ai_batches.by_status` | breakdown / `count` | Batches per `status`. | not supported |
 
-Filters use the AI Calls list names: `operation`, `prompt` (`prompt_key`), `prompt_version`, `provider` (`resolved_provider`), `model` (`resolved_model`), and `status` (`pending` / `running`) on the stuck metrics. `tokens_by_profile` and `fallback_retry_rate` take the same list filters; `ai_batches.by_status` has none (there is no batch list). Groups under `min_group_size` (5) fold into `other`. There is no grouping by initiator, executor, recording, request or job ids, prompt text, or error message. The stuck metrics skip the Metrics cache so they reflect the threshold at request time. Same AdminRoot `:view` check and site scope as the other AI run metrics.
+Filters use the AI Calls list names: `operation`, `prompt` (`prompt_key`), `prompt_version`, `provider` (`resolved_provider`), `model` (`resolved_model`), and `status` (`pending` / `running`) on `ai_runs.stuck` and `ai_runs.oldest_stuck_age`. `ai_runs.stuck_over_time` takes the list filters except `status`. `tokens_by_profile` and `fallback_retry_rate` take the same list filters; `ai_batches.by_status` has none (there is no batch list). Groups under `min_group_size` (5) fold into `other`. There is no grouping by initiator, executor, recording, request or job ids, prompt text, or error message. The stuck metrics skip the Metrics cache so they reflect the threshold at request time. Same AdminRoot `:view` check and site scope as the other AI run metrics.
 
 Set the stuck threshold in the initializer (default 15 minutes):
 
@@ -335,8 +337,17 @@ mount RecordingStudioAI::Engine, at: "/recording_studio_ai"
 recording_studio_admin_for :admin, at: "/admin", root_section: :recording_studio_ai
 ```
 
-Lists (calls, attempts, tool calls, saved replies, provider batches) are Admin
-screens scoped to the current Admin root. They fail closed without a root.
+Call, attempt, tool-call, and saved-reply lists stay on the current Admin
+root and fail closed without one. Provider batches is the exception. That
+list is site-wide, like `ai_batches.by_status`, and can filter by model.
+Expires uses Flatpack Timestamp (time ago, exact time in the tooltip).
+
+Every widget on the AI section is site-wide too, including calls, tools,
+latency, spend, failed runs, stuck, tokens, retry or fallback, and batches.
+`/admin/screens/ai_runs_health` is the failed-run chart plus tokens-by-profile
+table. Stuck and retry stay on the section, not inside that screen. Headlines
+on the health screen and on the failed/retry cards are the same window as
+their charts, not today's last bucket.
 
 Saved replies open at `/recording_studio_ai/retained_responses/:id`. Listing
 uses the Admin surface role (default `:view`) and the current-root match.

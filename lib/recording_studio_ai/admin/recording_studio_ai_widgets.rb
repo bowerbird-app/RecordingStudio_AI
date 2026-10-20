@@ -134,6 +134,23 @@ module AdminScreens
       RecordingStudioAI::Run.where(root_recording_id: root_id)
     end
 
+    def site_admin_visible?(context)
+      return false if context.blank?
+
+      context.try(:access_recording).present? || context.try(:root_recording).present?
+    end
+
+    def site_runs_scope(context = admin_context)
+      bind_admin_context!(context) if context
+      return RecordingStudioAI::Run.none unless site_admin_visible?(context)
+
+      RecordingStudioAI::Run.all
+    end
+
+    def site_tool_scope(context = admin_context)
+      RecordingStudioAI::CustomToolInvocation.joins(:run).merge(site_runs_scope(context))
+    end
+
     def tool_scope(context = admin_context)
       RecordingStudioAI::CustomToolInvocation.joins(:run).merge(runs_scope(context))
     end
@@ -148,6 +165,13 @@ module AdminScreens
       return RecordingStudioAI::Batch.none if root_id.blank?
 
       RecordingStudioAI::Batch.where(root_recording_id: root_id)
+    end
+
+    def site_batches_scope(context = admin_context)
+      bind_admin_context!(context) if context
+      return RecordingStudioAI::Batch.none unless site_admin_visible?(context)
+
+      RecordingStudioAI::Batch.all
     end
 
     def responses_scope(context = admin_context)
@@ -172,7 +196,7 @@ module AdminScreens
     end
 
     def batch_distinct_values(column)
-      batches_scope.distinct.order(column).pluck(column).compact_blank
+      site_batches_scope.distinct.order(column).pluck(column).compact_blank
     end
 
     def run_distinct_values(column)
@@ -309,7 +333,7 @@ module AdminScreens
     def latency_chart_rows(context, dimension:, range: 30.days.ago..Time.current, limit: 5)
       memoize_widget([:latency_chart_rows, context.object_id, dimension, range.begin.to_f, range.end.to_f, limit]) do
         latency_rows_for_runs(
-          runs_scope(context).where(created_at: range).where.not(latency_ms: nil),
+          site_runs_scope(context).where(created_at: range).where.not(latency_ms: nil),
           dimension: dimension
         ).first(limit)
       end
@@ -446,7 +470,7 @@ module AdminScreens
 
     def retry_rate_chart_rows(context, range: 30.days.ago..Time.current, limit: 3)
       memoize_widget([:retry_rate_chart_rows, context.object_id, range.begin.to_f, range.end.to_f, limit]) do
-        retry_rate_by_model_rows(runs_scope(context), range: range, limit: limit)
+        retry_rate_by_model_rows(site_runs_scope(context), range: range, limit: limit)
       end
     end
 
@@ -837,7 +861,7 @@ module AdminScreens
     end
 
     def top_provider_call_rows(context, range: 30.days.ago..Time.current, limit: 5)
-      counts = runs_scope(context)
+      counts = site_runs_scope(context)
                .where(created_at: range)
                .where.not(resolved_provider: [nil, ""])
                .group(:resolved_provider)
@@ -850,7 +874,7 @@ module AdminScreens
     end
 
     def top_model_call_rows(context, range: 30.days.ago..Time.current, limit: 5)
-      counts = runs_scope(context)
+      counts = site_runs_scope(context)
                .where(created_at: range)
                .where.not(resolved_model: [nil, ""])
                .group(:resolved_provider, :resolved_model)
@@ -1146,7 +1170,7 @@ module AdminScreens
 
     def top_model_token_chart_rows(context, range: 30.days.ago..Time.current, limit: 5)
       memoize_widget([:top_model_token_chart_rows, context.object_id, range.begin.to_f, range.end.to_f, limit]) do
-        top_model_token_rows(runs_scope(context), range: range, limit: limit)
+        top_model_token_rows(site_runs_scope(context), range: range, limit: limit)
       end
     end
 
@@ -1179,7 +1203,7 @@ module AdminScreens
 
     def top_model_call_volume_rows(context, range: 30.days.ago..Time.current, limit: 5)
       memoize_widget([:top_model_call_volume_rows, context.object_id, range.begin.to_f, range.end.to_f, limit]) do
-        model_call_totals(runs_scope(context).where(created_at: range)).first(limit)
+        model_call_totals(site_runs_scope(context).where(created_at: range)).first(limit)
       end
     end
 

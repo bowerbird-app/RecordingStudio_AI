@@ -5,6 +5,21 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-19
+
+### Added
+- Admin run-health screen and five dashboard widgets that read the existing metrics: `ai_runs.failed_over_time` (by `error_category`), `ai_runs.stuck`, `ai_runs.tokens_by_profile`, `ai_runs.fallback_retry_rate`, and `ai_batches.by_status` on the provider-batches screen.
+- Each widget links to the screen that shows that metric. Numbers come from `RecordingStudioMetrics.execute`, not a second query.
+- `ai_runs.stuck_over_time`: daily stuck counts for the last 30 UTC days, rebuilt from run timestamps. The Stuck runs card keeps the live `ai_runs.stuck` number and draws this series beside it.
+- Provider batches table lists the same site-wide batches as `ai_batches.by_status` (no default last-4-weeks cutoff).
+- Failed-run and retry-or-fallback headlines use the same 30-day window as their charts. The health screen chart headline does too, and no longer embeds section widgets.
+- Admin AI section widgets all read site-wide, matching the metric cards.
+- Provider batches can filter by model. Expires uses Flatpack Timestamp (time ago, exact time in the tooltip).
+
+### Upgrade notes
+- Bump to `0.16.0`. No migration.
+- Hosts that already mount the `recording_studio_ai` Admin section get the new cards and screens. Staff still need Accessible `:view` on the admin access recording.
+
 ## [0.15.1] - 2026-10-17
 
 ### Fixed

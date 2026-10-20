@@ -8,14 +8,14 @@ module AdminScreens
     description { Copy.t("admin.widgets.slow_calls.description") }
     metadata { { period_label: Copy.t("common.last_30_days") } }
     value do |context|
-      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+      runs = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context)
                                                    .where(created_at: 30.days.ago..Time.current)
                                                    .where.not(latency_ms: nil)
       p90_latency = AdminScreens::RecordingStudioAIWidgets.p90_latency(runs)
       "#{AdminScreens::RecordingStudioAIWidgets.number(p90_latency)} ms"
     end
     change do |context|
-      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context).where.not(latency_ms: nil)
+      runs = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context).where.not(latency_ms: nil)
       current_p90 = AdminScreens::RecordingStudioAIWidgets.p90_latency(runs.where(created_at: 30.days.ago..Time.current))
       previous_p90 = AdminScreens::RecordingStudioAIWidgets.p90_latency(runs.where(created_at: 60.days.ago..30.days.ago))
       AdminScreens::RecordingStudioAIWidgets.percentage_change_label(current: current_p90, previous: previous_p90)

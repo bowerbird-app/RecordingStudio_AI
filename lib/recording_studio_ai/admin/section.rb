@@ -22,6 +22,11 @@ module AdminScreens
          url: ->(context) { context.admin_screen_path("attempts") },
          style: :secondary
 
+    link :ai_runs_health,
+         text: ->(_context) { Copy.t("admin.section.links.ai_runs_health") },
+         url: ->(context) { context.admin_screen_path("ai_runs_health") },
+         style: :secondary
+
     link :provider_batches,
          text: ->(_context) { Copy.t("admin.section.links.provider_batches") },
          url: ->(context) { context.admin_screen_path("provider_batches") },
@@ -89,5 +94,10 @@ module AdminScreens
     widget "widgets.recording_studio_ai.slow_calls"
     widget "widgets.recording_studio_ai.registered_providers"
     widget "widgets.recording_studio_ai.registered_models"
+    widget "widgets.recording_studio_ai.failed_over_time"
+    widget "widgets.recording_studio_ai.stuck"
+    widget "widgets.recording_studio_ai.tokens_by_profile"
+    widget "widgets.recording_studio_ai.fallback_retry_rate"
+    widget "widgets.recording_studio_ai.batches_by_status"
   end
 end

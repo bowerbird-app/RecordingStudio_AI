@@ -28,6 +28,7 @@ class MetricsTest < Minitest::Test
     assert_includes metrics, "api: [API]"
     assert_includes metrics, "API = :operations"
     assert_includes metrics, "Api::Access.can_view?"
+    assert_includes metrics, "custom :stuck_over_time"
     refute_includes metrics, "admin_operator?"
     refute_includes metrics, "estimated_spend"
     refute_includes metrics, "RecordingStudioMetrics::Api.register!"

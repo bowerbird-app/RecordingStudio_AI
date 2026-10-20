@@ -378,6 +378,143 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "/admin/screens/tool_calls"
   end
 
+  test "ai metric widgets on the dashboard link to grouped screens" do
+    authenticate_for_admin!
+
+    get "/admin"
+
+    assert_response :success
+    assert_includes response.body, "AI run health"
+    assert_includes response.body, "href=\"/admin/screens/ai_runs_health\""
+    assert_includes response.body, "href=\"/admin/screens/provider_batches\""
+    assert_includes response.body, "Failed runs"
+    assert_includes response.body, "Stuck runs"
+    assert_includes response.body, "Tokens by profile"
+    assert_includes response.body, "Retry or fallback rate"
+    assert_includes response.body, "Batches by status"
+    widget_keys = AdminScreens::RecordingStudioAISection.widget_keys
+    assert_includes widget_keys, "widgets.recording_studio_ai.failed_over_time"
+    assert_includes widget_keys, "widgets.recording_studio_ai.stuck"
+    assert_includes widget_keys, "widgets.recording_studio_ai.tokens_by_profile"
+    assert_includes widget_keys, "widgets.recording_studio_ai.fallback_retry_rate"
+    assert_includes widget_keys, "widgets.recording_studio_ai.batches_by_status"
+  end
+
+  test "ai run health screen reads failed stuck tokens and retry metrics" do
+    authenticate_for_admin!
+    create_run!(status: "failed", operation: "generation", resolved_model: "health-fail", total_tokens: 9)
+      .update_columns(error_category: "timeout", profile_key: "summary")
+    create_run!(status: "running", operation: "generation", resolved_model: "health-stuck", total_tokens: 3)
+      .update_columns(started_at: 2.hours.ago, created_at: 2.hours.ago)
+
+    get "/admin/screens/ai_runs_health"
+
+    assert_response :success
+    assert_includes response.body, "AI run health"
+    refute_includes response.body, "widgets.recording_studio_ai.stuck"
+    refute_includes response.body, "widgets.recording_studio_ai.fallback_retry_rate"
+
+    get "/admin/screens/ai_runs_health/chart"
+    assert_response :success
+    assert_includes response.body, "Failed runs"
+
+    get "/admin/screens/ai_runs_health/table"
+    assert_response :success
+    assert_includes response.body, "summary"
+    assert_includes response.body, "Profile"
+  end
+
+  test "ai run health screen lazy-loads chart and table without nested widgets" do
+    authenticate_for_admin!
+
+    assert_empty AdminScreens::RecordingStudioAIRunsHealthScreen.widget_keys
+
+    get "/admin/screens/ai_runs_health"
+    assert_response :success
+    assert_includes response.body, 'id="screen-chart"'
+    assert_includes response.body, 'id="screen-table"'
+    refute_includes response.body, "/admin/screens/ai_runs_health/widgets/"
+    refute_includes response.body, "recording-studio-admin-widget-screen-"
+
+    get "/admin/screens/ai_runs_health/chart",
+        headers: { "Turbo-Frame" => "screen-chart", "Sec-Fetch-Dest" => "empty" }
+    assert_response :success
+    assert_includes response.body, "Failed runs"
+
+    get "/admin/screens/ai_runs_health/table",
+        headers: { "Turbo-Frame" => "screen-table", "Sec-Fetch-Dest" => "empty" }
+    assert_response :success
+  end
+
+  test "ai metric widget counts match the screens they open" do
+    authenticate_for_admin!
+    create_run!(status: "failed", operation: "generation", resolved_model: "match-fail", total_tokens: 11)
+      .update_columns(error_category: "timeout", profile_key: "match-profile")
+    create_run!(status: "running", operation: "generation", resolved_model: "match-stuck", total_tokens: 4)
+      .update_columns(started_at: 2.hours.ago, created_at: 2.hours.ago)
+    RecordingStudioAI::Batch.create!(
+      status: "failed",
+      provider: "openai",
+      model: "match-batch",
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 1
+    )
+
+    controller = Object.new
+    root = @root_recording
+    controller.define_singleton_method(:current_root_recording) { root }
+    dashboard = RecordingStudioAdmin::Context.new(current_actor: @user, controller: controller)
+
+    stuck = RecordingStudioAI::Admin::MetricRead.scalar("ai_runs.stuck", admin_context: dashboard).to_i
+    tokens = RecordingStudioAI::Admin::MetricRead.profile_token_rows(dashboard).sum(&:tokens)
+    failed_window = RecordingStudioAI::Admin::MetricRead.window_sum(
+      "ai_runs.failed_over_time",
+      admin_context: dashboard
+    ).to_i
+    batches = Array(
+      RecordingStudioAI::Admin::MetricRead.call("ai_batches.by_status", admin_context: dashboard).data
+    ).sum { |row| (row[:value] || row["value"]).to_i }
+    retry_rate = AdminScreens.metric_widget_value(
+      AdminScreens::RecordingStudioAIMetricCards.card_for("ai_runs.fallback_retry_rate"),
+      dashboard
+    )
+
+    get "/admin"
+    assert_response :success
+    assert_equal stuck.to_s, widget_metric_text(response.body, "Stuck runs")
+    assert_includes widget_html(response.body, "Stuck runs"), "data-flat-pack--chart-series-value"
+    assert_equal AdminScreens::RecordingStudioAIWidgets.number(tokens),
+                 widget_metric_text(response.body, "Tokens by profile")
+    assert_equal failed_window.to_s, widget_metric_text(response.body, "Failed runs")
+    assert_equal batches.to_s, widget_metric_text(response.body, "Batches by status")
+    assert_equal retry_rate, widget_metric_text(response.body, "Retry or fallback rate")
+
+    get "/admin/screens/ai_runs_health"
+    assert_response :success
+    refute_includes response.body, "widgets.recording_studio_ai.stuck"
+    refute_includes response.body, "widgets.recording_studio_ai.fallback_retry_rate"
+
+    get "/admin/screens/ai_runs_health/table"
+    assert_response :success
+    assert_includes response.body, "match-profile"
+    assert_includes response.body, "11"
+
+    get "/admin/screens/ai_runs_health/chart"
+    assert_response :success
+    assert_equal failed_window, chart_series_total(response.body)
+    assert_includes response.body,
+                    %(<p class="text-5xl font-bold leading-none text-(--surface-content-color)">#{AdminScreens::RecordingStudioAIWidgets.number(failed_window)}</p>)
+
+    get "/admin/screens/provider_batches/chart"
+    assert_response :success
+    assert_equal batches, batches_chart_total(response.body)
+    assert_includes response.body,
+                    %(<p class="text-5xl font-bold leading-none text-(--surface-content-color)">#{AdminScreens::RecordingStudioAIWidgets.number(batches)}</p>)
+  end
+
   test "provider batches screen lists jobs for the current root" do
     authenticate_for_admin!
     RecordingStudioAI::Batch.create!(
@@ -397,11 +534,103 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Provider batches"
 
+    get "/admin/screens/provider_batches/chart"
+    assert_response :success
+    assert_includes response.body, "Batches by status"
+
     get "/admin/screens/provider_batches/table"
     assert_response :success
     assert_includes response.body, "dummy-echo-batch"
     refute_includes response.body, "provider_batch_id"
     refute_includes response.body, "error_message"
+  end
+
+  test "provider batches table filters by model and renders expires as a timestamp" do
+    authenticate_for_admin!
+    RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "keep-this-model",
+      expires_at: 2.days.from_now,
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 1
+    )
+    RecordingStudioAI::Batch.create!(
+      status: "failed",
+      provider: "openai",
+      model: "drop-this-model",
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 1
+    )
+
+    get "/admin/screens/provider_batches"
+    assert_response :success
+    assert_includes response.body, "name=\"model\""
+
+    get "/admin/screens/provider_batches/table", params: { model: "keep-this-model" }
+    assert_response :success
+    assert_includes response.body, "keep-this-model"
+    refute_includes response.body, "drop-this-model"
+    assert_includes response.body, 'data-controller="flat-pack--timestamp"'
+  end
+
+  test "provider batches table matches the site-wide by_status chart" do
+    authenticate_for_admin!
+    other_root = RecordingStudio.root_recording_for(Workspace.create!(name: "Other #{SecureRandom.hex(4)}"))
+    RecordingStudioAI::Batch.create!(
+      status: "failed",
+      provider: "openai",
+      model: "other-root-batch",
+      root_recording_id: other_root.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 2
+    )
+    old = RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "older-than-four-weeks",
+      root_recording_id: @root_recording.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user",
+      item_count: 1
+    )
+    old.update_columns(created_at: 6.weeks.ago)
+
+    get "/admin/screens/provider_batches/table"
+    assert_response :success
+    assert_includes response.body, "other-root-batch"
+    assert_includes response.body, "older-than-four-weeks"
+  end
+
+  test "ai section widgets count runs from every root" do
+    authenticate_for_admin!
+    range = AdminScreens::RecordingStudioAIWidgets.trailing_weeks_range(weeks_back: 4)
+    before = RecordingStudioAI::Run.where(created_at: range).count
+    other_root = RecordingStudio.root_recording_for(Workspace.create!(name: "Other #{SecureRandom.hex(4)}"))
+    RecordingStudioAI::Run.create!(
+      operation: "generation",
+      status: "completed",
+      resolved_model: "other-root-call",
+      root_recording_id: other_root.id,
+      context_recording_id: other_root.id,
+      initiator_type: "User",
+      initiator_id: @user.id,
+      initiator_kind: "user"
+    )
+
+    get "/admin"
+    assert_response :success
+    assert_equal AdminScreens::RecordingStudioAIWidgets.number(before + 1),
+                 widget_metric_text(response.body, "AI calls")
   end
 
   test "ai calls web search filter keeps only searched calls" do
@@ -969,7 +1198,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
       AdminScreens::RecordingStudioAICallsByProviderModelScreen,
       AdminScreens::RecordingStudioAIRegisteredProvidersScreen,
       AdminScreens::RecordingStudioAIRegisteredModelsScreen,
-      AdminScreens::RecordingStudioAIProfilesScreen
+      AdminScreens::RecordingStudioAIProfilesScreen,
+      AdminScreens::RecordingStudioAIRunsHealthScreen
     ]
 
     screens.each do |screen|
@@ -1394,15 +1624,21 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     authenticate_for_admin!
     current_run = create_run!(status: "completed", operation: "generation", resolved_model: "retry-widget-current")
     previous_run = create_run!(status: "completed", operation: "generation", resolved_model: "retry-widget-previous")
-    current_run.update_columns(retry_count: 2, created_at: 1.day.ago)
+    current_run.update_columns(retry_count: 10_000, created_at: 1.day.ago)
     previous_run.update_columns(retry_count: 1, created_at: 45.days.ago)
+
+    now = Time.current
+    current = RecordingStudioAI::Run.where(created_at: 30.days.ago..now).sum(:retry_count)
+    previous = RecordingStudioAI::Run.where(created_at: 60.days.ago..30.days.ago).sum(:retry_count)
+    change = AdminScreens::RecordingStudioAIWidgets.percentage_change_label(current: current, previous: previous)
 
     get "/admin"
 
     assert_response :success
-    assert_includes response.body, ">2<"
-    assert_includes response.body, "+100%"
-    assert_includes response.body, "text-[var(--color-danger-background-color)]"
+    card = widget_html(response.body, "Retry rate by model")
+    assert_includes card, ">#{AdminScreens::RecordingStudioAIWidgets.number(current)}<"
+    assert_includes card, change
+    assert_includes card, "text-[var(--color-danger-background-color)]" if current > previous
   end
 
   test "tool calls table filters by status" do
@@ -2011,6 +2247,44 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
   def configuration_accessor_names
     RecordingStudioAI::Configuration.instance_methods(false).grep(/=\z/).map { |name| name.to_s.chomp("=") }
+  end
+
+  def chart_series_total(html)
+    chart_series(html).sum do |row|
+      Array(row["data"] || row[:data]).sum { |point| (point["y"] || point[:y]).to_i }
+    end
+  end
+
+  def widget_html(html, title)
+    document = Nokogiri::HTML(html)
+    heading = document.css("h3").find { |node| node.text.strip == title }
+    assert heading, "expected heading #{title}"
+    heading.ancestors.find { |node| node.name == "div" && node["class"].to_s.include?("space-y-4") }&.to_html ||
+      heading.ancestors.find { |node| node.name == "div" && node["class"].to_s.include?("space-y") }&.to_html ||
+      heading.parent.to_html
+  end
+
+  def batches_chart_total(html)
+    series = chart_series(html).first
+    Array(series && (series["data"] || series[:data])).sum(&:to_i)
+  end
+
+  def chart_series(html)
+    match = html.match(/data-flat-pack--chart-series-value="([^"]+)"/)
+    return [] unless match
+
+    JSON.parse(CGI.unescapeHTML(match[1]))
+  end
+
+  def widget_metric_text(html, title)
+    document = Nokogiri::HTML(html)
+    heading = document.css("h3").find { |node| node.text.strip == title }
+    assert heading, "expected heading #{title}"
+    container = heading.ancestors.find do |node|
+      node.css("span").any? { |span| span["class"].to_s.include?("font-bold") && span.text.match?(/[\d%]/) }
+    end
+    span = container.css("span").find { |node| node["class"].to_s.include?("font-bold") && node.text.match?(/[\d%]/) }
+    span.text.strip
   end
 
   def create_run!(status:, operation:, prompt_key: nil, prompt_name_snapshot: nil,

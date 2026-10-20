@@ -9,7 +9,7 @@ module AdminScreens
     list_options { { divider: true } }
     items do |context|
       rows = AdminScreens::RecordingStudioAIWidgets.top_prompt_call_rows(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context),
+        AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context),
         range: 30.days.ago..Time.current,
         limit: 5
       )

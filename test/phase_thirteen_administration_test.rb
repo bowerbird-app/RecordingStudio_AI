@@ -125,6 +125,24 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
   end
 
+  def test_site_batches_scope_fails_closed_without_admin_context
+    visible_root = create_recording_id
+    RecordingStudioAI::Batch.create!(
+      status: "completed",
+      provider: "openai",
+      model: "gpt-visible",
+      root_recording_id: visible_root,
+      initiator_type: "User",
+      initiator_id: @actor.id,
+      initiator_kind: "user"
+    )
+    context = Struct.new(:root_recording).new(nil)
+
+    assert_empty AdminScreens::RecordingStudioAIWidgets.site_batches_scope(context)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
   def test_admin_batches_scope_fails_closed_without_a_root
     visible_root = create_recording_id
     RecordingStudioAI::Batch.create!(
@@ -203,7 +221,9 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal ["visible-tool"], widgets.tool_scope(context).pluck(:tool_key)
     assert_equal ["openai"], widgets.responses_scope(context).pluck(:provider)
     assert_equal %w[openai], widgets.batches_scope(context).pluck(:provider)
-    assert_equal %w[openai], widgets.batch_distinct_values(:provider)
+    assert_equal %w[gemini openai], widgets.site_batches_scope(context).pluck(:provider).sort
+    assert_equal %w[gemini openai], widgets.batch_distinct_values(:provider)
+    assert_equal [visible_run.id, hidden_run.id].sort, widgets.site_runs_scope(context).pluck(:id).sort
     assert_equal %w[completed], widgets.run_distinct_values(:status)
     assert_equal %w[visible-prompt], widgets.run_present_distinct_values(:prompt_key)
     assert_equal %w[openai], widgets.run_distinct_values(:resolved_provider)

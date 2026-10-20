@@ -8,13 +8,13 @@ module AdminScreens
     description { Copy.t("admin.widgets.ai_calls_windows.description") }
     metadata { { period_label: Copy.t("common.last_30_days") } }
     value do |context|
-      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+      runs = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context)
       AdminScreens::RecordingStudioAIWidgets.number(
         runs.where(created_at: AdminScreens::RecordingStudioAIWidgets.trailing_weeks_range(weeks_back: 4)).count
       )
     end
     change do |context|
-      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+      runs = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context)
       current = runs.where(created_at: AdminScreens::RecordingStudioAIWidgets.this_week_range).count
       previous = runs.where(created_at: AdminScreens::RecordingStudioAIWidgets.previous_week_range).count
       AdminScreens::RecordingStudioAIWidgets.percentage_change_label(current: current, previous: previous)
@@ -23,7 +23,7 @@ module AdminScreens
     chart_type :line
     series do |context|
       AdminScreens::RecordingStudioAIWidgets.weekly_calls_series(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context),
+        AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context),
         weeks_back: 4,
         series_name: Copy.t("common.ai_calls")
       )

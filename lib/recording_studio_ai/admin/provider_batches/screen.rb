@@ -8,14 +8,48 @@ module AdminScreens
     subtitle { Copy.t("admin.screens.provider_batches.subtitle") }
 
     query do |context|
-      RecordingStudioAIWidgets.batches_scope(context).order(created_at: :desc)
+      RecordingStudioAIWidgets.site_batches_scope(context).order(created_at: :desc)
     end
 
     filter_presentation :modal, inline_count: 3
-    filter :date_range, field: :created_at, default: :last_4_weeks
+    filter :date_range, field: :created_at
     filter :status, field: :status, values: -> { RecordingStudioAI::Batch::STATUSES.values }
     filter :provider, field: :provider,
            values: -> { RecordingStudioAIWidgets.batch_distinct_values(:provider) }
+    filter :model, field: :model,
+           values: -> { RecordingStudioAIWidgets.batch_distinct_values(:model) }
+
+    summary do
+      hide_change
+      value do |context|
+        Array(
+          RecordingStudioAI::Admin::MetricRead.call("ai_batches.by_status", admin_context: context).data
+        ).sum { |row| (row[:value] || row["value"]).to_i }
+      end
+    end
+
+    chart do
+      title { Copy.t("admin.screens.provider_batches.chart_title") }
+      subtitle { Copy.t("admin.screens.provider_batches.chart_subtitle") }
+      type :bar
+      series do |context|
+        RecordingStudioAI::Admin::MetricRead.chart_series(
+          "ai_batches.by_status",
+          admin_context: context,
+          kind: :breakdown
+        )
+      end
+      options do |context|
+        result = RecordingStudioAI::Admin::MetricRead.call("ai_batches.by_status", admin_context: context)
+        categories = RecordingStudioAI::Admin::MetricRead.breakdown_categories(result)
+        {
+          height: [240, (categories.length * 40) + 80].max,
+          plotOptions: { bar: { horizontal: true, barHeight: "55%" } },
+          xaxis: { categories: categories, min: 0 },
+          dataLabels: { enabled: false }
+        }
+      end
+    end
 
     table do
       column :created_at, title: "Created"
@@ -50,7 +84,7 @@ module AdminScreens
              }
       column :failed_item_count, title: "Failed"
       column :total_tokens, title: "Tokens"
-      column :expires_at, title: "Expires"
+      column :expires_at, title: "Expires", display: :timestamp
       default_sort :created_at, direction: :desc
       paginate per_page: 25
     end

@@ -8,7 +8,7 @@ module AdminScreens
     description { Copy.t("admin.widgets.registered_custom_tools.description") }
     list_options { { divider: true } }
     items do |context|
-      rows = AdminScreens::RecordingStudioAIWidgets.tool_scope(context)
+      rows = AdminScreens::RecordingStudioAIWidgets.site_tool_scope(context)
                                                    .where(created_at: 30.days.ago..Time.current)
                                                    .group(:tool_key)
                                                    .count

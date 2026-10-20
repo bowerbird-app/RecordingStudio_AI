@@ -8,14 +8,14 @@ module AdminScreens
     description { Copy.t("admin.widgets.estimated_spend.description") }
     metadata { { period_label: Copy.t("common.last_30_days") } }
     value do |context|
-      runs = AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+      runs = AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context)
       total_tokens = runs.where(created_at: 30.days.ago..Time.current).where.not(total_tokens: nil).sum(:total_tokens)
       AdminScreens::RecordingStudioAIWidgets.number(total_tokens)
     end
     change do |context|
       now = Time.current
       AdminScreens::RecordingStudioAIWidgets.token_change_label(
-        AdminScreens::RecordingStudioAIWidgets.runs_scope(context),
+        AdminScreens::RecordingStudioAIWidgets.site_runs_scope(context),
         current_range: 30.days.ago..now,
         previous_range: 60.days.ago..30.days.ago
       )
