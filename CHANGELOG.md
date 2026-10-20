@@ -5,6 +5,15 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-10-20
+
+### Changed
+- Runtime dependency `recording_studio_metrics` is now `>= 0.3.0, < 0.6` (GitHub tag `v0.5.0`). Charts still pass `{ x:, y: }` points to Flatpack; Metrics 0.5.0 already emits that shape from `Admin.chart_series`.
+
+### Upgrade notes
+- Bump to `0.16.1`. No migration.
+- Pin `recording_studio_metrics` to `>= 0.3.0, < 0.6` (tag `v0.5.0`).
+
 ## [0.16.0] - 2026-10-19
 
 ### Added
@@ -980,7 +989,9 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.16.1...HEAD
+[0.16.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.16.0...v0.16.1
+[0.16.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.15.1...v0.16.0
 [0.14.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.12.0...v0.13.0
 [0.11.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.10.1...v0.11.0
