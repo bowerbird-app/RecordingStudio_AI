@@ -79,19 +79,21 @@ class AICallLogsTest < ActiveSupport::TestCase
       destructive: false, requires_confirmation: false, idempotent: true, latency_ms: 8
     )
 
-    stamp_created_at!(RecordingStudioAI::Attempt, Time.utc(2026, 10, 1, 12))
-    stamp_created_at!(RecordingStudioAI::CustomToolInvocation, Time.utc(2026, 10, 1, 12))
+    stamp_created_at!(run.attempts, Time.utc(2026, 10, 1, 12))
+    stamp_created_at!(run.custom_tool_invocations, Time.utc(2026, 10, 1, 12))
 
     RecordingStudioAI::Services::RebuildAiCallLogSummaries.call(day: @day)
 
-    counts = RecordingStudioAI::AttemptDaySummary.where(day: @day)
-    assert_equal 3, counts.sum(:call_count)
+    raw_attempts = run.attempts
+    counts = RecordingStudioAI::AttemptDaySummary.where(day: @day, root_recording_id: @root.id)
+    assert_equal raw_attempts.count, counts.sum(:call_count)
     assert_equal 2, counts.where(provider: "openai", model: "gpt-test", status: "completed").sum(:call_count)
     assert_equal 1, counts.where(status: "failed").sum(:call_count)
-    assert_equal 61, counts.sum(:latency_sum_ms)
+    assert_equal raw_attempts.sum(:latency_ms), counts.sum(:latency_sum_ms)
 
-    tools = RecordingStudioAI::ToolCallDaySummary.where(day: @day)
-    assert_equal 2, tools.sum(:tool_call_count)
+    raw_tools = run.custom_tool_invocations
+    tools = RecordingStudioAI::ToolCallDaySummary.where(day: @day, root_recording_id: @root.id)
+    assert_equal raw_tools.count, tools.sum(:tool_call_count)
     assert_equal 1, tools.where(tool_key: "dummy_echo_tool", status: "completed").sum(:tool_call_count)
     assert_equal 1, tools.where(status: "failed").sum(:tool_call_count)
   end
@@ -111,8 +113,8 @@ class AICallLogsTest < ActiveSupport::TestCase
     )
   end
 
-  def stamp_created_at!(model, time)
-    model.update_all(created_at: time, updated_at: time)
+  def stamp_created_at!(rows, time)
+    rows.update_all(created_at: time, updated_at: time)
   end
 
   def clear_runs!
