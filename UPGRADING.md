@@ -1,5 +1,43 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.18.0
+
+Adopts RecordingStudioLogs for the AI call log. This release includes a migration.
+
+### What changed
+
+- The existing `recording_studio_ai_attempts` and
+  `recording_studio_ai_custom_tool_invocations` tables stay in place. They are
+  not copied, switched, or partitioned. Primary keys stay integer `id`.
+- `root_recording_id` is added and backfilled from `recording_studio_ai_runs`.
+  New rows copy the run's root on create.
+- Daily summaries `ai/call_counts` (calls, errors via `status`, latency per
+  provider/model) and `ai/tool_calls` (per tool) write to
+  `recording_studio_ai_attempt_day_summaries` and
+  `recording_studio_ai_tool_call_day_summaries`.
+- `config.logs_summaries_enabled` defaults to **false**. Admin AI screens,
+  Metrics, and warning metrics keep reading raw attempts.
+- Logs retention on these tables is indefinite. Attempts are tied to run history
+  (foreign keys and integrity triggers). RecordingStudioLogs must not prune rows
+  that runs or responses still reference. Hosts that want a window keep using
+  `execution_history_retention_period` and `HistoryCleanupJob`.
+- Aggregatable columns exclude prompts, outputs, actor, IP, and error text.
+
+### Upgrade steps
+
+1. Bump the host gem to `0.18.0`.
+2. Pin `recording_studio_logs` to GitHub tag `v0.5.0` (allowed range
+   `>= 0.4.1, < 0.6`).
+3. If Logs run tables are missing: `bin/rails generate recording_studio_logs:migrations`.
+4. `bin/rails recording_studio_ai:install:migrations` then `bin/rails db:migrate`.
+5. Leave `config.logs_summaries_enabled` false.
+
+Optional later: rebuild summaries with
+`RecordingStudioAI::Services::RebuildAiCallLogSummaries.backfill!(from:, to:)`,
+then enable the flag and schedule Logs `DailyAggregationJob` /
+`ReconciliationJob`. Do not schedule partition maintenance for these
+unpartitioned tables.
+
 ## Upgrading to 0.17.1
 
 Admin AI section chart tick labels. No migration.

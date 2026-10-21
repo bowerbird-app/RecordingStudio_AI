@@ -8,8 +8,11 @@ module RecordingStudioAI
         app/models/recording_studio_ai/application_record
         app/models/concerns/recording_studio_ai/terminal_immutability
         app/models/recording_studio_ai/run
+        app/models/concerns/recording_studio_ai/assigns_root_recording_id
         app/models/recording_studio_ai/attempt
         app/models/recording_studio_ai/custom_tool_invocation
+        app/models/recording_studio_ai/attempt_day_summary
+        app/models/recording_studio_ai/tool_call_day_summary
         app/models/recording_studio_ai/batch
         app/models/recording_studio_ai/batch_item
         app/models/recording_studio_ai/response
@@ -48,7 +51,9 @@ module RecordingStudioAI
           classes + [
             AllowRecordingStudioAIDecisionExecutions,
             AllowRecordingStudioAIToolExecutions,
-            AllowRecordingStudioAIHostedAgentRuns
+            AllowRecordingStudioAIHostedAgentRuns,
+            AddRootRecordingIdToRecordingStudioAICallLogs,
+            CreateRecordingStudioAICallLogSummaries
           ]
         end
       end
@@ -86,6 +91,8 @@ module RecordingStudioAI
           RecordingStudioAI::Run,
           RecordingStudioAI::Attempt,
           RecordingStudioAI::CustomToolInvocation,
+          RecordingStudioAI::AttemptDaySummary,
+          RecordingStudioAI::ToolCallDaySummary,
           RecordingStudioAI::Batch,
           RecordingStudioAI::BatchItem,
           RecordingStudioAI::Response

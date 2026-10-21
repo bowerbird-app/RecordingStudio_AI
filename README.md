@@ -29,6 +29,9 @@ gem "recording_studio",
     tag: "v4.7.0"
 gem "recording_studio_ai",
     github: "bowerbird-app/RecordingStudio_AI"
+gem "recording_studio_logs",
+    github: "bowerbird-app/RecordingStudio_logs",
+    tag: "v0.5.0"
 gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
     tag: "v0.5.0"
@@ -95,9 +98,10 @@ different mount point:
 bin/rails generate recording_studio_ai:install --mount-path=/addons/ai
 ```
 
-Install and run addon migrations:
+Install Logs run tables (if the host does not already have them) and addon migrations:
 
 ```bash
+bin/rails generate recording_studio_logs:migrations
 bin/rails recording_studio_ai:install:migrations
 bin/rails db:migrate
 ```
@@ -153,6 +157,8 @@ RecordingStudioAI.configure do |config|
   config.maximum_retained_response_size = 1.megabyte
   # Canonical execution history cleanup is opt-in and separate from response expiry.
   config.execution_history_retention_period = nil
+  # Optional daily Logs summaries. Default false keeps Admin AI and Metrics on raw attempts.
+  config.logs_summaries_enabled = false
   # Optional second-pass sanitizer; input has already been normalized and sanitized.
   config.response_sanitizer = nil
   config.instrumentation_enabled = true
@@ -267,9 +273,25 @@ subject to each provider's retention policy even though this addon does not
 persist attachment bytes or filenames.
 
 Canonical runs, attempts, tool invocations, batches, and batch items are kept
-indefinitely by default. To apply an explicit policy, set
-`execution_history_retention_period` to a positive duration and schedule
-`RecordingStudioAI::HistoryCleanupJob` or
+indefinitely by default. Attempts and custom tool invocations register with
+RecordingStudioLogs as existing unpartitioned tables (`partition_interval: nil`).
+Logs retention on those tables is `:indefinite` because attempts are referenced
+by runs, responses, and tool invocations. Do not set
+`RecordingStudioLogs.configure { |config| config.retention_for(...) }` on the AI
+call logs. If the host needs a window, use `execution_history_retention_period`
+and `RecordingStudioAI::HistoryCleanupJob`, which deletes responses and
+dependents before owners. RecordingStudioLogs must not prune rows that history
+still references.
+
+Daily summaries (`ai/call_counts`, `ai/tool_calls`) sit behind
+`config.logs_summaries_enabled`, which defaults to false. With the flag off,
+Admin AI screens, Metrics, and warning metrics keep reading raw attempts.
+Rebuild a day with `RecordingStudioAI::Services::RebuildAiCallLogSummaries.call(day:)`
+before turning the flag on, and schedule Logs `DailyAggregationJob` /
+`ReconciliationJob`. Do not schedule partition maintenance for these tables.
+
+To apply an explicit history policy, set `execution_history_retention_period` to
+a positive duration and schedule `RecordingStudioAI::HistoryCleanupJob` or
 `bin/rails recording_studio_ai:cleanup_history`. It removes only terminal rows
 older than the cutoff in one transaction and deletes dependents before owners.
 

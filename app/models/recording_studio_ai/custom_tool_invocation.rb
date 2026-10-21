@@ -4,6 +4,7 @@ module RecordingStudioAI
   class CustomToolInvocation < ApplicationRecord
     include TerminalImmutability
     include InstrumentedLifecycle
+    include AssignsRootRecordingId
 
     self.table_name = "recording_studio_ai_custom_tool_invocations"
 
@@ -52,6 +53,7 @@ module RecordingStudioAI
       def immutable_after_terminal_columns
         %i[
           run_id
+          root_recording_id
           requested_by_attempt_id
           continued_by_attempt_id
           provider_tool_call_id

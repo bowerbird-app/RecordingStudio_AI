@@ -15,9 +15,10 @@ config.authorization_handler = RecordingStudioAI::AccessibleAuthorization.method
 
 	That mapper separates view / execute / confirm / sensitive / retained onto
 	Accessible `:view` / `:edit` / `:admin`. Never use `->(**) { true }`.
-6. Install and apply addon migrations:
+6. Install and apply Logs run tables (if they are not already present) and addon migrations:
 
 ```bash
+bin/rails generate recording_studio_logs:migrations
 bin/rails recording_studio_ai:install:migrations
 bin/rails db:migrate
 ```
@@ -65,7 +66,10 @@ Canonical execution history has a separate, disabled-by-default policy. Set
 `RecordingStudioAI::HistoryCleanupJob` or
 `bin/rails recording_studio_ai:cleanup_history`. The cleanup transaction removes
 only terminal history older than the cutoff, deleting responses and dependent
-records before runs and batches to preserve foreign-key integrity.
+records before runs and batches to preserve foreign-key integrity. Do not set
+RecordingStudioLogs retention on attempts or tool invocations; those rows stay
+tied to run history. Leave `config.logs_summaries_enabled` false unless you
+rebuild daily summaries.
 
 Staff UI is Recording Studio Admin. Install that gem, mount it, enable the
 `recording_studio_ai` section, and grant Accessible access. Saved replies live

@@ -22,6 +22,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal 1_048_576, configuration.maximum_retained_response_size
     assert_nil configuration.response_sanitizer
     assert configuration.instrumentation_enabled
+    assert_equal false, configuration.logs_summaries_enabled
     assert_equal "recording_studio_ai", configuration.notification_namespace
     refute_respond_to configuration, :admin_actor_resolver
     refute_respond_to configuration, :admin_authenticate

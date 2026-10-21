@@ -15,6 +15,10 @@ module RecordingStudioAI
       )
     end
 
+    initializer "recording_studio_ai.logs" do
+      config.to_prepare { RecordingStudioAI::LogsRegistration.register! }
+    end
+
     initializer "recording_studio_ai.metrics" do
       config.to_prepare { RecordingStudioAI::Metrics.register! }
     end
