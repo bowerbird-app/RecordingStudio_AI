@@ -52,8 +52,11 @@ class RecordingStudioAITest < Minitest::Test
     specification = Gem::Specification.load(File.expand_path("../recording_studio_ai.gemspec", __dir__))
     dependencies = specification.runtime_dependencies.to_h { |dependency| [dependency.name, dependency.requirement] }
 
-    assert_equal %w[csv flat_pack json_schemer openai rails recording_studio recording_studio_logs recording_studio_metrics],
-                 dependencies.keys.sort
+    expected = %w[
+      csv flat_pack json_schemer openai rails
+      recording_studio recording_studio_logs recording_studio_metrics
+    ]
+    assert_equal expected, dependencies.keys.sort
     assert_equal ">= 0.3.0, < 0.6", dependencies.fetch("recording_studio_metrics").to_s
     assert_equal ">= 0.4.1, < 0.6", dependencies.fetch("recording_studio_logs").to_s
     assert_equal "~> 4.7", dependencies.fetch("recording_studio").to_s

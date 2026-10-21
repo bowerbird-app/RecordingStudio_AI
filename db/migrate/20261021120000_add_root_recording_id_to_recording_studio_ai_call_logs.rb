@@ -36,28 +36,42 @@ class AddRootRecordingIdToRecordingStudioAICallLogs < ActiveRecord::Migration[8.
   end
 
   def backfill_from_runs(table)
-    quoted_table = connection.quote_table_name(table)
-    quoted_root = connection.quote_column_name("root_recording_id")
-    quoted_run_id = connection.quote_column_name("run_id")
-    quoted_runs = connection.quote_table_name("recording_studio_ai_runs")
+    quoted = quoted_backfill_names(table)
+    sql = if connection.adapter_name.match?(/PostgreSQL/i)
+            postgres_backfill_sql(quoted)
+          else
+            sqlite_backfill_sql(quoted)
+          end
+    execute sql
+  end
 
-    if connection.adapter_name.match?(/PostgreSQL/i)
-      execute <<~SQL.squish
-        UPDATE #{quoted_table} AS logs
-        SET #{quoted_root} = runs.root_recording_id
-        FROM #{quoted_runs} AS runs
-        WHERE logs.#{quoted_run_id} = runs.id
-          AND logs.#{quoted_root} IS NULL
-      SQL
-    else
-      execute <<~SQL.squish
-        UPDATE #{quoted_table}
-        SET #{quoted_root} = (
-          SELECT runs.root_recording_id FROM #{quoted_runs} AS runs
-          WHERE runs.id = #{quoted_table}.#{quoted_run_id}
-        )
-        WHERE #{quoted_root} IS NULL
-      SQL
-    end
+  def quoted_backfill_names(table)
+    {
+      table: connection.quote_table_name(table),
+      root: connection.quote_column_name("root_recording_id"),
+      run_id: connection.quote_column_name("run_id"),
+      runs: connection.quote_table_name("recording_studio_ai_runs")
+    }
+  end
+
+  def postgres_backfill_sql(quoted)
+    <<~SQL.squish
+      UPDATE #{quoted[:table]} AS logs
+      SET #{quoted[:root]} = runs.root_recording_id
+      FROM #{quoted[:runs]} AS runs
+      WHERE logs.#{quoted[:run_id]} = runs.id
+        AND logs.#{quoted[:root]} IS NULL
+    SQL
+  end
+
+  def sqlite_backfill_sql(quoted)
+    <<~SQL.squish
+      UPDATE #{quoted[:table]}
+      SET #{quoted[:root]} = (
+        SELECT runs.root_recording_id FROM #{quoted[:runs]} AS runs
+        WHERE runs.id = #{quoted[:table]}.#{quoted[:run_id]}
+      )
+      WHERE #{quoted[:root]} IS NULL
+    SQL
   end
 end

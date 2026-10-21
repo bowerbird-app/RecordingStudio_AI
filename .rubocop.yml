@@ -49,6 +49,7 @@ Metrics/ModuleLength:
 Metrics/MethodLength:
   Exclude:
     - 'test/**/*'
+    - 'db/migrate/**/*'
     - 'lib/generators/**/*'
     - 'lib/recording_studio_ai/admin/**/*'
     - 'lib/recording_studio_ai/models/definition.rb'

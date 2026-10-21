@@ -59,9 +59,9 @@ module RecordingStudioAI
 
       def immutable_after_terminal_columns
         %i[
-        run_id
-        root_recording_id
-        sequence
+          run_id
+          root_recording_id
+          sequence
           kind
           profile_key
           provider

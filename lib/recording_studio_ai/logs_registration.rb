@@ -33,6 +33,29 @@ module RecordingStudioAI
       destructive: { filter: [:eq], group: true },
       latency_ms: { measurements: %i[sum maximum] }
     }.freeze
+    ATTEMPT_LOG = {
+      model: ATTEMPT_MODEL, timestamp_column: :created_at, partition_interval: nil,
+      root_column: :root_recording_id, owner: OWNER, retention: :indefinite,
+      aggregatable: ATTEMPT_AGGREGATABLE
+    }.freeze
+    TOOL_LOG = {
+      model: TOOL_MODEL, timestamp_column: :created_at, partition_interval: nil,
+      root_column: :root_recording_id, owner: OWNER, retention: :indefinite,
+      aggregatable: TOOL_AGGREGATABLE
+    }.freeze
+    CALL_COUNTS_AGGREGATION = {
+      source: ATTEMPT_MODEL, name: CALL_COUNTS,
+      summary_model: "RecordingStudioAI::AttemptDaySummary", owner: OWNER,
+      group_by: %i[root_recording_id provider model status],
+      measurements: { call_count: :count, latency_sum_ms: { sum: :latency_ms },
+                      latency_max_ms: { maximum: :latency_ms } }
+    }.freeze
+    TOOL_CALLS_AGGREGATION = {
+      source: TOOL_MODEL, name: TOOL_CALLS,
+      summary_model: "RecordingStudioAI::ToolCallDaySummary", owner: OWNER,
+      group_by: %i[root_recording_id tool_key status],
+      measurements: { tool_call_count: :count, latency_sum_ms: { sum: :latency_ms } }
+    }.freeze
 
     module_function
 
@@ -53,50 +76,13 @@ module RecordingStudioAI
     end
 
     def register_attempts!
-      RecordingStudioLogs.register(
-        model: ATTEMPT_MODEL,
-        timestamp_column: :created_at,
-        partition_interval: nil,
-        root_column: :root_recording_id,
-        owner: OWNER,
-        retention: :indefinite,
-        aggregatable: ATTEMPT_AGGREGATABLE
-      )
-      RecordingStudioLogs.aggregate(
-        source: ATTEMPT_MODEL,
-        name: CALL_COUNTS,
-        summary_model: "RecordingStudioAI::AttemptDaySummary",
-        owner: OWNER,
-        group_by: %i[root_recording_id provider model status],
-        measurements: {
-          call_count: :count,
-          latency_sum_ms: { sum: :latency_ms },
-          latency_max_ms: { maximum: :latency_ms }
-        }
-      )
+      RecordingStudioLogs.register(**ATTEMPT_LOG)
+      RecordingStudioLogs.aggregate(**CALL_COUNTS_AGGREGATION)
     end
 
     def register_tool_invocations!
-      RecordingStudioLogs.register(
-        model: TOOL_MODEL,
-        timestamp_column: :created_at,
-        partition_interval: nil,
-        root_column: :root_recording_id,
-        owner: OWNER,
-        retention: :indefinite,
-        aggregatable: TOOL_AGGREGATABLE
-      )
-      RecordingStudioLogs.aggregate(
-        source: TOOL_MODEL,
-        name: TOOL_CALLS,
-        summary_model: "RecordingStudioAI::ToolCallDaySummary",
-        owner: OWNER,
-        group_by: %i[root_recording_id tool_key status],
-        measurements: {
-          tool_call_count: :count,
-          latency_sum_ms: { sum: :latency_ms }
-        }
-      )
+      RecordingStudioLogs.register(**TOOL_LOG)
+      RecordingStudioLogs.aggregate(**TOOL_CALLS_AGGREGATION)
     end
 
     def call_counts_definition

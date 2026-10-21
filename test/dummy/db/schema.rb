@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -84,6 +84,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
     t.index ["depends_on_recording_id"], name: "index_recording_studio_accesses_on_depends_on_recording_id"
   end
 
+  create_table "recording_studio_ai_attempt_day_summaries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.bigint "call_count", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.date "day", null: false
+    t.bigint "latency_max_ms", default: 0, null: false
+    t.bigint "latency_sum_ms", default: 0, null: false
+    t.string "model"
+    t.string "provider"
+    t.uuid "root_recording_id"
+    t.string "status"
+    t.datetime "updated_at", null: false
+    t.index ["day", "root_recording_id", "provider", "model", "status"], name: "index_rsai_attempt_day_summaries_identity", unique: true, nulls_not_distinct: true
+    t.index ["root_recording_id", "day"], name: "index_rsai_attempt_day_summaries_on_root_and_day"
+  end
+
   create_table "recording_studio_ai_attempts", force: :cascade do |t|
     t.json "attachment_content_types"
     t.integer "attachment_count", default: 0, null: false
@@ -109,6 +124,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
     t.string "provider_request_id"
     t.bigint "reasoning_tokens"
     t.boolean "retryable"
+    t.uuid "root_recording_id"
     t.bigint "run_id", null: false
     t.integer "sequence", null: false
     t.datetime "started_at"
@@ -120,6 +136,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
     t.boolean "web_search_used", default: false, null: false
     t.index ["provider", "model", "created_at"], name: "idx_rsai_attempts_provider_model_created_at"
     t.index ["provider_request_id"], name: "index_recording_studio_ai_attempts_on_provider_request_id"
+    t.index ["root_recording_id", "created_at"], name: "idx_rsai_attempts_root_created_at"
     t.index ["run_id", "sequence"], name: "index_recording_studio_ai_attempts_on_run_id_and_sequence", unique: true
     t.index ["run_id"], name: "index_recording_studio_ai_attempts_on_run_id"
     t.index ["status", "created_at"], name: "index_recording_studio_ai_attempts_on_status_and_created_at"
@@ -240,6 +257,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
     t.boolean "requires_confirmation", null: false
     t.json "result"
     t.text "result_summary"
+    t.uuid "root_recording_id"
     t.bigint "run_id", null: false
     t.datetime "started_at"
     t.string "status", null: false
@@ -251,6 +269,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
     t.index ["continued_by_attempt_id"], name: "idx_rsai_tool_invocations_continued_attempt"
     t.index ["provider_tool_call_id"], name: "idx_on_provider_tool_call_id_c470d20051"
     t.index ["requested_by_attempt_id"], name: "idx_rsai_tool_invocations_requested_attempt"
+    t.index ["root_recording_id", "created_at"], name: "idx_rsai_tool_invocations_root_created_at"
     t.index ["run_id", "created_at"], name: "idx_rsai_tool_invocations_run_created_at"
     t.index ["run_id"], name: "index_recording_studio_ai_custom_tool_invocations_on_run_id"
     t.index ["status", "created_at"], name: "idx_on_status_created_at_3871597917"
@@ -362,8 +381,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
     t.check_constraint "attachment_count >= 0 AND attachment_total_bytes >= 0 AND citation_count >= 0", name: "chk_rsai_runs_nonnegative_attachment_counts"
     t.check_constraint "attempt_count >= 0 AND retry_count >= 0 AND fallback_count >= 0 AND custom_tool_invocation_count >= 0", name: "chk_rsai_runs_nonnegative_counts"
     t.check_constraint "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at", name: "chk_rsai_runs_timeline"
-    t.check_constraint "operation::text = ANY (ARRAY['generation'::character varying, 'stream'::character varying, 'batch'::character varying, 'decision'::character varying, 'tool'::character varying, 'hosted_agent'::character varying]::text[])", name: "chk_rsai_runs_operation"
+    t.check_constraint "operation::text = ANY (ARRAY['generation'::character varying::text, 'stream'::character varying::text, 'batch'::character varying::text, 'decision'::character varying::text, 'tool'::character varying::text, 'hosted_agent'::character varying::text])", name: "chk_rsai_runs_operation"
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "chk_rsai_runs_status"
+  end
+
+  create_table "recording_studio_ai_tool_call_day_summaries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.date "day", null: false
+    t.bigint "latency_sum_ms", default: 0, null: false
+    t.uuid "root_recording_id"
+    t.string "status"
+    t.bigint "tool_call_count", default: 0, null: false
+    t.string "tool_key"
+    t.datetime "updated_at", null: false
+    t.index ["day", "root_recording_id", "tool_key", "status"], name: "index_rsai_tool_call_day_summaries_identity", unique: true, nulls_not_distinct: true
+    t.index ["root_recording_id", "day"], name: "index_rsai_tool_call_day_summaries_on_root_and_day"
   end
 
   create_table "recording_studio_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -383,6 +415,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_16_120000) do
     t.uuid "recording_id", null: false
     t.index ["recording_id", "idempotency_key"], name: "index_recording_studio_events_on_recording_and_idempotency_key", unique: true, where: "(idempotency_key IS NOT NULL)"
     t.index ["recording_id"], name: "index_recording_studio_events_on_recording_id"
+  end
+
+  create_table "recording_studio_logs_aggregation_runs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "aggregation_name", null: false
+    t.datetime "created_at", null: false
+    t.date "day", null: false
+    t.text "error_message"
+    t.datetime "finished_at"
+    t.string "status", null: false
+    t.datetime "updated_at", null: false
+    t.index ["aggregation_name", "day"], name: "index_rs_logs_aggregation_runs_on_name_and_day", unique: true
+  end
+
+  create_table "recording_studio_logs_maintenance_runs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "details"
+    t.datetime "finished_at", null: false
+    t.string "status", null: false
+    t.string "subject", null: false
+    t.string "task", null: false
+    t.datetime "updated_at", null: false
+    t.index ["task", "subject", "finished_at"], name: "index_rs_logs_maintenance_runs_on_task_and_subject"
   end
 
   create_table "recording_studio_recordings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

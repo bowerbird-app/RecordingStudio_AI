@@ -22,17 +22,7 @@ class CreateRecordingStudioAICallLogSummaries < ActiveRecord::Migration[8.1]
   def create_attempt_summaries
     return if connection.data_source_exists?(ATTEMPT_TABLE)
 
-    create_table ATTEMPT_TABLE, **summary_table_options do |t|
-      t.date :day, null: false
-      t.column :root_recording_id, root_recording_id_type
-      t.string :provider
-      t.string :model
-      t.string :status
-      t.bigint :call_count, null: false, default: 0
-      t.bigint :latency_sum_ms, null: false, default: 0
-      t.bigint :latency_max_ms, null: false, default: 0
-      t.timestamps
-    end
+    create_table ATTEMPT_TABLE, **summary_table_options, &attempt_summary_columns
     add_summary_index(
       ATTEMPT_TABLE,
       %i[day root_recording_id provider model status],
@@ -44,7 +34,31 @@ class CreateRecordingStudioAICallLogSummaries < ActiveRecord::Migration[8.1]
   def create_tool_summaries
     return if connection.data_source_exists?(TOOL_TABLE)
 
-    create_table TOOL_TABLE, **summary_table_options do |t|
+    create_table TOOL_TABLE, **summary_table_options, &tool_summary_columns
+    add_summary_index(
+      TOOL_TABLE,
+      %i[day root_recording_id tool_key status],
+      name: TOOL_IDENTITY
+    )
+    add_index TOOL_TABLE, %i[root_recording_id day], name: "index_rsai_tool_call_day_summaries_on_root_and_day"
+  end
+
+  def attempt_summary_columns
+    lambda do |t|
+      t.date :day, null: false
+      t.column :root_recording_id, root_recording_id_type
+      t.string :provider
+      t.string :model
+      t.string :status
+      t.bigint :call_count, null: false, default: 0
+      t.bigint :latency_sum_ms, null: false, default: 0
+      t.bigint :latency_max_ms, null: false, default: 0
+      t.timestamps
+    end
+  end
+
+  def tool_summary_columns
+    lambda do |t|
       t.date :day, null: false
       t.column :root_recording_id, root_recording_id_type
       t.string :tool_key
@@ -53,12 +67,6 @@ class CreateRecordingStudioAICallLogSummaries < ActiveRecord::Migration[8.1]
       t.bigint :latency_sum_ms, null: false, default: 0
       t.timestamps
     end
-    add_summary_index(
-      TOOL_TABLE,
-      %i[day root_recording_id tool_key status],
-      name: TOOL_IDENTITY
-    )
-    add_index TOOL_TABLE, %i[root_recording_id day], name: "index_rsai_tool_call_day_summaries_on_root_and_day"
   end
 
   def summary_table_options
