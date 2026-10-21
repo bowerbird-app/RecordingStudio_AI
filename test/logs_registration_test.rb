@@ -11,11 +11,6 @@ class LogsRegistrationTest < RecordingStudioAI::Test::PersistenceCase
     true
   end
 
-  def test_summaries_default_off
-    assert_equal false, RecordingStudioAI.configuration.logs_summaries_enabled
-    refute RecordingStudioAI::LogsRegistration.summaries_enabled?
-  end
-
   def test_registers_unpartitioned_indefinite_call_logs
     RecordingStudioAI::LogsRegistration.register!
 
@@ -26,9 +21,14 @@ class LogsRegistrationTest < RecordingStudioAI::Test::PersistenceCase
     assert_nil attempt_log.partition_interval
     assert attempt_log.indefinite?
     assert_equal :root_recording_id, attempt_log.root_column
+    assert_equal :indefinite, RecordingStudioAI::LogsRegistration::ATTEMPT_LOG[:retention]
     assert_equal :created_at, tool_log.timestamp_column
     assert_nil tool_log.partition_interval
     assert tool_log.indefinite?
+    assert_equal :indefinite, RecordingStudioAI::LogsRegistration::TOOL_LOG[:retention]
+    assert_equal :root_recording_id, tool_log.root_column
+    assert_empty RecordingStudioLogs.registry.aggregations_for(attempt_log)
+    assert_empty RecordingStudioLogs.registry.aggregations_for(tool_log)
 
     RecordingStudioAI::LogsRegistration::FORBIDDEN_ATTEMPT_COLUMNS.each do |column|
       refute_includes RecordingStudioAI::LogsRegistration::ATTEMPT_AGGREGATABLE.keys, column

@@ -42,7 +42,6 @@ class MetricsTest < Minitest::Test
 
     assert_includes gemspec, 'spec.add_dependency "recording_studio_metrics", ">= 0.3.0", "< 0.6"'
     assert_includes gemspec, 'spec.add_dependency "recording_studio_logs", ">= 0.4.1", "< 0.6"'
-    refute_includes metrics, "AttemptDaySummary"
     refute_includes dummy_metrics, "RecordingStudioMetrics::Api.register!"
   end
 end

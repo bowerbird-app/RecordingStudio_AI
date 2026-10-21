@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -82,21 +82,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
     t.index ["actor_type", "actor_id", "role"], name: "index_recording_studio_accesses_on_actor_and_role"
     t.index ["actor_type", "actor_id"], name: "index_recording_studio_accesses_on_actor"
     t.index ["depends_on_recording_id"], name: "index_recording_studio_accesses_on_depends_on_recording_id"
-  end
-
-  create_table "recording_studio_ai_attempt_day_summaries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.bigint "call_count", default: 0, null: false
-    t.datetime "created_at", null: false
-    t.date "day", null: false
-    t.bigint "latency_max_ms", default: 0, null: false
-    t.bigint "latency_sum_ms", default: 0, null: false
-    t.string "model"
-    t.string "provider"
-    t.uuid "root_recording_id"
-    t.string "status"
-    t.datetime "updated_at", null: false
-    t.index ["day", "root_recording_id", "provider", "model", "status"], name: "index_rsai_attempt_day_summaries_identity", unique: true, nulls_not_distinct: true
-    t.index ["root_recording_id", "day"], name: "index_rsai_attempt_day_summaries_on_root_and_day"
   end
 
   create_table "recording_studio_ai_attempts", force: :cascade do |t|
@@ -383,19 +368,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_130000) do
     t.check_constraint "completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at", name: "chk_rsai_runs_timeline"
     t.check_constraint "operation::text = ANY (ARRAY['generation'::character varying::text, 'stream'::character varying::text, 'batch'::character varying::text, 'decision'::character varying::text, 'tool'::character varying::text, 'hosted_agent'::character varying::text])", name: "chk_rsai_runs_operation"
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'running'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "chk_rsai_runs_status"
-  end
-
-  create_table "recording_studio_ai_tool_call_day_summaries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.date "day", null: false
-    t.bigint "latency_sum_ms", default: 0, null: false
-    t.uuid "root_recording_id"
-    t.string "status"
-    t.bigint "tool_call_count", default: 0, null: false
-    t.string "tool_key"
-    t.datetime "updated_at", null: false
-    t.index ["day", "root_recording_id", "tool_key", "status"], name: "index_rsai_tool_call_day_summaries_identity", unique: true, nulls_not_distinct: true
-    t.index ["root_recording_id", "day"], name: "index_rsai_tool_call_day_summaries_on_root_and_day"
   end
 
   create_table "recording_studio_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

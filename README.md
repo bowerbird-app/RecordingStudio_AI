@@ -157,8 +157,6 @@ RecordingStudioAI.configure do |config|
   config.maximum_retained_response_size = 1.megabyte
   # Canonical execution history cleanup is opt-in and separate from response expiry.
   config.execution_history_retention_period = nil
-  # Optional daily Logs summaries. Default false keeps Admin AI and Metrics on raw attempts.
-  config.logs_summaries_enabled = false
   # Optional second-pass sanitizer; input has already been normalized and sanitized.
   config.response_sanitizer = nil
   config.instrumentation_enabled = true
@@ -283,12 +281,9 @@ and `RecordingStudioAI::HistoryCleanupJob`, which deletes responses and
 dependents before owners. RecordingStudioLogs must not prune rows that history
 still references.
 
-Daily summaries (`ai/call_counts`, `ai/tool_calls`) sit behind
-`config.logs_summaries_enabled`, which defaults to false. With the flag off,
-Admin AI screens, Metrics, and warning metrics keep reading raw attempts.
-Rebuild a day with `RecordingStudioAI::Services::RebuildAiCallLogSummaries.call(day:)`
-before turning the flag on, and schedule Logs `DailyAggregationJob` /
-`ReconciliationJob`. Do not schedule partition maintenance for these tables.
+Do not register aggregations or summary tables for these logs. Admin AI screens,
+Metrics, and warning metrics keep reading raw attempts. Do not schedule partition
+maintenance for these unpartitioned tables.
 
 To apply an explicit history policy, set `execution_history_retention_period` to
 a positive duration and schedule `RecordingStudioAI::HistoryCleanupJob` or

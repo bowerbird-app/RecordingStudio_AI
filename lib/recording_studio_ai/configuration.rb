@@ -41,7 +41,6 @@ module RecordingStudioAI
       :maximum_decision_text_characters,
       :maximum_decision_characters,
       :instrumentation_enabled,
-      :logs_summaries_enabled,
       :notification_namespace,
       :openai_api_key,
       :openai_client,
@@ -133,7 +132,6 @@ module RecordingStudioAI
       @maximum_decision_text_characters = Decisions::MAXIMUM_TEXT_CHARACTERS
       @maximum_decision_characters = Decisions::MAXIMUM_DECISION_CHARACTERS
       @instrumentation_enabled = true
-      @logs_summaries_enabled = false
       @notification_namespace = "recording_studio_ai"
       @openai_api_key = ENV.fetch("OPENAI_API_KEY", nil)
       @openai_client = nil

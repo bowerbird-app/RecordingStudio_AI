@@ -2,7 +2,8 @@
 
 ## Upgrading to 0.18.0
 
-Adopts RecordingStudioLogs for the AI call log. This release includes a migration.
+Adopts RecordingStudioLogs registration for the AI call log. This release
+includes a migration. There are no summary tables.
 
 ### What changed
 
@@ -11,12 +12,9 @@ Adopts RecordingStudioLogs for the AI call log. This release includes a migratio
   not copied, switched, or partitioned. Primary keys stay integer `id`.
 - `root_recording_id` is added and backfilled from `recording_studio_ai_runs`.
   New rows copy the run's root on create.
-- Daily summaries `ai/call_counts` (calls, errors via `status`, latency per
-  provider/model) and `ai/tool_calls` (per tool) write to
-  `recording_studio_ai_attempt_day_summaries` and
-  `recording_studio_ai_tool_call_day_summaries`.
-- `config.logs_summaries_enabled` defaults to **false**. Admin AI screens,
-  Metrics, and warning metrics keep reading raw attempts.
+- Both tables register with RecordingStudioLogs (`partition_interval: nil`,
+  `retention: :indefinite`, no `aggregate` calls). Admin AI screens, Metrics,
+  and warning metrics keep reading raw attempts.
 - Logs retention on these tables is indefinite. Attempts are tied to run history
   (foreign keys and integrity triggers). RecordingStudioLogs must not prune rows
   that runs or responses still reference. Hosts that want a window keep using
@@ -30,13 +28,8 @@ Adopts RecordingStudioLogs for the AI call log. This release includes a migratio
    `>= 0.4.1, < 0.6`).
 3. If Logs run tables are missing: `bin/rails generate recording_studio_logs:migrations`.
 4. `bin/rails recording_studio_ai:install:migrations` then `bin/rails db:migrate`.
-5. Leave `config.logs_summaries_enabled` false.
 
-Optional later: rebuild summaries with
-`RecordingStudioAI::Services::RebuildAiCallLogSummaries.backfill!(from:, to:)`,
-then enable the flag and schedule Logs `DailyAggregationJob` /
-`ReconciliationJob`. Do not schedule partition maintenance for these
-unpartitioned tables.
+Do not schedule partition maintenance for these unpartitioned tables.
 
 ## Upgrading to 0.17.1
 

@@ -363,13 +363,6 @@ class ConfigController < ApplicationController
       explanation: "Optional cleanup window for run history. nil keeps it."
     },
     {
-      key: "logs_summaries_enabled",
-      required: "No",
-      accepted_values: "true or false",
-      default: "false",
-      explanation: "Use daily Logs summaries. Off keeps Admin and Metrics on raw calls."
-    },
-    {
       key: "response_sanitizer",
       required: "No",
       accepted_values: "Callable or nil",
@@ -539,7 +532,6 @@ class ConfigController < ApplicationController
       config.response_retention_period = 7.days
       config.maximum_retained_response_size = 1.megabyte
       config.execution_history_retention_period = nil
-      config.logs_summaries_enabled = false
       config.response_sanitizer = nil
 
       # Instrumentation and event naming.

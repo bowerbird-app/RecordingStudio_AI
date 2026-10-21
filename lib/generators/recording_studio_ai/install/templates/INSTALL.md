@@ -68,8 +68,7 @@ Canonical execution history has a separate, disabled-by-default policy. Set
 only terminal history older than the cutoff, deleting responses and dependent
 records before runs and batches to preserve foreign-key integrity. Do not set
 RecordingStudioLogs retention on attempts or tool invocations; those rows stay
-tied to run history. Leave `config.logs_summaries_enabled` false unless you
-rebuild daily summaries.
+tied to run history (`retention: :indefinite`).
 
 Staff UI is Recording Studio Admin. Install that gem, mount it, enable the
 `recording_studio_ai` section, and grant Accessible access. Saved replies live

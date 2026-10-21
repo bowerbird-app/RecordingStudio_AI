@@ -4,8 +4,6 @@ require "test_helper"
 
 class AICallLogsTest < ActiveSupport::TestCase
   setup do
-    @original_flag = RecordingStudioAI.configuration.logs_summaries_enabled
-    RecordingStudioAI.configuration.logs_summaries_enabled = false
     RecordingStudioAI::LogsRegistration.register!
     @user = User.create!(
       email: "ai-logs-#{SecureRandom.hex(4)}@example.com",
@@ -14,16 +12,9 @@ class AICallLogsTest < ActiveSupport::TestCase
     )
     @workspace = Workspace.create!(name: "AI logs #{SecureRandom.hex(4)}")
     @root = RecordingStudio.root_recording_for(@workspace)
-    @day = Date.new(2026, 10, 1)
-    clear_runs!
   end
 
-  teardown do
-    RecordingStudioAI.configuration.logs_summaries_enabled = @original_flag
-  end
-
-  test "flag stays off and Metrics still reads raw runs" do
-    refute RecordingStudioAI::LogsRegistration.summaries_enabled?
+  test "Metrics still reads raw runs" do
     assert_equal RecordingStudioAI::Run, RecordingStudioMetrics.find("ai_runs.over_time").model
   end
 
@@ -32,18 +23,24 @@ class AICallLogsTest < ActiveSupport::TestCase
     %w[
       recording_studio_ai_attempts
       recording_studio_ai_custom_tool_invocations
-      recording_studio_ai_attempt_day_summaries
-      recording_studio_ai_tool_call_day_summaries
     ].each do |table|
       relkind = connection.select_value("SELECT relkind FROM pg_class WHERE relname = #{connection.quote(table)}")
       assert_equal "r", relkind, table
     end
+    refute connection.data_source_exists?("recording_studio_ai_attempt_day_summaries")
+    refute connection.data_source_exists?("recording_studio_ai_tool_call_day_summaries")
     assert_equal "id", connection.primary_key("recording_studio_ai_attempts")
 
     attempt_log = RecordingStudioLogs.registry.log_for("RecordingStudioAI::Attempt")
+    tool_log = RecordingStudioLogs.registry.log_for("RecordingStudioAI::CustomToolInvocation")
     assert_nil attempt_log.partition_interval
     assert attempt_log.indefinite?
     assert_equal :root_recording_id, attempt_log.root_column
+    assert_nil tool_log.partition_interval
+    assert tool_log.indefinite?
+    assert_equal :root_recording_id, tool_log.root_column
+    assert_empty RecordingStudioLogs.registry.aggregations_for(attempt_log)
+    assert_empty RecordingStudioLogs.registry.aggregations_for(tool_log)
   end
 
   test "new rows stamp root_recording_id from the run" do
@@ -59,45 +56,6 @@ class AICallLogsTest < ActiveSupport::TestCase
     assert_equal @root.id, invocation.root_recording_id
   end
 
-  test "rebuild writes daily counts that match raw attempts and tool calls" do
-    run = create_run!
-    2.times do |index|
-      run.attempts.create!(
-        sequence: index + 1, kind: index.zero? ? "primary" : "retry", status: "completed",
-        provider: "openai", model: "gpt-test", latency_ms: 10 + index
-      )
-    end
-    run.attempts.create!(
-      sequence: 3, kind: "fallback", status: "failed", provider: "gemini", model: "gemini-test", latency_ms: 40
-    )
-    run.custom_tool_invocations.create!(
-      tool_key: "dummy_echo_tool", tool_version: 1, status: "completed", read_only: true,
-      destructive: false, requires_confirmation: false, idempotent: true, latency_ms: 5
-    )
-    run.custom_tool_invocations.create!(
-      tool_key: "dummy_echo_tool", tool_version: 1, status: "failed", read_only: true,
-      destructive: false, requires_confirmation: false, idempotent: true, latency_ms: 8
-    )
-
-    stamp_created_at!(run.attempts, Time.utc(2026, 10, 1, 12))
-    stamp_created_at!(run.custom_tool_invocations, Time.utc(2026, 10, 1, 12))
-
-    RecordingStudioAI::Services::RebuildAiCallLogSummaries.call(day: @day)
-
-    raw_attempts = run.attempts
-    counts = RecordingStudioAI::AttemptDaySummary.where(day: @day, root_recording_id: @root.id)
-    assert_equal raw_attempts.count, counts.sum(:call_count)
-    assert_equal 2, counts.where(provider: "openai", model: "gpt-test", status: "completed").sum(:call_count)
-    assert_equal 1, counts.where(status: "failed").sum(:call_count)
-    assert_equal raw_attempts.sum(:latency_ms), counts.sum(:latency_sum_ms)
-
-    raw_tools = run.custom_tool_invocations
-    tools = RecordingStudioAI::ToolCallDaySummary.where(day: @day, root_recording_id: @root.id)
-    assert_equal raw_tools.count, tools.sum(:tool_call_count)
-    assert_equal 1, tools.where(tool_key: "dummy_echo_tool", status: "completed").sum(:tool_call_count)
-    assert_equal 1, tools.where(status: "failed").sum(:tool_call_count)
-  end
-
   private
 
   def create_run!
@@ -111,16 +69,5 @@ class AICallLogsTest < ActiveSupport::TestCase
       initiator_id: @user.id,
       initiator_kind: "user"
     )
-  end
-
-  def stamp_created_at!(rows, time)
-    rows.update_all(created_at: time, updated_at: time)
-  end
-
-  def clear_runs!
-    connection = RecordingStudioAI::LogsRegistration.logging_connection
-    return unless connection.data_source_exists?("recording_studio_logs_aggregation_runs")
-
-    connection.execute("DELETE FROM #{connection.quote_table_name('recording_studio_logs_aggregation_runs')}")
   end
 end

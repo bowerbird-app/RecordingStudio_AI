@@ -61,7 +61,7 @@ class InstallGeneratorTest < Minitest::Test
       assert_includes initializer, "config.batch_synchronization_interval = 1.minute"
       assert_includes initializer, "config.allowed_provider_overrides"
       assert_includes initializer, "config.retain_responses = false"
-      assert_includes initializer, "config.logs_summaries_enabled = false"
+      refute_includes initializer, "config.logs_summaries_enabled"
       assert_includes initializer, "config.response_retention_period = 7.days"
       assert_includes initializer, "config.maximum_retained_response_size = 1.megabyte"
       assert_includes initializer, "config.response_sanitizer = nil"

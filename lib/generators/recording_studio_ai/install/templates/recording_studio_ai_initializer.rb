@@ -78,8 +78,6 @@ RecordingStudioAI.configure do |config|
   config.maximum_retained_response_size = 1.megabyte
   # Canonical execution history is never deleted unless this is explicitly enabled.
   config.execution_history_retention_period = nil
-  # Daily Logs summaries of attempts and tool calls. Off keeps Admin and Metrics on raw rows.
-  config.logs_summaries_enabled = false
   # Receives recursively normalized, built-in-sanitized Hash/Array/scalar values.
   config.response_sanitizer = nil
   config.instrumentation_enabled = true
