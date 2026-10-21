@@ -29,6 +29,9 @@ gem "recording_studio",
     tag: "v4.7.0"
 gem "recording_studio_ai",
     github: "bowerbird-app/RecordingStudio_AI"
+gem "recording_studio_logs",
+    github: "bowerbird-app/RecordingStudio_logs",
+    tag: "v0.5.0"
 gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
     tag: "v0.5.0"
@@ -95,9 +98,10 @@ different mount point:
 bin/rails generate recording_studio_ai:install --mount-path=/addons/ai
 ```
 
-Install and run addon migrations:
+Install Logs run tables (if the host does not already have them) and addon migrations:
 
 ```bash
+bin/rails generate recording_studio_logs:migrations
 bin/rails recording_studio_ai:install:migrations
 bin/rails db:migrate
 ```
@@ -267,9 +271,22 @@ subject to each provider's retention policy even though this addon does not
 persist attachment bytes or filenames.
 
 Canonical runs, attempts, tool invocations, batches, and batch items are kept
-indefinitely by default. To apply an explicit policy, set
-`execution_history_retention_period` to a positive duration and schedule
-`RecordingStudioAI::HistoryCleanupJob` or
+indefinitely by default. Attempts and custom tool invocations register with
+RecordingStudioLogs as existing unpartitioned tables (`partition_interval: nil`).
+Logs retention on those tables is `:indefinite` because attempts are referenced
+by runs, responses, and tool invocations. Do not set
+`RecordingStudioLogs.configure { |config| config.retention_for(...) }` on the AI
+call logs. If the host needs a window, use `execution_history_retention_period`
+and `RecordingStudioAI::HistoryCleanupJob`, which deletes responses and
+dependents before owners. RecordingStudioLogs must not prune rows that history
+still references.
+
+Do not register aggregations or summary tables for these logs. Admin AI screens,
+Metrics, and warning metrics keep reading raw attempts. Do not schedule partition
+maintenance for these unpartitioned tables.
+
+To apply an explicit history policy, set `execution_history_retention_period` to
+a positive duration and schedule `RecordingStudioAI::HistoryCleanupJob` or
 `bin/rails recording_studio_ai:cleanup_history`. It removes only terminal rows
 older than the cutoff in one transaction and deletes dependents before owners.
 

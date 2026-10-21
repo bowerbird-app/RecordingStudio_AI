@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.17.1", RecordingStudioAI::VERSION
+    assert_equal "0.18.0", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -52,20 +52,30 @@ class RecordingStudioAITest < Minitest::Test
     specification = Gem::Specification.load(File.expand_path("../recording_studio_ai.gemspec", __dir__))
     dependencies = specification.runtime_dependencies.to_h { |dependency| [dependency.name, dependency.requirement] }
 
-    assert_equal %w[csv flat_pack json_schemer openai rails recording_studio recording_studio_metrics],
-                 dependencies.keys.sort
+    expected = %w[
+      csv flat_pack json_schemer openai rails
+      recording_studio recording_studio_logs recording_studio_metrics
+    ]
+    assert_equal expected, dependencies.keys.sort
     assert_equal ">= 0.3.0, < 0.6", dependencies.fetch("recording_studio_metrics").to_s
+    assert_equal ">= 0.4.1, < 0.6", dependencies.fetch("recording_studio_logs").to_s
     assert_equal "~> 4.7", dependencies.fetch("recording_studio").to_s
     assert_equal "~> 0.103", dependencies.fetch("openai").to_s
     refute_includes dependencies.keys, "recording_studio_accessible"
     refute_includes dependencies.keys, "recording_studio_admin"
+
+    %w[Gemfile test/dummy/Gemfile].each do |path|
+      contents = File.read(File.expand_path("../#{path}", __dir__))
+      assert_includes contents, "RecordingStudio_logs", path
+      assert_includes contents, 'tag: "v0.5.0"', path
+    end
   end
 
   def test_phase_six_ships_concrete_providers_without_example_surfaces
     root = File.expand_path("..", __dir__)
     migration_files = Dir[File.join(root, "db/migrate/*.rb")]
 
-    assert_equal 11, migration_files.size
+    assert_equal 12, migration_files.size
     expected_migration_fragments.each do |fragment|
       assert migration_files.any? { |file| file.include?(fragment) }, fragment
     end
@@ -84,6 +94,7 @@ class RecordingStudioAITest < Minitest::Test
       allow_recording_studio_ai_decision_executions
       allow_recording_studio_ai_tool_executions
       allow_recording_studio_ai_hosted_agent_runs
+      add_root_recording_id_to_recording_studio_ai_call_logs
       add_prompt_attribution_to_recording_studio_ai_runs
       remove_prompt_namespace_and_short_name_from_recording_studio_ai_runs
     ]

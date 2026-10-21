@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "recording_studio"
+require "recording_studio_logs"
 require "recording_studio_ai/version"
 require "recording_studio_ai/copy"
 require "recording_studio_ai/configuration"
@@ -31,6 +32,7 @@ require "recording_studio_ai/response_cleanup"
 require "recording_studio_ai/history_cleanup"
 require "recording_studio_ai/warning_metrics"
 require "recording_studio_ai/metrics"
+require "recording_studio_ai/logs_registration"
 require "recording_studio_ai/orchestrator"
 require "recording_studio_ai/batch_orchestrator"
 require "recording_studio_ai/webhooks"

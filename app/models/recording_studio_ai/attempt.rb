@@ -4,6 +4,7 @@ module RecordingStudioAI
   class Attempt < ApplicationRecord
     include TerminalImmutability
     include InstrumentedLifecycle
+    include AssignsRootRecordingId
 
     self.table_name = "recording_studio_ai_attempts"
 
@@ -59,6 +60,7 @@ module RecordingStudioAI
       def immutable_after_terminal_columns
         %i[
           run_id
+          root_recording_id
           sequence
           kind
           profile_key

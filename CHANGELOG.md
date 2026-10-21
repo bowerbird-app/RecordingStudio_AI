@@ -5,6 +5,25 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-21
+
+### Added
+- RecordingStudioLogs registration for the AI call log. `recording_studio_ai_attempts`
+  and `recording_studio_ai_custom_tool_invocations` stay in place (unpartitioned).
+  New rows stamp `root_recording_id` from the run. Existing rows are backfilled.
+  Both logs register with `retention: :indefinite` and no aggregations.
+- Runtime dependency `recording_studio_logs` `>= 0.4.1, < 0.6` (GitHub tag `v0.5.0`).
+
+### Changed
+- Version is `0.18.0`.
+
+### Upgrade notes
+- Bump to `0.18.0` and pin `recording_studio_logs` to GitHub tag `v0.5.0`.
+- `bin/rails generate recording_studio_logs:migrations` if run tables are missing.
+- `bin/rails recording_studio_ai:install:migrations` then `db:migrate`.
+- Do not point RecordingStudioLogs retention at attempts or tool invocations.
+  Use `execution_history_retention_period` and HistoryCleanup if you need a window.
+
 ## [0.17.1] - 2026-10-20
 
 ### Changed

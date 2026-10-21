@@ -10,6 +10,9 @@ gem "recording_studio",
 gem "flat_pack",
     github: "bowerbird-app/flatpack",
     tag: "v0.1.207"
+gem "recording_studio_logs",
+    github: "bowerbird-app/RecordingStudio_logs",
+    tag: "v0.5.0"
 gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
     tag: "v0.5.0"

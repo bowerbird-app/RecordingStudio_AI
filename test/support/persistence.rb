@@ -8,6 +8,7 @@ module RecordingStudioAI
         app/models/recording_studio_ai/application_record
         app/models/concerns/recording_studio_ai/terminal_immutability
         app/models/recording_studio_ai/run
+        app/models/concerns/recording_studio_ai/assigns_root_recording_id
         app/models/recording_studio_ai/attempt
         app/models/recording_studio_ai/custom_tool_invocation
         app/models/recording_studio_ai/batch
@@ -48,7 +49,8 @@ module RecordingStudioAI
           classes + [
             AllowRecordingStudioAIDecisionExecutions,
             AllowRecordingStudioAIToolExecutions,
-            AllowRecordingStudioAIHostedAgentRuns
+            AllowRecordingStudioAIHostedAgentRuns,
+            AddRootRecordingIdToRecordingStudioAICallLogs
           ]
         end
       end
