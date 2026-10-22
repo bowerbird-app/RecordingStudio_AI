@@ -92,15 +92,15 @@ GIT
 PATH
   remote: ../..
   specs:
-    recording_studio_ai (0.18.0)
+    recording_studio_ai (0.18.1)
       csv (>= 3.2)
       flat_pack (~> 0.1)
       json_schemer (~> 2.4)
       openai (~> 0.103)
       rails (>= 8.1, < 9.0)
       recording_studio (~> 4.7)
-      recording_studio_logs (>= 0.4.1, < 0.6)
-      recording_studio_metrics (>= 0.3.0, < 0.6)
+      recording_studio_logs (>= 0.4.1, < 1.0)
+      recording_studio_metrics (>= 0.3.0, < 1.0)
 
 GEM
   remote: https://rubygems.org/
@@ -613,7 +613,7 @@ CHECKSUMS
   recording_studio (4.7.0)
   recording_studio_accessible (0.18.0)
   recording_studio_admin (2.3.0)
-  recording_studio_ai (0.18.0)
+  recording_studio_ai (0.18.1)
   recording_studio_cache (0.5.0)
   recording_studio_logs (0.5.0)
   recording_studio_metrics (0.5.0)

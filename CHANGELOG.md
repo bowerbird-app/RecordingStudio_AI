@@ -5,6 +5,16 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-10-22
+
+### Changed
+- Runtime dependency `recording_studio_logs` is now `>= 0.4.1, < 1.0` (CI tested with 0.5.0).
+- Runtime dependency `recording_studio_metrics` is now `>= 0.3.0, < 1.0` (CI tested with 0.5.0).
+- Version is `0.18.1`. No code change.
+
+### Upgrade notes
+- Bump to `0.18.1`. No migration.
+
 ## [0.18.0] - 2026-10-21
 
 ### Added
@@ -1032,7 +1042,9 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.17.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.18.1...HEAD
+[0.18.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.18.0...v0.18.1
+[0.18.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.16.0...v0.16.1

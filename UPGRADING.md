@@ -1,5 +1,18 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.18.1
+
+Widens Logs and Metrics runtime ceilings to `< 1.0`. No code change. No migration.
+
+### What changed
+
+- `recording_studio_logs` is `>= 0.4.1, < 1.0` (CI tested with 0.5.0).
+- `recording_studio_metrics` is `>= 0.3.0, < 1.0` (CI tested with 0.5.0).
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.18.1`. No migration is required.
+
 ## Upgrading to 0.18.0
 
 Adopts RecordingStudioLogs registration for the AI call log. This release
