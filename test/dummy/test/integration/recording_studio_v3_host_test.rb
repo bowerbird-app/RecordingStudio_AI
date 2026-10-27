@@ -6,7 +6,7 @@ class RecordingStudioV3HostTest < ActiveSupport::TestCase
   test "dummy app loads root switchable config and host sidebar layout" do
     assert_equal "0.9.0", RecordingStudioRootSwitchable::VERSION
     assert_equal "0.18.0", RecordingStudioAccessible::VERSION
-    assert_equal "2.3.0", RecordingStudioAdmin::VERSION
+    assert_equal "2.7.0", RecordingStudioAdmin::VERSION
     assert_equal [ "all_workspaces" ], RecordingStudioRootSwitchable.configuration.scopes.keys
     assert_equal :application_layout, RecordingStudioRootSwitchable.configuration.layout
     assert_includes ApplicationController.ancestors, RecordingStudio::RootSwitchable::ControllerSupport
@@ -28,6 +28,7 @@ class RecordingStudioV3HostTest < ActiveSupport::TestCase
     assert connection.table_exists?(:recording_studio_accesses)
     assert connection.table_exists?(:recording_studio_access_boundaries)
     refute connection.table_exists?(:recording_studio_device_sessions)
+    refute connection.table_exists?(:admin_audit_logs)
   end
 
   test "dummy seeds use v3 hierarchy idempotently and restore current actor" do

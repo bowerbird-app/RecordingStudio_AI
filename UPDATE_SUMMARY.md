@@ -14,7 +14,7 @@ The saved-reply view sets `content_for :title` and `content_for :subtitle`. Clos
 
 ## Host dummy
 
-The dummy sidebar stays the shell for playground, config, and methods. Admin and the saved-reply page use `recording_studio/default_layout`. Flatpack stylesheets load before Tailwind. `test/support/widen_recording_studio_requirement.rb` lets Bundler resolve Recording Studio 6.1.0 while sibling gems still declare a `< 5` requirement.
+The dummy sidebar stays the shell for playground, config, and methods. Admin `v2.7.0` and the saved-reply page use `recording_studio/default_layout`. Flatpack stylesheets load before Tailwind. The dummy has no `admin_audit_logs` table. `test/support/widen_recording_studio_requirement.rb` lets Bundler resolve Recording Studio 6.1.0 while sibling gems still declare a `< 5` requirement.
 
 ## Upgrade
 

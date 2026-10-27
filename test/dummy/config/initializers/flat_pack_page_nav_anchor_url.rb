@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# Admin 2.3 and Root Switchable 0.9 still pass keywords Flatpack 0.1.319 removed.
-# Translate them in the dummy so those screens keep rendering.
+# Root Switchable 0.9 still passes keywords Flatpack 0.1.319 removed.
+# Translate them in the dummy so that screen keeps rendering. Admin 2.7 sets its own heading.
 module DummyFlatPackButtonUrl
   def initialize(url: nil, href: nil, **kwargs)
     super(href: href.presence || url, **kwargs)

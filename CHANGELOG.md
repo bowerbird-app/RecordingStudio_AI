@@ -15,9 +15,13 @@ Versioning and Keep a Changelog.
 - The saved-reply controller calls `recording_studio_layout`. `RecordingStudio::UsesDefaultLayout` is gone.
 - The saved-reply page sets `content_for :title` and `content_for :subtitle`. Close uses `flat_pack_page_nav`. Access avatars stay in `recording_studio_page_nav_right`.
 - Saved-reply cards use `border:` and `shadow:` instead of `style:`.
+- The dummy pins `recording_studio_admin` tag `v2.7.0` (commit `f8bb2efa5a579faa0ad7b52ea92c816f5d1e2e9d`).
+- The dummy has no `admin_audit_logs` table, so Admin 2.6's `root_recording_id` migration is not installed.
+- The dummy locks `net-ssh` at `7.3.8` (`>= 7.3.5`).
 
 ### Upgrade notes
-- Bump to `0.19.0`. No migration.
+- Bump to `0.19.0`. No migration in this gem.
+- Hosts that already have `admin_audit_logs` from Admin before 2.6 run `bin/rails generate recording_studio_admin:logs` and migrate. New Admin roots already create `root_recording_id`. This dummy never created that table.
 - Pin Recording Studio to tag `v6.1.0` and Flatpack to `>= 0.1.315` (this repo pins commit `1fcbafe94f8eb118f0a22182f63f5110fcc97a56`).
 - Lock `view_component` to `4.19.0`, or any release in `>= 4.14, < 5`.
 - Remove `include RecordingStudio::UsesDefaultLayout` and `layout "recording_studio/default_layout"`. Set `config.layout` or leave it `nil`.

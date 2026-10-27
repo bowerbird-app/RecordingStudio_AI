@@ -35,7 +35,7 @@ class HostLocaleOverrideTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_select "h1", text: HOST_SECTION_TITLE, count: 1
       refute_select "h1", text: "Recording Studio AI"
-      assert_select "title", text: "Recording Studio AI"
+      assert_select "title", text: HOST_SECTION_TITLE
     end
   end
 

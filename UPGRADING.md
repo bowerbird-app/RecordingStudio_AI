@@ -2,7 +2,7 @@
 
 ## Upgrading to 0.19.0
 
-Adopts Recording Studio 6.1 layouts and Flatpack 0.1.319. No migration.
+Adopts Recording Studio 6.1 layouts and Flatpack 0.1.319. The dummy pins Admin `v2.7.0`. No migration in this gem.
 
 ### What changed
 
@@ -13,6 +13,7 @@ Adopts Recording Studio 6.1 layouts and Flatpack 0.1.319. No migration.
 - `RecordingStudioAI::RetainedResponsesController` calls `recording_studio_layout`. `RecordingStudio::UsesDefaultLayout` is removed.
 - The saved-reply heading is `content_for :title` and `content_for :subtitle`. Close is `flat_pack_page_nav`. Access avatars stay in `recording_studio_page_nav_right`.
 - Cards use `border:` and `shadow:` instead of `style:`.
+- The dummy pins `recording_studio_admin` tag `v2.7.0` (commit `f8bb2efa5a579faa0ad7b52ea92c816f5d1e2e9d`). Admin 2.7 sets section and screen headings with `content_for :title`. The dummy has no `admin_audit_logs` table, so the Admin 2.6 `root_recording_id` migration is not copied here.
 
 ### Upgrade steps
 
@@ -23,6 +24,7 @@ Adopts Recording Studio 6.1 layouts and Flatpack 0.1.319. No migration.
 5. Delete `include RecordingStudio::UsesDefaultLayout` and any `layout "recording_studio/default_layout"`. Set `config.layout` only when the host must override the core layout.
 6. On pages that use `recording_studio/default_layout`, set `content_for :title` and remove the duplicate page-level `FlatPack::PageTitle`. Put back and close on `flat_pack_page_nav`. Put page actions on `register_page_nav` or `recording_studio_page_nav_right`.
 7. Load `flat_pack/variables`, `flat_pack/application`, and `flat_pack/rich_text` before Tailwind.
+8. Pin Admin to tag `v2.7.0` when the host uses this dummy's Admin surface. If `admin_audit_logs` already exists without `root_recording_id`, run `bin/rails generate recording_studio_admin:logs` and migrate. Skip that generator when the table was never created.
 
 Sibling gems that still require Recording Studio below 5 can be widened in the host Gemfile with `test/support/widen_recording_studio_requirement.rb`. Do not fork those gems for the constraint alone.
 
