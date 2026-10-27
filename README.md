@@ -12,7 +12,7 @@ six execution infrastructure tables, and a read-only FlatPack admin surface.
 
 - Ruby 3.3 or newer
 - Rails 8.1
-- Recording Studio `~> 4.7`
+- Recording Studio `>= 6.1.0`
 
 The OpenAI provider uses the official `openai` Ruby SDK (`~> 0.103`, which includes
 the Agents API). Gemini uses its REST API
@@ -21,12 +21,16 @@ Ruby SDK. Both providers support injected clients.
 
 ## Installation
 
-Add the addon and Recording Studio `~> 4.7` to the host application's `Gemfile`:
+Add the addon and Recording Studio `>= 6.1.0` to the host application's `Gemfile`:
 
 ```ruby
 gem "recording_studio",
     github: "bowerbird-app/RecordingStudio",
-    tag: "v4.7.0"
+    tag: "v6.1.0"
+gem "flat_pack",
+    github: "bowerbird-app/flatpack",
+    ref: "1fcbafe94f8eb118f0a22182f63f5110fcc97a56"
+gem "view_component", "4.19.0"
 gem "recording_studio_ai",
     github: "bowerbird-app/RecordingStudio_AI"
 gem "recording_studio_logs",
@@ -36,6 +40,8 @@ gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
     tag: "v0.5.0"
 ```
+
+`RecordingStudioAI.configuration.layout` selects the saved-reply layout. Leave it `nil` to follow `RecordingStudio.configuration.layout`, then `recording_studio/default_layout`. A layout name, `false`, or a callable that takes `controller:` is also valid. Do not include `RecordingStudio::UsesDefaultLayout` or hard-code `layout "recording_studio/default_layout"`.
 
 
 AI registers site-wide run metrics. The host exposes them once:
@@ -387,7 +393,7 @@ follows `RecordingStudio.t` / view `t` escaping (args escaped, template markup
 kept). A plain `default:` with no interpolation is returned as a plain
 (non-`html_safe`) String, so views will escape it. Hosts override keys in their
 own `config/locales`. Admin table column headers stay English literals.
-Requires RecordingStudio `~> 4.7`.
+Requires Recording Studio `>= 6.1.0`. The saved-reply page puts its heading in `content_for :title` and `content_for :subtitle`, and its close control on `flat_pack_page_nav`.
 
 Keep `admin_warning_thresholds`, `admin_slow_call_threshold_ms`, and
 `admin_expensive_models` for widget warnings. Engine-admin resolvers
@@ -1013,10 +1019,10 @@ cd test/dummy
 bin/dev
 ```
 
-The dummy app preserves Recording Studio `~> 4.7` declarations, actor wiring,
-root recordings, authentication, the host sidebar shell, `UsesDefaultLayout` on
-gem admin screens, and the mounted addon route. See [UPGRADING.md](UPGRADING.md)
-for the `~> 4.7` host pin.
+The dummy app preserves Recording Studio `>= 6.1.0` declarations, actor wiring,
+root recordings, authentication, the host sidebar shell, `config.layout` on
+the saved-reply controller, and the mounted addon route. See [UPGRADING.md](UPGRADING.md)
+for the `>= 6.1.0` host pin.
 
 Dummy credentials (`test/dummy/config/credentials.yml.enc`) are encrypted with
 the shared RecordingStudio_* development master key. Set `RAILS_MASTER_KEY` or
