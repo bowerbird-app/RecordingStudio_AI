@@ -23,10 +23,10 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "json_schemer", "~> 2.4"
   spec.add_dependency "csv", ">= 3.2"
-  spec.add_dependency "flat_pack", "~> 0.1"
+  spec.add_dependency "flat_pack", ">= 0.1.315"
   spec.add_dependency "openai", "~> 0.103"
   spec.add_dependency "rails", ">= 8.1", "< 9.0"
-  spec.add_dependency "recording_studio", "~> 4.7"
+  spec.add_dependency "recording_studio", ">= 6.1.0"
   spec.add_dependency "recording_studio_logs", ">= 0.4.1", "< 1.0"
   spec.add_dependency "recording_studio_metrics", ">= 0.3.0", "< 1.0"
 end

@@ -2,14 +2,17 @@
 
 source "https://rubygems.org"
 
+require_relative "test/support/widen_recording_studio_requirement"
+
 # Recording Studio is pinned here because its source is currently distributed
 # from GitHub. The runtime constraint is declared in the gemspec.
 gem "recording_studio",
     github: "bowerbird-app/RecordingStudio",
-    tag: "v4.7.0"
+    tag: "v6.1.0"
 gem "flat_pack",
     github: "bowerbird-app/flatpack",
-    tag: "v0.1.207"
+    ref: "1fcbafe94f8eb118f0a22182f63f5110fcc97a56"
+gem "view_component", "4.19.0"
 gem "recording_studio_logs",
     github: "bowerbird-app/RecordingStudio_logs",
     tag: "v0.5.0"
