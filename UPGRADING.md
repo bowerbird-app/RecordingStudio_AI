@@ -1,5 +1,33 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.19.0
+
+Adopts Recording Studio 6.1 layouts and Flatpack 0.1.319. The dummy pins Admin `v2.7.0`. No migration in this gem.
+
+### What changed
+
+- `recording_studio` is `>= 6.1.0`. Development pins tag `v6.1.0`.
+- `flat_pack` is `>= 0.1.315`. Development pins commit `1fcbafe94f8eb118f0a22182f63f5110fcc97a56` (`FlatPack::VERSION` `0.1.319`). The newest git tag is `v0.1.315`.
+- `view_component` stays in `>= 4.14, < 5`. Development locks `4.19.0`.
+- `RecordingStudioAI.configuration.layout` is `nil`, `false`, a layout name, or a callable that takes `controller:`. `nil` uses `RecordingStudio.configuration.layout`, then `recording_studio/default_layout`.
+- `RecordingStudioAI::RetainedResponsesController` calls `recording_studio_layout`. `RecordingStudio::UsesDefaultLayout` is removed.
+- The saved-reply heading is `content_for :title` and `content_for :subtitle`. Close is `flat_pack_page_nav`. Access avatars stay in `recording_studio_page_nav_right`.
+- Cards use `border:` and `shadow:` instead of `style:`.
+- The dummy pins `recording_studio_admin` tag `v2.7.0` (commit `f8bb2efa5a579faa0ad7b52ea92c816f5d1e2e9d`). Admin 2.7 sets section and screen headings with `content_for :title`. The dummy has no `admin_audit_logs` table, so the Admin 2.6 `root_recording_id` migration is not copied here.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.19.0`.
+2. Pin Recording Studio to GitHub tag `v6.1.0`.
+3. Pin Flatpack to `>= 0.1.315`. This repo uses commit `1fcbafe94f8eb118f0a22182f63f5110fcc97a56`.
+4. Lock `view_component` at `4.19.0` unless the host already allows another `4.x` release at `>= 4.14`.
+5. Delete `include RecordingStudio::UsesDefaultLayout` and any `layout "recording_studio/default_layout"`. Set `config.layout` only when the host must override the core layout.
+6. On pages that use `recording_studio/default_layout`, set `content_for :title` and remove the duplicate page-level `FlatPack::PageTitle`. Put back and close on `flat_pack_page_nav`. Put page actions on `register_page_nav` or `recording_studio_page_nav_right`.
+7. Load `flat_pack/variables`, `flat_pack/application`, and `flat_pack/rich_text` before Tailwind.
+8. Pin Admin to tag `v2.7.0` when the host uses this dummy's Admin surface. If `admin_audit_logs` already exists without `root_recording_id`, run `bin/rails generate recording_studio_admin:logs` and migrate. Skip that generator when the table was never created.
+
+Sibling gems that still require Recording Studio below 5 can be widened in the host Gemfile with `test/support/widen_recording_studio_requirement.rb`. Do not fork those gems for the constraint alone.
+
 ## Upgrading to 0.18.1
 
 Widens Logs and Metrics runtime ceilings to `< 1.0`. No code change. No migration.

@@ -1,4 +1,5 @@
-<% recording_studio_page_nav(title: "Config", page_nav_anchor_url: root_path) %>
+<% content_for :title, "Config" %>
+<% flat_pack_page_nav(round: true, style: :default, anchor_href: root_path, anchor_tooltip: "Close") %>
 
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(

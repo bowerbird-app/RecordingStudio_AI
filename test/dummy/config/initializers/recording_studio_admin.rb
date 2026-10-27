@@ -78,10 +78,6 @@ end
 Rails.application.config.to_prepare do
   next unless defined?(RecordingStudioAdmin::ApplicationController)
 
-  unless RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudio::UsesDefaultLayout)
-    RecordingStudioAdmin::ApplicationController.include(RecordingStudio::UsesDefaultLayout)
-  end
-
   unless RecordingStudioAdmin::ApplicationController.ancestors.include?(RecordingStudioAdminRootAnchorDefault)
     RecordingStudioAdmin::ApplicationController.prepend(RecordingStudioAdminRootAnchorDefault)
   end

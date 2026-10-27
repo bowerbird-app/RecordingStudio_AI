@@ -1,6 +1,10 @@
-<% recording_studio_page_nav(
-  page_nav_anchor_url: @admin_home_path,
-  page_nav_anchor_label: RecordingStudio.t("recording_studio.ai.retained_responses.close")
+<% content_for :title, RecordingStudio.t("recording_studio.ai.retained_responses.page_title") %>
+<% content_for :subtitle, RecordingStudio.t("recording_studio.ai.retained_responses.page_subtitle") %>
+<% flat_pack_page_nav(
+  round: true,
+  style: :default,
+  anchor_href: @admin_home_path,
+  anchor_tooltip: RecordingStudio.t("recording_studio.ai.retained_responses.close")
 ) %>
 <% if @access_recording.present? %>
   <% recording_studio_page_nav_right do %>
@@ -30,13 +34,7 @@
 
 <%= render FlatPack::Grid::Component.new(cols: 2, gap: :lg, align: :start) do %>
   <%= render FlatPack::Grid::Component.new(cols: 1, gap: :lg, align: :start) do %>
-    <%= render FlatPack::PageTitle::Component.new(
-      title: RecordingStudio.t("recording_studio.ai.retained_responses.page_title"),
-      subtitle: RecordingStudio.t("recording_studio.ai.retained_responses.page_subtitle"),
-      variant: :h1
-    ) %>
-
-    <%= render FlatPack::Card::Component.new(style: :elevated) do |card| %>
+    <%= render FlatPack::Card::Component.new(border: :default, shadow: :md) do |card| %>
       <% card.header(divider: true) do %>
         <%= render FlatPack::PageTitle::Component.new(title: RecordingStudio.t("recording_studio.ai.retained_responses.about_title"), variant: :h3, class: "mb-0") %>
       <% end %>
@@ -88,7 +86,7 @@
     <% end %>
 
     <% if reply_text.present? %>
-      <%= render FlatPack::Card::Component.new(style: :elevated) do |card| %>
+      <%= render FlatPack::Card::Component.new(border: :default, shadow: :md) do |card| %>
         <% card.header(divider: true) do %>
           <%= render FlatPack::PageTitle::Component.new(title: RecordingStudio.t("recording_studio.ai.retained_responses.reply"), variant: :h3, class: "mb-0") %>
         <% end %>

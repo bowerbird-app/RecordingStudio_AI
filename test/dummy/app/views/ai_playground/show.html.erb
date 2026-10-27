@@ -1,4 +1,5 @@
-<% recording_studio_page_nav(title: "AI Playground", page_nav_anchor_url: root_path) %>
+<% content_for :title, "AI Playground" %>
+<% flat_pack_page_nav(round: true, style: :default, anchor_href: root_path, anchor_tooltip: "Close") %>
 
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
@@ -189,7 +190,7 @@
               value: @form.fetch("tool_key"),
               data: { ai_playground_form_target: "toolKey", action: "change->ai-playground-form#refreshToolDescription" }
             ) %>
-            <%= render FlatPack::Card::Component.new(style: :default, class: "mt-2") do |card| %>
+            <%= render FlatPack::Card::Component.new(border: :default, shadow: :none, class: "mt-2") do |card| %>
               <% card.header do %>
                 <%= render FlatPack::PageTitle::Component.new(title: "Selected tool", variant: :h4, class: "mb-0 pb-0") %>
               <% end %>
@@ -219,7 +220,7 @@
       <% end %>
 
       <div class="hidden" data-ai-playground-form-target="streamPanel" aria-live="polite">
-        <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+        <%= render FlatPack::Card::Component.new(border: :default, shadow: :none) do |card| %>
           <% card.header do %>
             <div class="flex items-center justify-between gap-3">
               <%= render FlatPack::PageTitle::Component.new(title: "Live response", variant: :h4, class: "mb-0 pb-0") %>

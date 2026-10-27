@@ -21,7 +21,7 @@
       <% end %>
       <% @response.answers.each do |entry| %>
         <% answer = entry.answer %>
-        <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+        <%= render FlatPack::Card::Component.new(border: :default, shadow: :none) do |card| %>
           <% card.header do %>
             <%= render FlatPack::PageTitle::Component.new(
               title: entry.key.public_key.to_s,

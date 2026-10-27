@@ -1,42 +1,21 @@
-# RecordingStudio AI English-fallback update summary
+# RecordingStudio AI layout update
 
-## Current branch summary
+## Current release
 
-This branch adds English fallback for missing `recording_studio.ai.*` keys via
-RecordingStudio `~> 4.7` (`v4.7.0` / `613501c`): `RecordingStudio.t` and
-`RecordingStudio::Translation.register_shipped_english`.
+`0.19.0` runs on Recording Studio `>= 6.1.0` (development tag `v6.1.0`) and Flatpack `>= 0.1.315` (development commit `1fcbafe94f8eb118f0a22182f63f5110fcc97a56`, version `0.1.319`). `view_component` is locked at `4.19.0`.
 
-Main shipped metrics as `0.12.0`, so this release is `0.13.0`.
+## Layout
 
-### Dependency changes
+`RecordingStudioAI::Configuration#layout` defaults to `nil`. Assignment goes through `RecordingStudio::Layout.accept`.
 
-- Gemspec requires `recording_studio ~> 4.7` (keeps main's
-  `recording_studio_metrics ~> 0.3`).
-- Root and dummy Gemfiles pin RecordingStudio to tag `v4.7.0`.
-- Lockfiles differ from `main` only for RecordingStudio `4.7.0` (`613501c`),
-  this gem's version (`0.13.0`), and the `~> 4.7` dependency line.
-- Gem version is `0.13.0`.
+`RecordingStudioAI::RetainedResponsesController` calls `recording_studio_layout { RecordingStudioAI.configuration.layout }`. A `nil` setting uses `RecordingStudio.configuration.layout`, then `recording_studio/default_layout`. A String is the layout name. `false` renders no layout. A callable must take `controller:` and return a String, `nil`, or `false`.
 
-### Behavior
+The saved-reply view sets `content_for :title` and `content_for :subtitle`. Close uses `flat_pack_page_nav`. Access avatars use `recording_studio_page_nav_right`. Cards use `border:` and `shadow:`.
 
-- Engine registers `config/locales/en.yml` at boot before
-  `recording_studio.load_shipped_english`.
-- Gem chrome uses `RecordingStudio.t` / `Copy.t` for `recording_studio.ai.*`
-  keys only. Host or other-namespace keys stay on `I18n.t` with main's
-  `default:`.
-- No gem-local Translation helper.
-- `en.yml` is byte-identical to `main`.
-- Dynamic unknown attempt kinds / prompt roles keep main's
-  `Copy.t(..., default: english)` (same English constants / `humanize`).
+## Host dummy
 
-### Upgrade note (`_html`)
+The dummy sidebar stays the shell for playground, config, and methods. Admin `v2.7.0` and the saved-reply page use `recording_studio/default_layout`. Flatpack stylesheets load before Tailwind. The dummy has no `admin_audit_logs` table. `test/support/widen_recording_studio_requirement.rb` lets Bundler resolve Recording Studio 6.1.0 while sibling gems still declare a `< 5` requirement.
 
-A missing `_html` key with a caller `default:` follows `RecordingStudio.t` /
-view `t` escaping. A plain `default:` with no interpolation is returned as a
-plain (non-`html_safe`) String, so views will escape it.
+## Upgrade
 
-### Verification
-
-Behavior files match pre-rebase `0b46b5e` (engine, Copy, widgets, saved-reply
-view, fallback + translation tests). Version/docs/locks retargeted to `0.13.0`
-after rebase onto main's `0.12.0` metrics release.
+See `UPGRADING.md` for `0.19.0`. No database migration.

@@ -1,13 +1,16 @@
 source "https://rubygems.org"
 
+require_relative "../support/widen_recording_studio_requirement"
+
 # Recording Studio AI addon under test
 gem "recording_studio_ai", path: "../.."
 
 # RecordingStudio engine
-gem "recording_studio", github: "bowerbird-app/RecordingStudio", tag: "v4.7.0"
+gem "recording_studio", github: "bowerbird-app/RecordingStudio", tag: "v6.1.0"
+gem "view_component", "4.19.0"
 gem "recording_studio_accessible", github: "bowerbird-app/RecordingStudio_accessible", tag: "v0.18.0"
-gem "recording_studio_admin", github: "bowerbird-app/RecordingStudio_admin", tag: "v2.3.0"
-# Admin 2.3+ query helpers only (Trashable gemspec still lists Metrics for Bundler).
+gem "recording_studio_admin", github: "bowerbird-app/RecordingStudio_admin", tag: "v2.7.0"
+# Admin query helpers only (Trashable gemspec still lists Metrics for Bundler).
 gem "recording_studio_trashable", github: "bowerbird-app/RecordingStudio_trashable",
                                   tag: "v0.11.0", require: false
 
@@ -45,7 +48,7 @@ gem "jbuilder"
 gem "tailwindcss-rails"
 
 # FlatPack UI component library [https://github.com/bowerbird-app/flatpack]
-gem "flat_pack", github: "bowerbird-app/flatpack", tag: "v0.1.207"
+gem "flat_pack", github: "bowerbird-app/flatpack", ref: "1fcbafe94f8eb118f0a22182f63f5110fcc97a56"
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"

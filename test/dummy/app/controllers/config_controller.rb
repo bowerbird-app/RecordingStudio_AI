@@ -410,6 +410,13 @@ class ConfigController < ApplicationController
       accepted_values: "Array of model name strings",
       default: "[]",
       explanation: "Models treated as expensive in admin warnings."
+    },
+    {
+      key: "layout",
+      required: "No",
+      accepted_values: "nil, false, a layout name, or a callable that takes controller:",
+      default: "nil",
+      explanation: "Saved-reply layout. nil follows RecordingStudio.configuration.layout, then recording_studio/default_layout."
     }
   ].freeze
 
@@ -543,6 +550,9 @@ class ConfigController < ApplicationController
       config.admin_slow_call_threshold_ms = 10_000
       config.admin_expensive_models = []
       config.stuck_run_threshold = 15.minutes
+
+      # Saved replies. nil follows RecordingStudio.configuration.layout.
+      config.layout = nil
     end
   RUBY
 

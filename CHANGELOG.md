@@ -5,6 +5,30 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-27
+
+### Changed
+- Runtime dependency `recording_studio` is now `>= 6.1.0` (development pin tag `v6.1.0`).
+- Runtime dependency `flat_pack` is now `>= 0.1.315` (development pin commit `1fcbafe94f8eb118f0a22182f63f5110fcc97a56`, `FlatPack::VERSION` `0.1.319`).
+- Development locks `view_component` at `4.19.0` (`>= 4.14, < 5` from Flatpack).
+- `RecordingStudioAI.configuration.layout` chooses the saved-reply layout. `nil` uses `RecordingStudio.configuration.layout`, then `recording_studio/default_layout`.
+- The saved-reply controller calls `recording_studio_layout`. `RecordingStudio::UsesDefaultLayout` is gone.
+- The saved-reply page sets `content_for :title` and `content_for :subtitle`. Close uses `flat_pack_page_nav`. Access avatars stay in `recording_studio_page_nav_right`.
+- Saved-reply cards use `border:` and `shadow:` instead of `style:`.
+- The dummy pins `recording_studio_admin` tag `v2.7.0` (commit `f8bb2efa5a579faa0ad7b52ea92c816f5d1e2e9d`).
+- The dummy has no `admin_audit_logs` table, so Admin 2.6's `root_recording_id` migration is not installed.
+- The dummy locks `net-ssh` at `7.3.8` (`>= 7.3.5`).
+
+### Upgrade notes
+- Bump to `0.19.0`. No migration in this gem.
+- Hosts that already have `admin_audit_logs` from Admin before 2.6 run `bin/rails generate recording_studio_admin:logs` and migrate. New Admin roots already create `root_recording_id`. This dummy never created that table.
+- Pin Recording Studio to tag `v6.1.0` and Flatpack to `>= 0.1.315` (this repo pins commit `1fcbafe94f8eb118f0a22182f63f5110fcc97a56`).
+- Lock `view_component` to `4.19.0`, or any release in `>= 4.14, < 5`.
+- Remove `include RecordingStudio::UsesDefaultLayout` and `layout "recording_studio/default_layout"`. Set `config.layout` or leave it `nil`.
+- Move the page heading to `content_for :title` and `content_for :subtitle`. Put close on `flat_pack_page_nav`. Put extra nav content in `recording_studio_page_nav_right` or `register_page_nav`.
+- Replace `FlatPack::Card::Component.new(style:)` with `background:`, `border:`, and `shadow:`.
+- Load Flatpack stylesheets before Tailwind.
+
 ## [0.18.1] - 2026-10-22
 
 ### Changed
@@ -1042,7 +1066,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.18.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.17.0...v0.17.1
