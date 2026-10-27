@@ -2,7 +2,7 @@
 
 module RecordingStudioAI
   class RetainedResponsesController < ::ApplicationController
-    include RecordingStudio::UsesDefaultLayout
+    recording_studio_layout { RecordingStudioAI.configuration.layout }
 
     RESOURCE_KEY = "recording_studio_ai_retained_responses"
 

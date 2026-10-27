@@ -1,6 +1,6 @@
 <div class="fixed inset-0 p-4">
   <%= render FlatPack::Grid::Component.new(cols: 1, align: :center, class: "h-full w-full place-content-center justify-items-center") do %>
-    <%= render FlatPack::Card::Component.new(style: :default, class: "w-full max-w-md h-auto") do |card| %>
+    <%= render FlatPack::Card::Component.new(border: :default, shadow: :none, class: "w-full max-w-md h-auto") do |card| %>
       <% card.body do %>
         <div class="space-y-6">
           <%= render FlatPack::PageTitle::Component.new(

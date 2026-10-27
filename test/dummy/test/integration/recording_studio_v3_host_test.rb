@@ -10,8 +10,9 @@ class RecordingStudioV3HostTest < ActiveSupport::TestCase
     assert_equal [ "all_workspaces" ], RecordingStudioRootSwitchable.configuration.scopes.keys
     assert_equal :application_layout, RecordingStudioRootSwitchable.configuration.layout
     assert_includes ApplicationController.ancestors, RecordingStudio::RootSwitchable::ControllerSupport
-    refute_includes ApplicationController.ancestors, RecordingStudio::UsesDefaultLayout
-    assert_includes RecordingStudioAI::RetainedResponsesController.ancestors, RecordingStudio::UsesDefaultLayout
+    assert_nil ApplicationController.send(:recording_studio_layout_block)
+    retained = RecordingStudioAI::RetainedResponsesController.new
+    assert_equal "recording_studio/default_layout", retained.recording_studio_resolved_layout
   end
 
   test "dummy app validates v3 recordable declarations" do

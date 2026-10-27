@@ -65,8 +65,14 @@ module RecordingStudioAI
       :usage_handler,
       :usage_key_resolver
     )
+    attr_reader :layout
+
+    def layout=(value)
+      @layout = RecordingStudio::Layout.accept(value)
+    end
 
     def initialize
+      @layout = nil
       @default_profile = :medium
       @stuck_run_threshold = 15.minutes
       @authorization_handler = ->(**) { false }

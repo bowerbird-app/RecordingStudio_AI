@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.18.1", RecordingStudioAI::VERSION
+    assert_equal "0.19.0", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -59,7 +59,8 @@ class RecordingStudioAITest < Minitest::Test
     assert_equal expected, dependencies.keys.sort
     assert_equal ">= 0.3.0, < 1.0", dependencies.fetch("recording_studio_metrics").to_s
     assert_equal ">= 0.4.1, < 1.0", dependencies.fetch("recording_studio_logs").to_s
-    assert_equal "~> 4.7", dependencies.fetch("recording_studio").to_s
+    assert_equal ">= 6.1.0", dependencies.fetch("recording_studio").to_s
+    assert_equal ">= 0.1.315", dependencies.fetch("flat_pack").to_s
     assert_equal "~> 0.103", dependencies.fetch("openai").to_s
     refute_includes dependencies.keys, "recording_studio_accessible"
     refute_includes dependencies.keys, "recording_studio_admin"
@@ -68,6 +69,9 @@ class RecordingStudioAITest < Minitest::Test
       contents = File.read(File.expand_path("../#{path}", __dir__))
       assert_includes contents, "RecordingStudio_logs", path
       assert_includes contents, 'tag: "v0.5.0"', path
+      assert_includes contents, 'tag: "v6.1.0"', path
+      assert_includes contents, "1fcbafe94f8eb118f0a22182f63f5110fcc97a56", path
+      assert_includes contents, 'gem "view_component", "4.19.0"', path
     end
   end
 
@@ -148,8 +152,12 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes contents, "FlatPack::CodeBlock::Component"
     refute_includes contents, "Not kept."
     assert_includes contents, 'RecordingStudio.t("recording_studio.ai.retained_responses.page_title")'
-    assert_includes contents, "recording_studio_page_nav"
-    assert_includes contents, "page_nav_anchor_url"
+    assert_includes contents, "content_for :title"
+    assert_includes contents, "flat_pack_page_nav"
+    assert_includes contents, "anchor_href:"
+    assert_includes contents, "recording_studio_page_nav_right"
+    refute_includes contents, "recording_studio_page_nav("
+    refute_includes contents, "style: :elevated"
 
     widgets = File.read(File.expand_path("../lib/recording_studio_ai/admin/recording_studio_ai_widgets.rb", __dir__))
     assert_includes widgets, "FlatPack::Modal::Component"

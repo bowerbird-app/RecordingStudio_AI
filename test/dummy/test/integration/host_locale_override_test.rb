@@ -33,8 +33,9 @@ class HostLocaleOverrideTest < ActionDispatch::IntegrationTest
       get "/admin/sections/recording_studio_ai"
 
       assert_response :success
-      assert_includes response.body, HOST_SECTION_TITLE
-      refute_includes response.body, ">Recording Studio AI<"
+      assert_select "h1", text: HOST_SECTION_TITLE, count: 1
+      refute_select "h1", text: "Recording Studio AI"
+      assert_select "title", text: "Recording Studio AI"
     end
   end
 

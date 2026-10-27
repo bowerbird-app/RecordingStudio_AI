@@ -156,7 +156,6 @@ class DefaultLayoutTest < ActionDispatch::IntegrationTest
 
   def assert_gem_admin_shell
     assert_select "html[data-theme='rounded']", count: 1
-    assert_select "body[data-theme='rounded']", count: 1
     assert_select "body[data-recording-studio-default-layout='true']", count: 1
     refute_includes response.body, "flat-pack--sidebar-layout"
     assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
