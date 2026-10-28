@@ -1043,6 +1043,5 @@ always runs last. `.cursor/start.sh` starts PostgreSQL on each boot. Rebuild
 with Draft off to load a new pack. See
 [Cursor skills in Cloud Agents](docs/cursor-skills.md).
 
-A copy-paste third-party provider adapter lives in
-[`docs/providers/starter_example.rb`](docs/providers/starter_example.rb).
-The gem does not load it.
+The dummy `/config` page shows a copy-paste third-party provider adapter from
+`RecordingStudioAI::Providers::StarterExample`.
