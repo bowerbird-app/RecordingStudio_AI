@@ -5,6 +5,19 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-10-28
+
+### Changed
+- Ignore SimpleCov output (`coverage/`) instead of tracking HTML reports.
+- Remove leftover `docs/gem_template/` template documentation.
+- Remove the nested dummy workflow at `test/dummy/.github/workflows/ci.yml`.
+- Move the copy-paste provider adapter to `docs/providers/starter_example.rb`. The gem does not load it.
+- Split `AdminScreens::RecordingStudioAIWidgets` helpers by admin screen. Public constants and method names are unchanged.
+
+### Upgrade notes
+- Bump to `0.19.1`. No migration. No behavior change.
+- If a host required `recording_studio_ai/providers/starter_example`, load `docs/providers/starter_example.rb` from the repository instead.
+
 ## [0.19.0] - 2026-10-27
 
 ### Changed
@@ -1066,7 +1079,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.1...HEAD
+[0.19.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.17.1...v0.18.0
