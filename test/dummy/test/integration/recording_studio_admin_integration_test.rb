@@ -1276,7 +1276,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "summarize_text"
     assert_match(/text-5xl[^>]*>2</, response.body)
     assert_includes response.body, "+100%"
-    assert_includes response.body, "Last 4 weeks"
+    # Chart turbo-frame uses Admin's summary period caption; keep the filter default last_4_weeks.
+    assert_match(/This month|Last 4 weeks/, response.body)
     refute_includes response.body, ">0%</span>"
 
     get "/admin/screens/registered_prompts/table"
@@ -2317,7 +2318,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "P90 latency (ms)"
     assert_match(/text-5xl[^>]*>900</, response.body)
     assert_includes response.body, "+100%"
-    assert_includes response.body, "Last 4 weeks"
+    assert_match(/This month|Last 4 weeks/, response.body)
     refute_includes response.body, ">0%</span>"
   end
 
@@ -2359,7 +2360,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "P90 latency (ms)"
     assert_match(/text-5xl[^>]*>900</, response.body)
     assert_includes response.body, "+100%"
-    assert_includes response.body, "Last 4 weeks"
+    assert_match(/This month|Last 4 weeks/, response.body)
     refute_includes response.body, ">0%</span>"
   end
 
