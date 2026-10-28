@@ -105,5 +105,6 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_match(/not available/i, response.body)
+    assert_select "[role='alert']", text: /not available/i
   end
 end

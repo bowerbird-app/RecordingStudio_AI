@@ -51,9 +51,10 @@ Useful routes:
 - `/up` — Rails health check
 
 Authenticated host pages use `layouts/flat_pack_sidebar` (sidebar + top nav,
-theme `rounded` on `html` and `body`). Recording Studio Admin (`/admin`) uses
-its default engine layout, and the saved-reply controller calls
-`recording_studio_layout`. Both render `recording_studio/default_layout`.
+theme `rounded` on `html` and `body`). That shell renders Flatpack flash.
+Recording Studio Admin (`/admin`) uses its default engine layout, and the
+saved-reply controller calls `recording_studio_layout`. Both render
+`recording_studio/default_layout`.
 The layout loads Flatpack stylesheets before Tailwind. Dummy
 `app/views/recording_studio/_default_layout_head.html.erb` adds the host
 application stylesheet and importmap. The gem page-nav right slot is Access
