@@ -101,9 +101,12 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     private_workspace = Workspace.create!(name: "Private Switch Workspace")
     private_root = RecordingStudio.root_recording_for(private_workspace)
 
-    switch_to_root!(private_root, return_to: "/")
+    assert_no_difference -> { RecordingStudio::RootSwitchable::Selection.where(actor: user).count } do
+      switch_to_root!(private_root, return_to: "/")
+    end
 
     assert_response :unprocessable_entity
-    assert_match(/not available/i, response.body)
+    assert_includes response.body, "Nothing to switch"
+    refute_equal private_root, RecordingStudio::RootSwitchable::Selection.find_by(actor: user)&.root_recording
   end
 end
