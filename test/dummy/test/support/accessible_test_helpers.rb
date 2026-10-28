@@ -14,27 +14,23 @@ module AccessibleTestHelpers
     current_role = RecordingStudioAccessible.role_for(actor: actor, recording: recording)
     return if role_covers?(current_role, role)
 
-    if role.to_sym == :admin
-      bootstrap_result = RecordingStudioAccessible.bootstrap_owner_access!(
-        recording: recording,
-        actor: actor
-      )
-      return bootstrap_result if bootstrap_result.success?
+    requested = role.to_sym
+    if requested == :admin
+      bootstrap = RecordingStudioAccessible.bootstrap_owner_access!(recording: recording, actor: actor)
+      return bootstrap if bootstrap.success?
     end
 
-    previous = RecordingStudioAccessible.configuration.access_management_authorizer
-    RecordingStudioAccessible.configuration.access_management_authorizer = ->(**) { true }
+    manager = grantor_for(recording)
+    manager ||= bootstrap_grantor!(recording)
     result = RecordingStudioAccessible.grant_access(
       recording: recording,
       actor: actor,
       role: role,
-      manager_actor: actor
+      manager_actor: manager
     )
     raise result.error unless result.success?
 
     result
-  ensure
-    RecordingStudioAccessible.configuration.access_management_authorizer = previous if defined?(previous)
   end
 
   def switch_to_root!(root_recording, return_to: "/")
@@ -48,6 +44,30 @@ module AccessibleTestHelpers
   end
 
   private
+
+  def grantor_for(recording)
+    RecordingStudioAccessible.access_recordings_for(recording).filter_map do |access_recording|
+      grant = access_recording.recordable
+      next unless grant.respond_to?(:actor) && grant.respond_to?(:role)
+      next unless grant.role.to_s == "admin"
+
+      grant.actor
+    end.first
+  end
+
+  def bootstrap_grantor!(recording)
+    grantor = User.create!(
+      email: "grantor-#{SecureRandom.hex(4)}@example.com",
+      password: "Password123!"
+    )
+    bootstrap = RecordingStudioAccessible.bootstrap_owner_access!(recording: recording, actor: grantor)
+    return grantor if bootstrap.success?
+
+    existing = grantor_for(recording)
+    raise bootstrap.error unless existing
+
+    existing
+  end
 
   def role_covers?(current_role, required_role)
     return false if current_role.nil?

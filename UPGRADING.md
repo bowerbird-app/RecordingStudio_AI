@@ -2,7 +2,7 @@
 
 ## Upgrading to 0.19.1
 
-Dummy/dev sibling pins move to Flatpack tag `v0.1.329`, Root Switchable `v0.10.0`, Accessible `v0.21.0`, Cache `v0.5.1`, Metrics `v0.6.1`, and Trashable `v0.11.3`. Admin stays `v2.7.0`. Recording Studio stays `v6.1.0`. The dummy PageNav compat shim is gone. No migration.
+Dummy/dev sibling pins move to Flatpack tag `v0.1.329`, Root Switchable `v0.11.0`, Accessible `v0.21.0`, Cache `v0.5.1`, Metrics `v0.6.1`, and Trashable `v0.11.3`. Admin stays `v2.7.0`. Recording Studio stays `v6.1.0`. The dummy PageNav compat shim is gone. No migration.
 
 ### Upgrade steps
 
