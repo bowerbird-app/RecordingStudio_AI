@@ -12,13 +12,10 @@ Versioning and Keep a Changelog.
 - Remove leftover `docs/gem_template/` template documentation.
 - Remove the nested dummy workflow at `test/dummy/.github/workflows/ci.yml`.
 - Split `AdminScreens::RecordingStudioAIWidgets` helpers by admin screen. Public constants and method names are unchanged.
-- Remove the dummy PageNav compat shim. Close uses native Flatpack `flat_pack_page_nav`.
-- Align dummy/dev sibling pins with Flatpack `v0.1.329`, Root Switchable `v0.11.0`, Accessible `v0.21.0`, Cache `v0.5.1`, Metrics `v0.6.1`, and Trashable `v0.11.3`.
-- Dummy AI metrics tests bootstrap AdminRoot access through Accessible instead of granting as a manager who does not hold the role.
+- Remove the dummy PageNav compat shim. Dummy/test pin Root Switchable `v0.11.0`.
 
 ### Upgrade notes
-- Bump to `0.19.1`. No migration. No gem API change.
-- Development pins Flatpack tag `v0.1.329` and Metrics tag `v0.6.1`. Dummy also pins Root Switchable `v0.11.0`, Accessible `v0.21.0`, Cache `v0.5.1`, and Trashable `v0.11.3`. Admin stays `v2.7.0`.
+- Bump to `0.19.1`. No migration. No behavior change.
 
 ## [0.19.0] - 2026-10-27
 

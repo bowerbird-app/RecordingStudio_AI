@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# Accessible 0.21 still passes Card `style:`. Button `url:` and
-# `recording_studio_page_nav` stay for sibling screens. Admin 2.7 sets its own heading.
+# Leftover Card `style:` and Button `url:` stay mapped for sibling screens.
+# Admin 2.7 sets its own heading.
 module DummyFlatPackButtonUrl
   def initialize(url: nil, href: nil, **kwargs)
     super(href: href.presence || url, **kwargs)

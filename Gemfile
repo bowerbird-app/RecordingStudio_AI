@@ -11,14 +11,14 @@ gem "recording_studio",
     tag: "v6.1.0"
 gem "flat_pack",
     github: "bowerbird-app/flatpack",
-    tag: "v0.1.329"
+    ref: "1fcbafe94f8eb118f0a22182f63f5110fcc97a56"
 gem "view_component", "4.19.0"
 gem "recording_studio_logs",
     github: "bowerbird-app/RecordingStudio_logs",
     tag: "v0.5.0"
 gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
-    tag: "v0.6.1"
+    tag: "v0.5.0"
 
 gemspec
 

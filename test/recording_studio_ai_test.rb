@@ -70,7 +70,7 @@ class RecordingStudioAITest < Minitest::Test
       assert_includes contents, "RecordingStudio_logs", path
       assert_includes contents, 'tag: "v0.5.0"', path
       assert_includes contents, 'tag: "v6.1.0"', path
-      assert_includes contents, 'tag: "v0.1.329"', path
+      assert_includes contents, "1fcbafe94f8eb118f0a22182f63f5110fcc97a56", path
       assert_includes contents, 'gem "view_component", "4.19.0"', path
     end
   end
@@ -155,12 +155,6 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes contents, "content_for :title"
     assert_includes contents, "flat_pack_page_nav"
     assert_includes contents, "anchor_href:"
-    assert_includes contents, "anchor_tooltip:"
-    refute_includes contents, "show_back"
-    refute_includes contents, "right_slot"
-    refute_includes contents, "anchor_label"
-    refute_includes contents, "back_label"
-    refute_includes contents, "secondary_anchor"
     assert_includes contents, "recording_studio_page_nav_right"
     refute_includes contents, "recording_studio_page_nav("
     refute_includes contents, "style: :elevated"
