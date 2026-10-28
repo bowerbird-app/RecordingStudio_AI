@@ -107,6 +107,8 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_includes response.body, "Nothing to switch"
+    assert_match(/not available/i, response.body)
+    assert_select "[role='alert']", text: /not available/i
     refute_equal private_root, RecordingStudio::RootSwitchable::Selection.find_by(actor: user)&.root_recording
   end
 end

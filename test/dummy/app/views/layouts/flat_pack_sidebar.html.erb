@@ -35,6 +35,12 @@
 
       <% layout.main do %>
         <main class="min-h-0 overflow-y-auto p-6">
+          <% if flash[:notice].present? %>
+            <%= render FlatPack::Alert::Component.new(description: flash[:notice], style: :success) %>
+          <% end %>
+          <% if flash[:alert].present? %>
+            <%= render FlatPack::Alert::Component.new(description: flash[:alert], style: :danger) %>
+          <% end %>
           <%= yield %>
         </main>
       <% end %>
