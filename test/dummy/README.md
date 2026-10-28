@@ -51,7 +51,8 @@ Useful routes:
 - `/up` — Rails health check
 
 Authenticated host pages use `layouts/flat_pack_sidebar` (sidebar + top nav,
-theme `rounded` on `html` and `body`). Recording Studio Admin (`/admin`) uses
+theme `rounded` on `html` and `body`). That shell renders Flatpack flash so
+Root Switchable `v0.11.0` rejection copy stays visible on the switch page. Recording Studio Admin (`/admin`) uses
 its default engine layout, and the saved-reply controller calls
 `recording_studio_layout`. Both render `recording_studio/default_layout`.
 The layout loads Flatpack stylesheets before Tailwind. Dummy

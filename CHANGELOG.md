@@ -14,6 +14,7 @@ Versioning and Keep a Changelog.
 - Split `AdminScreens::RecordingStudioAIWidgets` helpers by admin screen. Public constants and method names are unchanged.
 - Remove the dummy PageNav compat shim. Close uses native Flatpack `flat_pack_page_nav`.
 - Align dummy/dev sibling pins with Flatpack `v0.1.329`, Root Switchable `v0.11.0`, Accessible `v0.21.0`, Cache `v0.5.1`, Metrics `v0.6.1`, and Trashable `v0.11.3`.
+- Dummy AI metrics tests bootstrap AdminRoot access through Accessible instead of granting as a manager who does not hold the role.
 
 ### Upgrade notes
 - Bump to `0.19.1`. No migration. No gem API change.

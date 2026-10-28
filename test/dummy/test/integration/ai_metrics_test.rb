@@ -3,10 +3,13 @@
 require "test_helper"
 
 class AIMetricsTest < ActiveSupport::TestCase
+  include AccessibleTestHelpers
+
   GrantContext = Struct.new(:access_grant)
   Grant = Struct.new(:actor)
 
   setup do
+    @original_resolver = RecordingStudioAdmin.configuration.access_recording_resolver
     @staff = User.create!(
       email: "metrics-staff-#{SecureRandom.hex(4)}@example.com",
       password: "Password",
@@ -22,16 +25,17 @@ class AIMetricsTest < ActiveSupport::TestCase
     @root = RecordingStudio.root_recording_for(@workspace)
     @admin_root = RecordingStudio.root_recording_for(Workspace.find_or_create_by!(name: "Admin"))
     AdminRoot.find_or_create_by!(name: "Admin")
-    grant!(@admin_root, @staff, :admin)
+    grant_accessible!(recording: @admin_root, actor: @staff, role: :admin)
     bootstrap_owner!(@root, @staff)
-    @original_resolver = RecordingStudioAdmin.configuration.access_recording_resolver
     RecordingStudioAdmin.configuration.access_recording_resolver = ->(_context) { @admin_root }
     seed_runs!
     Current.actor = nil
   end
 
   teardown do
-    RecordingStudioAdmin.configuration.access_recording_resolver = @original_resolver
+    if instance_variable_defined?(:@original_resolver)
+      RecordingStudioAdmin.configuration.access_recording_resolver = @original_resolver
+    end
     Current.actor = nil
   end
 
@@ -426,21 +430,5 @@ class AIMetricsTest < ActiveSupport::TestCase
     context.define_singleton_method(:api_key) { :operations }
     context.define_singleton_method(:params) { params }
     context
-  end
-
-  def grant!(recording, actor, role)
-    return if RecordingStudioAccessible.authorized?(actor: actor, recording: recording, role: role)
-
-    original = RecordingStudioAccessible.configuration.access_management_authorizer
-    RecordingStudioAccessible.configuration.access_management_authorizer = ->(**) { true }
-    result = RecordingStudioAccessible.grant_access(
-      recording: recording,
-      actor: actor,
-      role: role,
-      manager_actor: @staff
-    )
-    raise result.error if result.failure?
-  ensure
-    RecordingStudioAccessible.configuration.access_management_authorizer = original
   end
 end
