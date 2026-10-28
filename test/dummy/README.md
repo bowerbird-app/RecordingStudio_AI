@@ -60,7 +60,7 @@ application stylesheet and importmap. The gem page-nav right slot is Access
 only. No Sign out, Root Switchable, or admin/root dropdown. Devise sign-in
 keeps `layouts/application`. Admin `v2.7.0` sets `content_for :title` and close through
 `flat_pack_page_nav`, so the default layout renders one heading. The dummy
-still maps leftover Card `style:`, PageNav `anchor_label:`, and Button `url:`
-from Root Switchable `0.9.0`. The dummy has no `admin_audit_logs` table, so
+still maps leftover Card `style:` and Button `url:`. Root Switchable is
+`v0.11.0`. The dummy has no `admin_audit_logs` table, so
 Admin 2.6's `root_recording_id` migration is not installed. Admin and the
 saved-reply page discard leftover Devise sign-in notices.
