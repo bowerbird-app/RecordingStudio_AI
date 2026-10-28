@@ -11,13 +11,10 @@ Versioning and Keep a Changelog.
 - Ignore SimpleCov output (`coverage/`) instead of tracking HTML reports.
 - Remove leftover `docs/gem_template/` template documentation.
 - Remove the nested dummy workflow at `test/dummy/.github/workflows/ci.yml`.
-- Move the copy-paste provider adapter to `docs/providers/starter_example.rb`. The gem does not load it.
 - Split `AdminScreens::RecordingStudioAIWidgets` helpers by admin screen. Public constants and method names are unchanged.
-- Dummy admin chart tests accept Admin's summary period caption (`This month` or `Last 4 weeks`) on the chart turbo-frame. Filter defaults stay `last_4_weeks`.
 
 ### Upgrade notes
 - Bump to `0.19.1`. No migration. No behavior change.
-- If a host required `recording_studio_ai/providers/starter_example`, load `docs/providers/starter_example.rb` from the repository instead.
 
 ## [0.19.0] - 2026-10-27
 

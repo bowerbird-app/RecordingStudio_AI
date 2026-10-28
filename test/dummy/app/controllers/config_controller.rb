@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require File.expand_path("../../../../docs/providers/starter_example", __dir__)
-
 class ConfigController < ApplicationController
   CONFIG_OPTIONS = [
     {

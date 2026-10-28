@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-# Documentation example only. The gem does not load this file.
-
 module RecordingStudioAI
   module Providers
     module StarterExample

@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "test_helper"
-require File.expand_path("../docs/providers/starter_example", __dir__)
 
 class ProviderRegistrationTest < RecordingStudioAI::Test::IsolatedCase
   class ProbeProvider < RecordingStudioAI::Providers::Base
