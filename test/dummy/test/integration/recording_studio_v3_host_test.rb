@@ -4,11 +4,11 @@ require "test_helper"
 
 class RecordingStudioV3HostTest < ActiveSupport::TestCase
   test "dummy app loads root switchable config and host sidebar layout" do
-    assert_equal "0.9.0", RecordingStudioRootSwitchable::VERSION
-    assert_equal "0.18.0", RecordingStudioAccessible::VERSION
+    assert_equal "0.11.0", RecordingStudioRootSwitchable::VERSION
+    assert_equal "0.21.0", RecordingStudioAccessible::VERSION
     assert_equal "2.7.0", RecordingStudioAdmin::VERSION
     assert_equal [ "all_workspaces" ], RecordingStudioRootSwitchable.configuration.scopes.keys
-    assert_equal :application_layout, RecordingStudioRootSwitchable.configuration.layout
+    assert_equal "flat_pack_sidebar", RecordingStudioRootSwitchable.configuration.layout
     assert_includes ApplicationController.ancestors, RecordingStudio::RootSwitchable::ControllerSupport
     assert_nil ApplicationController.send(:recording_studio_layout_block)
     retained = RecordingStudioAI::RetainedResponsesController.new
