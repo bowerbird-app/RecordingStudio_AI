@@ -155,9 +155,22 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes contents, "content_for :title"
     assert_includes contents, "flat_pack_page_nav"
     assert_includes contents, "anchor_href:"
+    assert_includes contents, "anchor_tooltip:"
+    refute_includes contents, "show_back"
+    refute_includes contents, "right_slot"
+    refute_includes contents, "anchor_label"
+    refute_includes contents, "back_label"
+    refute_includes contents, "secondary_anchor"
     assert_includes contents, "recording_studio_page_nav_right"
     refute_includes contents, "recording_studio_page_nav("
     refute_includes contents, "style: :elevated"
+
+    dummy_shim = File.read(File.expand_path("../test/dummy/config/initializers/flat_pack_page_nav_anchor_url.rb", __dir__))
+    refute_includes dummy_shim, "DummyFlatPackPageNavLegacy"
+    refute_includes dummy_shim, "FlatPack::PageNav::Component"
+    assert_includes dummy_shim, "DummyFlatPackButtonUrl"
+    assert_includes dummy_shim, "DummyFlatPackCardStyle"
+    assert_includes dummy_shim, "DummyRecordingStudioPageNav"
 
     widgets = File.read(File.expand_path("../lib/recording_studio_ai/admin/recording_studio_ai_widgets.rb", __dir__))
     assert_includes widgets, "FlatPack::Modal::Component"
