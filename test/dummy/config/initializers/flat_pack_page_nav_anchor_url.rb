@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# Root Switchable 0.9 still passes keywords Flatpack 0.1.319 removed.
-# Translate them in the dummy so that screen keeps rendering. Admin 2.7 sets its own heading.
+# Accessible 0.21 still passes Card `style:`. Button `url:` and
+# `recording_studio_page_nav` stay for sibling screens. Admin 2.7 sets its own heading.
 module DummyFlatPackButtonUrl
   def initialize(url: nil, href: nil, **kwargs)
     super(href: href.presence || url, **kwargs)

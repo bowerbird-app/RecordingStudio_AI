@@ -18,19 +18,19 @@ GIT
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_metrics.git
-  revision: b3ff62dbee7e4e1107e3e41cdae7b2481893ca51
-  tag: v0.5.0
+  revision: 05e78289bbe3d9a90507c4cb4d7ba990edc57227
+  tag: v0.6.1
   specs:
-    recording_studio_metrics (0.5.0)
+    recording_studio_metrics (0.6.1)
       rails (~> 8.1.0)
       recording_studio (>= 6.1.0)
 
 GIT
   remote: https://github.com/bowerbird-app/flatpack.git
-  revision: 1fcbafe94f8eb118f0a22182f63f5110fcc97a56
-  ref: 1fcbafe94f8eb118f0a22182f63f5110fcc97a56
+  revision: 3e49ad38b1980add449194d27265edaa7b892c0d
+  tag: v0.1.329
   specs:
-    flat_pack (0.1.319)
+    flat_pack (0.1.329)
       pagy (~> 9.0)
       rails (>= 7.1, < 9)
       tailwind_merge (~> 0.13)
@@ -362,7 +362,7 @@ CHECKSUMS
   drb (2.2.3) sha256=0b00d6fdb50995fe4a45dea13663493c841112e4068656854646f418fda13373
   erb (6.0.7) sha256=c5ca6dc25b0ef974a44dc8f59fe847577122483b1968a38dec305c60bf91ee92
   erubi (1.13.1) sha256=a082103b0885dbc5ecf1172fede897f9ebdb745a4b97a5e8dc63953db1ee4ad9
-  flat_pack (0.1.319)
+  flat_pack (0.1.329)
   globalid (1.4.0) sha256=037f12fbf1d9d7a014d501c2d5c77356fd4ddd96d7a7991d6700bba96706f427
   hana (1.3.7) sha256=5425db42d651fea08859811c29d20446f16af196308162894db208cac5ce9b0d
   i18n (1.15.2) sha256=00f9eb62412fe593b2a65a97daa75300d37abb8f7202ec748e94b6d46a9dd1b5
@@ -409,7 +409,7 @@ CHECKSUMS
   recording_studio (6.1.0)
   recording_studio_ai (0.19.1)
   recording_studio_logs (0.5.0)
-  recording_studio_metrics (0.5.0)
+  recording_studio_metrics (0.6.1)
   regexp_parser (2.12.0) sha256=35a916a1d63190ab5c9009457136ae5f3c0c7512d60291d0d1378ba18ce08ebb
   reline (0.7.0) sha256=5b012d8e55dbf9d450f12bde2cf7d15ff546ae80b3f8f3b30e570d431815583d
   rubocop (1.81.7) sha256=6fb5cc298c731691e2a414fe0041a13eb1beed7bab23aec131da1bcc527af094

@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.19.1
+
+Dummy/dev sibling pins move to Flatpack tag `v0.1.329`, Root Switchable `v0.10.0`, Accessible `v0.21.0`, Cache `v0.5.1`, Metrics `v0.6.1`, and Trashable `v0.11.3`. Admin stays `v2.7.0`. Recording Studio stays `v6.1.0`. The dummy PageNav compat shim is gone. No migration.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.19.1`.
+2. Pin Flatpack to GitHub tag `v0.1.329` if the host still used commit `1fcbafe94f8eb118f0a22182f63f5110fcc97a56`.
+3. Pin Metrics to tag `v0.6.1` in development. The runtime range stays `>= 0.3.0, < 1.0`.
+
 ## Upgrading to 0.19.0
 
 Adopts Recording Studio 6.1 layouts and Flatpack 0.1.319. The dummy pins Admin `v2.7.0`. No migration in this gem.
