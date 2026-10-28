@@ -6,8 +6,7 @@ The dummy PageNav compat shim is gone. Dummy and test pin Root Switchable `v0.11
 
 ### Upgrade steps
 
-1. Install RecordingStudioAI `0.19.1`.
-2. Dummy/test: pin Root Switchable to tag `v0.11.0` if the dummy still used `v0.9.0`.
+No host action.
 
 ## Upgrading to 0.19.0
 
