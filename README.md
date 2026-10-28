@@ -3,16 +3,19 @@
 `recording_studio_ai` is an isolated Rails engine for adding AI capabilities to
 [Recording Studio](https://github.com/bowerbird-app/RecordingStudio).
 
-This repository contains the complete V1 addon through Phase 14 acceptance hardening.
-It exposes provider-independent public contracts, capability-aware profiles,
-OpenAI and Gemini generation, streaming and provider batches, authorization,
-six execution infrastructure tables, and a read-only FlatPack admin surface.
+This engine adds AI capabilities to Recording Studio: provider-independent
+public contracts, capability-aware profiles, OpenAI and Gemini generation,
+streaming and provider batches, authorization, six execution infrastructure
+tables, and a read-only FlatPack admin surface.
 
 ## Requirements
 
 - Ruby 3.3 or newer
 - Rails 8.1
-- Recording Studio `>= 6.1.0`
+- Recording Studio `>= 6.1.0` (development pin tag `v6.1.0`)
+- Recording Studio Logs `>= 0.4.1, < 1.0` (development pin tag `v0.5.0`)
+- Recording Studio Metrics `>= 0.3.0, < 1.0` (development pin tag `v0.5.0`)
+- Flatpack `>= 0.1.315` (development pin commit `1fcbafe94f8eb118f0a22182f63f5110fcc97a56`)
 
 The OpenAI provider uses the official `openai` Ruby SDK (`~> 0.103`, which includes
 the Agents API). Gemini uses its REST API
@@ -67,7 +70,7 @@ Staff with AdminRoot `:view` (`RecordingStudioAI::Api::Access.can_view?`) can re
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/fallback_retry_rate`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_batches/by_status`
 
-Failure and stuck-run metrics (Recording Studio Metrics `>= 0.3.0, < 0.6`, tag `v0.5.0`):
+Failure and stuck-run metrics (Recording Studio Metrics `>= 0.3.0, < 1.0`, development pin tag `v0.5.0`):
 
 | Metric | Type / unit | Definition | `group_by` |
 | --- | --- | --- | --- |
@@ -1040,5 +1043,5 @@ always runs last. `.cursor/start.sh` starts PostgreSQL on each boot. Rebuild
 with Draft off to load a new pack. See
 [Cursor skills in Cloud Agents](docs/cursor-skills.md).
 
-The original template documentation remains under `docs/gem_template/` as
-architectural reference only.
+The dummy `/config` page shows a copy-paste third-party provider adapter from
+`RecordingStudioAI::Providers::StarterExample`.

@@ -4,7 +4,7 @@
 
 - This repository is the Recording Studio AI Rails engine addon.
 - Preserve engine namespace isolation under `RecordingStudioAI`.
-- Treat `docs/gem_template/` as architectural reference material. For current addon workflow, prefer the top-level README and the dummy app.
+- For current addon workflow, prefer the top-level README and the dummy app.
 - Keep changes small and scoped. Do not rewrite addon surfaces unless the request requires it.
 
 ## UI Conventions

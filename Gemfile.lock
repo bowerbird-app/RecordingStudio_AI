@@ -39,7 +39,7 @@ GIT
 PATH
   remote: .
   specs:
-    recording_studio_ai (0.19.0)
+    recording_studio_ai (0.19.1)
       csv (>= 3.2)
       flat_pack (>= 0.1.315)
       json_schemer (~> 2.4)
@@ -407,7 +407,7 @@ CHECKSUMS
   rbs (4.2.0) sha256=51f7b886dcc05bc09e10b901daa6a81829f6adc03101d6ca9ea4aac6103e0674
   rdoc (8.1.0) sha256=befc37880a5cfd36dcb176c748b5fd5ee39dd3536a75e81824e4972ce230f60a
   recording_studio (6.1.0)
-  recording_studio_ai (0.19.0)
+  recording_studio_ai (0.19.1)
   recording_studio_logs (0.5.0)
   recording_studio_metrics (0.5.0)
   regexp_parser (2.12.0) sha256=35a916a1d63190ab5c9009457136ae5f3c0c7512d60291d0d1378ba18ce08ebb

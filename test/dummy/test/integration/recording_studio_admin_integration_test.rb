@@ -1231,6 +1231,8 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
   end
 
   test "registered prompts screen shows chart and table metrics" do
+    # On the 28th of a 31-day month, last_4_weeks is also this month (Admin labels "This month").
+    travel_to Time.utc(2026, 10, 15, 12) do
     authenticate_for_admin!
     create_run!(
       status: "completed",
@@ -1310,6 +1312,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "th", text: /\APrompt Key/
+    end
   end
 
   test "registered prompts screen includes unused registered prompts" do
@@ -2281,6 +2284,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
   end
 
   test "latency by model shows grouped P90 latency" do
+    travel_to Time.utc(2026, 10, 15, 12) do
     authenticate_for_admin!
 
     [100, 200, 300, 400, 500, 600, 700, 800, 900, 10_000].each do |latency_ms|
@@ -2319,9 +2323,11 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "+100%"
     assert_includes response.body, "Last 4 weeks"
     refute_includes response.body, ">0%</span>"
+    end
   end
 
   test "latency by prompt shows grouped P90 latency" do
+    travel_to Time.utc(2026, 10, 15, 12) do
     authenticate_for_admin!
 
     [100, 200, 300, 400, 500, 600, 700, 800, 900, 10_000].each do |latency_ms|
@@ -2361,6 +2367,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "+100%"
     assert_includes response.body, "Last 4 weeks"
     refute_includes response.body, ">0%</span>"
+    end
   end
 
   test "latency by model mini chart follows the selected date range into ai calls" do
