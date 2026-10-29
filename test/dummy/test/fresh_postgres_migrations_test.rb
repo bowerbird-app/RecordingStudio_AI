@@ -69,6 +69,38 @@ class FreshPostgresMigrationsTest < ActiveSupport::TestCase
     end
   end
 
+  test "apply_migrations_after runs later copies through apply_migration_file" do
+    require Rails.root.join("test/support/fresh_postgres_migration_guard.rb").to_s
+
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, "20261029100000_guard_after_skipped.rb"), <<~RUBY)
+        class GuardAfterSkipped < ActiveRecord::Migration[8.1]
+          cattr_accessor :applied
+          def change
+            self.class.applied = true
+          end
+        end
+      RUBY
+      File.write(File.join(dir, "20261029183000_guard_after_probe.recording_studio_ai.rb"), <<~RUBY)
+        class GuardAfterProbe < ActiveRecord::Migration[8.1]
+          cattr_accessor :applied
+          def change
+            self.class.applied = true
+          end
+        end
+      RUBY
+
+      FreshPostgresMigrationGuard.apply_migrations_after(
+        20261029100000,
+        migrations_directory: dir,
+        record_version: false
+      )
+
+      assert GuardAfterProbe.applied
+      refute_operator Object, :const_defined?, :GuardAfterSkipped
+    end
+  end
+
   private
 
   def postgres_available?

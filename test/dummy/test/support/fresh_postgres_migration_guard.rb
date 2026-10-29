@@ -63,11 +63,11 @@ module FreshPostgresMigrationGuard
     end
   end
 
-  def apply_migrations_after(version)
-    Dir[Rails.root.join("db/migrate/*.rb").to_s].sort.each do |file|
+  def apply_migrations_after(version, migrations_directory: Rails.root.join("db/migrate"), record_version: true)
+    Dir[File.join(migrations_directory, "*.rb")].sort.each do |file|
       next if migration_version(file).to_i <= version
 
-      apply_migration_file(file)
+      apply_migration_file(file, record_version: record_version)
     end
   end
 

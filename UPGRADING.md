@@ -10,7 +10,7 @@ Install RecordingStudioAI `0.19.3`. No new migration is added. Hosts that alread
 
 Run `bin/rails db:migrate:status` first. Delete only copies that show as `down`.
 
-Host copies use a new timestamp and a `.recording_studio_ai.rb` suffix. Also check `db/migrate/*_<name>*.rb` for a copy that was renamed or hand-copied without that suffix:
+Host copies use a new timestamp and a `.recording_studio_ai.rb` suffix. Also check `db/migrate/*_<name>*.rb` for a copy that was renamed or hand-copied without that suffix. That glob can also match a host migration whose name extends ours (for example `remove_cost_columns_from_recording_studio_ai_batches`). Confirm each match is our migration before deleting it. Check the class name and the file contents.
 
 ```bash
 ls db/migrate/*_remove_legacy_recording_studio_ai_persistence_columns.recording_studio_ai.rb
