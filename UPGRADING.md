@@ -6,9 +6,20 @@ Fresh installs can migrate. `RemoveLegacyRecordingStudioAIPersistenceColumns` an
 
 ### Upgrade steps
 
-Install RecordingStudioAI `0.19.3`. No new migration is added.
+Install RecordingStudioAI `0.19.3`. No new migration is added. Hosts that already migrated are unaffected.
 
-If `db:migrate` already failed on `remove_legacy_recording_studio_ai_persistence_columns` or `remove_cost_columns_from_recording_studio_ai`, delete the copied migration from the host `db/migrate`, run `bin/rails recording_studio_ai:install:migrations`, then `bin/rails db:migrate`.
+If `db:migrate` stopped on `20260813120000`, the installer has already copied the old `20260814130000` file as well. Delete both of these from the host `db/migrate`:
+
+- `20260813120000_remove_legacy_recording_studio_ai_persistence_columns.rb`
+- `20260814130000_remove_cost_columns_from_recording_studio_ai.rb`
+
+Then run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`.
+
+### Rollback
+
+`RemoveLegacyRecordingStudioAIPersistenceColumns` `down` adds the legacy columns back when they are missing. It does not recreate indexes that were on those columns.
+
+`RemoveCostColumnsFromRecordingStudioAI` (`20260814130000`) uses `change` and `remove_column` without a type. Rolling it back raises `ActiveRecord::IrreversibleMigration` when a cost column is still present. A rollback does not put those columns back.
 
 ## Upgrading to 0.19.2
 

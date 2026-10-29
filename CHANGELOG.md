@@ -13,7 +13,9 @@ Versioning and Keep a Changelog.
 
 ### Upgrade notes
 - Bump to `0.19.3`. Hosts that already migrated are unaffected. Recorded migrations do not run again.
-- If a new install stopped on `remove_legacy_recording_studio_ai_persistence_columns` or `remove_cost_columns_from_recording_studio_ai`, delete that copied file, run `bin/rails recording_studio_ai:install:migrations`, then `bin/rails db:migrate`.
+- If a new install stopped on `20260813120000`, delete both copied files from the host `db/migrate`: `20260813120000_remove_legacy_recording_studio_ai_persistence_columns.rb` and `20260814130000_remove_cost_columns_from_recording_studio_ai.rb`. Then run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`.
+- Rolling back `20260813120000` adds the legacy columns again and does not recreate their indexes.
+- Rolling back `20260814130000` raises `ActiveRecord::IrreversibleMigration` when a cost column is still present. It does not restore those columns.
 
 ## [0.19.2] - 2026-10-29
 

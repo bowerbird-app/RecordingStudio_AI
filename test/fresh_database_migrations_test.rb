@@ -2,6 +2,13 @@
 
 require "test_helper"
 
+# SQLite rebuilds a table by copying column definitions. Dropping a name that
+# is not in that list does nothing, so a fresh SQLite run still passes if the
+# migrations drop columns that were never created. These examples check the
+# resulting shape, column removal when the columns are present, and rollback
+# limits. They do not prove a fresh PostgreSQL install. That guard is
+# FreshPostgresMigrationsTest in the dummy app. CI runs it against Postgres.
+# `rake test:fresh_migrate` applies the same empty-database chain.
 class FreshDatabaseMigrationsTest < Minitest::Test
   include RecordingStudioAI::Test::Persistence
 
@@ -18,7 +25,7 @@ class FreshDatabaseMigrationsTest < Minitest::Test
     disconnect_sqlite!
   end
 
-  def test_every_shipped_migration_applies_on_an_empty_database
+  def test_every_shipped_migration_applies_on_an_empty_sqlite_database
     apply(migrations)
 
     assert column_exists?(:recording_studio_ai_runs, :prompt_key)
@@ -46,20 +53,33 @@ class FreshDatabaseMigrationsTest < Minitest::Test
     assert_cost_columns_absent
   end
 
-  def test_legacy_migration_down_restores_missing_columns_once
-    apply(migrations)
+  def test_legacy_migration_down_restores_missing_columns_without_indexes
+    apply(migrations_before(LEGACY_MIGRATION))
+    install_legacy_columns
+    add_index :recording_studio_ai_runs, :input_digest, name: "idx_rsai_runs_input_digest"
+    apply([[LEGACY_MIGRATION, migration_class(LEGACY_MIGRATION)]])
+    refute index_exists?(:recording_studio_ai_runs, name: "idx_rsai_runs_input_digest")
+
     migration = migration_class(LEGACY_MIGRATION)
-
     ActiveRecord::Migration.suppress_messages { migration.migrate(:down) }
 
     assert_legacy_columns_present
+    refute index_exists?(:recording_studio_ai_runs, name: "idx_rsai_runs_input_digest")
     ActiveRecord::Migration.suppress_messages { migration.migrate(:down) }
     assert_legacy_columns_present
+    refute index_exists?(:recording_studio_ai_runs, name: "idx_rsai_runs_input_digest")
+  end
 
-    ActiveRecord::Migration.suppress_messages { migration.migrate(:up) }
-    assert_legacy_columns_absent
-    ActiveRecord::Migration.suppress_messages { migration.migrate(:up) }
-    assert_legacy_columns_absent
+  def test_cost_migration_down_raises_when_a_cost_column_is_still_present
+    apply(migrations_before(COST_MIGRATION))
+    add_column :recording_studio_ai_runs, :cost_amount_microunits, :bigint
+
+    error = assert_raises(ActiveRecord::IrreversibleMigration) do
+      ActiveRecord::Migration.suppress_messages { RemoveCostColumnsFromRecordingStudioAI.migrate(:down) }
+    end
+
+    assert_match(/remove_column is only reversible if given a type/, error.message)
+    assert column_exists?(:recording_studio_ai_runs, :cost_amount_microunits)
   end
 
   def test_cost_columns_are_removed_when_present
