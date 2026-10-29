@@ -25,6 +25,31 @@ class FreshPostgresMigrationsTest < ActiveSupport::TestCase
     run_scenario("legacy")
   end
 
+  test "host copies with the recording_studio_ai suffix use the migration name" do
+    require Rails.root.join("test/support/fresh_postgres_migration_guard.rb").to_s
+    %w[
+      20260813120000_remove_legacy_recording_studio_ai_persistence_columns.rb
+      20260814130000_remove_cost_columns_from_recording_studio_ai.rb
+    ].each { |file| load RecordingStudioAI::Engine.root.join("db/migrate", file).to_s }
+
+    {
+      "remove_legacy_recording_studio_ai_persistence_columns" =>
+        "RemoveLegacyRecordingStudioAIPersistenceColumns",
+      "remove_cost_columns_from_recording_studio_ai" =>
+        "RemoveCostColumnsFromRecordingStudioAI"
+    }.each do |migration_name, class_name|
+      plain = "db/migrate/20260813120000_#{migration_name}.rb"
+      copied = "db/migrate/20261029183000_#{migration_name}.recording_studio_ai.rb"
+
+      assert_equal migration_name, FreshPostgresMigrationGuard.migration_name(plain)
+      assert_equal migration_name, FreshPostgresMigrationGuard.migration_name(copied)
+      assert_equal class_name, FreshPostgresMigrationGuard.migration_name(copied).camelize
+      assert_equal FreshPostgresMigrationGuard.migration_class(plain),
+                   FreshPostgresMigrationGuard.migration_class(copied)
+      assert_equal class_name, FreshPostgresMigrationGuard.migration_class(copied).name
+    end
+  end
+
   private
 
   def postgres_available?

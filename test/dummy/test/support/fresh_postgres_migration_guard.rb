@@ -6,6 +6,21 @@
 
 require_relative "../../config/environment"
 
+# Host copies from `install:migrations` are `<timestamp>_<name>.recording_studio_ai.rb`.
+# The migration name is the middle part. The scope suffix is not part of the class.
+module FreshPostgresMigrationGuard
+  def self.migration_name(filename)
+    _version, name, _scope = File.basename(filename).scan(ActiveRecord::Migration::MigrationFilenameRegexp).first
+    raise ArgumentError, "unrecognized migration filename #{filename}" if name.nil? || name.empty?
+
+    name
+  end
+
+  def self.migration_class(filename)
+    migration_name(filename).camelize.constantize
+  end
+end
+
 GUARD_DATABASE = "recording_studio_ai_migration_guard"
 LEGACY_STOP = 20260812150000
 
@@ -53,7 +68,7 @@ def apply_migrations_after(version)
     next if file_version.to_i <= version
 
     load file
-    klass = File.basename(file, ".rb").sub(/\A\d+_/, "").camelize.constantize
+    klass = FreshPostgresMigrationGuard.migration_class(file)
     ActiveRecord::Migration.suppress_messages { klass.migrate(:up) }
     ActiveRecord::Base.connection.execute(
       "INSERT INTO schema_migrations (version) VALUES (#{ActiveRecord::Base.connection.quote(file_version)})"
@@ -107,25 +122,27 @@ def assert_legacy_indexes_gone!(connection)
   end
 end
 
-scenario = ARGV.fetch(0)
-unless ActiveRecord::Base.connection.adapter_name.match?(/PostgreSQL/i)
-  abort "Postgres is not available"
-end
-
-with_guard_database do |connection|
-  case scenario
-  when "fresh"
-    migrate_to(nil)
-    assert_shape!(connection)
-  when "legacy"
-    migrate_to(LEGACY_STOP)
-    install_legacy_columns(connection)
-    apply_migrations_after(LEGACY_STOP)
-    assert_shape!(connection)
-    assert_legacy_indexes_gone!(connection)
-  else
-    abort "unknown scenario #{scenario}"
+if $PROGRAM_NAME == __FILE__
+  scenario = ARGV.fetch(0)
+  unless ActiveRecord::Base.connection.adapter_name.match?(/PostgreSQL/i)
+    abort "Postgres is not available"
   end
-end
 
-puts "ok #{scenario}"
+  with_guard_database do |connection|
+    case scenario
+    when "fresh"
+      migrate_to(nil)
+      assert_shape!(connection)
+    when "legacy"
+      migrate_to(LEGACY_STOP)
+      install_legacy_columns(connection)
+      apply_migrations_after(LEGACY_STOP)
+      assert_shape!(connection)
+      assert_legacy_indexes_gone!(connection)
+    else
+      abort "unknown scenario #{scenario}"
+    end
+  end
+
+  puts "ok #{scenario}"
+end
