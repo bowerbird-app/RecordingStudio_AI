@@ -5,6 +5,16 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.19.3] - 2026-10-29
+
+### Fixed
+- `RemoveLegacyRecordingStudioAIPersistenceColumns` drops `initiator_snapshot` and the other legacy columns, and any index on those columns, only when they are present. A fresh database can run `recording_studio_ai:install:migrations` and `db:migrate`.
+- `RemoveCostColumnsFromRecordingStudioAI` skips cost columns that this gem's create migration never adds. A fresh database was failing there next.
+
+### Upgrade notes
+- Bump to `0.19.3`. Hosts that already migrated are unaffected. Recorded migrations do not run again.
+- If a new install stopped on `remove_legacy_recording_studio_ai_persistence_columns` or `remove_cost_columns_from_recording_studio_ai`, delete that copied file, run `bin/rails recording_studio_ai:install:migrations`, then `bin/rails db:migrate`.
+
 ## [0.19.2] - 2026-10-29
 
 ### Changed
@@ -1090,7 +1100,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.2...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.3...HEAD
+[0.19.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.18.1...v0.19.0

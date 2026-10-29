@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.19.3
+
+Fresh installs can migrate. `RemoveLegacyRecordingStudioAIPersistenceColumns` and `RemoveCostColumnsFromRecordingStudioAI` drop legacy columns only when those columns exist, and the legacy migration drops an index on those columns only when the index exists. Hosts that already migrated are unaffected.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.19.3`. No new migration is added.
+
+If `db:migrate` already failed on `remove_legacy_recording_studio_ai_persistence_columns` or `remove_cost_columns_from_recording_studio_ai`, delete the copied migration from the host `db/migrate`, run `bin/rails recording_studio_ai:install:migrations`, then `bin/rails db:migrate`.
+
 ## Upgrading to 0.19.2
 
 Admin prompt and tool definition modals use Flatpack cards for each labeled
