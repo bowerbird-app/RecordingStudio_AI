@@ -367,6 +367,7 @@ Call, attempt, tool-call, and saved-reply lists stay on the current Admin
 root and fail closed without one. Provider batches is the exception. That
 list is site-wide, like `ai_batches.by_status`, and can filter by model.
 Expires uses Flatpack Timestamp (time ago, exact time in the tooltip).
+Prompt and tool definition modals use a Flatpack card per labeled field.
 
 Every widget on the AI section is site-wide too, including calls, tools,
 latency, spend, failed runs, stuck, tokens, retry or fallback, and batches.
