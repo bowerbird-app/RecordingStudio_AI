@@ -281,18 +281,8 @@ module AdminScreens
 
     def definition_modal(modal_id:, title:, trigger_text:, aria_label:, fields:, trailing: nil)
       helpers = ActionController::Base.helpers
-      body = helpers.content_tag(:div, class: "grid gap-4 text-sm") do
-        labeled = fields.map do |label, value|
-          helpers.content_tag(:div) do
-            helpers.safe_join([
-                                helpers.content_tag(:dt, label,
-                                                    class: "text-sm text-[var(--surface-muted-content-color)]"),
-                                helpers.content_tag(:dd, value)
-                              ])
-          end
-        end
-        helpers.safe_join([*labeled, trailing].compact)
-      end
+      labeled = fields.map { |label, value| definition_field_card(label:, value:) }
+      body = helpers.safe_join([*labeled, trailing].compact)
       trigger = render_flatpack(
         FlatPack::Link::Component.new(
           href: "#",
@@ -306,6 +296,21 @@ module AdminScreens
         component.body { body }
       end
       helpers.safe_join([trigger, modal])
+    end
+
+    def definition_field_card(label:, value:)
+      render_flatpack(
+        FlatPack::Card::Component.new(
+          background: :default,
+          border: :none,
+          shadow: :none,
+          hover: :none,
+          padding: :md
+        )
+      ) do |card|
+        card.header(divider: false) { label }
+        card.body { value }
+      end
     end
 
     def render_flatpack(component, &)

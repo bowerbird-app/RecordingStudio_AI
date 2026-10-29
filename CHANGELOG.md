@@ -5,6 +5,18 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-10-29
+
+### Changed
+- Admin prompt and tool definition modals render each labeled field with
+  `FlatPack::Card::Component` (`background: :default`, `border: :none`,
+  `shadow: :none`, `hover: :none`, `padding: :md`) instead of a hand-written
+  Tailwind `dt`/`dd` grid. Labels, values, and order are unchanged.
+
+### Upgrade notes
+- Bump to `0.19.2`. No migration. Staff see Flatpack cards in definition
+  modals; hosts do not change config.
+
 ## [0.19.1] - 2026-10-28
 
 ### Changed
@@ -1078,7 +1090,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.2...HEAD
+[0.19.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.18.0...v0.18.1

@@ -1301,6 +1301,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Registered by"
     assert_includes response.body, "Host"
     refute_includes response.body, ">Prompt</dt>"
+    refute_includes response.body, "class=\"grid gap-4 text-sm\""
+    assert_includes response.body, "fp-card"
+    assert_includes response.body, "data-background=\"default\""
     assert_includes response.body, "System Prompt"
     assert_includes response.body, "User Prompt"
     assert_includes response.body, "Creates a concise summary of supplied text"
@@ -1404,10 +1407,23 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
                   text: /Dummy Echo Tool/
     assert_select "button[data-modal-id='custom-tool-definition-dummy_echo_tool-1']", count: 0
     assert_includes response.body, "data-controller=\"flat-pack--modal\""
-    assert_includes response.body, "class=\"grid gap-4 text-sm\""
+    refute_includes response.body, "class=\"grid gap-4 text-sm\""
     refute_includes response.body, "md:grid-cols-2"
-    assert_includes response.body, "#000000"
+    assert_includes response.body, "fp-card"
+    assert_includes response.body, "data-background=\"default\""
+    assert_includes response.body, "data-fp-card-padding=\"md\""
+    assert_includes response.body, "Description"
+    assert_includes response.body, "Use when"
+    assert_includes response.body, "Do not use when"
+    assert_includes response.body, "Returns"
+    assert_includes response.body, "Executor"
+    assert_includes response.body, "Safety"
     assert_includes response.body, "Echoes input text with lightweight context metadata"
+    assert_match(
+      /Description.*Use when.*Do not use when.*Returns.*Executor.*Safety/m,
+      response.body
+    )
+    assert_includes response.body, "#000000"
     refute_includes response.body, "Parameters"
     refute_includes response.body, "Repeated argument digests"
 

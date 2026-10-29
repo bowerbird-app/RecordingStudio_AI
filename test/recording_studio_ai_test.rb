@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.19.1", RecordingStudioAI::VERSION
+    assert_equal "0.19.2", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -163,6 +163,14 @@ class RecordingStudioAITest < Minitest::Test
     assert_includes widgets, "FlatPack::Modal::Component"
     assert_includes widgets, "FlatPack::Chart::Component"
     assert_includes widgets, "FlatPack::Link::Component"
+    assert_includes widgets, "FlatPack::Card::Component"
+    assert_includes widgets, "background: :default"
+    assert_includes widgets, "border: :none"
+    assert_includes widgets, "shadow: :none"
+    assert_includes widgets, "hover: :none"
+    assert_includes widgets, "padding: :md"
+    refute_includes widgets, "style: :"
+    refute_includes widgets, 'class: "grid gap-4 text-sm"'
     refute_includes widgets, "prompt_namespace"
     refute_includes widgets, "click->flat-pack--modal#clickBackdrop"
   end
