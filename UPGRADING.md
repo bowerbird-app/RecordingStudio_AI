@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.19.1
+
+The dummy PageNav compat shim is gone. Dummy and test pin Root Switchable `v0.11.0` and set `config.layout = "flat_pack_sidebar"`. Those are development and test pins, not runtime requirements. No migration.
+
+### Upgrade steps
+
+No host action.
+
 ## Upgrading to 0.19.0
 
 Adopts Recording Studio 6.1 layouts and Flatpack 0.1.319. The dummy pins Admin `v2.7.0`. No migration in this gem.

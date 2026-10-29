@@ -12,6 +12,7 @@ Versioning and Keep a Changelog.
 - Remove leftover `docs/gem_template/` template documentation.
 - Remove the nested dummy workflow at `test/dummy/.github/workflows/ci.yml`.
 - Split `AdminScreens::RecordingStudioAIWidgets` helpers by admin screen. Public constants and method names are unchanged.
+- Remove the dummy PageNav compat shim. Dummy/test pin Root Switchable `v0.11.0`.
 
 ### Upgrade notes
 - Bump to `0.19.1`. No migration. No behavior change.
