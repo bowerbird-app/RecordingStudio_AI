@@ -13,7 +13,9 @@ Versioning and Keep a Changelog.
 
 ### Upgrade notes
 - Bump to `0.19.3`. Hosts that already migrated are unaffected. Recorded migrations do not run again.
-- If a new install stopped on `remove_legacy_recording_studio_ai_persistence_columns`, delete both host copies. They use a new timestamp and a `.recording_studio_ai.rb` suffix. Find them with `ls db/migrate/*_remove_legacy_recording_studio_ai_persistence_columns.recording_studio_ai.rb` and `ls db/migrate/*_remove_cost_columns_from_recording_studio_ai.recording_studio_ai.rb`. Then run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`.
+- Run `bin/rails db:migrate:status` first and delete only copies that show as `down`.
+- If both `remove_legacy_recording_studio_ai_persistence_columns` and `remove_cost_columns_from_recording_studio_ai` are `down`, delete both. If the legacy migration is `up` and migrate stopped on the cost migration, delete only the `remove_cost_columns_from_recording_studio_ai` copy. Do not delete an `up` legacy copy; that leaves a `NO FILE` row.
+- Host copies use a new timestamp and a `.recording_studio_ai.rb` suffix (`ls db/migrate/*_<name>.recording_studio_ai.rb`). Also check `db/migrate/*_<name>*.rb` for a renamed or hand-copied file without that suffix. Then run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`.
 - Rolling back `remove_legacy_recording_studio_ai_persistence_columns` adds the legacy columns again and does not recreate their indexes.
 - Rolling back `remove_cost_columns_from_recording_studio_ai` raises `ActiveRecord::IrreversibleMigration` when a cost column is still present. It does not restore those columns.
 

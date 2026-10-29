@@ -2,6 +2,7 @@
 
 require "test_helper"
 require "open3"
+require "tmpdir"
 
 # PostgreSQL raises PG::UndefinedColumn when a migration drops a column that
 # was never created. SQLite does not. Each scenario runs in its own process
@@ -47,6 +48,24 @@ class FreshPostgresMigrationsTest < ActiveSupport::TestCase
       assert_equal FreshPostgresMigrationGuard.migration_class(plain),
                    FreshPostgresMigrationGuard.migration_class(copied)
       assert_equal class_name, FreshPostgresMigrationGuard.migration_class(copied).name
+    end
+  end
+
+  test "apply_migration_file loads a scope-suffixed filename" do
+    require Rails.root.join("test/support/fresh_postgres_migration_guard.rb").to_s
+    refute_operator Object, :const_defined?, :GUARD_DATABASE
+    refute Object.private_method_defined?(:apply_migration_file)
+
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "20261029183000_guard_suffix_probe.recording_studio_ai.rb")
+      File.write(path, <<~RUBY)
+        class GuardSuffixProbe < ActiveRecord::Migration[8.1]
+          def change; end
+        end
+      RUBY
+
+      klass = FreshPostgresMigrationGuard.apply_migration_file(path, record_version: false)
+      assert_equal GuardSuffixProbe, klass
     end
   end
 
