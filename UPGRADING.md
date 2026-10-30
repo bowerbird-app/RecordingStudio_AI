@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.19.5
+
+CI and Security disable Git's automatic commit-graph maintenance so Bundler 2.5 can hardlink-clone git gems. No host config change. No migration.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.19.5`. No host action.
+
 ## Upgrading to 0.19.4
 
 Staff run lists can use a host relation. `config.admin_runs_scope` defaults to `nil`, which keeps those lists on the current Admin root and shows nothing when that root is missing. Site-wide widgets still use `site_runs_scope`. No migration.
