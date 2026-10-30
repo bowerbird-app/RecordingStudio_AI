@@ -8,17 +8,16 @@ Staff run lists can use a host relation. `config.admin_runs_scope` defaults to `
 
 Install RecordingStudioAI `0.19.4`. Leave `config.admin_runs_scope` unset when the current Admin root is the right list.
 
-To include runs stored on other roots, set the callable and delete any prepend of `AdminScreens::RecordingStudioAIWidgets` that replaced `runs_scope`. The callable receives the Admin context and returns a `RecordingStudioAI::Run` relation. Do not call `runs_scope` from inside it.
+To include runs stored on other roots, set the callable and delete any prepend of `AdminScreens::RecordingStudioAIWidgets` that replaced `runs_scope`. The callable receives the Admin context and returns an `ActiveRecord::Relation` of `RecordingStudioAI::Run`. Anything else raises a configuration error when the list is built. Do not call `runs_scope` from inside it. Saved replies use that same relation.
 
 ```ruby
 RecordingStudioAI.configure do |config|
   config.admin_runs_scope = lambda do |context|
-    root_ids = [context&.root_recording&.id]
-    root_ids.concat(workspace_root_ids) # host query for the other roots
-    root_ids.compact!
-    root_ids.uniq!
-    next RecordingStudioAI::Run.none if root_ids.empty?
+    next RecordingStudioAI::Run.none if context&.root_recording.nil?
 
+    root_ids = [context.root_recording.id]
+    root_ids.concat(workspace_root_ids) # host query for the other roots
+    root_ids.uniq!
     RecordingStudioAI::Run.where(root_recording_id: root_ids)
   end
 end

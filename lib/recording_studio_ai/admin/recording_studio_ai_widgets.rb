@@ -131,13 +131,23 @@ module AdminScreens
     def runs_scope(context = admin_context)
       bind_admin_context!(context) if context
       resolver = RecordingStudioAI.configuration.admin_runs_scope
-      return resolver.call(context) if resolver
+      return host_runs_relation(resolver.call(context)) if resolver
 
       root_id = context&.root_recording&.id
       return RecordingStudioAI::Run.none if root_id.blank?
 
       RecordingStudioAI::Run.where(root_recording_id: root_id)
     end
+
+    def host_runs_relation(relation)
+      return relation if relation.is_a?(ActiveRecord::Relation) && relation.klass == RecordingStudioAI::Run
+
+      raise RecordingStudioAI::Errors::ContractValidationError.new(
+        "admin_runs_scope must return an ActiveRecord::Relation of RecordingStudioAI::Run",
+        code: "configuration"
+      )
+    end
+    private :host_runs_relation
 
     def site_admin_visible?(context)
       return false if context.blank?

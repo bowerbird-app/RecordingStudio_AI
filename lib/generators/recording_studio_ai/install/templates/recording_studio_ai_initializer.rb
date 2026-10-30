@@ -87,15 +87,16 @@ RecordingStudioAI.configure do |config|
   # nil lists staff runs on the current Admin root and shows nothing without one.
   # Set a callable to include runs stored on other roots, then delete any prepend
   # of AdminScreens::RecordingStudioAIWidgets. The callable receives the Admin
-  # context and returns a RecordingStudioAI::Run relation. Do not call runs_scope
-  # from inside it. Site-wide widgets keep site_runs_scope.
+  # context and returns an ActiveRecord::Relation of RecordingStudioAI::Run.
+  # Anything else raises a configuration error when the list is built. Do not
+  # call runs_scope from inside it. Site-wide widgets keep site_runs_scope.
+  # Saved replies use the same relation.
   # config.admin_runs_scope = lambda do |context|
-  #   root_ids = [context&.root_recording&.id]
-  #   root_ids.concat(workspace_root_ids) # host query for the other roots
-  #   root_ids.compact!
-  #   root_ids.uniq!
-  #   next RecordingStudioAI::Run.none if root_ids.empty?
+  #   next RecordingStudioAI::Run.none if context&.root_recording.nil?
   #
+  #   root_ids = [context.root_recording.id]
+  #   root_ids.concat(workspace_root_ids) # host query for the other roots
+  #   root_ids.uniq!
   #   RecordingStudioAI::Run.where(root_recording_id: root_ids)
   # end
   config.admin_runs_scope = nil
