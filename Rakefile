@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "bundler/gem_tasks"
+require "fileutils"
 require "rake/testtask"
 
 DUMMY_TEST_FILES = [
@@ -43,6 +44,18 @@ def dummy_bundle_base_env
   }
 end
 
+def fresh_database_env(env)
+  env.merge(
+    "RAILS_ENV" => "test",
+    "DB_NAME" => "recording_studio_ai_fresh",
+    "DATABASE_URL" => nil,
+    # An empty database loads db/schema.rb before db:migrate and marks every
+    # migration as run. Point SCHEMA at a missing file so the task applies
+    # migrations. The dump after migrate stays out of the repo.
+    "SCHEMA" => "/tmp/recording_studio_ai_fresh_schema.rb"
+  )
+end
+
 Rake::TestTask.new(:test) do |t|
   t.libs << "test"
   t.test_files = FileList["test/**/*_test.rb"].exclude(*ROOT_TEST_EXCLUSIONS)
@@ -50,6 +63,15 @@ Rake::TestTask.new(:test) do |t|
 end
 
 namespace :test do
+  desc "Apply every dummy migration on an empty database"
+  task :fresh_migrate do
+    Dir.chdir(DUMMY_APP_ROOT) do
+      env = fresh_database_env(dummy_bundle_env)
+      FileUtils.rm_f(env.fetch("SCHEMA"))
+      run_command!(env, "bundle", "exec", "bin/rails", "db:drop", "db:create", "db:migrate")
+    end
+  end
+
   desc "Run dummy app integration tests under the dummy app bundle"
   task :dummy do
     Dir.chdir(DUMMY_APP_ROOT) do
@@ -64,7 +86,7 @@ namespace :test do
   end
 
   desc "Run gem and dummy app tests"
-  task all: %i[test dummy]
+  task all: %i[test fresh_migrate dummy]
 end
 
 namespace :app do

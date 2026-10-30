@@ -1,5 +1,35 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.19.3
+
+Fresh installs can migrate. `RemoveLegacyRecordingStudioAIPersistenceColumns` and `RemoveCostColumnsFromRecordingStudioAI` drop legacy columns only when those columns exist, and the legacy migration drops an index on those columns only when the index exists. Hosts that already migrated are unaffected.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.19.3`. No new migration is added. Hosts that already migrated are unaffected.
+
+Run `bin/rails db:migrate:status` first. Delete only copies that show as `down`.
+
+Host copies use a new timestamp and a `.recording_studio_ai.rb` suffix. Also check `db/migrate/*_<name>*.rb` for a copy that was renamed or hand-copied without that suffix. That glob can also match a host migration whose name extends ours (for example `remove_cost_columns_from_recording_studio_ai_batches`). Confirm each match is our migration before deleting it. Check the class name and the file contents.
+
+```bash
+ls db/migrate/*_remove_legacy_recording_studio_ai_persistence_columns.recording_studio_ai.rb
+ls db/migrate/*_remove_cost_columns_from_recording_studio_ai.recording_studio_ai.rb
+ls db/migrate/*_remove_legacy_recording_studio_ai_persistence_columns*.rb
+ls db/migrate/*_remove_cost_columns_from_recording_studio_ai*.rb
+```
+
+- Both `remove_legacy_recording_studio_ai_persistence_columns` and `remove_cost_columns_from_recording_studio_ai` are `down`: delete both `down` copies.
+- `remove_legacy_recording_studio_ai_persistence_columns` is `up` and migrate stopped on `remove_cost_columns_from_recording_studio_ai`: delete only that cost copy. Do not delete the applied legacy copy. Deleting an `up` file leaves a `NO FILE` row in `db:migrate:status`.
+
+Then run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`.
+
+### Rollback
+
+`RemoveLegacyRecordingStudioAIPersistenceColumns` `down` adds the legacy columns back when they are missing. It does not recreate indexes that were on those columns.
+
+`RemoveCostColumnsFromRecordingStudioAI` uses `change` and `remove_column` without a type. Rolling `remove_cost_columns_from_recording_studio_ai` back raises `ActiveRecord::IrreversibleMigration` when a cost column is still present. A rollback does not put those columns back.
+
 ## Upgrading to 0.19.2
 
 Admin prompt and tool definition modals use Flatpack cards for each labeled

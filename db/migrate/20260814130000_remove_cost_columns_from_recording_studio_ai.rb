@@ -18,7 +18,9 @@ class RemoveCostColumnsFromRecordingStudioAI < ActiveRecord::Migration[8.1]
                               name: "chk_rsai_tool_invocations_cost_category"
     end
     COST_COLUMNS.each do |table, columns|
-      remove_columns table, *columns
+      columns.each do |column|
+        remove_column table, column if column_exists?(table, column)
+      end
     end
   end
 end
