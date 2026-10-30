@@ -5,6 +5,14 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.19.5] - 2026-10-30
+
+### Fixed
+- CI and Security set `gc.auto=0` and `maintenance.auto=false` for git. Git 2.54 otherwise writes a commit graph after a fetch. Bundler 2.5 hardlink-clones that cache and can fail with `hardlink different from source` on `objects/info/commit-graphs/tmp_graph_*`. These are the same settings current Bundler passes to git.
+
+### Upgrade notes
+- Bump to `0.19.5`. No migration. No host config change.
+
 ## [0.19.4] - 2026-10-30
 
 ### Added
