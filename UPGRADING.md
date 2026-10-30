@@ -1,5 +1,28 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.19.4
+
+Staff run lists can use a host relation. `config.admin_runs_scope` defaults to `nil`, which keeps those lists on the current Admin root and shows nothing when that root is missing. Site-wide widgets still use `site_runs_scope`. No migration.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.19.4`. Leave `config.admin_runs_scope` unset when the current Admin root is the right list.
+
+To include runs stored on other roots, set the callable and delete any prepend of `AdminScreens::RecordingStudioAIWidgets` that replaced `runs_scope`. The callable receives the Admin context and returns an `ActiveRecord::Relation` of `RecordingStudioAI::Run`. Anything else raises a configuration error when the list is built. Do not call `runs_scope` from inside it. Saved replies use that same relation.
+
+```ruby
+RecordingStudioAI.configure do |config|
+  config.admin_runs_scope = lambda do |context|
+    next RecordingStudioAI::Run.none if context&.root_recording.nil?
+
+    root_ids = [context.root_recording.id]
+    root_ids.concat(workspace_root_ids) # host query for the other roots
+    root_ids.uniq!
+    RecordingStudioAI::Run.where(root_recording_id: root_ids)
+  end
+end
+```
+
 ## Upgrading to 0.19.3
 
 Fresh installs can migrate. `RemoveLegacyRecordingStudioAIPersistenceColumns` and `RemoveCostColumnsFromRecordingStudioAI` drop legacy columns only when those columns exist, and the legacy migration drops an index on those columns only when the index exists. Hosts that already migrated are unaffected.

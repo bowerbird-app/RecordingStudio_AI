@@ -16,6 +16,7 @@ module RecordingStudioAI
       :batch_synchronization_job,
       :batch_synchronization_interval,
       :admin_expensive_models,
+      :admin_runs_scope,
       :admin_slow_call_threshold_ms,
       :admin_warning_thresholds,
       :custom_tool_confirmation_handler,
@@ -86,6 +87,9 @@ module RecordingStudioAI
       @batch_synchronization_job = "RecordingStudioAI::BatchSynchronizationJob"
       @batch_synchronization_interval = 1.minute
       @admin_expensive_models = []
+      # nil lists runs on the current Admin root. A callable receives that
+      # context and returns a RecordingStudioAI::Run relation.
+      @admin_runs_scope = nil
       @admin_slow_call_threshold_ms = 10_000
       @admin_warning_thresholds = {
         runs: 1_000,
@@ -225,6 +229,9 @@ module RecordingStudioAI
       end
       if !webhook_batch_initiator.nil? && !webhook_batch_initiator.respond_to?(:call)
         invalid_configuration!("webhook_batch_initiator must be nil or respond to call")
+      end
+      if !admin_runs_scope.nil? && !admin_runs_scope.respond_to?(:call)
+        invalid_configuration!("admin_runs_scope must be nil or respond to call")
       end
       validate_usage_meter!
       normalize_model_fallbacks!
