@@ -125,8 +125,14 @@ module AdminScreens
     # Fail closed: missing root yields no rows instead of every tenant's runs.
     # Binding the context lets filter option lambdas (which receive no args from
     # Recording Studio Admin) reuse the same root scope for dropdown values.
+    # config.admin_runs_scope replaces this relation when a host must list runs
+    # from more than the current Admin root. Site-wide widgets stay on
+    # site_runs_scope.
     def runs_scope(context = admin_context)
       bind_admin_context!(context) if context
+      resolver = RecordingStudioAI.configuration.admin_runs_scope
+      return resolver.call(context) if resolver
+
       root_id = context&.root_recording&.id
       return RecordingStudioAI::Run.none if root_id.blank?
 
