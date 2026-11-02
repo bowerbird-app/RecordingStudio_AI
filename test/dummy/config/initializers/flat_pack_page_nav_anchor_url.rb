@@ -1,13 +1,7 @@
 # frozen_string_literal: true
 
-# Leftover Card `style:` and Button `url:` stay mapped for sibling screens.
+# Leftover Card `style:` stays mapped for sibling screens.
 # Admin 2.7 sets its own heading.
-module DummyFlatPackButtonUrl
-  def initialize(url: nil, href: nil, **kwargs)
-    super(href: href.presence || url, **kwargs)
-  end
-end
-
 module DummyFlatPackCardStyle
   STYLE_ARGUMENTS = {
     default: { border: :default, shadow: :none },
@@ -42,7 +36,6 @@ end
 
 Rails.application.config.to_prepare do
   [
-    [FlatPack::Button::Component, DummyFlatPackButtonUrl],
     [FlatPack::Card::Component, DummyFlatPackCardStyle]
   ].each do |component, legacy|
     next unless component.is_a?(Class)

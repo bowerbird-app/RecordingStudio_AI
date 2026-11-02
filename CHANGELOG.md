@@ -5,6 +5,9 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+### Changed
+- Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
+
 ## [0.19.5] - 2026-10-30
 
 ### Fixed
