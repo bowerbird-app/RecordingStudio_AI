@@ -9,6 +9,7 @@ Versioning and Keep a Changelog.
 
 ### Fixed
 - CI and Security set `gc.auto=0` and `maintenance.auto=false` for git. Git 2.54 otherwise writes a commit graph after a fetch. Bundler 2.5 hardlink-clones that cache and can fail with `hardlink different from source` on `objects/info/commit-graphs/tmp_graph_*`. These are the same settings current Bundler passes to git.
+- Development and dummy lockfiles use rack 3.2.8. 3.2.7 matches the Ruby advisory database (`GHSA-2j8w-xcrc-x985`, `GHSA-5v64-555j-wjxm`, `GHSA-p8x9-v4hv-2w4g`, `GHSA-wvg4-6p58-3gh3`).
 
 ### Upgrade notes
 - Bump to `0.19.5`. No migration. No host config change.

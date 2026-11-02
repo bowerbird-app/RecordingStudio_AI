@@ -2,7 +2,7 @@
 
 ## Upgrading to 0.19.5
 
-CI and Security disable Git's automatic commit-graph maintenance so Bundler 2.5 can hardlink-clone git gems. No host config change. No migration.
+CI and Security disable Git's automatic commit-graph maintenance so Bundler 2.5 can hardlink-clone git gems. The development and dummy lockfiles use rack 3.2.8. Hosts do not inherit that pin. No host config change. No migration.
 
 ### Upgrade steps
 
