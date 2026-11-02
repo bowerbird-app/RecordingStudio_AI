@@ -11,9 +11,7 @@ module AdminScreens
              RecordingStudioAI::Engine.routes.url_helpers.retained_response_path(row)
            },
            visible_if: lambda { |row, context|
-             run = RecordingStudioAIWidgets.response_run(row)
-             root = context.root_recording
-             run && root && run.root_recording_id == root.id
+             RecordingStudioAIWidgets.saved_reply_listed?(row, context)
            }
   end
 end

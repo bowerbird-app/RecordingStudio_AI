@@ -28,6 +28,7 @@ class ConfigurationTest < Minitest::Test
     refute_respond_to configuration, :admin_authenticate
     refute_respond_to configuration, :admin_visible_roots_resolver
     refute_respond_to configuration, :admin_layout
+    assert_nil configuration.admin_runs_scope
     assert_equal 0.1, configuration.admin_warning_thresholds[:error_rate]
     assert_equal 100_000_000, configuration.admin_warning_thresholds[:spend_microunits]
     assert_equal 3, configuration.maximum_attempts
@@ -193,5 +194,27 @@ class ConfigurationTest < Minitest::Test
 
     assert_equal "configuration", error.code
     assert_includes error.message, "usage_key_resolver"
+  end
+
+  def test_admin_runs_scope_accepts_nil_or_a_callable
+    configuration = RecordingStudioAI::Configuration.new
+
+    assert_nil configuration.admin_runs_scope
+    assert_same configuration, configuration.validate!
+
+    called = false
+    configuration.admin_runs_scope = lambda do |*|
+      called = true
+      RecordingStudioAI::Run.none
+    end
+    configuration.validate!
+
+    refute called
+
+    configuration.admin_runs_scope = "current-root"
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
+
+    assert_equal "configuration", error.code
+    assert_includes error.message, "admin_runs_scope"
   end
 end

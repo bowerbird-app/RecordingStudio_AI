@@ -172,6 +172,9 @@ RecordingStudioAI.configure do |config|
   config.notification_namespace = "recording_studio_ai"
   config.admin_warning_thresholds = RecordingStudioAI::Configuration.new.admin_warning_thresholds
   config.admin_slow_call_threshold_ms = 10_000
+  # nil lists staff runs on the current Admin root. A callable receives the
+  # Admin context and returns a RecordingStudioAI::Run relation.
+  config.admin_runs_scope = nil
   config.maximum_attempts = 3
   # Decision input caps. Raise maximum_decision_questions for a larger question
   # set, and raise maximum_decision_characters when those questions are long.
@@ -364,8 +367,28 @@ recording_studio_admin_for :admin, at: "/admin", root_section: :recording_studio
 ```
 
 Call, attempt, tool-call, and saved-reply lists stay on the current Admin
-root and fail closed without one. Provider batches is the exception. That
-list is site-wide, like `ai_batches.by_status`, and can filter by model.
+root and fail closed without one. `config.admin_runs_scope` replaces that
+relation when those lists must include runs stored on other roots. Leave it
+`nil` for the current-root list. The callable receives the Admin context and
+returns an `ActiveRecord::Relation` of `RecordingStudioAI::Run`. Anything
+else raises a configuration error when the list is built. Do not call
+`runs_scope` from inside it. Site-wide widgets keep `site_runs_scope`.
+
+```ruby
+RecordingStudioAI.configure do |config|
+  config.admin_runs_scope = lambda do |context|
+    next RecordingStudioAI::Run.none if context&.root_recording.nil?
+
+    root_ids = [context.root_recording.id]
+    root_ids.concat(workspace_root_ids) # host query for the other roots
+    root_ids.uniq!
+    RecordingStudioAI::Run.where(root_recording_id: root_ids)
+  end
+end
+```
+
+Provider batches is the exception. That list is site-wide, like
+`ai_batches.by_status`, and can filter by model.
 Expires uses Flatpack Timestamp (time ago, exact time in the tooltip).
 Prompt and tool definition modals use a Flatpack card per labeled field.
 

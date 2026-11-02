@@ -5,6 +5,15 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.19.4] - 2026-10-30
+
+### Added
+- `RecordingStudioAI.configuration.admin_runs_scope` sets the relation used to list AI runs and saved replies on Admin screens. `nil` keeps the current Admin root and shows nothing without one. A callable receives the Admin context and must return an `ActiveRecord::Relation` of `RecordingStudioAI::Run`. Anything else raises a configuration error when the list is built. Site-wide widgets stay on `site_runs_scope`.
+
+### Upgrade notes
+- Bump to `0.19.4`. No migration.
+- Hosts that prepend `AdminScreens::RecordingStudioAIWidgets` to widen `runs_scope` set `config.admin_runs_scope` and delete the prepend. Leave the setting `nil` to keep the current list.
+
 ## [0.19.3] - 2026-10-29
 
 ### Fixed

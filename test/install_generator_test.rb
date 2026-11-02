@@ -68,6 +68,7 @@ class InstallGeneratorTest < Minitest::Test
       assert_includes initializer, "config.instrumentation_enabled = true"
       assert_includes initializer, 'config.notification_namespace = "recording_studio_ai"'
       assert_includes initializer, "config.admin_warning_thresholds"
+      assert_includes initializer, "config.admin_runs_scope = nil"
       assert_includes initializer, "config.maximum_attempts = 3"
       assert_includes initializer, "config.maximum_attachment_count = 10"
       assert_includes initializer, "config.maximum_attachment_bytes = 20.megabytes"

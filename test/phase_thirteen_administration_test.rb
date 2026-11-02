@@ -115,6 +115,96 @@ class PhaseThirteenAdministrationTest < RecordingStudioAI::Test::PersistenceCase
     assert_empty result[:breaches]
   end
 
+  def test_admin_runs_scope_setting_replaces_the_listed_runs
+    staff_root = create_recording_id
+    workspace_root = create_recording_id
+    other_root = create_recording_id
+    staff_run = create_run(root_id: staff_root, status: "completed", tokens: 1)
+    workspace_run = create_run(root_id: workspace_root, status: "completed", tokens: 1)
+    other_run = create_run(root_id: other_root, status: "failed", tokens: 1)
+    workspace_run.custom_tool_invocations.create!(
+      tool_key: "workspace-tool", tool_version: 1, status: "completed", read_only: true,
+      destructive: false, requires_confirmation: false, idempotent: true
+    )
+    other_run.custom_tool_invocations.create!(
+      tool_key: "other-tool", tool_version: 1, status: "completed", read_only: true,
+      destructive: false, requires_confirmation: false, idempotent: true
+    )
+    context = Struct.new(:root_recording).new(Actor.new(id: staff_root))
+    received = nil
+    @configuration.admin_runs_scope = lambda do |given|
+      received = given
+      RecordingStudioAI::Run.where(root_recording_id: [staff_root, workspace_root])
+    end
+    widgets = AdminScreens::RecordingStudioAIWidgets
+
+    staff_attempt = staff_run.attempts.create!(
+      sequence: 1, kind: "primary", status: "completed", provider: "openai", model: "gpt-staff"
+    )
+    workspace_attempt = workspace_run.attempts.create!(
+      sequence: 1, kind: "primary", status: "completed", provider: "openai", model: "gpt-workspace"
+    )
+    other_attempt = other_run.attempts.create!(
+      sequence: 1, kind: "primary", status: "failed", provider: "gemini", model: "gemini-other"
+    )
+    staff_reply = RecordingStudioAI::Response.create!(
+      attempt: staff_attempt, response_type: "generation", provider: "openai", model: "gpt-staff",
+      complete: true, byte_size: 4
+    )
+    workspace_reply = RecordingStudioAI::Response.create!(
+      attempt: workspace_attempt, response_type: "generation", provider: "openai", model: "gpt-workspace",
+      complete: true, byte_size: 4
+    )
+    other_reply = RecordingStudioAI::Response.create!(
+      attempt: other_attempt, response_type: "error", provider: "gemini", model: "gemini-other",
+      complete: false, byte_size: 4
+    )
+
+    assert_equal [staff_run.id, workspace_run.id].sort, widgets.runs_scope(context).pluck(:id).sort
+    assert_equal ["workspace-tool"], widgets.tool_scope(context).pluck(:tool_key)
+    assert_equal [staff_reply.id, workspace_reply.id].sort, widgets.responses_scope(context).pluck(:id).sort
+    assert widgets.saved_reply_listed?(workspace_reply, context)
+    refute widgets.saved_reply_listed?(other_reply, context)
+    assert_equal [staff_run.id, workspace_run.id, other_run.id].sort, widgets.site_runs_scope(context).pluck(:id).sort
+    assert_same context, received
+    assert_same context, widgets.admin_context
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
+  def test_admin_runs_scope_setting_rejects_a_bad_relation
+    root_id = create_recording_id
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    widgets = AdminScreens::RecordingStudioAIWidgets
+
+    @configuration.admin_runs_scope = ->(_context) {}
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      widgets.runs_scope(context)
+    end
+    assert_equal "configuration", error.code
+    assert_includes error.message, "ActiveRecord::Relation of RecordingStudioAI::Run"
+
+    @configuration.admin_runs_scope = ->(_context) { RecordingStudioAI::Attempt.all }
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      widgets.runs_scope(context)
+    end
+    assert_equal "configuration", error.code
+    assert_includes error.message, "RecordingStudioAI::Run"
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
+  def test_admin_runs_scope_setting_can_list_nothing
+    root_id = create_recording_id
+    create_run(root_id: root_id, status: "completed", tokens: 1)
+    context = Struct.new(:root_recording).new(Actor.new(id: root_id))
+    @configuration.admin_runs_scope = ->(_context) { RecordingStudioAI::Run.none }
+
+    assert_empty AdminScreens::RecordingStudioAIWidgets.runs_scope(context)
+  ensure
+    AdminScreens::RecordingStudioAIWidgets.clear_admin_context!
+  end
+
   def test_admin_runs_scope_fails_closed_without_a_root
     visible_root = create_recording_id
     create_run(root_id: visible_root, status: "completed", tokens: 10)

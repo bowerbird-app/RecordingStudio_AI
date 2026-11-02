@@ -398,6 +398,13 @@ class ConfigController < ApplicationController
       explanation: "Latency that counts as a slow call on admin screens."
     },
     {
+      key: "admin_runs_scope",
+      required: "No",
+      accepted_values: "nil, or a callable that takes the Admin context and returns a Run relation",
+      default: "nil",
+      explanation: "Relation for staff run lists. nil keeps the current Admin root and shows nothing without one. Site-wide widgets stay on every visible run."
+    },
+    {
       key: "stuck_run_threshold",
       required: "No",
       accepted_values: "ActiveSupport::Duration",
@@ -548,6 +555,8 @@ class ConfigController < ApplicationController
       # Admin behavior. Thresholds keep their defaults unless you override a key.
       # config.admin_warning_thresholds = config.admin_warning_thresholds.merge(error_rate: 0.05)
       config.admin_slow_call_threshold_ms = 10_000
+      # nil lists staff runs on the current Admin root.
+      config.admin_runs_scope = nil
       config.admin_expensive_models = []
       config.stuck_run_threshold = 15.minutes
 
