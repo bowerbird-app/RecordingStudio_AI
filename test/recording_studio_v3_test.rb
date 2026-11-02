@@ -11,6 +11,16 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
     refute FlatPack::PageNav::Component.ancestors.map(&:name).include?("DummyFlatPackPageNavLegacy")
   end
 
+  test "dummy does not remap Button url onto Flatpack Button" do
+    refute FlatPack::Button::Component.ancestors.map(&:name).include?("DummyFlatPackButtonUrl")
+    refute defined?(DummyFlatPackButtonUrl)
+  end
+
+  test "dummy still maps leftover Card style and PageNav arguments" do
+    assert FlatPack::Card::Component.ancestors.map(&:name).include?("DummyFlatPackCardStyle")
+    assert RecordingStudio::LayoutHelper.ancestors.map(&:name).include?("DummyRecordingStudioPageNav")
+  end
+
   test "dummy recordable declarations validate and expose v3 introspection" do
     assert RecordingStudio.validate_recordable_declarations!
     assert_equal ["Workspace"], RecordingStudio.root_recordable_types
