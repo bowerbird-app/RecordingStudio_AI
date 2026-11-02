@@ -13,6 +13,17 @@ concurrency:
 permissions:
   contents: read
 
+# Git 2.54 writes a commit graph in the background after a fetch. Bundler 2.5
+# then hardlink-clones that cache and can fail with "hardlink different from
+# source" on objects/info/commit-graphs/tmp_graph_*. Current Bundler passes
+# these same settings on every git command.
+env:
+  GIT_CONFIG_COUNT: "2"
+  GIT_CONFIG_KEY_0: gc.auto
+  GIT_CONFIG_VALUE_0: "0"
+  GIT_CONFIG_KEY_1: maintenance.auto
+  GIT_CONFIG_VALUE_1: "false"
+
 jobs:
   lint:
     runs-on: ubuntu-latest
