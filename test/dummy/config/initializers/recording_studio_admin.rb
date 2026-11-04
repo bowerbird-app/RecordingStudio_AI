@@ -69,7 +69,13 @@ module RecordingStudioAdminRootAnchorDefault
   def preserve_anchor_url(url)
     safe_url = RecordingStudioAdmin::UrlSafety.safe_href(url)
     return safe_url if safe_url.blank?
-    return safe_url if safe_url.start_with?("/admin/screens/")
+
+    # /admin is the in-admin home, so it does not need to be copied onto every
+    # screen link. A host return path, such as /, must survive screen navigation
+    # or Close drops the operator back inside admin.
+    anchor_url = page_nav_anchor_url
+    admin_home = RecordingStudioAdmin.configuration.default_mount_path.to_s
+    return safe_url if anchor_url.blank? || anchor_url == admin_home || anchor_url == "#{admin_home}/"
 
     super
   end

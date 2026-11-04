@@ -12,17 +12,17 @@
     <nav class="py-4 space-y-1" aria-label="Main navigation">
       <%= render FlatPack::Sidebar::Item::Component.new(
         text: "AI Admin",
-        href: "/admin",
+        href: admin_href("/admin"),
         icon: :dashboard
       ) %>
       <%= render FlatPack::Sidebar::Item::Component.new(
         text: "AI Calls",
-        href: "/admin/screens/ai_calls",
+        href: admin_href("/admin/screens/ai_calls"),
         icon: :cpu_chip
       ) %>
       <%= render FlatPack::Sidebar::Item::Component.new(
         text: "AI Responses",
-        href: "/admin/screens/recording_studio_ai_responses",
+        href: admin_href("/admin/screens/recording_studio_ai_responses"),
         icon: :table
       ) %>
       <%= render FlatPack::Sidebar::Item::Component.new(
