@@ -12,20 +12,13 @@ Versioning and Keep a Changelog.
 
 ### Security
 - Development and dummy lockfiles keep rack 3.2.8 and bump loofah 2.25.3, nokogiri 1.19.7, and rails-html-sanitizer 1.7.2 for Bundler Audit.
-- OpenAI webhook signatures follow the official SDK: success is a void return (`nil`), failure raises. Boolean stubs must return exactly `true`. A `nil` is not treated as a failed check.
-- A host response sanitizer that raises no longer stores unsanitized text. The gem stores nothing and logs the error class only.
-- Admin health delta markup and Flatpack render helpers escape values that are not already safe.
-- Saved-reply Admin context params use an explicit permit list instead of the raw request hash.
-- `batch_synchronization_job` must resolve to an Active Job class.
 
 ### Changed
 - Development pin Recording Studio `v6.3.0`, Flatpack `v0.1.341`, Logs `v0.7.3`, and Metrics `v0.7.2`. Dummy pins Trashable `v0.12.2`, Cache `v0.6.2`, Root Switchable `v0.11.4`, and Accessible `v0.24.0`. Admin stays on `v2.7.0`.
-- Remove the Bundler gemspec prepend that widened sibling Recording Studio requirements, and remove `UPDATE_SUMMARY.md`.
+- Remove the Bundler gemspec prepend that widened sibling Recording Studio requirements.
 
 ### Upgrade notes
 - Bump to `0.19.6`. No migration.
-- Hosts that set `batch_synchronization_job` to a string must name an `ActiveJob::Base` subclass.
-- The OpenAI webhook verifier still returns false when verification raises. Official SDK success is `nil`.
 
 ## [0.19.5] - 2026-10-30
 
@@ -1146,8 +1139,6 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 
 [Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.6...HEAD
 [0.19.6]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.5...v0.19.6
-[0.19.5]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.4...v0.19.5
-[0.19.4]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.3...v0.19.4
 [0.19.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.0...v0.19.1

@@ -243,22 +243,12 @@ module RecordingStudioAI
     end
 
     def batch_synchronization_job_class
-      klass = resolve_batch_synchronization_job
-      unless klass.is_a?(Class) && defined?(ActiveJob::Base) && klass < ActiveJob::Base
-        invalid_configuration!("batch_synchronization_job must be a subclass of ActiveJob::Base")
-      end
-      klass
+      return batch_synchronization_job.constantize if batch_synchronization_job.is_a?(String)
+
+      batch_synchronization_job
     end
 
     private
-
-    def resolve_batch_synchronization_job
-      return batch_synchronization_job unless batch_synchronization_job.is_a?(String)
-
-      batch_synchronization_job.constantize
-    rescue NameError, LoadError, ArgumentError
-      invalid_configuration!("batch_synchronization_job must be a subclass of ActiveJob::Base")
-    end
 
     def normalize_model_fallbacks!
       raw = @model_fallbacks || {}

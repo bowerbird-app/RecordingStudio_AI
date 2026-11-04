@@ -22,7 +22,7 @@ class AIMetricsTest < ActiveSupport::TestCase
     @root = RecordingStudio.root_recording_for(@workspace)
     @admin_root = RecordingStudio.root_recording_for(Workspace.find_or_create_by!(name: "Admin"))
     AdminRoot.find_or_create_by!(name: "Admin")
-    bootstrap_owner!(@admin_root, @staff)
+    grant!(@admin_root, @staff, :admin)
     bootstrap_owner!(@root, @staff)
     @original_resolver = RecordingStudioAdmin.configuration.access_recording_resolver
     RecordingStudioAdmin.configuration.access_recording_resolver = ->(_context) { @admin_root }
@@ -437,7 +437,7 @@ class AIMetricsTest < ActiveSupport::TestCase
       recording: recording,
       actor: actor,
       role: role,
-      manager_actor: @staff
+      manager_actor: ensure_admin_manager!(recording)
     )
     raise result.error if result.failure?
   ensure

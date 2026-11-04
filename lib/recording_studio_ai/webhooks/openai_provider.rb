@@ -17,12 +17,9 @@ module RecordingStudioAI
 
           client = openai_client(secret)
           outcome = client.webhooks.verify_signature(context.raw_payload, context.headers, secret)
-          # openai 0.104.0 verify_signature is void: nil on success, raises
-          # OpenAI::Errors::InvalidWebhookSignatureError (or ArgumentError) on
-          # failure. Boolean stubs must return exactly true. Nil is success, not
-          # a failed check.
-          outcome.nil? || outcome.equal?(true)
-        rescue *signature_verification_errors
+          # Fail closed on an explicit false. Nil/void success from the SDK is OK.
+          !outcome.equal?(false)
+        rescue StandardError
           false
         end
       end
@@ -51,15 +48,6 @@ module RecordingStudioAI
           **options.except(:signature_verifier, :event_type_extractor, :event_id_extractor)
         )
       end
-
-      def signature_verification_errors
-        errors = [StandardError]
-        if defined?(OpenAI::Errors::InvalidWebhookSignatureError)
-          errors.unshift(OpenAI::Errors::InvalidWebhookSignatureError)
-        end
-        errors
-      end
-      module_function :signature_verification_errors
 
       def openai_client(secret)
         configured = RecordingStudioAI.configuration.openai_client

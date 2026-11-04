@@ -35,15 +35,8 @@ module RecordingStudioAI
       return normalized unless callback
 
       sanitize_value(callback.call(normalized))
-    rescue StandardError => e
-      log_sanitizer_error(e)
+    rescue StandardError
       nil
-    end
-
-    def log_sanitizer_error(error)
-      return unless defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger
-
-      Rails.logger.error("RecordingStudioAI::Retention sanitizer raised #{error.class}")
     end
 
     def sanitize_value(value, key: nil)

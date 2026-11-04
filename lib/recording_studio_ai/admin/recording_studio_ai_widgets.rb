@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "erb"
-require "active_support/core_ext/string/output_safety"
 require "recording_studio_ai/copy"
 
 module AdminScreens
@@ -332,13 +330,8 @@ module AdminScreens
     end
 
     def render_flatpack(component, &)
-      safe_rendered_html(component_view_context.render(component, &))
-    end
-
-    def safe_rendered_html(html)
-      return html if html.respond_to?(:html_safe?) && html.html_safe?
-
-      ERB::Util.html_escape(html.to_s)
+      html = component_view_context.render(component, &)
+      html.respond_to?(:html_safe) ? html : html.to_s.html_safe
     end
 
     def component_view_context
