@@ -3,6 +3,8 @@
 require "test_helper"
 
 class AIMetricsTest < ActiveSupport::TestCase
+  include AccessibleTestHelpers
+
   GrantContext = Struct.new(:access_grant)
   Grant = Struct.new(:actor)
 
