@@ -11,6 +11,7 @@ Versioning and Keep a Changelog.
 ## [0.19.6] - 2026-11-04
 
 ### Security
+- Development and dummy lockfiles keep rack 3.2.8 and bump loofah 2.25.3, nokogiri 1.19.7, and rails-html-sanitizer 1.7.2 for Bundler Audit.
 - OpenAI webhook signatures follow the official SDK: success is a void return (`nil`), failure raises. Boolean stubs must return exactly `true`. A `nil` is not treated as a failed check.
 - A host response sanitizer that raises no longer stores unsanitized text. The gem stores nothing and logs the error class only.
 - Admin health delta markup and Flatpack render helpers escape values that are not already safe.
