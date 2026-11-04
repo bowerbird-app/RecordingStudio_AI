@@ -12,10 +12,10 @@ tables, and a read-only FlatPack admin surface.
 
 - Ruby 3.3 or newer
 - Rails 8.1
-- Recording Studio `>= 6.1.0` (development pin tag `v6.1.0`)
-- Recording Studio Logs `>= 0.4.1, < 1.0` (development pin tag `v0.5.0`)
-- Recording Studio Metrics `>= 0.3.0, < 1.0` (development pin tag `v0.5.0`)
-- Flatpack `>= 0.1.315` (development pin commit `1fcbafe94f8eb118f0a22182f63f5110fcc97a56`)
+- Recording Studio `>= 6.1.0` (development pin tag `v6.3.0`)
+- Recording Studio Logs `>= 0.4.1, < 1.0` (development pin tag `v0.7.3`)
+- Recording Studio Metrics `>= 0.3.0, < 1.0` (development pin tag `v0.7.2`)
+- Flatpack `>= 0.1.315` (development pin tag `v0.1.341`)
 
 The OpenAI provider uses the official `openai` Ruby SDK (`~> 0.103`, which includes
 the Agents API). Gemini uses its REST API
@@ -29,19 +29,19 @@ Add the addon and Recording Studio `>= 6.1.0` to the host application's `Gemfile
 ```ruby
 gem "recording_studio",
     github: "bowerbird-app/RecordingStudio",
-    tag: "v6.1.0"
+    tag: "v6.3.0"
 gem "flat_pack",
     github: "bowerbird-app/flatpack",
-    ref: "1fcbafe94f8eb118f0a22182f63f5110fcc97a56"
+    tag: "v0.1.341"
 gem "view_component", "4.19.0"
 gem "recording_studio_ai",
     github: "bowerbird-app/RecordingStudio_AI"
 gem "recording_studio_logs",
     github: "bowerbird-app/RecordingStudio_logs",
-    tag: "v0.5.0"
+    tag: "v0.7.3"
 gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
-    tag: "v0.5.0"
+    tag: "v0.7.2"
 ```
 
 `RecordingStudioAI.configuration.layout` selects the saved-reply layout. Leave it `nil` to follow `RecordingStudio.configuration.layout`, then `recording_studio/default_layout`. A layout name, `false`, or a callable that takes `controller:` is also valid. Do not include `RecordingStudio::UsesDefaultLayout` or hard-code `layout "recording_studio/default_layout"`.
@@ -70,7 +70,7 @@ Staff with AdminRoot `:view` (`RecordingStudioAI::Api::Access.can_view?`) can re
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/fallback_retry_rate`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_batches/by_status`
 
-Failure and stuck-run metrics (Recording Studio Metrics `>= 0.3.0, < 1.0`, development pin tag `v0.5.0`):
+Failure and stuck-run metrics (Recording Studio Metrics `>= 0.3.0, < 1.0`, development pin tag `v0.7.2`):
 
 | Metric | Type / unit | Definition | `group_by` |
 | --- | --- | --- | --- |
@@ -343,23 +343,23 @@ roots. Omitting `root_ids` fails closed (empty metrics).
 Staff use Recording Studio Admin only. Mount Admin, enable the
 `recording_studio_ai` section, and grant Accessible access on that admin root.
 There is no `/recording_studio_ai/admin` surface. Admin `2.7.0` and Accessible
-`0.18.0` need Trashable query helpers (`require: false`); pin Metrics for
+`0.24.0` need Trashable query helpers (`require: false`); pin Metrics for
 Bundler even when the host already exposes it elsewhere:
 
 ```ruby
 gem "recording_studio_accessible",
     github: "bowerbird-app/RecordingStudio_accessible",
-    tag: "v0.18.0"
+    tag: "v0.24.0"
 gem "recording_studio_admin",
     github: "bowerbird-app/RecordingStudio_admin",
     tag: "v2.7.0"
 gem "recording_studio_metrics",
     github: "bowerbird-app/RecordingStudio_metrics",
-    tag: "v0.5.0",
+    tag: "v0.7.2",
     require: false
 gem "recording_studio_trashable",
     github: "bowerbird-app/RecordingStudio_trashable",
-    tag: "v0.11.0",
+    tag: "v0.12.2",
     require: false
 
 mount RecordingStudioAI::Engine, at: "/recording_studio_ai"

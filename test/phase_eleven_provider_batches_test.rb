@@ -175,7 +175,7 @@ class PhaseElevenProviderBatchesTest < RecordingStudioAI::Test::PersistenceCase
 
   def test_refresh_batch_async_enqueues_the_configured_polling_job
     scheduled = nil
-    polling_job = Class.new do
+    polling_job = Class.new(ActiveJob::Base) do
       define_singleton_method(:perform_later) { |**arguments| scheduled = arguments }
     end
     RecordingStudioAI.configuration.batch_synchronization_job = polling_job
@@ -881,7 +881,7 @@ class PhaseElevenProviderBatchesTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal 1, @provider.cancellations.length
 
     scheduled = nil
-    polling_job = Class.new do
+    polling_job = Class.new(ActiveJob::Base) do
       define_singleton_method(:perform_later) { |**arguments| scheduled = arguments }
     end
     RecordingStudioAI.configuration.batch_synchronization_job = polling_job

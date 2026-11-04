@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.19.6
+
+Install RecordingStudioAI `0.19.6`. No migration. Saved-reply screens still use Default Layout. Development pins Recording Studio `v6.3.0`, Flatpack tag `v0.1.341`, Logs `v0.7.3`, and Metrics `v0.7.2`. Dummy pins Trashable `v0.12.2`, Cache `v0.6.2`, Root Switchable `v0.11.4`, and Accessible `v0.24.0`. Leave Admin on `v2.7.0`. Delete `test/support/widen_recording_studio_requirement.rb` if you copied it; sibling pins now resolve without it.
+
+`batch_synchronization_job` must be an Active Job class (or a string that constantizes to one). A host response sanitizer that raises stores nothing. OpenAI webhook verification follows the official SDK: `nil` means the signature passed; a raised `OpenAI::Errors::InvalidWebhookSignatureError` means it did not.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.19.6`. Point development pins at the tags above. No host config change unless `batch_synchronization_job` is not an Active Job. Accessible `0.24.0` only lets a manager grant a role they already hold; dummy tests bootstrap an owner first.
+
 ## Upgrading to 0.19.5
 
 CI and Security disable Git's automatic commit-graph maintenance so Bundler 2.5 can hardlink-clone git gems. The development and dummy lockfiles use rack 3.2.8. Hosts do not inherit that pin. No host config change. No migration.

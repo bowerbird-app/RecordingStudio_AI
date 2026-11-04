@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "erb"
+require "active_support/core_ext/string/output_safety"
 require_relative "metric_read"
 
 module RecordingStudioAI
@@ -51,7 +53,9 @@ module RecordingStudioAI
 
       def change_markup(admin_context)
         change = headline_change(admin_context)
-        %(<span class="#{change[:css_class]}">#{ERB::Util.html_escape(change[:text])}</span>).html_safe
+        css_class = ERB::Util.html_escape(change[:css_class].to_s)
+        text = ERB::Util.html_escape(change[:text].to_s)
+        %(<span class="#{css_class}">#{text}</span>).html_safe
       end
 
       def change_display(current:, previous:)

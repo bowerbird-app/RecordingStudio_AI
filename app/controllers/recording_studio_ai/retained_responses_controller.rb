@@ -5,6 +5,7 @@ module RecordingStudioAI
     recording_studio_layout { RecordingStudioAI.configuration.layout }
 
     RESOURCE_KEY = "recording_studio_ai_retained_responses"
+    ADMIN_CONTEXT_PARAM_KEYS = %i[id authenticity_token utf8 _method commit].freeze
 
     before_action :require_recording_studio_admin
     before_action :discard_default_layout_notice
@@ -67,13 +68,18 @@ module RecordingStudioAI
 
     def admin_context
       @admin_context ||= ::RecordingStudioAdmin::Context.new(
-        params: params.to_unsafe_h,
+        params: admin_context_params,
         current_actor: admin_actor,
         controller: self,
         routes: self,
         view_context: view_context,
         surface: ::RecordingStudioAdmin.configuration.surface_for("admin")
       )
+    end
+
+    def admin_context_params
+      permitted = params.permit(*ADMIN_CONTEXT_PARAM_KEYS)
+      permitted.to_h
     end
 
     def admin_actor

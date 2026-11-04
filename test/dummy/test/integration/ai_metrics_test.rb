@@ -22,7 +22,7 @@ class AIMetricsTest < ActiveSupport::TestCase
     @root = RecordingStudio.root_recording_for(@workspace)
     @admin_root = RecordingStudio.root_recording_for(Workspace.find_or_create_by!(name: "Admin"))
     AdminRoot.find_or_create_by!(name: "Admin")
-    grant!(@admin_root, @staff, :admin)
+    bootstrap_owner!(@admin_root, @staff)
     bootstrap_owner!(@root, @staff)
     @original_resolver = RecordingStudioAdmin.configuration.access_recording_resolver
     RecordingStudioAdmin.configuration.access_recording_resolver = ->(_context) { @admin_root }
