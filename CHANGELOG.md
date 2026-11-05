@@ -8,6 +8,18 @@ Versioning and Keep a Changelog.
 ### Changed
 - Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
 
+## [0.19.6] - 2026-11-04
+
+### Security
+- Development and dummy lockfiles keep rack 3.2.8 and bump loofah 2.25.3, nokogiri 1.19.7, and rails-html-sanitizer 1.7.2 for Bundler Audit.
+
+### Changed
+- Development pin Recording Studio `v6.3.0`, Flatpack `v0.1.341`, Logs `v0.7.3`, and Metrics `v0.7.2`. Dummy pins Trashable `v0.12.2`, Cache `v0.6.2`, Root Switchable `v0.11.4`, and Accessible `v0.24.0`. Admin stays on `v2.7.0`.
+- Remove the Bundler gemspec prepend that widened sibling Recording Studio requirements.
+
+### Upgrade notes
+- Bump to `0.19.6`. No migration.
+
 ## [0.19.5] - 2026-10-30
 
 ### Fixed
@@ -1125,7 +1137,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.3...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.6...HEAD
+[0.19.6]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.5...v0.19.6
 [0.19.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.0...v0.19.1

@@ -3,6 +3,8 @@
 require "test_helper"
 
 class AIMetricsTest < ActiveSupport::TestCase
+  include AccessibleTestHelpers
+
   GrantContext = Struct.new(:access_grant)
   Grant = Struct.new(:actor)
 
@@ -437,7 +439,7 @@ class AIMetricsTest < ActiveSupport::TestCase
       recording: recording,
       actor: actor,
       role: role,
-      manager_actor: @staff
+      manager_actor: ensure_admin_manager!(recording)
     )
     raise result.error if result.failure?
   ensure
