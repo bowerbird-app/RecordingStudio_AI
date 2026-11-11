@@ -140,14 +140,14 @@ module RecordingStudioAI
       end
 
       def continue_stream(session, run, results, &block)
-        consume(session, run, block, reject_provider_failure: true) do |on_event|
+        consume(session, run, block, reject_provider_failure: true, submitted_results: results) do |on_event|
           adapter_for(session.provider).continue_hosted_agent_after_tool_results(
             provider_session_id: session.provider_session_id, results: results, &on_event
           )
         end
       end
 
-      def consume(session, run, handler, reject_provider_failure: false)
+      def consume(session, run, handler, reject_provider_failure: false, submitted_results: nil)
         finished = false
         pending = nil
         streaming do
@@ -162,10 +162,15 @@ module RecordingStudioAI
 
         recovered_turn(session, run, &handler)
       rescue Providers::HostedAgentFailure => e
+        release_still_pending_calls!(session, run, submitted_results) if submitted_results
         raise Failure, e.error if e.timeout?
         return recovered_turn(session, run, &handler) if e.dropped?
 
-        invalid_results!("hosted agent rejected the tool results") if reject_provider_failure
+        if reject_provider_failure
+          invalid_results!("hosted agent rejected the tool results") if e.tool_results_rejected?
+
+          raise Failure, e.error
+        end
 
         fail_and_raise(run, e)
       end
@@ -294,12 +299,13 @@ module RecordingStudioAI
 
       # The provider cancel has already been accepted. Usage on a turn is
       # best-effort and may be null, including after cancellation. Bill only
-      # what this read reports. A failed read leaves the run cancelled.
+      # what this read reports. A provider failure leaves the run cancelled.
+      # Any other error is raised.
       def usage_after_cancel(session, run)
         return if run.nil? || terminal_run?(run)
 
         fetch_recovery(session, run)
-      rescue StandardError => e
+      rescue Providers::HostedAgentFailure => e
         log_cancel_usage_failure(run, e)
         nil
       end
@@ -330,18 +336,45 @@ module RecordingStudioAI
         cancel_run(run, usage_after_cancel(session, run))
       end
 
+      # The provider read stays outside the row lock. The lock re-checks the
+      # run and records the call ids.
       def claim_pending_results!(session, run, results)
         invalid_results!("hosted agent turn is not waiting on tool results") if run.nil? || terminal_run?(run)
 
+        pending = pending_tool_calls(session, run)
         run.with_lock do
-          invalid_results!("hosted agent turn is not waiting on tool results") if terminal_run?(run)
+          invalid_results!("hosted agent turn is not waiting on tool results") if terminal_run?(run) || pending.empty?
 
-          pending = pending_tool_calls(session, run)
-          invalid_results!("hosted agent turn is not waiting on tool results") if pending.empty?
           match_pending_results!(pending, results)
           reject_claimed_calls!(run, results)
           remember_submitted_calls!(run, results)
         end
+      end
+
+      # A rejected, timed-out, or unsent post must not stick. Forget the claimed
+      # ids the provider still lists. A failed reread leaves them claimed.
+      def release_still_pending_calls!(session, run, results)
+        return if run.nil? || results.empty?
+
+        pending_ids = still_pending_call_ids(session, run)
+        return if pending_ids.nil?
+
+        releasing = results.map { |result| result[:call_id].to_s } & pending_ids
+        return if releasing.empty?
+
+        run.with_lock do
+          kept = submitted_call_ids(run) - releasing
+          run.update!(metadata: metadata_with(run, SUBMITTED_CALLS_KEY => kept))
+        end
+      end
+
+      def still_pending_call_ids(session, run)
+        snapshot = fetch_recovery(session, run)
+        return [] if snapshot.turn&.terminal?
+
+        Array(snapshot.tool_calls).map { |call| call.call_id.to_s }
+      rescue Providers::HostedAgentFailure
+        nil
       end
 
       def reject_claimed_calls!(run, results)

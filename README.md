@@ -558,16 +558,21 @@ has `arguments_error` and `raw_arguments`. Answer that call with `error:`.
 Call `submit_tool_results` after the `stream` block returns. Do not call it
 from inside that block. `stream` without a block returns an Enumerator that is
 not guarded: abandoning `stream(...).next` does not block a later submit on
-the same thread. `submit_tool_results` locks the run, re-checks the calls still
-pending, records those `call_id`s, then opens the provider event stream, posts
-one `agent.session.input.tool_result` per result, and yields the events that
-follow. A result is `{ call_id:, turn_id:, output: }` or `{ call_id:, turn_id:, error: }`.
-`output` and `error` are Strings of at most `Agents::Request::MAX_TOOL_RESULT_BYTES`
-(262144) bytes. `turn_id` has to match the pending call. An unknown `call_id`,
-a duplicate `call_id`, a `call_id` already submitted, a mismatched `turn_id`,
-or a turn that is finished or not waiting raises `invalid_request` and leaves
-the run and its billing unchanged. A provider rejection of the post raises
-that same error and leaves the run running. Do this until `tool_calls` is empty:
+the same thread. `submit_tool_results` reads the pending calls, then locks the
+run and re-checks it. It records those `call_id`s, opens the provider event
+stream, posts one `agent.session.input.tool_result` per result, and yields the
+events that follow. A result is `{ call_id:, turn_id:, output: }` or
+`{ call_id:, turn_id:, error: }`. `output` and `error` are Strings of at most
+`Agents::Request::MAX_TOOL_RESULT_BYTES` (262144) bytes. `turn_id` has to match
+the pending call. An unknown `call_id`, a duplicate `call_id`, a `call_id`
+already submitted, a mismatched `turn_id`, or a turn that is finished or not
+waiting raises `invalid_request` and leaves the run and its billing unchanged.
+A 4xx rejection of that post, other than authentication or a rate limit, raises
+the same error and leaves the run running. Call ids the provider still lists as
+pending are forgotten, so those results can be submitted again. A call the
+provider already accepted stays recorded. Authentication, a rate limit, a 5xx
+response, a timeout, and a failure while reading the continuation keep the
+provider error and leave the run running. Do this until `tool_calls` is empty:
 
 ```ruby
 session = RecordingStudioAI::Agents.create_session(
@@ -613,8 +618,9 @@ provider, then reads the turn and bills the usage that read reports, once.
 It then starts the new message as its own turn. `cancel` does the same billing.
 OpenAI reports turn usage on a best-effort basis. It can be null when unknown,
 including after `agent.session.turn.cancelled`, and a later read can change
-the counts. Null is not billed as zero. If the usage read fails, the run id
-and error class are logged and the run stays cancelled. Cancelling a finished
+the counts. Null is not billed as zero. If the usage read fails with a
+hosted-agent provider error, the run id and error class are logged and the run
+stays cancelled. Any other error from that read is raised. Cancelling a finished
 run does not bill it again.
 
 Each turn is one `hosted_agent` run, attributed with the caller's `root_recording` and

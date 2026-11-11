@@ -62,7 +62,7 @@ module RecordingStudioAI
       end
 
       def submit_hosted_agent_tool_results(provider_session_id:, results:)
-        hosted_request(session_lookup: true) do
+        hosted_request(session_lookup: true, tool_results: true) do
           client.beta.agents.sessions.events.create(
             provider_session_id,
             events: results.map { |result| tool_result_input(result) }
@@ -162,17 +162,31 @@ module RecordingStudioAI
         event.merge(output: result[:output])
       end
 
-      def hosted_request(session_lookup:)
+      def hosted_request(session_lookup:, tool_results: false)
         yield
       rescue StandardError => e
-        raise_hosted_failure(e, session_lookup: session_lookup, dropped: false)
+        raise_hosted_failure(e, session_lookup: session_lookup, dropped: false, tool_results: tool_results)
       end
 
-      def raise_hosted_failure(error, session_lookup:, dropped:)
+      def raise_hosted_failure(error, session_lookup:, dropped:, tool_results: false)
         raise error unless ProviderError.expected?(error)
 
+        status = ProviderError.status_for(error)
         mapped = map_hosted_error(error, session_lookup: session_lookup)
-        raise HostedAgentFailure.new(mapped, dropped: dropped && mapped.category == "connection")
+        raise HostedAgentFailure.new(
+          mapped,
+          dropped: dropped && mapped.category == "connection",
+          tool_results_rejected: tool_results && tool_result_rejection?(status, mapped)
+        )
+      end
+
+      # 401 and 429 are 4xx and are not a rejection of the tool-result body.
+      # 5xx, timeouts, and connection failures are not either.
+      def tool_result_rejection?(status, mapped)
+        return false if mapped.retryable? || mapped.category == "authentication"
+        return false if status.nil?
+
+        status >= 400 && status < 500 && status != 401 && status != 429
       end
 
       def map_hosted_error(error, session_lookup:)

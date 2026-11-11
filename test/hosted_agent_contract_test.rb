@@ -9,8 +9,8 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     provider_key :openai
 
     attr_reader :creates, :submits, :streams, :cancels, :deletes, :recoveries, :tool_results
-    attr_accessor :events, :items, :stream_failure, :default_turn, :tool_calls, :on_tool_results,
-                  :recovery_failure
+    attr_accessor :events, :items, :stream_failure, :tool_result_failure, :default_turn, :tool_calls,
+                  :on_tool_results, :recovery_failure
 
     def initialize(configuration: nil)
       super
@@ -28,6 +28,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       @items = []
       @on_tool_results = nil
       @recovery_failure = nil
+      @tool_result_failure = nil
     end
 
     def recovery_turns=(turns)
@@ -69,6 +70,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     def continue_hosted_agent_after_tool_results(provider_session_id:, results:, &)
       tool_results << { provider_session_id: provider_session_id, results: results }
       on_tool_results&.call
+      raise tool_result_failure if tool_result_failure
       raise stream_failure if stream_failure
 
       events.each(&)
@@ -621,7 +623,11 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_empty @spends
   end
 
-  def test_a_second_submit_after_claimed_call_ids_does_not_fail_the_billed_run
+  # Same connection as the in-flight submit. Persistence tests use a
+  # per-connection SQLite :memory: database, so a second thread from the pool
+  # cannot see this run or take its row lock. This checks the recorded-id
+  # rejection, which runs after the ids are saved and before the post returns.
+  def test_a_second_submit_on_the_same_connection_is_rejected_after_call_ids_are_recorded
     session = create_session
     call = tool_call("call_1")
     @fake.tool_calls = [call]
@@ -662,10 +668,12 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     call = tool_call("call_1")
     @fake.tool_calls = [call]
     @fake.default_turn = active_turn
-    @fake.stream_failure = RecordingStudioAI::Providers::HostedAgentFailure.new(
-      RecordingStudioAI::Contracts::NormalizedError.new(
-        category: "provider_error", code: "provider_error", message: "Provider request failed.", retryable: false
-      )
+    @fake.tool_result_failure = hosted_failure(
+      "provider_error",
+      code: "http_400",
+      message: "Provider request failed.",
+      retryable: false,
+      tool_results_rejected: true
     )
 
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
@@ -677,6 +685,142 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "hosted agent rejected the tool results", error.message
     assert_equal "running", run.status
     assert_empty @spends
+    assert_equal [], run.metadata["submitted_tool_call_ids"]
+  end
+
+  def test_a_rejected_tool_result_can_be_retried_and_bills_once
+    session = create_session
+    call = tool_call("call_1")
+    @fake.tool_calls = [call]
+    @fake.default_turn = active_turn
+    @fake.tool_result_failure = hosted_failure(
+      "provider_error",
+      code: "http_400",
+      message: "Provider request failed.",
+      retryable: false,
+      tool_results_rejected: true
+    )
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Agents.submit_tool_results(**session_args(session), results: [tool_result(call)]) { |_event| }
+    end
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal "invalid_request", error.code
+    assert_equal "running", run.status
+    assert_empty @spends
+    assert_equal [], run.metadata["submitted_tool_call_ids"]
+
+    @fake.tool_result_failure = nil
+    @fake.events = [
+      RecordingStudioAI::Providers::StreamEvent.new(
+        type: "turn_completed", usage: usage, metadata: { provider_turn_id: "turn_9" }
+      )
+    ]
+    turn = RecordingStudioAI::Agents.submit_tool_results(
+      **session_args(session), results: [tool_result(call)]
+    ) { |_event| }
+
+    assert_equal "completed", turn.status
+    assert_equal "completed", run.reload.status
+    assert_equal 1, @spends.length
+    assert_equal 14, @spends.first[:quantity]
+    assert_equal 2, @fake.tool_results.length
+  end
+
+  def test_submit_failures_other_than_a_4xx_rejection_keep_the_provider_error
+    session = create_session
+    call = tool_call("call_1")
+    @fake.tool_calls = [call]
+    @fake.default_turn = active_turn
+    [
+      ["timeout", "timeout", "Provider request timed out.", true],
+      ["authentication", "invalid_credentials", "Provider authentication failed.", false],
+      ["rate_limit", "rate_limit_exceeded", "Provider rate limit exceeded.", true],
+      ["provider_unavailable", "503", "Provider is unavailable.", true]
+    ].each do |category, code, message, retryable|
+      @fake.tool_result_failure = hosted_failure(category, code: code, message: message, retryable: retryable)
+      spends = @spends.length
+
+      error = assert_raises(RecordingStudioAI::Agents::Failure) do
+        RecordingStudioAI::Agents.submit_tool_results(**session_args(session), results: [tool_result(call)]) { |_event| }
+      end
+      run = RecordingStudioAI::Run.find(session.run_id)
+
+      assert_equal category, error.error.category, category
+      assert_equal retryable, error.error.retryable?, category
+      assert_equal "running", run.status, category
+      assert_equal spends, @spends.length, category
+      assert_equal [], run.metadata["submitted_tool_call_ids"], category
+    end
+  end
+
+  def test_a_continuation_failure_keeps_an_accepted_call_recorded
+    session = create_session
+    call = tool_call("call_1")
+    @fake.tool_calls = [call]
+    @fake.default_turn = active_turn
+    @fake.on_tool_results = -> { @fake.tool_calls = [] }
+    @fake.stream_failure = hosted_failure(
+      "provider_unavailable", code: "503", message: "Provider is unavailable.", retryable: true
+    )
+
+    error = assert_raises(RecordingStudioAI::Agents::Failure) do
+      RecordingStudioAI::Agents.submit_tool_results(**session_args(session), results: [tool_result(call)]) { |_event| }
+    end
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal "provider_unavailable", error.error.category
+    assert_predicate error.error, :retryable?
+    assert_equal "running", run.status
+    assert_equal ["call_1"], run.metadata["submitted_tool_call_ids"]
+  end
+
+  def test_a_continuation_failure_releases_call_ids_the_provider_still_lists
+    session = create_session
+    call = tool_call("call_1")
+    @fake.tool_calls = [call]
+    @fake.default_turn = active_turn
+    @fake.stream_failure = hosted_failure(
+      "provider_error", code: "http_400", message: "Provider request failed.", retryable: false
+    )
+
+    error = assert_raises(RecordingStudioAI::Agents::Failure) do
+      RecordingStudioAI::Agents.submit_tool_results(**session_args(session), results: [tool_result(call)]) { |_event| }
+    end
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal "provider_error", error.error.category
+    refute_predicate error.error, :retryable?
+    assert_equal "running", run.status
+    assert_equal [], run.metadata["submitted_tool_call_ids"]
+  end
+
+  def test_a_rejected_submit_keeps_claimed_ids_when_the_pending_reread_fails
+    session = create_session
+    call = tool_call("call_1")
+    @fake.tool_calls = [call]
+    @fake.default_turn = active_turn
+    @fake.tool_result_failure = hosted_failure(
+      "provider_error",
+      code: "http_400",
+      message: "Provider request failed.",
+      retryable: false,
+      tool_results_rejected: true
+    )
+    @fake.on_tool_results = lambda do
+      @fake.recovery_failure = hosted_failure(
+        "provider_unavailable", code: "503", message: "Provider is unavailable.", retryable: true
+      )
+    end
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Agents.submit_tool_results(**session_args(session), results: [tool_result(call)]) { |_event| }
+    end
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal "invalid_request", error.code
+    assert_equal "running", run.status
     assert_equal ["call_1"], run.metadata["submitted_tool_call_ids"]
   end
 
@@ -700,6 +844,22 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_empty @spends
     assert_match(/run_id=#{run.id}/, messages.join(" "))
     assert_match(/HostedAgentFailure/, messages.join(" "))
+  end
+
+  def test_cancel_usage_fetch_raises_unexpected_errors
+    session = create_session
+    run = RecordingStudioAI::Run.find(session.run_id)
+    @fake.recovery_failure = RuntimeError.new("metadata store down")
+    messages = []
+
+    Rails.logger.stub(:warn, ->(message = nil) { messages << message.to_s }) do
+      assert_raises(RuntimeError) { RecordingStudioAI::Agents.cancel(**session_args(session)) }
+    end
+
+    assert_equal ["sess_1"], @fake.cancels
+    assert_equal "running", run.reload.status
+    assert_empty @spends
+    assert_empty messages
   end
 
   def test_recovery_reports_pending_tool_calls
@@ -876,6 +1036,13 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
 
   def max_result_bytes
     RecordingStudioAI::Agents::Request::MAX_TOOL_RESULT_BYTES
+  end
+
+  def hosted_failure(category, code:, message:, retryable:, tool_results_rejected: false)
+    error = RecordingStudioAI::Contracts::NormalizedError.new(
+      category: category, code: code, message: message, retryable: retryable
+    )
+    RecordingStudioAI::Providers::HostedAgentFailure.new(error, tool_results_rejected: tool_results_rejected)
   end
 
   def item(role, text)

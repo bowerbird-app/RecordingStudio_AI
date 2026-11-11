@@ -42,6 +42,7 @@ class OpenAIHostedAgentTest < Minitest::Test
 
     def create(session_id, **params)
       @sessions.record(:create)
+      raise @sessions.post_error if @sessions.post_error
       raise @sessions.error if @sessions.error
 
       creates << [session_id, params]
@@ -85,7 +86,7 @@ class OpenAIHostedAgentTest < Minitest::Test
 
   class Sessions
     attr_reader :events, :turns, :items, :create_params, :deleted, :retrieved, :order
-    attr_accessor :error, :stream, :required_actions
+    attr_accessor :error, :post_error, :stream, :required_actions
 
     def initialize
       @events = Events.new(self)
@@ -221,6 +222,55 @@ class OpenAIHostedAgentTest < Minitest::Test
       },
       posted[1]
     )
+  end
+
+  def test_a_4xx_tool_result_post_is_marked_rejected
+    @sessions.stream = Stream.new([])
+    [400, 404, 422].each do |status|
+      @sessions.post_error = HttpError.new(status, "invalid_tool_result")
+      @sessions.order.clear
+      failure = assert_raises(RecordingStudioAI::Providers::HostedAgentFailure) do
+        continue_with_tool_result
+      end
+
+      assert_predicate failure, :tool_results_rejected?, status.to_s
+      refute_predicate failure.error, :retryable?
+      assert @sessions.stream.closed
+      assert_equal %i[stream create], @sessions.order
+    end
+  end
+
+  def test_auth_rate_limit_and_server_errors_on_the_tool_result_post_are_not_rejections
+    @sessions.stream = Stream.new([])
+    [
+      [401, "authentication", false],
+      [429, "rate_limit", true],
+      [503, "provider_unavailable", true],
+      [408, "timeout", true]
+    ].each do |status, category, retryable|
+      @sessions.post_error = HttpError.new(status)
+      @sessions.order.clear
+      failure = assert_raises(RecordingStudioAI::Providers::HostedAgentFailure) do
+        continue_with_tool_result
+      end
+
+      refute_predicate failure, :tool_results_rejected?, status.to_s
+      assert_equal category, failure.error.category
+      assert_equal retryable, failure.error.retryable?
+    end
+  end
+
+  def test_a_continuation_error_is_not_a_tool_result_rejection
+    @sessions.stream = Stream.new([], error: HttpError.new(400, "invalid_tool_result"))
+
+    failure = assert_raises(RecordingStudioAI::Providers::HostedAgentFailure) do
+      continue_with_tool_result
+    end
+
+    refute_predicate failure, :tool_results_rejected?
+    assert_equal "provider_error", failure.error.category
+    assert_equal %i[stream create], @sessions.order
+    assert @sessions.stream.closed
   end
 
   def test_malformed_arguments_are_a_tool_call_that_can_be_recovered_and_answered
@@ -383,6 +433,13 @@ class OpenAIHostedAgentTest < Minitest::Test
         turn: { id: "turn_1" }
       }
     ]
+  end
+
+  def continue_with_tool_result
+    @adapter.continue_hosted_agent_after_tool_results(
+      provider_session_id: "sess_1",
+      results: [{ call_id: "call_1", turn_id: "turn_1", output: "ok" }]
+    ) { |_event| }
   end
 
   def create_session
