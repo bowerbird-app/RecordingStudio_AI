@@ -15,6 +15,8 @@ module RecordingStudioAI
       TOOL_RESULT_KEYS = (%i[results] + SESSION_KEYS).freeze
       FUNCTION_TOOL_KEYS = %w[type name description parameters defer_loading].freeze
       RESULT_KEYS = %w[call_id turn_id output error].freeze
+      # Byte cap for a hosted function result's output or error string.
+      MAX_TOOL_RESULT_BYTES = 256 * 1024
 
       module_function
 
@@ -107,10 +109,15 @@ module RecordingStudioAI
 
       def function_tools!(value)
         return if value.nil?
+        return if value.is_a?(Array) && value.empty?
 
         invalid!("tools must be an Array of function definitions") unless value.is_a?(Array)
 
-        value.map { |tool| function_tool!(tool) }
+        tools = value.map { |tool| function_tool!(tool) }
+        duplicate = tools.map { |tool| tool[:name] }.tally.find { |_name, count| count > 1 }
+        invalid!("duplicate function tool name: #{duplicate.first}") if duplicate
+
+        tools
       end
 
       def function_tool!(tool)
@@ -162,7 +169,11 @@ module RecordingStudioAI
       def tool_results(value)
         invalid!("results must be a non-empty Array") unless value.is_a?(Array) && !value.empty?
 
-        value.map { |result| tool_result!(result) }
+        results = value.map { |result| tool_result!(result) }
+        duplicate = results.map { |result| result[:call_id] }.tally.find { |_id, count| count > 1 }
+        invalid!("duplicate tool result call_id: #{duplicate.first}") if duplicate
+
+        results
       end
 
       def tool_result!(result)
@@ -181,15 +192,21 @@ module RecordingStudioAI
       end
 
       def result_output!(output)
-        return output if output.is_a?(String)
+        invalid!("tool result output must be a String") unless output.is_a?(String)
 
-        invalid!("tool result output must be a String")
+        bounded_result!(output, "output")
       end
 
       def result_error!(message)
-        return message if message.is_a?(String) && !message.strip.empty?
+        invalid!("tool result error must be a non-empty String") unless message.is_a?(String) && !message.strip.empty?
 
-        invalid!("tool result error must be a non-empty String")
+        bounded_result!(message, "error")
+      end
+
+      def bounded_result!(value, name)
+        return value if value.bytesize <= MAX_TOOL_RESULT_BYTES
+
+        invalid!("tool result #{name} exceeds #{MAX_TOOL_RESULT_BYTES} bytes")
       end
 
       def result_id!(value, name)

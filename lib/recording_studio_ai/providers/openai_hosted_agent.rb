@@ -119,7 +119,7 @@ module RecordingStudioAI
 
       def session_create_params(instructions, model, input, idempotency_key, tools)
         agent = { model: model, instructions: instructions }.compact
-        agent[:tools] = tools unless tools.nil?
+        agent[:tools] = tools if tools.is_a?(Array) && !tools.empty?
         params = {
           agent: agent,
           environment: ENVIRONMENT,
@@ -337,33 +337,46 @@ module RecordingStudioAI
       def function_tool_call(action)
         return unless read_value(action, :type).to_s == "function_call"
 
+        parsed = parsed_tool_arguments(read_value(action, :arguments))
         Agents::ToolCall.new(
           call_id: read_value(action, :call_id),
           name: read_value(action, :name),
-          arguments: parsed_tool_arguments(read_value(action, :arguments)),
-          provider_turn_id: read_value(action, :turn_id)
+          arguments: parsed[:arguments],
+          provider_turn_id: read_value(action, :turn_id),
+          arguments_error: parsed[:arguments_error],
+          raw_arguments: parsed[:raw_arguments]
         )
       end
 
       def parsed_tool_arguments(raw)
         parsed = raw.is_a?(String) ? JSON.parse(raw) : raw
         parsed = parsed.to_h if tool_argument_object?(parsed)
-        return parsed if parsed.is_a?(Hash)
+        return { arguments: parsed } if parsed.is_a?(Hash)
 
-        invalid_tool_arguments!
+        unparsed_tool_arguments(raw)
       rescue JSON::ParserError
-        invalid_tool_arguments!
+        unparsed_tool_arguments(raw)
       end
 
       def tool_argument_object?(parsed)
         !parsed.is_a?(Hash) && !parsed.is_a?(Array) && !parsed.nil? && parsed.respond_to?(:to_h)
       end
 
-      def invalid_tool_arguments!
-        raise RecordingStudioAI::Errors::ContractValidationError.new(
-          "function call arguments must be a JSON object",
-          code: "invalid_request"
-        )
+      def unparsed_tool_arguments(raw)
+        {
+          arguments: nil,
+          arguments_error: "function call arguments must be a JSON object",
+          raw_arguments: raw_argument_text(raw)
+        }
+      end
+
+      def raw_argument_text(raw)
+        return raw if raw.is_a?(String)
+        return "" if raw.nil?
+
+        JSON.generate(raw)
+      rescue JSON::GeneratorError, TypeError
+        raw.to_s
       end
 
       def subagent_event?(event)

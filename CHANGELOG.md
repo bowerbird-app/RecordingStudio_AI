@@ -11,14 +11,17 @@ Versioning and Keep a Changelog.
 ## [0.20.0] - 2026-11-11
 
 ### Added
-- Hosted agent session create accepts `tools:`, an array of function definitions (`type`, `name`, `description`, `parameters`, optional `defer_loading`). The OpenAI adapter sends them as `agent.tools`. Leaving `tools` out sends the same create request as before.
-- `Agents.stream` yields `tool_calls` when the provider emits `agent.session.requires_action`. Each `Agents::ToolCall` has `call_id`, `name`, parsed `arguments`, and `provider_turn_id`. The turn stays running. `turn.status` is `requires_action` and `turn.tool_calls` holds the pending calls.
-- `Agents.submit_tool_results(session:, results:, **attribution)` posts one `agent.session.input.tool_result` per result, then continues the session stream. A result is `{ call_id:, turn_id:, output: }` or `{ call_id:, turn_id:, error: }`. `output` is a string.
-- `Agents.recover` and a dropped or resumed `stream` report unanswered function calls on `tool_calls`. Historical items are not treated as pending.
+- Hosted agent session create accepts `tools:`, an array of function definitions (`type`, `name`, `description`, `parameters`, optional `defer_loading`). The OpenAI adapter sends them as `agent.tools`. Leaving `tools` out, or passing `tools: []`, sends the same create request as before. Duplicate function names are rejected.
+- `Agents.stream` yields `tool_calls` when the provider emits `agent.session.requires_action`. Each `Agents::ToolCall` has `call_id`, `name`, `arguments`, and `provider_turn_id`. `arguments` is the parsed object. When the provider payload is not a JSON object, `arguments` is nil and the call also has `arguments_error` and `raw_arguments`. Answer that call with `error:`. The turn stays running. `turn.status` is `requires_action` and `turn.tool_calls` holds the pending calls.
+- `Agents.submit_tool_results(session:, results:, **attribution)` posts one `agent.session.input.tool_result` per result, then continues the session stream. A result is `{ call_id:, turn_id:, output: }` or `{ call_id:, turn_id:, error: }`. `output` and `error` are strings capped at `Agents::Request::MAX_TOOL_RESULT_BYTES` (262144). Duplicate `call_id`s are rejected.
+- `submit_tool_results` checks the calls still pending before it posts. An unknown `call_id`, a duplicate `call_id`, a `turn_id` mismatch, or a turn that is finished or not waiting raises `invalid_request`. That rejection does not call the provider and does not fail or bill the run.
+- `Agents.recover` and a dropped or resumed `stream` report unanswered function calls on `tool_calls`, including calls whose arguments did not parse. Historical items are not treated as pending.
+- A new message while a run is waiting on tool calls cancels that run, bills the tokens already used once, and starts the new message as its own turn. `Agents.cancel` bills a running turn's usage once. Cancelling a finished run does not bill again.
 
 ### Upgrade notes
-- Bump to `0.20.0`. No migration. Hosts that do not pass `tools` keep the previous session behavior.
-- Call `submit_tool_results` after `stream` returns, not from inside the stream block. Pass a block, or iterate the Enumerator, to read the rest of the turn.
+- Bump to `0.20.0`. No migration. Hosts that do not pass `tools`, or pass an empty array, keep the previous session behavior.
+- Call `submit_tool_results` after `stream` returns, not from inside the stream block or while its Enumerator is still open. Pass a block, or iterate the Enumerator, to read the rest of the turn.
+- Answer a call with `arguments_error` by sending `error:`. Do not retry a result the provider is no longer waiting on. A later message on a paused session cancels that run and bills the tokens it had already used.
 
 ## [0.19.6] - 2026-11-04
 

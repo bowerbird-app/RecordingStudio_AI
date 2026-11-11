@@ -164,12 +164,18 @@ class OpenAIHostedAgentTest < Minitest::Test
     assert_equal tools, @sessions.create_params.dig(:agent, :tools)
   end
 
-  def test_empty_tools_array_is_sent
+  def test_empty_tools_array_matches_omitted_tools
     @adapter.create_hosted_agent_session(
-      instructions: nil, model: "gpt-6-astra", input: "Hello", idempotency_key: "create-1", tools: []
+      instructions: "Be brief.", model: "gpt-6-astra", input: "Hello", idempotency_key: "create-1"
+    )
+    omitted = @sessions.create_params
+
+    @adapter.create_hosted_agent_session(
+      instructions: "Be brief.", model: "gpt-6-astra", input: "Hello", idempotency_key: "create-1", tools: []
     )
 
-    assert_equal [], @sessions.create_params.dig(:agent, :tools)
+    assert_equal omitted, @sessions.create_params
+    refute @sessions.create_params[:agent].key?(:tools)
   end
 
   def test_requires_action_becomes_a_tool_call_and_stops_that_read
@@ -217,24 +223,37 @@ class OpenAIHostedAgentTest < Minitest::Test
     )
   end
 
-  def test_function_call_arguments_must_be_a_json_object
-    @sessions.stream = Stream.new(
-      [
-        {
-          type: "agent.session.requires_action",
-          session: {
-            required_actions: [
-              { type: "function_call", turn_id: "turn_1", call_id: "call_1", name: "list_recordings", arguments: "[]" }
-            ]
-          }
-        }
-      ]
-    )
-    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
-      @adapter.stream_hosted_agent_session(provider_session_id: "sess_1") { |_event| }
-    end
-    assert_equal "invalid_request", error.code
-    assert_equal "function call arguments must be a JSON object", error.message
+  def test_malformed_arguments_are_a_tool_call_that_can_be_recovered_and_answered
+    action = {
+      type: "function_call", turn_id: "turn_1", call_id: "call_1", name: "list_recordings", arguments: "[]"
+    }
+    @sessions.stream = Stream.new([{ type: "agent.session.requires_action", session: { required_actions: [action] } }])
+    events = []
+    @adapter.stream_hosted_agent_session(provider_session_id: "sess_1") { |event| events << event }
+    streamed = events.first.tool_calls.first
+
+    assert_nil streamed.arguments
+    assert_equal "function call arguments must be a JSON object", streamed.arguments_error
+    assert_equal "[]", streamed.raw_arguments
+
+    @sessions.required_actions = [action]
+    recovery = @adapter.recover_hosted_agent_session(provider_session_id: "sess_1", provider_turn_id: "turn_1")
+    call = recovery.tool_calls.first
+    assert_nil call.arguments
+    assert_equal "[]", call.raw_arguments
+
+    @sessions.stream = Stream.new(stream_events.last(2))
+    continued = []
+    @adapter.continue_hosted_agent_after_tool_results(
+      provider_session_id: "sess_1",
+      results: [{ call_id: call.call_id, turn_id: call.provider_turn_id, error: "could not read arguments" }]
+    ) { |event| continued << event.type }
+
+    posted = @sessions.events.creates.last[1][:events].first
+    assert_equal %w[message_completed turn_completed], continued
+    assert_equal false, posted[:success]
+    assert_equal "could not read arguments", posted[:error]
+    assert_equal "call_1", posted[:call_id]
   end
 
   def test_recover_reports_pending_function_calls_only

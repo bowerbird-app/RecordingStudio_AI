@@ -366,7 +366,8 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       { tools: [{ type: "function", name: "Bad Name", description: "x", parameters: { type: "object" } }] },
       { tools: [{ type: "function", name: "list_recordings", description: " ", parameters: { type: "string" } }] },
       { tools: [{ type: "function", name: "list_recordings", description: "List.",
-                  parameters: { type: "object" }, extra: 1 }] }
+                  parameters: { type: "object" }, extra: 1 }] },
+      { tools: [function_tool, function_tool] }
     ].each do |extra|
       error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { create_session(**extra) }
       assert_equal "invalid_request", error.code
@@ -376,7 +377,13 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       [],
       [{ call_id: "call_1", turn_id: "turn_1" }],
       [{ call_id: "call_1", turn_id: "turn_1", output: "ok", error: "no" }],
-      [{ call_id: "call_1", turn_id: "turn_1", output: { ok: true } }]
+      [{ call_id: "call_1", turn_id: "turn_1", output: { ok: true } }],
+      [
+        { call_id: "call_1", turn_id: "turn_1", output: "ok" },
+        { call_id: "call_1", turn_id: "turn_1", error: "again" }
+      ],
+      [{ call_id: "call_1", turn_id: "turn_1", output: "x" * (max_result_bytes + 1) }],
+      [{ call_id: "call_1", turn_id: "turn_1", error: "x" * (max_result_bytes + 1) }]
     ].each do |results|
       error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
         RecordingStudioAI::Agents.submit_tool_results(**session_args(session), results: results) { |_event| }
@@ -397,13 +404,21 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     create_session(tools: tools)
 
     assert_equal [function_tool], @fake.creates.first[:tools]
-    assert_equal 1, RecordingStudioAI::Run.count
+
+    create_session
+    omitted = @fake.creates.last
+    create_session(tools: [])
+
+    assert_nil omitted[:tools]
+    assert_equal omitted, @fake.creates.last
+    runs = RecordingStudioAI::Run.count
+    creates = @fake.creates.length
 
     assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
       create_session(tools: [{ type: "mcp", server_label: "rs" }])
     end
-    assert_equal 1, RecordingStudioAI::Run.count
-    assert_equal 1, @fake.creates.length
+    assert_equal runs, RecordingStudioAI::Run.count
+    assert_equal creates, @fake.creates.length
   end
 
   def test_submit_tool_results_round_trip
@@ -431,7 +446,8 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     end
     assert_equal "invalid_request", error.code
 
-    @fake.tool_calls = []
+    second = tool_call("call_2")
+    @fake.tool_calls = [call, second]
     @fake.default_turn = nil
     @fake.events = [
       RecordingStudioAI::Providers::StreamEvent.new(
@@ -443,16 +459,159 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     ]
     continued = []
     turn = RecordingStudioAI::Agents.submit_tool_results(
-      **session_args(session), results: [tool_result(call), tool_result(call, error: "missing")]
+      **session_args(session), results: [tool_result(call), tool_result(second, error: "missing")]
     ) { |event| continued << event }
 
     assert_equal %w[text_delta turn_completed], continued.map(&:type)
     assert_equal "completed", turn.status
     assert_empty turn.tool_calls
     posted = @fake.tool_results.last[:results]
+    posted_ids = posted.map { |result| result[:call_id] }
+    assert_equal %w[call_1 call_2], posted_ids
     assert_equal "ok", posted[0][:output]
     assert_equal "missing", posted[1][:error]
     assert_equal "completed", RecordingStudioAI::Run.find(session.run_id).status
+  end
+
+  def test_submit_tool_results_rejects_results_that_are_not_pending
+    session = create_session
+    call = tool_call("call_1")
+    @fake.tool_calls = [call]
+    @fake.default_turn = active_turn
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_rejected_results(session, run, [{ call_id: "call_stale", turn_id: "turn_9", output: "ok" }])
+    assert_rejected_results(session, run, [{ call_id: "call_1", turn_id: "turn_other", output: "ok" }])
+    assert_empty @fake.tool_results
+    assert_empty @spends
+
+    @fake.tool_calls = []
+    assert_rejected_results(session, run, [tool_result(call)])
+    assert_equal "running", run.reload.status
+
+    @fake.events = [
+      RecordingStudioAI::Providers::StreamEvent.new(
+        type: "turn_completed", usage: usage, metadata: { provider_turn_id: "turn_9" }
+      )
+    ]
+    @fake.tool_calls = [call]
+    RecordingStudioAI::Agents.submit_tool_results(**session_args(session), results: [tool_result(call)]) { |_event| }
+    assert_equal "completed", run.reload.status
+    assert_equal 1, @spends.length
+    assert_equal 1, @fake.tool_results.length
+
+    assert_rejected_results(session, run, [tool_result(call)])
+    assert_equal "completed", run.reload.status
+    assert_equal 1, @spends.length
+    assert_equal 1, @fake.tool_results.length
+  end
+
+  def test_a_new_message_cancels_a_paused_run_and_bills_its_usage_once
+    session = create_session
+    @fake.tool_calls = [tool_call("call_1")]
+    @fake.default_turn = paused_turn
+    paused = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+
+    assert_equal "requires_action", paused.status
+    assert_equal "running", RecordingStudioAI::Run.find(session.run_id).status
+    assert_empty @spends
+
+    follow = RecordingStudioAI::Agents.send_input(
+      **session_args(session), input: "next question", idempotency_key: "next-1"
+    )
+    paused_run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal "cancelled", paused_run.status
+    assert_equal 14, paused_run.total_tokens
+    assert_equal 1, @spends.length
+    assert_equal 14, @spends.first[:quantity]
+    assert_equal "ai-hosted-agent-turn:turn_1", @spends.first[:idempotency_key]
+    assert_equal ["sess_1"], @fake.cancels
+    assert_equal "next-1", @fake.submits.last[:idempotency_key]
+    refute_equal paused_run.id, follow.run_id
+    assert_equal "running", RecordingStudioAI::Run.find(follow.run_id).status
+    assert_equal "sess_1", follow.provider_session_id
+  end
+
+  def test_cancelling_a_terminal_run_does_not_bill_again
+    session = create_session
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal "completed", run.status
+    assert_equal 1, @spends.length
+
+    cancelled = RecordingStudioAI::Agents.cancel(**session_args(session))
+
+    assert_equal "cancelled", cancelled.status
+    assert_equal "completed", run.reload.status
+    assert_equal 1, @spends.length
+    assert_equal ["sess_1"], @fake.cancels
+  end
+
+  def test_cancel_bills_a_paused_run_once
+    session = create_session
+    @fake.tool_calls = [tool_call("call_1")]
+    @fake.default_turn = paused_turn
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+
+    RecordingStudioAI::Agents.cancel(**session_args(session))
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal "cancelled", run.status
+    assert_equal 14, run.total_tokens
+    assert_equal 1, @spends.length
+
+    RecordingStudioAI::Agents.cancel(**session_args(session))
+
+    assert_equal "cancelled", run.reload.status
+    assert_equal 1, @spends.length
+    assert_equal 2, @fake.cancels.length
+  end
+
+  def test_unparsed_tool_arguments_can_be_recovered_and_answered
+    session = create_session
+    call = RecordingStudioAI::Agents::ToolCall.new(
+      call_id: "call_bad", name: "list_recordings", arguments: nil, provider_turn_id: "turn_9",
+      arguments_error: "function call arguments must be a JSON object", raw_arguments: "[]"
+    )
+    @fake.tool_calls = [call]
+    @fake.default_turn = active_turn
+    recovery = RecordingStudioAI::Agents.recover(**session_args(session))
+
+    assert_nil recovery.tool_calls.first.arguments
+    assert_equal "[]", recovery.tool_calls.first.raw_arguments
+    assert_equal "function call arguments must be a JSON object", recovery.tool_calls.first.arguments_error
+    assert_equal "running", RecordingStudioAI::Run.find(session.run_id).status
+
+    @fake.events = [
+      RecordingStudioAI::Providers::StreamEvent.new(
+        type: "turn_completed", usage: usage, metadata: { provider_turn_id: "turn_9" }
+      )
+    ]
+    turn = RecordingStudioAI::Agents.submit_tool_results(
+      **session_args(session),
+      results: [{ call_id: "call_bad", turn_id: "turn_9", error: "could not read arguments" }]
+    ) { |_event| }
+
+    assert_equal "completed", turn.status
+    assert_equal "could not read arguments", @fake.tool_results.last[:results].first[:error]
+  end
+
+  def test_stream_enumerator_next_keeps_submit_tool_results_blocked
+    session = create_session
+    enum = RecordingStudioAI::Agents.stream(**session_args(session))
+    assert_equal "text_delta", enum.next.type
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Agents.submit_tool_results(**session_args(session), results: [tool_result]) { |_event| }
+    end
+
+    assert_equal "invalid_request", error.code
+    assert_match(/after stream returns/, error.message)
+    assert_empty @fake.tool_results
+  ensure
+    drain_enumerator(enum)
   end
 
   def test_recovery_reports_pending_tool_calls
@@ -605,6 +764,38 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     RecordingStudioAI::Providers::HostedTurn.new(
       provider_turn_id: "turn_1", status: "in_progress", usage: nil, error: nil
     )
+  end
+
+  def paused_turn
+    RecordingStudioAI::Providers::HostedTurn.new(
+      provider_turn_id: "turn_1", status: "in_progress", usage: usage, error: nil
+    )
+  end
+
+  def assert_rejected_results(session, run, results)
+    before = run.reload.attributes
+    spends = @spends.length
+    posted = @fake.tool_results.length
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Agents.submit_tool_results(**session_args(session), results: results) { |_event| }
+    end
+
+    assert_equal "invalid_request", error.code
+    assert_equal before, run.reload.attributes
+    assert_equal spends, @spends.length
+    assert_equal posted, @fake.tool_results.length
+  end
+
+  def max_result_bytes
+    RecordingStudioAI::Agents::Request::MAX_TOOL_RESULT_BYTES
+  end
+
+  def drain_enumerator(enum)
+    return unless enum
+
+    loop { enum.next }
+  rescue StopIteration
+    nil
   end
 
   def item(role, text)

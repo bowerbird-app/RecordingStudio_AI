@@ -13,7 +13,7 @@ module RecordingStudioAI
       STREAMING_KEY = :recording_studio_ai_hosted_agent_streaming
 
       def self.streaming?
-        Thread.current[STREAMING_KEY] == true
+        Thread.current.thread_variable_get(STREAMING_KEY) == true
       end
 
       def create(raw)
@@ -63,10 +63,12 @@ module RecordingStudioAI
         authorize!(request)
         session = request.fetch(:session)
         guard_session!(session, request)
+        run = running_run(session, request)
+        snapshot = cancel_snapshot(session, run)
         call_provider(nil) do
           adapter_for(session.provider).cancel_hosted_agent_turn(provider_session_id: session.provider_session_id)
         end
-        cancel_run(running_run(session, request))
+        cancel_run(run, snapshot)
         replace_status(session, "cancelled")
       end
 
@@ -87,7 +89,9 @@ module RecordingStudioAI
         session = request.fetch(:session)
         guard_session!(session, request)
         run = running_run(session, request) || latest_run(session, request)
-        continue_stream(session, run, request.fetch(:results), &)
+        results = request.fetch(:results)
+        ensure_pending_results!(session, run, results)
+        continue_stream(session, run, results, &)
       end
 
       def recover(raw)
@@ -162,11 +166,11 @@ module RecordingStudioAI
       end
 
       def streaming
-        previous = Thread.current[STREAMING_KEY]
-        Thread.current[STREAMING_KEY] = true
+        previous = Thread.current.thread_variable_get(STREAMING_KEY)
+        Thread.current.thread_variable_set(STREAMING_KEY, true)
         yield
       ensure
-        Thread.current[STREAMING_KEY] = previous
+        Thread.current.thread_variable_set(STREAMING_KEY, previous)
       end
 
       def recovered_turn(session, run, &block)
@@ -283,13 +287,72 @@ module RecordingStudioAI
         run.update!(terminal_attributes(run, "failed", error, nil))
       end
 
-      def cancel_run(run)
-        return unless run
+      def cancel_snapshot(session, run)
+        return if run.nil? || terminal_run?(run)
 
-        error = Contracts::NormalizedError.new(
+        fetch_recovery(session, run)
+      rescue Providers::HostedAgentFailure => e
+        raise Failure, e.error
+      end
+
+      def cancel_run(run, snapshot = nil)
+        return if run.nil? || terminal_run?(run)
+
+        remember_turn(run, snapshot&.turn&.provider_turn_id)
+        finish_run(run, "cancelled", snapshot&.turn&.usage, cancelled_error, nil)
+      end
+
+      def cancelled_error
+        Contracts::NormalizedError.new(
           category: "cancelled", code: "cancelled", message: "Hosted agent turn was cancelled.", retryable: false
         )
-        finish_run(run, "cancelled", nil, error, nil)
+      end
+
+      def release_paused_run(session, run, snapshot)
+        call_provider(nil) do
+          adapter_for(session.provider).cancel_hosted_agent_turn(provider_session_id: session.provider_session_id)
+        end
+        cancel_run(run, snapshot)
+      end
+
+      def ensure_pending_results!(session, run, results)
+        invalid_results!("hosted agent turn is not waiting on tool results") if run.nil? || terminal_run?(run)
+
+        pending = pending_tool_calls(session, run)
+        invalid_results!("hosted agent turn is not waiting on tool results") if pending.empty?
+        match_pending_results!(pending, results)
+      end
+
+      def pending_tool_calls(session, run)
+        snapshot = fetch_recovery(session, run)
+        return [] if snapshot.turn&.terminal?
+
+        Array(snapshot.tool_calls)
+      rescue Providers::HostedAgentFailure => e
+        raise Failure, e.error
+      end
+
+      def match_pending_results!(pending, results)
+        by_id = pending.index_by(&:call_id)
+        seen = {}
+        results.each do |result|
+          call_id = result[:call_id]
+          invalid_results!("duplicate tool result call_id: #{call_id}") if seen[call_id]
+          seen[call_id] = true
+          call = by_id[call_id]
+          invalid_results!("unknown tool result call_id: #{call_id}") unless call
+          next if result[:turn_id] == call.provider_turn_id
+
+          invalid_results!("tool result turn_id does not match call #{call_id}")
+        end
+      end
+
+      def invalid_results!(message)
+        raise RecordingStudioAI::Errors::ContractValidationError.new(message, code: "invalid_request")
+      end
+
+      def terminal_run?(run)
+        run.class.terminal_statuses.include?(run.status)
       end
 
       def terminal_attributes(run, status, error, text)
@@ -305,19 +368,22 @@ module RecordingStudioAI
       def run_for_input(session, request)
         current = running_run(session, request)
         return insert_follow_up(session, request) unless current
-        return current if turn_still_active?(session, current)
 
+        snapshot = fetch_recovery(session, current)
+        if paused_for_tools?(snapshot)
+          release_paused_run(session, current, snapshot)
+          return insert_follow_up(session, request)
+        end
+        return current unless snapshot.turn&.terminal?
+
+        apply_recovery(current, snapshot)
         insert_follow_up(session, request)
-      end
-
-      def turn_still_active?(session, run)
-        snapshot = fetch_recovery(session, run)
-        return true unless snapshot.turn&.terminal?
-
-        apply_recovery(run, snapshot)
-        false
       rescue Providers::HostedAgentFailure => e
         raise Failure, e.error
+      end
+
+      def paused_for_tools?(snapshot)
+        Array(snapshot.tool_calls).any? && !snapshot.turn&.terminal?
       end
 
       def insert_follow_up(session, request)

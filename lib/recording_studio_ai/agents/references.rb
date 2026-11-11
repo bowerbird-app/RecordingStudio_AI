@@ -54,17 +54,22 @@ module RecordingStudioAI
     end
 
     # One function call the provider is waiting on. +arguments+ is the parsed
-    # object. +provider_turn_id+ is the +turn_id+ to send back with the result.
+    # object, or nil when the provider payload was not a JSON object.
+    # +arguments_error+ and +raw_arguments+ are set only in that case, so the
+    # host can answer with +error:+. +provider_turn_id+ is the +turn_id+ to
+    # send back with the result.
     class ToolCall
       NAME_PATTERN = /\A[A-Za-z0-9_-]{1,64}\z/
       MAX_ID_LENGTH = 255
 
-      attr_reader :call_id, :name, :arguments, :provider_turn_id
+      attr_reader :call_id, :name, :arguments, :provider_turn_id, :arguments_error, :raw_arguments
 
-      def initialize(call_id:, name:, arguments:, provider_turn_id:)
+      def initialize(call_id:, name:, arguments:, provider_turn_id:, arguments_error: nil, raw_arguments: nil)
         @call_id = call_id.to_s
         @name = name.to_s
         @provider_turn_id = provider_turn_id.to_s
+        @arguments_error = arguments_error
+        @raw_arguments = raw_arguments
         @arguments = RecordingStudioAI::Contracts::Containment.ensure_serializable!(
           arguments, path: "tool_call.arguments"
         )
@@ -72,7 +77,10 @@ module RecordingStudioAI
       end
 
       def to_h
-        { call_id: call_id, name: name, arguments: arguments, provider_turn_id: provider_turn_id }
+        fields = { call_id: call_id, name: name, arguments: arguments, provider_turn_id: provider_turn_id }
+        return fields if arguments_error.nil?
+
+        fields.merge(arguments_error: arguments_error, raw_arguments: raw_arguments)
       end
 
       private
@@ -81,14 +89,19 @@ module RecordingStudioAI
         return if valid_call?
 
         raise RecordingStudioAI::Errors::ContractValidationError.new(
-          "tool call requires a call id, turn id, function name, and Hash arguments",
+          "tool call requires a call id, turn id, function name, and Hash arguments or an arguments error",
           code: "invalid_request"
         )
       end
 
       def valid_call?
-        valid_id?(call_id) && valid_id?(provider_turn_id) &&
-          name.match?(NAME_PATTERN) && arguments.is_a?(Hash)
+        valid_id?(call_id) && valid_id?(provider_turn_id) && name.match?(NAME_PATTERN) && valid_arguments?
+      end
+
+      def valid_arguments?
+        return arguments.is_a?(Hash) if arguments_error.nil? && raw_arguments.nil?
+
+        arguments.nil? && arguments_error.is_a?(String) && !arguments_error.strip.empty? && raw_arguments.is_a?(String)
       end
 
       def valid_id?(value)

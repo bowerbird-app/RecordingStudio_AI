@@ -2,11 +2,17 @@
 
 ## Upgrading to 0.20.0
 
-Hosted agent sessions can call function tools. No migration. Sessions created without `tools` are unchanged.
+Hosted agent sessions can call function tools. No migration. Sessions created without `tools`, and sessions created with `tools: []`, send the same create request as 0.19.6.
 
 ### Upgrade steps
 
-Install RecordingStudioAI `0.20.0`. Pass `tools` only when a session should call your functions. Read `tool_calls` from the stream, run them, then continue with `submit_tool_results`. `recover` includes any calls that are still unanswered.
+Install RecordingStudioAI `0.20.0`. Pass `tools` only when a session should call your functions. An empty array is the same as leaving `tools` out. Read `tool_calls` from the stream, run them, then continue with `submit_tool_results`. `recover` includes any calls that are still unanswered.
+
+A call whose arguments are not a JSON object has `arguments` nil, plus `arguments_error` and `raw_arguments`. Answer it with `error:` so the session can continue. `output` and `error` strings are capped at `RecordingStudioAI::Agents::Request::MAX_TOOL_RESULT_BYTES` (262144 bytes). Duplicate tool names and duplicate result `call_id`s are rejected.
+
+`submit_tool_results` rejects an unknown `call_id`, a duplicate `call_id`, a `turn_id` that does not match the pending call, and any result when the turn is finished or not waiting. Those rejections do not call the provider and do not change the run. Call it after `stream` returns. An open stream Enumerator on the same thread still counts as inside the stream.
+
+Sending a new message while a run is waiting on tool calls cancels that run, bills the tokens it used before the pause once, and then handles the new message as its own turn. `Agents.cancel` also bills a running turn's usage once. Cancelling a run that is already finished does not bill it again.
 
 ## Upgrading to 0.19.6
 
