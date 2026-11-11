@@ -10,6 +10,12 @@ module RecordingStudioAI
         "cancelled" => "cancelled"
       }.freeze
 
+      STREAMING_KEY = :recording_studio_ai_hosted_agent_streaming
+
+      def self.streaming?
+        Thread.current[STREAMING_KEY] == true
+      end
+
       def create(raw)
         request = Request.create!(**raw)
         authorize!(request)
@@ -18,7 +24,8 @@ module RecordingStudioAI
         hosted = call_provider(run) do
           adapter_for(candidate.provider).create_hosted_agent_session(
             instructions: request[:instructions], model: candidate.model,
-            input: request[:input], idempotency_key: request[:idempotency_key]
+            input: request[:input], idempotency_key: request[:idempotency_key],
+            tools: request[:tools]
           )
         end
         remember_session(run, hosted)
@@ -46,7 +53,7 @@ module RecordingStudioAI
         session = request.fetch(:session)
         guard_session!(session, request)
         run = running_run(session, request) || latest_run(session, request)
-        return recovered_turn(session, run, &) if terminal_snapshot?(session, run)
+        return recovered_turn(session, run, &) if settled_snapshot?(session, run)
 
         watch(session, run, &)
       end
@@ -72,6 +79,15 @@ module RecordingStudioAI
           adapter_for(session.provider).delete_hosted_agent_session(provider_session_id: session.provider_session_id)
         end
         replace_status(session, "deleted")
+      end
+
+      def submit_tool_results(raw, &)
+        request = Request.tool_results!(**raw)
+        authorize!(request)
+        session = request.fetch(:session)
+        guard_session!(session, request)
+        run = running_run(session, request) || latest_run(session, request)
+        continue_stream(session, run, request.fetch(:results), &)
       end
 
       def recover(raw)
@@ -109,28 +125,64 @@ module RecordingStudioAI
       end
 
       def watch(session, run, &block)
-        finished = false
-        adapter_for(session.provider).stream_hosted_agent_session(
-          provider_session_id: session.provider_session_id
-        ) do |event|
-          finished = true if observe(run, event)
-          block.call(event)
+        consume(session, run, block) do |on_event|
+          adapter_for(session.provider).stream_hosted_agent_session(
+            provider_session_id: session.provider_session_id, &on_event
+          )
         end
-        return turn_from(run.reload) if finished
+      end
 
-        recovered_turn(session, run, &block)
+      def continue_stream(session, run, results, &block)
+        consume(session, run, block) do |on_event|
+          adapter_for(session.provider).continue_hosted_agent_after_tool_results(
+            provider_session_id: session.provider_session_id, results: results, &on_event
+          )
+        end
+      end
+
+      def consume(session, run, handler)
+        finished = false
+        pending = nil
+        streaming do
+          yield proc { |event|
+            finished = true if observe(run, event)
+            pending = event.tool_calls if event.type == "tool_calls"
+            handler.call(event)
+          }
+        end
+        return turn_from(run&.reload) if finished
+        return turn_from(run&.reload, tool_calls: pending) if pending
+
+        recovered_turn(session, run, &handler)
       rescue Providers::HostedAgentFailure => e
         raise Failure, e.error if e.timeout?
-        return recovered_turn(session, run, &block) if e.dropped?
+        return recovered_turn(session, run, &handler) if e.dropped?
 
         fail_and_raise(run, e)
+      end
+
+      def streaming
+        previous = Thread.current[STREAMING_KEY]
+        Thread.current[STREAMING_KEY] = true
+        yield
+      ensure
+        Thread.current[STREAMING_KEY] = previous
       end
 
       def recovered_turn(session, run, &block)
         snapshot = fetch_recovery(session, run)
         apply_recovery(run, snapshot)
-        Array(snapshot.items).each { |item| block.call(item_event(item)) if replay_item?(item) }
-        block.call(turn_event(snapshot.turn)) if snapshot.turn&.terminal?
+        calls = Array(snapshot.tool_calls)
+        streaming do
+          Array(snapshot.items).each { |item| block.call(item_event(item)) if replay_item?(item) }
+          if calls.any?
+            block.call(tool_calls_event(calls))
+          elsif snapshot.turn&.terminal?
+            block.call(turn_event(snapshot.turn))
+          end
+        end
+        return turn_from(run&.reload, snapshot.turn, session, tool_calls: calls) if calls.any?
+
         turn_from(run&.reload, snapshot.turn, session)
       rescue Providers::HostedAgentFailure => e
         raise Failure, e.error if e.timeout?
@@ -138,8 +190,12 @@ module RecordingStudioAI
         fail_and_raise(run, e)
       end
 
-      def terminal_snapshot?(session, run)
-        fetch_recovery(session, run).turn&.terminal?
+      # A finished turn can be replayed. A turn that is already waiting on the
+      # caller must be reported from the session, because a new event stream does
+      # not repeat requires_action.
+      def settled_snapshot?(session, run)
+        snapshot = fetch_recovery(session, run)
+        snapshot.turn&.terminal? || Array(snapshot.tool_calls).any?
       rescue Providers::HostedAgentFailure => e
         raise Failure, e.error if e.timeout?
 
@@ -167,6 +223,7 @@ module RecordingStudioAI
         return unless run && snapshot.turn
 
         remember_turn(run, snapshot.turn.provider_turn_id)
+        return if Array(snapshot.tool_calls).any?
         return unless snapshot.turn.terminal?
 
         text = Array(snapshot.items).map(&:text).join
@@ -343,16 +400,18 @@ module RecordingStudioAI
         )
       end
 
-      def turn_from(run, hosted_turn = nil, session = nil)
+      def turn_from(run, hosted_turn = nil, session = nil, tool_calls: nil)
+        calls = Array(tool_calls)
         Turn.new(
           provider: run&.resolved_provider || session.provider,
           provider_session_id: run&.provider_session_id || session.provider_session_id,
           provider_turn_id: run&.provider_turn_id || hosted_turn&.provider_turn_id,
           model: run&.resolved_model || session.model,
-          status: run&.status || hosted_turn&.status || "running",
+          status: calls.any? ? "requires_action" : (run&.status || hosted_turn&.status || "running"),
           run_id: run&.id,
           usage: usage_from(run),
-          error: error_from(run) || hosted_turn&.error
+          error: error_from(run) || hosted_turn&.error,
+          tool_calls: calls
         )
       end
 
@@ -391,11 +450,20 @@ module RecordingStudioAI
                                    metadata: { provider_turn_id: turn.provider_turn_id })
       end
 
+      def tool_calls_event(calls)
+        Providers::StreamEvent.new(
+          type: "tool_calls", tool_calls: calls,
+          metadata: { provider_turn_id: calls.first.provider_turn_id }
+        )
+      end
+
       def recovery_from(session, run, snapshot)
+        calls = Array(snapshot.tool_calls)
         Recovery.new(
           session: replace_status(session, snapshot.session.status),
-          turn: turn_from(run&.reload, snapshot.turn, session),
-          items: Array(snapshot.items).map { |item| public_item(item) }
+          turn: turn_from(run&.reload, snapshot.turn, session, tool_calls: calls),
+          items: Array(snapshot.items).map { |item| public_item(item) },
+          tool_calls: calls
         )
       end
 

@@ -18,10 +18,11 @@ module RecordingStudioAI
 
     # Neutral handle for one turn. Cost is calculated when read.
     class Turn
-      attr_reader :provider, :provider_session_id, :provider_turn_id, :model, :status, :run_id, :usage, :error
+      attr_reader :provider, :provider_session_id, :provider_turn_id, :model, :status, :run_id, :usage, :error,
+                  :tool_calls
 
       def initialize(provider:, provider_session_id:, model:, status:, run_id:, provider_turn_id: nil,
-                     usage: nil, error: nil)
+                     usage: nil, error: nil, tool_calls: [])
         @provider = provider.to_sym
         @provider_session_id = provider_session_id.to_s
         @provider_turn_id = provider_turn_id&.to_s
@@ -30,6 +31,7 @@ module RecordingStudioAI
         @run_id = run_id
         @usage = usage
         @error = error
+        @tool_calls = tool_calls
       end
 
       def cost
@@ -51,13 +53,57 @@ module RecordingStudioAI
       end
     end
 
-    class Recovery
-      attr_reader :session, :turn, :items
+    # One function call the provider is waiting on. +arguments+ is the parsed
+    # object. +provider_turn_id+ is the +turn_id+ to send back with the result.
+    class ToolCall
+      NAME_PATTERN = /\A[A-Za-z0-9_-]{1,64}\z/
+      MAX_ID_LENGTH = 255
 
-      def initialize(session:, turn:, items:)
+      attr_reader :call_id, :name, :arguments, :provider_turn_id
+
+      def initialize(call_id:, name:, arguments:, provider_turn_id:)
+        @call_id = call_id.to_s
+        @name = name.to_s
+        @provider_turn_id = provider_turn_id.to_s
+        @arguments = RecordingStudioAI::Contracts::Containment.ensure_serializable!(
+          arguments, path: "tool_call.arguments"
+        )
+        validate!
+      end
+
+      def to_h
+        { call_id: call_id, name: name, arguments: arguments, provider_turn_id: provider_turn_id }
+      end
+
+      private
+
+      def validate!
+        return if valid_call?
+
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          "tool call requires a call id, turn id, function name, and Hash arguments",
+          code: "invalid_request"
+        )
+      end
+
+      def valid_call?
+        valid_id?(call_id) && valid_id?(provider_turn_id) &&
+          name.match?(NAME_PATTERN) && arguments.is_a?(Hash)
+      end
+
+      def valid_id?(value)
+        !value.empty? && value.length <= MAX_ID_LENGTH
+      end
+    end
+
+    class Recovery
+      attr_reader :session, :turn, :items, :tool_calls
+
+      def initialize(session:, turn:, items:, tool_calls: [])
         @session = session
         @turn = turn
         @items = items
+        @tool_calls = tool_calls
       end
     end
 

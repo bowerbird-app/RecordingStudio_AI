@@ -9,7 +9,11 @@ module RecordingStudioAI
       end
     end
     HostedItem = Data.define(:id, :role, :text, :status, :provider_turn_id)
-    HostedRecovery = Data.define(:session, :turn, :items)
+    HostedRecovery = Data.define(:session, :turn, :items, :tool_calls) do
+      def initialize(session:, turn:, items:, tool_calls: [])
+        super
+      end
+    end
 
     # Provider failure already mapped to a neutral error. +dropped+ means the
     # stream ended before a terminal event; the caller must fetch saved state

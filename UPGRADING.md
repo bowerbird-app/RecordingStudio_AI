@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.20.0
+
+Hosted agent sessions can call function tools. No migration. Sessions created without `tools` are unchanged.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.20.0`. Pass `tools` only when a session should call your functions. Read `tool_calls` from the stream, run them, then continue with `submit_tool_results`. `recover` includes any calls that are still unanswered.
+
 ## Upgrading to 0.19.6
 
 Install RecordingStudioAI `0.19.6`. No migration. Saved-reply screens still use Default Layout. Development pins Recording Studio `v6.3.0`, Flatpack tag `v0.1.341`, Logs `v0.7.3`, and Metrics `v0.7.2`. Dummy pins Trashable `v0.12.2`, Cache `v0.6.2`, Root Switchable `v0.11.4`, and Accessible `v0.24.0`. Leave Admin on `v2.7.0`. Delete `test/support/widen_recording_studio_requirement.rb` if you copied it; sibling pins now resolve without it.

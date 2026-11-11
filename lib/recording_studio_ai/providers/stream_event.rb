@@ -3,15 +3,17 @@
 module RecordingStudioAI
   module Providers
     class StreamEvent
-      TYPES = %w[text_delta citation message_completed turn_completed failed cancelled].freeze
+      TYPES = %w[text_delta citation message_completed tool_calls turn_completed failed cancelled].freeze
 
-      attr_reader :type, :text_delta, :text, :citation, :usage, :error, :metadata
+      attr_reader :type, :text_delta, :text, :citation, :tool_calls, :usage, :error, :metadata
 
-      def initialize(type:, text_delta: nil, text: nil, citation: nil, usage: nil, error: nil, metadata: {})
+      def initialize(type:, text_delta: nil, text: nil, citation: nil, tool_calls: nil, usage: nil, error: nil,
+                     metadata: {})
         @type = type.to_s
         @text_delta = text_delta
         @text = text
         @citation = citation
+        @tool_calls = tool_calls
         @usage = usage
         @error = error
         @metadata = RecordingStudioAI::Metadata.sanitize!(metadata, path: "provider_stream_event.metadata")
@@ -24,6 +26,7 @@ module RecordingStudioAI
           text_delta: text_delta,
           text: text,
           citation: citation&.to_h,
+          tool_calls: tool_calls&.map(&:to_h),
           usage: usage&.to_h,
           error: error&.to_h,
           metadata: metadata
@@ -42,8 +45,20 @@ module RecordingStudioAI
         ensure_string!(:text_delta, text_delta)
         ensure_string!(:text, text)
         ensure_citation!
+        ensure_tool_calls!
         ensure_usage!
         ensure_error!
+      end
+
+      def ensure_tool_calls!
+        if type == "tool_calls"
+          return if tool_calls.is_a?(Array) && tool_calls.any? && tool_calls.all?(RecordingStudioAI::Agents::ToolCall)
+
+          invalid!("tool_calls must be RecordingStudioAI::Agents::ToolCall objects")
+        end
+        return if tool_calls.nil?
+
+        invalid!("tool_calls is only set on a tool_calls event")
       end
 
       def ensure_string!(name, value)

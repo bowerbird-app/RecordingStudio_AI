@@ -8,6 +8,18 @@ Versioning and Keep a Changelog.
 ### Changed
 - Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
 
+## [0.20.0] - 2026-11-11
+
+### Added
+- Hosted agent session create accepts `tools:`, an array of function definitions (`type`, `name`, `description`, `parameters`, optional `defer_loading`). The OpenAI adapter sends them as `agent.tools`. Leaving `tools` out sends the same create request as before.
+- `Agents.stream` yields `tool_calls` when the provider emits `agent.session.requires_action`. Each `Agents::ToolCall` has `call_id`, `name`, parsed `arguments`, and `provider_turn_id`. The turn stays running. `turn.status` is `requires_action` and `turn.tool_calls` holds the pending calls.
+- `Agents.submit_tool_results(session:, results:, **attribution)` posts one `agent.session.input.tool_result` per result, then continues the session stream. A result is `{ call_id:, turn_id:, output: }` or `{ call_id:, turn_id:, error: }`. `output` is a string.
+- `Agents.recover` and a dropped or resumed `stream` report unanswered function calls on `tool_calls`. Historical items are not treated as pending.
+
+### Upgrade notes
+- Bump to `0.20.0`. No migration. Hosts that do not pass `tools` keep the previous session behavior.
+- Call `submit_tool_results` after `stream` returns, not from inside the stream block. Pass a block, or iterate the Enumerator, to read the rest of the turn.
+
 ## [0.19.6] - 2026-11-04
 
 ### Security
@@ -1137,7 +1149,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.6...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.6...v0.20.0
 [0.19.6]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.5...v0.19.6
 [0.19.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.1...v0.19.2

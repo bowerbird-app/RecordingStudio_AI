@@ -465,6 +465,7 @@ Phase 2 introduced validation and normalized return contracts for:
 - `RecordingStudioAI::Agents.create_session(...)`
 - `RecordingStudioAI::Agents.send_input(...)`
 - `RecordingStudioAI::Agents.stream(...)`
+- `RecordingStudioAI::Agents.submit_tool_results(...)`
 - `RecordingStudioAI::Agents.cancel(...)`
 - `RecordingStudioAI::Agents.delete_session(...)`
 - `RecordingStudioAI::Agents.recover(...)`
@@ -540,21 +541,74 @@ RecordingStudioAI::Agents.cancel(session: session, root_recording: root_recordin
 RecordingStudioAI::Agents.delete_session(session: session, root_recording: root_recording, initiator: current_user)
 ```
 
-`stream` without a block returns an Enumerator of the same events. Each turn is
-one `hosted_agent` run, attributed with the caller's `root_recording` and
-authorized with `recording_studio_ai.execute`. `send_input`, `stream`, `cancel`,
-`delete_session`, and `recover` also require a `hosted_agent` run for that
-provider session on the caller's root and none on any other root. Otherwise
+`stream` without a block returns an Enumerator of the same events.
+
+Pass `tools` to register function tools on the session. Each entry is a function
+definition: `type` is `"function"`, plus `name`, `description`, and `parameters`
+(a JSON Schema object). `defer_loading` is optional. Other tool types are
+rejected. Omit `tools` and the create request matches a session with no tools.
+
+`stream` yields a `tool_calls` event and returns when the provider is waiting
+on your functions. The run stays `running`. `turn.status` is `"requires_action"`
+and `turn.tool_calls` is an array of `Agents::ToolCall` (`call_id`, `name`,
+parsed `arguments`, `provider_turn_id`). Call `submit_tool_results` after
+`stream` returns. It opens the provider event stream, posts one
+`agent.session.input.tool_result` per result, and yields the events that follow.
+A result is `{ call_id:, turn_id:, output: }` or `{ call_id:, turn_id:, error: }`.
+`output` is a String. Do this until `tool_calls` is empty:
+
+```ruby
+session = RecordingStudioAI::Agents.create_session(
+  instructions: "Use the tools you were given.",
+  profile: :medium,
+  input: "List the latest recordings.",
+  idempotency_key: "session-tools-1",
+  tools: [
+    {
+      type: "function",
+      name: "list_recordings",
+      description: "List recordings the current person can read.",
+      parameters: { type: "object", properties: { limit: { type: "integer" } } }
+    }
+  ],
+  purpose: "agent_chat",
+  root_recording: root_recording,
+  initiator: current_user
+)
+
+turn = RecordingStudioAI::Agents.stream(
+  session: session, root_recording: root_recording, initiator: current_user
+) { |event| print event.text_delta }
+
+while turn.tool_calls.any?
+  results = turn.tool_calls.map do |call|
+    { call_id: call.call_id, turn_id: call.provider_turn_id, output: "{\"ok\":true}" }
+  end
+  turn = RecordingStudioAI::Agents.submit_tool_results(
+    session: session, results: results, root_recording: root_recording, initiator: current_user
+  ) { |event| print event.text_delta }
+end
+```
+
+`submit_tool_results` without a block returns an Enumerator of the continuation.
+A dropped stream, a later `stream` on a session that is already waiting, and
+`recover` all report unanswered calls on `tool_calls`. Saved messages are not
+pending calls. `recovery.tool_calls` is empty when nothing is waiting.
+
+Each turn is one `hosted_agent` run, attributed with the caller's `root_recording` and
+authorized with `recording_studio_ai.execute`. `send_input`, `stream`,
+`submit_tool_results`, `cancel`, `delete_session`, and `recover` also require a
+`hosted_agent` run for that provider session on the caller's root and none on
+any other root. Otherwise
 they raise that same authorization error and do not call the provider. A
 follow-up while that turn is still active steers it and keeps the same run. A
 follow-up after the turn is terminal records a new run.
 
 Pass `idempotency_key` on create and on every `send_input`. Follow-up submits
 send that key as the provider `Idempotency-Key`. Session create has no typed
-idempotency field, so the adapter sends the same header. A dropped stream
-fetches the saved session, turn, and items.
-It does not send the input again. A timeout raises `Agents::Failure` and leaves
-the run running.
+idempotency field, so the adapter sends the same header. A dropped stream fetches the saved session, turn, items, and any unanswered
+function calls. It does not send the input again. A timeout raises
+`Agents::Failure` and leaves the run running.
 
 Hosted sessions are stored on the provider. OpenAI's Agents API is not Zero
 Data Retention eligible. The Responses adapter still sends `store: false`;

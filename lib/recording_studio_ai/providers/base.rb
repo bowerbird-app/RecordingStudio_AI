@@ -65,6 +65,14 @@ module RecordingStudioAI
         unsupported_hosted_agent!
       end
 
+      def submit_hosted_agent_tool_results(**)
+        unsupported_hosted_agent!
+      end
+
+      def continue_hosted_agent_after_tool_results(**)
+        unsupported_hosted_agent!
+      end
+
       def cancel_hosted_agent_turn(**)
         unsupported_hosted_agent!
       end
