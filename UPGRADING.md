@@ -1,5 +1,19 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.20.0
+
+Hosted agent sessions can call function tools. No migration. Sessions created without `tools`, and sessions created with `tools: []`, send the same create request as 0.19.6.
+
+### Upgrade steps
+
+Install RecordingStudioAI `0.20.0`. Pass `tools` only when a session should call your functions. An empty array is the same as leaving `tools` out. Read `tool_calls` from the stream, run them, then continue with `submit_tool_results`. `recover` includes any calls that are still unanswered.
+
+A call whose arguments are not a JSON object has `arguments` nil, plus `arguments_error` and `raw_arguments`. Answer it with `error:` so the session can continue. `output` and `error` strings are capped at `RecordingStudioAI::Agents::Request::MAX_TOOL_RESULT_BYTES` (262144 bytes). Duplicate tool names and duplicate result `call_id`s are rejected.
+
+`submit_tool_results` reads the pending calls, then locks the run and re-checks it. It rejects an unknown `call_id`, a duplicate `call_id`, a `call_id` already submitted, a `turn_id` that does not match the pending call, and any result when the turn is finished or not waiting. Those rejections do not call the provider and do not change the run. A 4xx rejection of the tool-result post, other than authentication (401) or a rate limit, raises the same `invalid_request` and leaves the run running. Call ids the provider still lists as pending are forgotten, so those results can be submitted again. A call the provider already accepted stays recorded. If that reread fails, the claimed ids stay recorded. Authentication, a rate limit, a 5xx response, a timeout, and a failure while reading the continuation keep the provider error, including `retryable`, and leave the run running. Call it after the `stream` block returns. `stream` without a block returns an Enumerator that is not guarded. Abandoning `stream(...).next` does not block a later submit on that thread, and it also does not stop one made from another fiber.
+
+Sending a new message while a run is waiting on tool calls cancels that run at the provider first, then reads the turn and bills the usage that read reports, once. `Agents.cancel` does the same. OpenAI's turn `usage` is best-effort and may be null when unknown, including on a cancelled or still-unfinished turn (`agent.session.turn.cancelled` carries usage only when available). Null is not treated as zero, and this gem does not wait for a later usage update. If the usage read fails with a hosted-agent provider error, the error class and run id are logged and the run stays cancelled. Any other error from that read is raised. Cancelling a run that is already finished does not bill it again.
+
 ## Upgrading to 0.19.6
 
 Install RecordingStudioAI `0.19.6`. No migration. Saved-reply screens still use Default Layout. Development pins Recording Studio `v6.3.0`, Flatpack tag `v0.1.341`, Logs `v0.7.3`, and Metrics `v0.7.2`. Dummy pins Trashable `v0.12.2`, Cache `v0.6.2`, Root Switchable `v0.11.4`, and Accessible `v0.24.0`. Leave Admin on `v2.7.0`. Delete `test/support/widen_recording_studio_requirement.rb` if you copied it; sibling pins now resolve without it.

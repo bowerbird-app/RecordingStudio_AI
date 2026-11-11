@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "json"
+
 module RecordingStudioAI
   module Providers
     # OpenAI Agents API sessions. Hosted sessions are stored on OpenAI and are
@@ -30,10 +32,10 @@ module RecordingStudioAI
         "provider_error" => "Provider request failed."
       }.freeze
 
-      def create_hosted_agent_session(instructions:, model:, input:, idempotency_key:)
+      def create_hosted_agent_session(instructions:, model:, input:, idempotency_key:, tools: nil)
         response = hosted_request(session_lookup: false) do
           client.beta.agents.sessions.create(
-            **session_create_params(instructions, model, input, idempotency_key)
+            **session_create_params(instructions, model, input, idempotency_key, tools)
           )
         end
         hosted_session(response)
@@ -54,6 +56,30 @@ module RecordingStudioAI
         stream = client.beta.agents.sessions.events.stream_streaming(provider_session_id)
         each_hosted_event(stream, &)
       rescue StandardError => e
+        raise_hosted_failure(e, session_lookup: true, dropped: true)
+      ensure
+        stream&.close if stream.respond_to?(:close)
+      end
+
+      def submit_hosted_agent_tool_results(provider_session_id:, results:)
+        hosted_request(session_lookup: true, tool_results: true) do
+          client.beta.agents.sessions.events.create(
+            provider_session_id,
+            events: results.map { |result| tool_result_input(result) }
+          )
+        end
+        nil
+      end
+
+      # Open the live stream before posting. The Agents API keeps writing events
+      # on that stream after each agent.session.input.tool_result.
+      def continue_hosted_agent_after_tool_results(provider_session_id:, results:, &)
+        stream = client.beta.agents.sessions.events.stream_streaming(provider_session_id)
+        submit_hosted_agent_tool_results(provider_session_id: provider_session_id, results: results)
+        each_hosted_event(stream, &)
+      rescue StandardError => e
+        raise e if e.is_a?(HostedAgentFailure)
+
         raise_hosted_failure(e, session_lookup: true, dropped: true)
       ensure
         stream&.close if stream.respond_to?(:close)
@@ -83,16 +109,19 @@ module RecordingStudioAI
           HostedRecovery.new(
             session: hosted_session(session),
             turn: turn && hosted_turn(turn),
-            items: fetch_hosted_items(provider_session_id)
+            items: fetch_hosted_items(provider_session_id),
+            tool_calls: function_tool_calls_from(session)
           )
         end
       end
 
       private
 
-      def session_create_params(instructions, model, input, idempotency_key)
+      def session_create_params(instructions, model, input, idempotency_key, tools)
+        agent = { model: model, instructions: instructions }.compact
+        agent[:tools] = tools if tools.is_a?(Array) && !tools.empty?
         params = {
-          agent: { model: model, instructions: instructions }.compact,
+          agent: agent,
           environment: ENVIRONMENT,
           input: input
         }
@@ -115,21 +144,49 @@ module RecordingStudioAI
           next unless neutral
 
           yield neutral
-          break if TERMINAL_EVENT_TYPES.include?(neutral.type)
+          # A function call pauses this read. The next read is opened before the
+          # tool result is posted, and that stream delivers the rest of the turn.
+          break if TERMINAL_EVENT_TYPES.include?(neutral.type) || neutral.type == "tool_calls"
         end
       end
 
-      def hosted_request(session_lookup:)
-        yield
-      rescue StandardError => e
-        raise_hosted_failure(e, session_lookup: session_lookup, dropped: false)
+      def tool_result_input(result)
+        event = {
+          type: "agent.session.input.tool_result",
+          turn_id: result[:turn_id],
+          call_id: result[:call_id],
+          success: !result.key?(:error)
+        }
+        return event.merge(error: result[:error]) if result.key?(:error)
+
+        event.merge(output: result[:output])
       end
 
-      def raise_hosted_failure(error, session_lookup:, dropped:)
+      def hosted_request(session_lookup:, tool_results: false)
+        yield
+      rescue StandardError => e
+        raise_hosted_failure(e, session_lookup: session_lookup, dropped: false, tool_results: tool_results)
+      end
+
+      def raise_hosted_failure(error, session_lookup:, dropped:, tool_results: false)
         raise error unless ProviderError.expected?(error)
 
+        status = ProviderError.status_for(error)
         mapped = map_hosted_error(error, session_lookup: session_lookup)
-        raise HostedAgentFailure.new(mapped, dropped: dropped && mapped.category == "connection")
+        raise HostedAgentFailure.new(
+          mapped,
+          dropped: dropped && mapped.category == "connection",
+          tool_results_rejected: tool_results && tool_result_rejection?(status, mapped)
+        )
+      end
+
+      # 401 and 429 are 4xx and are not a rejection of the tool-result body.
+      # 5xx, timeouts, and connection failures are not either.
+      def tool_result_rejection?(status, mapped)
+        return false if mapped.retryable? || mapped.category == "authentication"
+        return false if status.nil?
+
+        status >= 400 && status < 500 && status != 401 && status != 429
       end
 
       def map_hosted_error(error, session_lookup:)
@@ -268,11 +325,72 @@ module RecordingStudioAI
 
       def normalize_hosted_event(event)
         return if subagent_event?(event)
+        return tool_calls_stream_event(event) if read_value(event, :type).to_s == "agent.session.requires_action"
 
         neutral = EVENT_TYPES[read_value(event, :type).to_s]
         return unless neutral
 
         build_hosted_event(event, neutral)
+      end
+
+      def tool_calls_stream_event(event)
+        calls = function_tool_calls_from(read_value(event, :session))
+        return if calls.empty?
+
+        StreamEvent.new(
+          type: "tool_calls",
+          tool_calls: calls,
+          metadata: hosted_event_metadata(event).merge(provider_turn_id: calls.first.provider_turn_id)
+        )
+      end
+
+      def function_tool_calls_from(session)
+        Array(read_value(session, :required_actions)).filter_map { |action| function_tool_call(action) }
+      end
+
+      def function_tool_call(action)
+        return unless read_value(action, :type).to_s == "function_call"
+
+        parsed = parsed_tool_arguments(read_value(action, :arguments))
+        Agents::ToolCall.new(
+          call_id: read_value(action, :call_id),
+          name: read_value(action, :name),
+          arguments: parsed[:arguments],
+          provider_turn_id: read_value(action, :turn_id),
+          arguments_error: parsed[:arguments_error],
+          raw_arguments: parsed[:raw_arguments]
+        )
+      end
+
+      def parsed_tool_arguments(raw)
+        parsed = raw.is_a?(String) ? JSON.parse(raw) : raw
+        parsed = parsed.to_h if tool_argument_object?(parsed)
+        return { arguments: parsed } if parsed.is_a?(Hash)
+
+        unparsed_tool_arguments(raw)
+      rescue JSON::ParserError
+        unparsed_tool_arguments(raw)
+      end
+
+      def tool_argument_object?(parsed)
+        !parsed.is_a?(Hash) && !parsed.is_a?(Array) && !parsed.nil? && parsed.respond_to?(:to_h)
+      end
+
+      def unparsed_tool_arguments(raw)
+        {
+          arguments: nil,
+          arguments_error: "function call arguments must be a JSON object",
+          raw_arguments: raw_argument_text(raw)
+        }
+      end
+
+      def raw_argument_text(raw)
+        return raw if raw.is_a?(String)
+        return "" if raw.nil?
+
+        JSON.generate(raw)
+      rescue JSON::GeneratorError, TypeError
+        raw.to_s
       end
 
       def subagent_event?(event)

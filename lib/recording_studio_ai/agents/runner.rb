@@ -10,6 +10,16 @@ module RecordingStudioAI
         "cancelled" => "cancelled"
       }.freeze
 
+      STREAMING_KEY = :recording_studio_ai_hosted_agent_streaming
+      SUBMITTED_CALLS_KEY = "submitted_tool_call_ids"
+
+      # Fiber-local. The block form sets it on the caller's fiber. An external
+      # Enumerator runs in its own fiber, so abandoning stream(...).next does
+      # not leave the guard set on a pooled thread. That form is not guarded.
+      def self.streaming?
+        Thread.current[STREAMING_KEY] == true
+      end
+
       def create(raw)
         request = Request.create!(**raw)
         authorize!(request)
@@ -18,7 +28,8 @@ module RecordingStudioAI
         hosted = call_provider(run) do
           adapter_for(candidate.provider).create_hosted_agent_session(
             instructions: request[:instructions], model: candidate.model,
-            input: request[:input], idempotency_key: request[:idempotency_key]
+            input: request[:input], idempotency_key: request[:idempotency_key],
+            tools: request[:tools]
           )
         end
         remember_session(run, hosted)
@@ -46,7 +57,7 @@ module RecordingStudioAI
         session = request.fetch(:session)
         guard_session!(session, request)
         run = running_run(session, request) || latest_run(session, request)
-        return recovered_turn(session, run, &) if terminal_snapshot?(session, run)
+        return recovered_turn(session, run, &) if settled_snapshot?(session, run)
 
         watch(session, run, &)
       end
@@ -56,10 +67,11 @@ module RecordingStudioAI
         authorize!(request)
         session = request.fetch(:session)
         guard_session!(session, request)
+        run = running_run(session, request)
         call_provider(nil) do
           adapter_for(session.provider).cancel_hosted_agent_turn(provider_session_id: session.provider_session_id)
         end
-        cancel_run(running_run(session, request))
+        cancel_run(run, usage_after_cancel(session, run))
         replace_status(session, "cancelled")
       end
 
@@ -72,6 +84,17 @@ module RecordingStudioAI
           adapter_for(session.provider).delete_hosted_agent_session(provider_session_id: session.provider_session_id)
         end
         replace_status(session, "deleted")
+      end
+
+      def submit_tool_results(raw, &)
+        request = Request.tool_results!(**raw)
+        authorize!(request)
+        session = request.fetch(:session)
+        guard_session!(session, request)
+        run = running_run(session, request) || latest_run(session, request)
+        results = request.fetch(:results)
+        claim_pending_results!(session, run, results)
+        continue_stream(session, run, results, &)
       end
 
       def recover(raw)
@@ -109,28 +132,71 @@ module RecordingStudioAI
       end
 
       def watch(session, run, &block)
-        finished = false
-        adapter_for(session.provider).stream_hosted_agent_session(
-          provider_session_id: session.provider_session_id
-        ) do |event|
-          finished = true if observe(run, event)
-          block.call(event)
+        consume(session, run, block) do |on_event|
+          adapter_for(session.provider).stream_hosted_agent_session(
+            provider_session_id: session.provider_session_id, &on_event
+          )
         end
-        return turn_from(run.reload) if finished
+      end
 
-        recovered_turn(session, run, &block)
+      def continue_stream(session, run, results, &block)
+        consume(session, run, block, reject_provider_failure: true, submitted_results: results) do |on_event|
+          adapter_for(session.provider).continue_hosted_agent_after_tool_results(
+            provider_session_id: session.provider_session_id, results: results, &on_event
+          )
+        end
+      end
+
+      def consume(session, run, handler, reject_provider_failure: false, submitted_results: nil)
+        finished = false
+        pending = nil
+        streaming do
+          yield proc { |event|
+            finished = true if observe(run, event)
+            pending = event.tool_calls if event.type == "tool_calls"
+            handler.call(event)
+          }
+        end
+        return turn_from(run&.reload) if finished
+        return turn_from(run&.reload, tool_calls: pending) if pending
+
+        recovered_turn(session, run, &handler)
       rescue Providers::HostedAgentFailure => e
+        release_still_pending_calls!(session, run, submitted_results) if submitted_results
         raise Failure, e.error if e.timeout?
-        return recovered_turn(session, run, &block) if e.dropped?
+        return recovered_turn(session, run, &handler) if e.dropped?
+
+        if reject_provider_failure
+          invalid_results!("hosted agent rejected the tool results") if e.tool_results_rejected?
+
+          raise Failure, e.error
+        end
 
         fail_and_raise(run, e)
+      end
+
+      def streaming
+        previous = Thread.current[STREAMING_KEY]
+        Thread.current[STREAMING_KEY] = true
+        yield
+      ensure
+        Thread.current[STREAMING_KEY] = previous
       end
 
       def recovered_turn(session, run, &block)
         snapshot = fetch_recovery(session, run)
         apply_recovery(run, snapshot)
-        Array(snapshot.items).each { |item| block.call(item_event(item)) if replay_item?(item) }
-        block.call(turn_event(snapshot.turn)) if snapshot.turn&.terminal?
+        calls = Array(snapshot.tool_calls)
+        streaming do
+          Array(snapshot.items).each { |item| block.call(item_event(item)) if replay_item?(item) }
+          if calls.any?
+            block.call(tool_calls_event(calls))
+          elsif snapshot.turn&.terminal?
+            block.call(turn_event(snapshot.turn))
+          end
+        end
+        return turn_from(run&.reload, snapshot.turn, session, tool_calls: calls) if calls.any?
+
         turn_from(run&.reload, snapshot.turn, session)
       rescue Providers::HostedAgentFailure => e
         raise Failure, e.error if e.timeout?
@@ -138,8 +204,12 @@ module RecordingStudioAI
         fail_and_raise(run, e)
       end
 
-      def terminal_snapshot?(session, run)
-        fetch_recovery(session, run).turn&.terminal?
+      # A finished turn can be replayed. A turn that is already waiting on the
+      # caller must be reported from the session, because a new event stream does
+      # not repeat requires_action.
+      def settled_snapshot?(session, run)
+        snapshot = fetch_recovery(session, run)
+        snapshot.turn&.terminal? || Array(snapshot.tool_calls).any?
       rescue Providers::HostedAgentFailure => e
         raise Failure, e.error if e.timeout?
 
@@ -167,6 +237,7 @@ module RecordingStudioAI
         return unless run && snapshot.turn
 
         remember_turn(run, snapshot.turn.provider_turn_id)
+        return if Array(snapshot.tool_calls).any?
         return unless snapshot.turn.terminal?
 
         text = Array(snapshot.items).map(&:text).join
@@ -226,13 +297,134 @@ module RecordingStudioAI
         run.update!(terminal_attributes(run, "failed", error, nil))
       end
 
-      def cancel_run(run)
-        return unless run
+      # The provider cancel has already been accepted. Usage on a turn is
+      # best-effort and may be null, including after cancellation. Bill only
+      # what this read reports. A provider failure leaves the run cancelled.
+      # Any other error is raised.
+      def usage_after_cancel(session, run)
+        return if run.nil? || terminal_run?(run)
 
-        error = Contracts::NormalizedError.new(
+        fetch_recovery(session, run)
+      rescue Providers::HostedAgentFailure => e
+        log_cancel_usage_failure(run, e)
+        nil
+      end
+
+      def log_cancel_usage_failure(run, error)
+        Rails.logger.warn(
+          "recording_studio_ai cancel usage fetch failed run_id=#{run.id} error=#{error.class}"
+        )
+      end
+
+      def cancel_run(run, snapshot = nil)
+        return if run.nil? || terminal_run?(run)
+
+        remember_turn(run, snapshot&.turn&.provider_turn_id)
+        finish_run(run, "cancelled", snapshot&.turn&.usage, cancelled_error, nil)
+      end
+
+      def cancelled_error
+        Contracts::NormalizedError.new(
           category: "cancelled", code: "cancelled", message: "Hosted agent turn was cancelled.", retryable: false
         )
-        finish_run(run, "cancelled", nil, error, nil)
+      end
+
+      def release_paused_run(session, run)
+        call_provider(nil) do
+          adapter_for(session.provider).cancel_hosted_agent_turn(provider_session_id: session.provider_session_id)
+        end
+        cancel_run(run, usage_after_cancel(session, run))
+      end
+
+      # The provider read stays outside the row lock. The lock re-checks the
+      # run and records the call ids.
+      def claim_pending_results!(session, run, results)
+        invalid_results!("hosted agent turn is not waiting on tool results") if run.nil? || terminal_run?(run)
+
+        pending = pending_tool_calls(session, run)
+        run.with_lock do
+          invalid_results!("hosted agent turn is not waiting on tool results") if terminal_run?(run) || pending.empty?
+
+          match_pending_results!(pending, results)
+          reject_claimed_calls!(run, results)
+          remember_submitted_calls!(run, results)
+        end
+      end
+
+      # A rejected, timed-out, or unsent post must not stick. Forget the claimed
+      # ids the provider still lists. A failed reread leaves them claimed.
+      def release_still_pending_calls!(session, run, results)
+        return if run.nil? || results.empty?
+
+        pending_ids = still_pending_call_ids(session, run)
+        return if pending_ids.nil?
+
+        releasing = results.map { |result| result[:call_id].to_s } & pending_ids
+        return if releasing.empty?
+
+        run.with_lock do
+          kept = submitted_call_ids(run) - releasing
+          run.update!(metadata: metadata_with(run, SUBMITTED_CALLS_KEY => kept))
+        end
+      end
+
+      def still_pending_call_ids(session, run)
+        snapshot = fetch_recovery(session, run)
+        return [] if snapshot.turn&.terminal?
+
+        Array(snapshot.tool_calls).map { |call| call.call_id.to_s }
+      rescue Providers::HostedAgentFailure
+        nil
+      end
+
+      def reject_claimed_calls!(run, results)
+        claimed = submitted_call_ids(run)
+        results.each do |result|
+          next unless claimed.include?(result[:call_id])
+
+          invalid_results!("tool result call_id was already submitted: #{result[:call_id]}")
+        end
+      end
+
+      def remember_submitted_calls!(run, results)
+        ids = submitted_call_ids(run) + results.map { |result| result[:call_id] }
+        run.update!(metadata: metadata_with(run, SUBMITTED_CALLS_KEY => ids.uniq))
+      end
+
+      def submitted_call_ids(run)
+        Array(run.metadata.to_h[SUBMITTED_CALLS_KEY]).map(&:to_s)
+      end
+
+      def pending_tool_calls(session, run)
+        snapshot = fetch_recovery(session, run)
+        return [] if snapshot.turn&.terminal?
+
+        Array(snapshot.tool_calls)
+      rescue Providers::HostedAgentFailure => e
+        raise Failure, e.error
+      end
+
+      def match_pending_results!(pending, results)
+        by_id = pending.index_by(&:call_id)
+        seen = {}
+        results.each do |result|
+          call_id = result[:call_id]
+          invalid_results!("duplicate tool result call_id: #{call_id}") if seen[call_id]
+          seen[call_id] = true
+          call = by_id[call_id]
+          invalid_results!("unknown tool result call_id: #{call_id}") unless call
+          next if result[:turn_id] == call.provider_turn_id
+
+          invalid_results!("tool result turn_id does not match call #{call_id}")
+        end
+      end
+
+      def invalid_results!(message)
+        raise RecordingStudioAI::Errors::ContractValidationError.new(message, code: "invalid_request")
+      end
+
+      def terminal_run?(run)
+        run.class.terminal_statuses.include?(run.status)
       end
 
       def terminal_attributes(run, status, error, text)
@@ -248,19 +440,22 @@ module RecordingStudioAI
       def run_for_input(session, request)
         current = running_run(session, request)
         return insert_follow_up(session, request) unless current
-        return current if turn_still_active?(session, current)
 
+        snapshot = fetch_recovery(session, current)
+        if paused_for_tools?(snapshot)
+          release_paused_run(session, current)
+          return insert_follow_up(session, request)
+        end
+        return current unless snapshot.turn&.terminal?
+
+        apply_recovery(current, snapshot)
         insert_follow_up(session, request)
-      end
-
-      def turn_still_active?(session, run)
-        snapshot = fetch_recovery(session, run)
-        return true unless snapshot.turn&.terminal?
-
-        apply_recovery(run, snapshot)
-        false
       rescue Providers::HostedAgentFailure => e
         raise Failure, e.error
+      end
+
+      def paused_for_tools?(snapshot)
+        Array(snapshot.tool_calls).any? && !snapshot.turn&.terminal?
       end
 
       def insert_follow_up(session, request)
@@ -343,16 +538,18 @@ module RecordingStudioAI
         )
       end
 
-      def turn_from(run, hosted_turn = nil, session = nil)
+      def turn_from(run, hosted_turn = nil, session = nil, tool_calls: nil)
+        calls = Array(tool_calls)
         Turn.new(
           provider: run&.resolved_provider || session.provider,
           provider_session_id: run&.provider_session_id || session.provider_session_id,
           provider_turn_id: run&.provider_turn_id || hosted_turn&.provider_turn_id,
           model: run&.resolved_model || session.model,
-          status: run&.status || hosted_turn&.status || "running",
+          status: calls.any? ? "requires_action" : (run&.status || hosted_turn&.status || "running"),
           run_id: run&.id,
           usage: usage_from(run),
-          error: error_from(run) || hosted_turn&.error
+          error: error_from(run) || hosted_turn&.error,
+          tool_calls: calls
         )
       end
 
@@ -391,11 +588,20 @@ module RecordingStudioAI
                                    metadata: { provider_turn_id: turn.provider_turn_id })
       end
 
+      def tool_calls_event(calls)
+        Providers::StreamEvent.new(
+          type: "tool_calls", tool_calls: calls,
+          metadata: { provider_turn_id: calls.first.provider_turn_id }
+        )
+      end
+
       def recovery_from(session, run, snapshot)
+        calls = Array(snapshot.tool_calls)
         Recovery.new(
           session: replace_status(session, snapshot.session.status),
-          turn: turn_from(run&.reload, snapshot.turn, session),
-          items: Array(snapshot.items).map { |item| public_item(item) }
+          turn: turn_from(run&.reload, snapshot.turn, session, tool_calls: calls),
+          items: Array(snapshot.items).map { |item| public_item(item) },
+          tool_calls: calls
         )
       end
 

@@ -8,6 +8,22 @@ Versioning and Keep a Changelog.
 ### Changed
 - Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
 
+## [0.20.0] - 2026-11-11
+
+### Added
+- Hosted agent session create accepts `tools:`, an array of function definitions (`type`, `name`, `description`, `parameters`, optional `defer_loading`). The OpenAI adapter sends them as `agent.tools`. Leaving `tools` out, or passing `tools: []`, sends the same create request as before. Duplicate function names are rejected.
+- `Agents.stream` yields `tool_calls` when the provider emits `agent.session.requires_action`. Each `Agents::ToolCall` has `call_id`, `name`, `arguments`, and `provider_turn_id`. `arguments` is the parsed object. When the provider payload is not a JSON object, `arguments` is nil and the call also has `arguments_error` and `raw_arguments`. Answer that call with `error:`. The turn stays running. `turn.status` is `requires_action` and `turn.tool_calls` holds the pending calls.
+- `Agents.submit_tool_results(session:, results:, **attribution)` posts one `agent.session.input.tool_result` per result, then continues the session stream. A result is `{ call_id:, turn_id:, output: }` or `{ call_id:, turn_id:, error: }`. `output` and `error` are strings capped at `Agents::Request::MAX_TOOL_RESULT_BYTES` (262144). Duplicate `call_id`s are rejected.
+- `submit_tool_results` reads the pending calls, then locks the run, re-checks it, and records the submitted `call_id`s before it posts. An unknown `call_id`, a duplicate `call_id`, a `call_id` already submitted, a `turn_id` mismatch, or a turn that is finished or not waiting raises `invalid_request`. That rejection does not call the provider and does not fail or bill the run. A 4xx rejection of the tool-result post, other than authentication (401) or a rate limit, raises that same `invalid_request` and leaves the run running. Call ids the provider still lists as pending are forgotten, so those results can be submitted again. A call the provider already accepted stays recorded. If the pending calls cannot be reread, the claimed ids stay recorded. Authentication, a rate limit, a 5xx response, a timeout, and a failure while reading the continuation keep the provider error, including `retryable`, and leave the run running.
+- `Agents.recover` and a dropped or resumed `stream` report unanswered function calls on `tool_calls`, including calls whose arguments did not parse. Historical items are not treated as pending.
+- A new message while a run is waiting on tool calls cancels that run at the provider, then reads the turn's usage and bills whatever was reported, once. `Agents.cancel` does the same. Usage is best-effort and may be null on an unfinished or cancelled turn; null is not billed as zero. If that read fails with a hosted-agent provider error, the failure is logged with the run id and error class, and the run stays cancelled. Any other error from that read is raised. Cancelling a finished run does not bill again.
+- The stream guard applies to the block passed to `Agents.stream`. `stream` without a block returns an Enumerator that is not guarded. Abandoning `stream(...).next` does not block a later `submit_tool_results` on that thread.
+
+### Upgrade notes
+- Bump to `0.20.0`. No migration. Hosts that do not pass `tools`, or pass an empty array, keep the previous session behavior.
+- Call `submit_tool_results` after `stream` returns, not from inside the stream block. The Enumerator returned by `stream` is not guarded. Do not rely on it to block a later submit. Pass a block, or iterate the Enumerator to completion yourself, to read the turn.
+- Answer a call with `arguments_error` by sending `error:`. Do not retry a `call_id` the provider already accepted. A rejected, timed out, or unsent post forgets call ids the provider still lists as pending, and those can be submitted again. A later message on a paused session cancels that run and bills the usage the provider reports after the cancel. A null usage is left unbilled. A hosted-agent provider error while reading that usage is logged with the run id and error class. Any other error from that read is raised.
+
 ## [0.19.6] - 2026-11-04
 
 ### Security
@@ -1137,7 +1153,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.6...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.6...v0.20.0
 [0.19.6]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.5...v0.19.6
 [0.19.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.1...v0.19.2
