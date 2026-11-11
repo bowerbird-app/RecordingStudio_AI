@@ -11,9 +11,13 @@ module RecordingStudioAI
       }.freeze
 
       STREAMING_KEY = :recording_studio_ai_hosted_agent_streaming
+      SUBMITTED_CALLS_KEY = "submitted_tool_call_ids"
 
+      # Fiber-local. The block form sets it on the caller's fiber. An external
+      # Enumerator runs in its own fiber, so abandoning stream(...).next does
+      # not leave the guard set on a pooled thread. That form is not guarded.
       def self.streaming?
-        Thread.current.thread_variable_get(STREAMING_KEY) == true
+        Thread.current[STREAMING_KEY] == true
       end
 
       def create(raw)
@@ -64,11 +68,10 @@ module RecordingStudioAI
         session = request.fetch(:session)
         guard_session!(session, request)
         run = running_run(session, request)
-        snapshot = cancel_snapshot(session, run)
         call_provider(nil) do
           adapter_for(session.provider).cancel_hosted_agent_turn(provider_session_id: session.provider_session_id)
         end
-        cancel_run(run, snapshot)
+        cancel_run(run, usage_after_cancel(session, run))
         replace_status(session, "cancelled")
       end
 
@@ -90,7 +93,7 @@ module RecordingStudioAI
         guard_session!(session, request)
         run = running_run(session, request) || latest_run(session, request)
         results = request.fetch(:results)
-        ensure_pending_results!(session, run, results)
+        claim_pending_results!(session, run, results)
         continue_stream(session, run, results, &)
       end
 
@@ -137,14 +140,14 @@ module RecordingStudioAI
       end
 
       def continue_stream(session, run, results, &block)
-        consume(session, run, block) do |on_event|
+        consume(session, run, block, reject_provider_failure: true) do |on_event|
           adapter_for(session.provider).continue_hosted_agent_after_tool_results(
             provider_session_id: session.provider_session_id, results: results, &on_event
           )
         end
       end
 
-      def consume(session, run, handler)
+      def consume(session, run, handler, reject_provider_failure: false)
         finished = false
         pending = nil
         streaming do
@@ -162,15 +165,17 @@ module RecordingStudioAI
         raise Failure, e.error if e.timeout?
         return recovered_turn(session, run, &handler) if e.dropped?
 
+        invalid_results!("hosted agent rejected the tool results") if reject_provider_failure
+
         fail_and_raise(run, e)
       end
 
       def streaming
-        previous = Thread.current.thread_variable_get(STREAMING_KEY)
-        Thread.current.thread_variable_set(STREAMING_KEY, true)
+        previous = Thread.current[STREAMING_KEY]
+        Thread.current[STREAMING_KEY] = true
         yield
       ensure
-        Thread.current.thread_variable_set(STREAMING_KEY, previous)
+        Thread.current[STREAMING_KEY] = previous
       end
 
       def recovered_turn(session, run, &block)
@@ -287,12 +292,22 @@ module RecordingStudioAI
         run.update!(terminal_attributes(run, "failed", error, nil))
       end
 
-      def cancel_snapshot(session, run)
+      # The provider cancel has already been accepted. Usage on a turn is
+      # best-effort and may be null, including after cancellation. Bill only
+      # what this read reports. A failed read leaves the run cancelled.
+      def usage_after_cancel(session, run)
         return if run.nil? || terminal_run?(run)
 
         fetch_recovery(session, run)
-      rescue Providers::HostedAgentFailure => e
-        raise Failure, e.error
+      rescue StandardError => e
+        log_cancel_usage_failure(run, e)
+        nil
+      end
+
+      def log_cancel_usage_failure(run, error)
+        Rails.logger.warn(
+          "recording_studio_ai cancel usage fetch failed run_id=#{run.id} error=#{error.class}"
+        )
       end
 
       def cancel_run(run, snapshot = nil)
@@ -308,19 +323,43 @@ module RecordingStudioAI
         )
       end
 
-      def release_paused_run(session, run, snapshot)
+      def release_paused_run(session, run)
         call_provider(nil) do
           adapter_for(session.provider).cancel_hosted_agent_turn(provider_session_id: session.provider_session_id)
         end
-        cancel_run(run, snapshot)
+        cancel_run(run, usage_after_cancel(session, run))
       end
 
-      def ensure_pending_results!(session, run, results)
+      def claim_pending_results!(session, run, results)
         invalid_results!("hosted agent turn is not waiting on tool results") if run.nil? || terminal_run?(run)
 
-        pending = pending_tool_calls(session, run)
-        invalid_results!("hosted agent turn is not waiting on tool results") if pending.empty?
-        match_pending_results!(pending, results)
+        run.with_lock do
+          invalid_results!("hosted agent turn is not waiting on tool results") if terminal_run?(run)
+
+          pending = pending_tool_calls(session, run)
+          invalid_results!("hosted agent turn is not waiting on tool results") if pending.empty?
+          match_pending_results!(pending, results)
+          reject_claimed_calls!(run, results)
+          remember_submitted_calls!(run, results)
+        end
+      end
+
+      def reject_claimed_calls!(run, results)
+        claimed = submitted_call_ids(run)
+        results.each do |result|
+          next unless claimed.include?(result[:call_id])
+
+          invalid_results!("tool result call_id was already submitted: #{result[:call_id]}")
+        end
+      end
+
+      def remember_submitted_calls!(run, results)
+        ids = submitted_call_ids(run) + results.map { |result| result[:call_id] }
+        run.update!(metadata: metadata_with(run, SUBMITTED_CALLS_KEY => ids.uniq))
+      end
+
+      def submitted_call_ids(run)
+        Array(run.metadata.to_h[SUBMITTED_CALLS_KEY]).map(&:to_s)
       end
 
       def pending_tool_calls(session, run)
@@ -371,7 +410,7 @@ module RecordingStudioAI
 
         snapshot = fetch_recovery(session, current)
         if paused_for_tools?(snapshot)
-          release_paused_run(session, current, snapshot)
+          release_paused_run(session, current)
           return insert_follow_up(session, request)
         end
         return current unless snapshot.turn&.terminal?

@@ -20,7 +20,8 @@ module RecordingStudioAI
     end
 
     # With a block, yields neutral stream events and returns the turn.
-    # Without a block, returns an Enumerator of those events.
+    # Without a block, returns an Enumerator of those events. That Enumerator
+    # is not guarded. Abandoning it does not block a later submit on the thread.
     # A +tool_calls+ event pauses the read. The returned turn carries those calls
     # and stays unbilled. +submit_tool_results+ continues the turn.
     def stream(**kwargs, &block)
@@ -30,8 +31,8 @@ module RecordingStudioAI
     end
 
     # Posts one function result per entry, then continues the session stream.
-    # Call it after +stream+ or +recover+ returns. It raises if a stream block
-    # is already running on this thread.
+    # Call it after +stream+ or +recover+ returns. It raises if called from
+    # inside the stream block. An external Enumerator is not guarded.
     def submit_tool_results(**kwargs, &block)
       if Runner.streaming?
         raise RecordingStudioAI::Errors::ContractValidationError.new(

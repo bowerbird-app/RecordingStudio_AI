@@ -9,7 +9,8 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     provider_key :openai
 
     attr_reader :creates, :submits, :streams, :cancels, :deletes, :recoveries, :tool_results
-    attr_accessor :events, :items, :stream_failure, :default_turn, :tool_calls
+    attr_accessor :events, :items, :stream_failure, :default_turn, :tool_calls, :on_tool_results,
+                  :recovery_failure
 
     def initialize(configuration: nil)
       super
@@ -25,6 +26,8 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       @tool_calls = []
       @events = []
       @items = []
+      @on_tool_results = nil
+      @recovery_failure = nil
     end
 
     def recovery_turns=(turns)
@@ -65,6 +68,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
 
     def continue_hosted_agent_after_tool_results(provider_session_id:, results:, &)
       tool_results << { provider_session_id: provider_session_id, results: results }
+      on_tool_results&.call
       raise stream_failure if stream_failure
 
       events.each(&)
@@ -72,6 +76,8 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     end
 
     def recover_hosted_agent_session(provider_session_id:, provider_turn_id: nil)
+      raise recovery_failure if recovery_failure
+
       recoveries << { provider_session_id: provider_session_id, provider_turn_id: provider_turn_id }
       RecordingStudioAI::Providers::HostedRecovery.new(
         session: hosted_session(provider_session_id, "gpt-6-astra"),
@@ -598,7 +604,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "could not read arguments", @fake.tool_results.last[:results].first[:error]
   end
 
-  def test_stream_enumerator_next_keeps_submit_tool_results_blocked
+  def test_an_abandoned_stream_enumerator_does_not_block_submit_tool_results
     session = create_session
     enum = RecordingStudioAI::Agents.stream(**session_args(session))
     assert_equal "text_delta", enum.next.type
@@ -608,10 +614,92 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     end
 
     assert_equal "invalid_request", error.code
-    assert_match(/after stream returns/, error.message)
+    assert_match(/not waiting on tool results/, error.message)
+    refute_match(/after stream returns/, error.message)
+    assert_equal "running", RecordingStudioAI::Run.find(session.run_id).status
     assert_empty @fake.tool_results
-  ensure
-    drain_enumerator(enum)
+    assert_empty @spends
+  end
+
+  def test_a_second_submit_after_claimed_call_ids_does_not_fail_the_billed_run
+    session = create_session
+    call = tool_call("call_1")
+    @fake.tool_calls = [call]
+    @fake.default_turn = active_turn
+    @fake.events = [
+      RecordingStudioAI::Providers::StreamEvent.new(
+        type: "turn_completed", usage: usage, metadata: { provider_turn_id: "turn_9" }
+      )
+    ]
+    raced = nil
+    @fake.on_tool_results = lambda do
+      Fiber.new do
+        raced = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+          RecordingStudioAI::Agents.submit_tool_results(**session_args(session), results: [tool_result(call)]) do
+            |_event|
+          end
+        end
+        assert_equal "running", RecordingStudioAI::Run.find(session.run_id).status
+      end.resume
+    end
+
+    turn = RecordingStudioAI::Agents.submit_tool_results(
+      **session_args(session), results: [tool_result(call)]
+    ) { |_event| }
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal "invalid_request", raced.code
+    assert_match(/already submitted: call_1/, raced.message)
+    assert_equal "completed", turn.status
+    assert_equal "completed", run.status
+    assert_equal 1, @spends.length
+    assert_equal 14, @spends.first[:quantity]
+    assert_equal 1, @fake.tool_results.length
+  end
+
+  def test_a_provider_rejection_of_tool_results_does_not_fail_the_run
+    session = create_session
+    call = tool_call("call_1")
+    @fake.tool_calls = [call]
+    @fake.default_turn = active_turn
+    @fake.stream_failure = RecordingStudioAI::Providers::HostedAgentFailure.new(
+      RecordingStudioAI::Contracts::NormalizedError.new(
+        category: "provider_error", code: "provider_error", message: "Provider request failed.", retryable: false
+      )
+    )
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Agents.submit_tool_results(**session_args(session), results: [tool_result(call)]) { |_event| }
+    end
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal "invalid_request", error.code
+    assert_equal "hosted agent rejected the tool results", error.message
+    assert_equal "running", run.status
+    assert_empty @spends
+    assert_equal ["call_1"], run.metadata["submitted_tool_call_ids"]
+  end
+
+  def test_cancel_still_cancels_when_the_usage_fetch_fails
+    session = create_session
+    run = RecordingStudioAI::Run.find(session.run_id)
+    @fake.recovery_failure = RecordingStudioAI::Providers::HostedAgentFailure.new(
+      RecordingStudioAI::Contracts::NormalizedError.new(
+        category: "provider_unavailable", code: "503", message: "Provider is unavailable.", retryable: true
+      )
+    )
+    messages = []
+    cancelled = nil
+    Rails.logger.stub(:warn, ->(message = nil) { messages << message.to_s }) do
+      cancelled = RecordingStudioAI::Agents.cancel(**session_args(session))
+    end
+
+    assert_equal ["sess_1"], @fake.cancels
+    assert_equal "cancelled", cancelled.status
+    assert_equal "cancelled", run.reload.status
+    assert_empty @spends
+    assert_match(/run_id=#{run.id}/, messages.join(" "))
+    assert_match(/HostedAgentFailure/, messages.join(" "))
   end
 
   def test_recovery_reports_pending_tool_calls
@@ -788,14 +876,6 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
 
   def max_result_bytes
     RecordingStudioAI::Agents::Request::MAX_TOOL_RESULT_BYTES
-  end
-
-  def drain_enumerator(enum)
-    return unless enum
-
-    loop { enum.next }
-  rescue StopIteration
-    nil
   end
 
   def item(role, text)
