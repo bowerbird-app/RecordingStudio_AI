@@ -93,14 +93,21 @@ class ConfigController < ApplicationController
       required: "No",
       accepted_values: "Callable or nil",
       default: "nil",
-      explanation: "Charges each provider attempt, and one batch submission, before the provider runs. Refresh and cancel are not charged. Leave nil to keep calls unmetered."
+      explanation: "Charges whole credits after each attempt from reported usage. Leave nil to keep calls free."
     },
     {
-      key: "usage_key_resolver",
-      required: "No",
+      key: "usage_precheck",
+      required: "When usage_handler is set",
       accepted_values: "Callable or nil",
       default: "nil",
-      explanation: "Returns a usage key for a provider attempt or a batch submission, or nil when that call is free. Refresh and cancel are not charged. Set this when usage_handler is set."
+      explanation: "Return true when the account has at least minimum credits. Anything else blocks the provider call."
+    },
+    {
+      key: "credit_prices",
+      required: "When usage_handler is set",
+      accepted_values: "Hash with a global \"*\" catch-all",
+      default: "{}",
+      explanation: "Whole-number credit prices per usage kind. Token kinds are per 1,000,000. Other kinds are per use."
     },
     {
       key: "attribution_validator",
@@ -486,7 +493,9 @@ class ConfigController < ApplicationController
       #   config.authorization_handler = RecordingStudioAI::AccessibleAuthorization.method(:call)
       config.authorization_handler = ->(**) { false }
       config.usage_handler = nil
-      config.usage_key_resolver = nil
+      config.usage_precheck = nil
+      config.credit_prices = {}
+      config.minimum_credit_balance = 1
 
       # The gem already checks that the workspace root and context match.
       # Set this only for a stricter host rule.

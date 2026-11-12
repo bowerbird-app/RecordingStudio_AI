@@ -69,12 +69,7 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     isolate_allow_all_configuration!
   end
 
-  def test_missing_handler_skips_the_resolver_and_still_aggregates_usage
-    resolver_calls = 0
-    RecordingStudioAI.configuration.usage_key_resolver = lambda do |**|
-      resolver_calls += 1
-      raise "resolver must not run"
-    end
+  def test_missing_handler_skips_billing_and_still_aggregates_usage
     provider = QueueProvider.new(success_result("Done", usage: usage(10, 5), cost: cost(40)))
     configure_single_candidate(:medium, :catalog_provider, provider)
 
@@ -83,7 +78,6 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     assert_predicate response, :success?
     assert_equal "Done", response.text
     assert_equal 1, provider.calls.length
-    assert_equal 0, resolver_calls
     assert_equal 10, response.usage.input_tokens
     assert_equal 5, response.usage.output_tokens
     assert_equal 15, response.usage.total_tokens
@@ -91,9 +85,9 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     refute response.cost.estimated?
   end
 
-  def test_nil_usage_key_skips_the_handler_and_calls_the_provider
+  def test_attempt_without_usage_skips_the_charge_and_calls_the_provider
     handler_calls = 0
-    RecordingStudioAI.configuration.usage_key_resolver = ->(**) {}
+    assign_meter([])
     RecordingStudioAI.configuration.usage_handler = lambda do |**|
       handler_calls += 1
       raise "handler must not run"
@@ -108,63 +102,45 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal 1, provider.calls.length
   end
 
-  def test_handler_runs_before_the_provider_with_meter_metadata
+  def test_handler_charges_after_the_provider_from_reported_usage
     order = []
     seen = []
-    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { "ai.gemini_flash" }
-    RecordingStudioAI.configuration.usage_handler = lambda do |key:, quantity:, attribution:,
-                                                              idempotency_key:, metadata:|
-      order << :handler
-      seen << {
-        key: key,
-        quantity: quantity,
-        attribution: attribution,
-        idempotency_key: idempotency_key,
-        metadata: metadata
-      }
+    assign_meter(seen)
+    RecordingStudioAI.configuration.usage_precheck = lambda do |**|
+      order << :precheck
+      true
     end
-    provider = QueueProvider.new(success_result("Done"))
+    RecordingStudioAI.configuration.usage_handler = lambda do |**kwargs|
+      order << :handler
+      seen << kwargs
+    end
+    provider = QueueProvider.new(success_result("Done", usage: usage(12, 8)))
     provider.on_call = -> { order << :provider }
     configure_single_candidate(:medium, :gemini, provider)
 
     response = generate(metadata: { leak: "hidden-note" })
 
     assert_predicate response, :success?
-    assert_equal %i[handler provider], order
+    assert_equal %i[precheck provider handler], order
     attempt = RecordingStudioAI::Attempt.sole
     spend = seen.sole
-    assert_equal "ai.gemini_flash", spend.fetch(:key)
-    assert_equal 1, spend.fetch(:quantity)
+    assert_equal 20, spend.fetch(:credits)
     assert_same @root_recording, spend.fetch(:attribution).root_recording
     assert_equal "ai-attempt:#{attempt.id}", spend.fetch(:idempotency_key)
-    assert_equal "gemini", spend.dig(:metadata, :provider)
-    assert_equal "gemini-model", spend.dig(:metadata, :model)
-    assert spend.fetch(:metadata).frozen?
-    assert_equal(
-      {
-        operation: "generation",
-        provider: "gemini",
-        model: "gemini-model",
-        profile: "medium",
-        purpose: nil,
-        ai_run_id: attempt.run_id,
-        attempt_id: attempt.id,
-        attempt_kind: "primary",
-        provider_native_tools: []
-      },
-      spend.fetch(:metadata)
-    )
-    assert spend.dig(:metadata, :provider_native_tools).frozen?
-    values = spend.fetch(:metadata).values.map(&:to_s)
-    refute(values.any? { |value| value.include?("Resilient request") })
-    refute(values.any? { |value| value.include?("hidden-note") })
+    assert_equal "gemini", spend.dig(:breakdown, :provider)
+    assert_equal "gemini-model", spend.dig(:breakdown, :model)
+    assert_equal({ input: 12, output: 8 }, spend.dig(:breakdown, :counts))
+    assert spend.fetch(:breakdown).frozen?
+    refute_includes spend.fetch(:breakdown).inspect, "Resilient request"
+    refute_includes spend.fetch(:breakdown).inspect, "hidden-note"
   end
 
   def test_handler_refusal_fails_the_attempt_without_calling_the_provider
     provider = QueueProvider.new(success_result("must not run"))
     configure_single_candidate(:medium, :first, provider)
-    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { "ai.openai" }
-    RecordingStudioAI.configuration.usage_handler = ->(**) { raise "credits exhausted" }
+    RecordingStudioAI.configuration.credit_prices = { "*" => { input: 1 } }
+    RecordingStudioAI.configuration.usage_precheck = ->(**) { raise "credits exhausted" }
+    RecordingStudioAI.configuration.usage_handler = ->(**) { raise "handler must not run" }
 
     error = assert_raises(RuntimeError) { generate }
 
@@ -189,8 +165,9 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     provider = QueueProvider.new(success_result("must not run"))
     configure_single_candidate(:medium, :first, provider)
     message = "x" * 300
-    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { "ai.openai" }
-    RecordingStudioAI.configuration.usage_handler = ->(**) { raise message }
+    RecordingStudioAI.configuration.credit_prices = { "*" => { input: 1 } }
+    RecordingStudioAI.configuration.usage_precheck = ->(**) { raise message }
+    RecordingStudioAI.configuration.usage_handler = ->(**) { raise "handler must not run" }
 
     error = assert_raises(RuntimeError) { generate }
 
@@ -224,7 +201,7 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal 28, response.usage.total_tokens
     assert_equal 230, response.cost.amount
     assert_equal 3, spends.length
-    assert_equal([1, 1, 1], spends.map { |spend| spend.fetch(:quantity) })
+    assert_equal([10, 4, 14], spends.map { |spend| spend.fetch(:credits) })
     keys = spends.map { |spend| spend.fetch(:idempotency_key) }
     assert_equal keys.uniq, keys
     attempt_ids = RecordingStudioAI::Attempt.order(:sequence).pluck(:id)
@@ -239,15 +216,13 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     spends = []
     assign_meter(spends)
 
+    result = success_result("Done", usage: usage(3, 1))
     2.times do
-      assert_nil RecordingStudioAI::Usage.spend!(
-        attempt: attempt,
-        attribution: attribution,
-        operation: :generation
-      )
+      assert charge_on(attempt, result)
     end
 
     assert_equal 2, spends.length
+    assert_equal([4, 4], spends.map { |spend| spend.fetch(:credits) })
     assert_equal(
       ["ai-attempt:#{attempt.id}", "ai-attempt:#{attempt.id}"],
       spends.map { |spend| spend.fetch(:idempotency_key) }
@@ -260,12 +235,7 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
       :medium, :decisive, provider, capabilities: %i[decision decision_noul]
     )
     spends = []
-    resolver_tools = nil
-    RecordingStudioAI.configuration.usage_key_resolver = lambda { |**kwargs|
-      resolver_tools = kwargs.fetch(:provider_native_tools)
-      "ai.jev"
-    }
-    RecordingStudioAI.configuration.usage_handler = ->(**kwargs) { spends << kwargs }
+    assign_meter(spends)
 
     response = RecordingStudioAI.decide(
       state: "Notes.",
@@ -280,13 +250,10 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "decision", response.operation
     assert_equal 1, provider.calls.length
     assert_equal 1, spends.length
-    assert_equal "decision", spends.sole.dig(:metadata, :operation)
-    assert_equal "decisive", spends.sole.dig(:metadata, :provider)
-    assert_equal "coverage_triage", spends.sole.dig(:metadata, :purpose)
-    assert_equal [], resolver_tools
-    assert resolver_tools.frozen?
-    assert_equal [], spends.sole.dig(:metadata, :provider_native_tools)
-    assert_equal 1, spends.sole.fetch(:quantity)
+    assert_equal "decisive", spends.sole.dig(:breakdown, :provider)
+    assert_equal({ decision: 1 }, spends.sole.dig(:breakdown, :counts))
+    assert_equal 1, spends.sole.fetch(:credits)
+    refute_includes spends.sole.fetch(:breakdown).inspect, "Notes."
   end
 
   def test_provider_error_after_a_successful_spend_stays_a_provider_failure
@@ -301,7 +268,7 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "provider_execution_error", response.error.code
     assert_equal "provider_error", response.error.category
     assert_equal 1, provider.calls.length
-    assert_equal 1, spends.length
+    assert_empty spends
     assert_equal "failed", response.run.status
     assert_equal "provider_execution_error", response.run.error_code
   end
@@ -309,7 +276,8 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
   def test_perform_tool_does_not_call_the_usage_handler
     isolate_tools_registry!
     register_echo
-    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { "ai.tool" }
+    RecordingStudioAI.configuration.credit_prices = { "*" => { input: 1 } }
+    RecordingStudioAI.configuration.usage_precheck = ->(**) { raise "precheck must not run" }
     RecordingStudioAI.configuration.usage_handler = ->(**) { raise "usage handler must not run" }
 
     performance = RecordingStudioAI.perform_tool!(
@@ -328,8 +296,9 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
   def test_stream_usage_refusal_stays_usage_declined
     provider = StreamProbe.new
     configure_single_candidate(:medium, :test, provider, capabilities: %i[generation streaming])
-    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { "ai.stream" }
-    RecordingStudioAI.configuration.usage_handler = ->(**) { raise "credits exhausted" }
+    RecordingStudioAI.configuration.credit_prices = { "*" => { input: 1 } }
+    RecordingStudioAI.configuration.usage_precheck = ->(**) { raise "credits exhausted" }
+    RecordingStudioAI.configuration.usage_handler = ->(**) { raise "handler must not run" }
     events = []
 
     error = assert_raises(RuntimeError) { stream { |event| events << event } }
@@ -353,8 +322,8 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     spends = []
     assign_meter(spends)
     provider = QueueProvider.new(
-      tool_result("call-1", "echo_text", { "text" => "hello" }),
-      success_result("continued")
+      tool_result("call-1", "echo_text", { "text" => "hello" }, usage: usage(2, 0)),
+      success_result("continued", usage: usage(1, 3))
     )
     configure_single_candidate(:medium, :first, provider, capabilities: %i[generation custom_tools])
     register_echo(executor: lambda { |arguments, _context|
@@ -370,111 +339,51 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal 2, provider.calls.length
     assert_equal %w[primary continuation], response.attempts.map(&:kind)
     assert_equal 2, spends.length
-    assert_equal([1, 1], spends.map { |spend| spend.fetch(:quantity) })
+    assert_equal([2, 4], spends.map { |spend| spend.fetch(:credits) })
     keys = spends.map { |spend| spend.fetch(:idempotency_key) }
     assert_equal 2, keys.uniq.length
     attempt_ids = RecordingStudioAI::Attempt.order(:sequence).pluck(:id)
     assert_equal attempt_ids.map { |id| "ai-attempt:#{id}" }, keys
   end
 
-  def test_spend_rejects_blank_and_non_string_keys_before_the_handler
-    attempt = meter_attempt
-    calls = []
-    RecordingStudioAI.configuration.usage_handler = ->(**kwargs) { calls << kwargs }
-
-    ["", "   ", 4].each do |key|
-      RecordingStudioAI.configuration.usage_key_resolver = ->(**) { key }
-      error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { spend_on(attempt) }
-
-      assert_equal "configuration", error.code
-    end
-    assert_empty calls
-  end
-
-  def test_resolver_exception_propagates_without_calling_the_handler
-    attempt = meter_attempt
-    calls = []
-    RecordingStudioAI.configuration.usage_handler = ->(**kwargs) { calls << kwargs }
-    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { raise IOError, "resolver down" }
-
-    error = assert_raises(IOError) { spend_on(attempt) }
-
-    assert_equal "resolver down", error.message
-    assert_empty calls
-  end
-
-  def test_handler_without_a_resolver_is_rejected_before_the_handler_runs
-    attempt = meter_attempt
-    calls = []
-    RecordingStudioAI.configuration.usage_handler = ->(**kwargs) { calls << kwargs }
-    RecordingStudioAI.configuration.usage_key_resolver = nil
-
-    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { spend_on(attempt) }
-
-    assert_equal "configuration", error.code
-    assert_includes error.message, "usage_key_resolver"
-    assert_empty calls
-  end
-
-  def test_missing_attempt_id_is_rejected_before_the_resolver
-    seen = []
+  def test_precheck_false_blocks_the_provider
+    provider = QueueProvider.new(success_result("must not run"))
+    configure_single_candidate(:medium, :first, provider)
+    assign_meter([])
+    RecordingStudioAI.configuration.usage_precheck = ->(**) { false }
     RecordingStudioAI.configuration.usage_handler = ->(**) { raise "handler must not run" }
-    RecordingStudioAI.configuration.usage_key_resolver = lambda { |**|
-      seen << :resolver
-      "ai.openai"
-    }
 
-    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { spend_on(meter_attempt(id: nil)) }
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { generate }
+
+    assert_equal "Not enough credits for this call.", error.message
+    assert_empty provider.calls
+    assert_equal "usage_declined", RecordingStudioAI::Attempt.sole.error_code
+  end
+
+  def test_missing_attempt_id_is_rejected_before_the_handler
+    assign_meter([])
+    RecordingStudioAI.configuration.usage_handler = ->(**) { raise "handler must not run" }
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      spend_on(meter_attempt(id: nil))
+    end
 
     assert_equal "invalid_request", error.code
-    assert_empty seen
   end
 
-  def test_symbol_usage_key_is_normalized_and_the_handler_return_is_ignored
+  def test_charge_ignores_the_handler_return_value
     attempt = meter_attempt
-    seen = nil
-    handled = nil
-    attribution = self.attribution
-    RecordingStudioAI.configuration.usage_key_resolver = lambda { |**kwargs|
-      seen = kwargs
-      :ai_openai
-    }
-    RecordingStudioAI.configuration.usage_handler = lambda { |**kwargs|
-      handled = kwargs
-      :billed
-    }
+    assign_meter([])
+    RecordingStudioAI.configuration.usage_handler = ->(**) { :billed }
 
-    assert_nil RecordingStudioAI::Usage.spend!(
-      attempt: attempt, attribution: attribution, operation: :decision, purpose: "draft_reply"
-    )
-
-    assert_same attribution, seen.fetch(:attribution)
-    assert_equal "decision", seen.fetch(:operation)
-    assert_equal "gemini", seen.fetch(:provider)
-    assert_equal "gemini-2.5-flash", seen.fetch(:model)
-    assert_equal "low", seen.fetch(:profile)
-    assert_equal "draft_reply", seen.fetch(:purpose)
-    assert_equal [], seen.fetch(:provider_native_tools)
-    assert seen.fetch(:provider_native_tools).frozen?
-    assert_equal(
-      %i[attribution operation provider model profile purpose provider_native_tools],
-      seen.keys
-    )
-    assert_equal [], handled.dig(:metadata, :provider_native_tools)
-    assert handled.dig(:metadata, :provider_native_tools).frozen?
-    assert_equal "ai_openai", handled.fetch(:key)
-    assert_equal 1, handled.fetch(:quantity)
-    assert_equal "ai-attempt:41", handled.fetch(:idempotency_key)
-    assert_equal "draft_reply", handled.dig(:metadata, :purpose)
-    assert_equal 9, handled.dig(:metadata, :ai_run_id)
-    assert handled.fetch(:metadata).frozen?
+    assert spend_on(attempt)
   end
 
-  def test_generate_with_web_search_passes_the_tool_list_and_search_key
-    resolver_tools = []
+  def test_reported_web_search_is_priced_and_the_prompt_stays_out_of_the_breakdown
     spends = []
-    meter_tool_choice(resolver_tools, spends)
-    provider = QueueProvider.new(success_result("Searched"))
+    assign_meter(spends)
+    searched = usage(4, 2).with_count(:web_search, 2)
+    provider = QueueProvider.new(success_result("Searched", usage: searched))
     configure_single_candidate(
       :medium, :gemini, provider, capabilities: %i[generation provider_native_web_search]
     )
@@ -482,93 +391,48 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     response = generate(prompt: "What shipped this week?", provider_native_tools: [:web_search])
 
     assert_predicate response, :success?
-    assert_equal [:web_search], resolver_tools.sole
-    assert resolver_tools.sole.frozen?
     spend = spends.sole
-    attempt = RecordingStudioAI::Attempt.sole
-    assert_equal "ai.gemini_flash_search", spend.fetch(:key)
-    assert_equal 1, spend.fetch(:quantity)
-    assert_equal "ai-attempt:#{attempt.id}", spend.fetch(:idempotency_key)
-    assert_equal ["web_search"], spend.dig(:metadata, :provider_native_tools)
-    assert spend.dig(:metadata, :provider_native_tools).frozen?
-    assert_equal "gemini", spend.dig(:metadata, :provider)
-    assert_equal "gemini-model", spend.dig(:metadata, :model)
-    refute_includes spend.fetch(:metadata).inspect, "What shipped this week?"
+    assert_equal({ input: 4, output: 2, web_search: 2 }, spend.dig(:breakdown, :counts))
+    assert_equal 8, spend.fetch(:credits)
+    assert_equal "gemini-model", spend.dig(:breakdown, :model)
+    refute_includes spend.fetch(:breakdown).inspect, "What shipped this week?"
   end
 
-  def test_generate_without_search_passes_an_empty_tool_list_and_the_base_key
-    resolver_tools = []
+  def test_prompt_and_tool_extras_are_applied_once
+    isolate_tools_registry!
+    original_prompts = RecordingStudioAI.instance_variable_get(:@prompts)
+    RecordingStudioAI.instance_variable_set(:@prompts, RecordingStudioAI::Prompts::Registry.new)
     spends = []
-    meter_tool_choice(resolver_tools, spends)
-    provider = QueueProvider.new(success_result("Plain"))
-    configure_single_candidate(
-      :medium, :gemini, provider, capabilities: %i[generation provider_native_web_search]
+    assign_meter(spends)
+    register_echo(credit_fee: 1, credit_multiplier: 2)
+    prompt = RecordingStudioAI.prompts.register(
+      key: :billing_note, version: 1, name: "Billing note", description: "A short note.",
+      inputs: [], messages: [{ role: "user", content: "Hello there" }],
+      credit_fee: 3, credit_multiplier: 2
     )
+    provider = QueueProvider.new(success_result("Done", usage: usage(1, 0)))
+    configure_single_candidate(:medium, :first, provider, capabilities: %i[generation custom_tools])
 
-    response = generate(prompt: "What shipped this week?")
+    response = generate(
+      prompt: "Hello there",
+      prompt_definition: prompt,
+      custom_tools: [{ key: :echo_text, version: 1 }]
+    )
 
     assert_predicate response, :success?
-    assert_equal [], resolver_tools.sole
-    assert resolver_tools.sole.frozen?
-    spend = spends.sole
-    assert_equal "ai.gemini_flash", spend.fetch(:key)
-    assert_equal 1, spend.fetch(:quantity)
-    assert_equal "gemini", spend.dig(:metadata, :provider)
-    assert_equal "gemini-model", spend.dig(:metadata, :model)
-    assert_equal [], spend.dig(:metadata, :provider_native_tools)
-    refute_includes spend.fetch(:metadata).inspect, "What shipped this week?"
+    # 1 input credit, times 2 prompt and 2 tool, plus fees 3 and 1, then one round up.
+    assert_equal 8, spends.sole.fetch(:credits)
+    assert_equal "billing_note", spends.sole.dig(:breakdown, :extras, :prompt_key)
+    assert_equal ["echo_text"], spends.sole.dig(:breakdown, :extras, :tool_keys)
+    refute_includes spends.sole.fetch(:breakdown).inspect, "Hello there"
+  ensure
+    RecordingStudioAI.instance_variable_set(:@prompts, original_prompts) if original_prompts
   end
 
-  def test_strict_resolver_missing_provider_native_tools_raises_before_the_provider
-    provider = QueueProvider.new(success_result("must not run"))
-    configure_single_candidate(:medium, :gemini, provider)
-    RecordingStudioAI.configuration.usage_key_resolver = lambda { |operation:, provider:, model:, profile:, purpose:,
-                                                                   attribution:|
-      "ai.#{operation}.#{provider}.#{model}.#{profile}.#{purpose}.#{attribution.class}"
-    }
-    RecordingStudioAI.configuration.usage_handler = ->(**) { :spent }
-
-    error = assert_raises(ArgumentError) { generate }
-
-    assert_includes error.message, "provider_native_tools"
-    assert_empty provider.calls
-  end
-
-  def test_nil_handler_returns_before_an_id_check_or_the_resolver
+  def test_nil_handler_does_not_charge_a_missing_id
     RecordingStudioAI.configuration.usage_handler = nil
-    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { raise "resolver must not run" }
-    batch = Struct.new(:id, :provider, :model, :profile_key, :item_count, keyword_init: true).new(
-      id: nil, provider: "gemini", model: "gemini-2.5-flash", profile_key: "medium", item_count: 2
-    )
 
     assert_nil spend_on(meter_attempt(id: nil))
-    assert_nil RecordingStudioAI::Usage.spend_batch_submission!(
-      batch: batch, attribution: attribution, provider_native_tools: [:web_search]
-    )
-  end
-
-  def test_provider_native_tools_keep_first_seen_symbols_without_an_allowlist
-    attempt = meter_attempt
-    seen = nil
-    handled = nil
-    RecordingStudioAI.configuration.usage_key_resolver = lambda { |**kwargs|
-      seen = kwargs.fetch(:provider_native_tools)
-      "ai.gemini_flash_search"
-    }
-    RecordingStudioAI.configuration.usage_handler = ->(**kwargs) { handled = kwargs }
-
-    assert_nil RecordingStudioAI::Usage.spend!(
-      attempt: attempt,
-      attribution: attribution,
-      operation: :generation,
-      provider_native_tools: [:other, "web_search", :other]
-    )
-
-    assert_equal %i[other web_search], seen
-    assert seen.frozen?
-    assert_equal %w[other web_search], handled.dig(:metadata, :provider_native_tools)
-    assert handled.dig(:metadata, :provider_native_tools).frozen?
-    refute_same seen, handled.dig(:metadata, :provider_native_tools)
   end
 
   def test_usage_is_a_legal_normalized_error_category
@@ -629,20 +493,27 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     ]
   end
 
-  def meter_tool_choice(resolver_tools, spends)
-    RecordingStudioAI.configuration.usage_key_resolver = lambda { |**kwargs|
-      tools = kwargs.fetch(:provider_native_tools)
-      resolver_tools << tools
-      tools.include?(:web_search) ? "ai.gemini_flash_search" : "ai.gemini_flash"
+  def assign_meter(bucket, precheck: ->(**) { true })
+    configuration = RecordingStudioAI.configuration
+    configuration.credit_prices = {
+      "*" => {
+        input: 1_000_000, output: 1_000_000, cached_input: 1_000_000,
+        reasoning: 1_000_000, web_search: 1, decision: 1
+      }
     }
-    RecordingStudioAI.configuration.usage_handler = ->(**kwargs) { spends << kwargs }
-  end
-
-  def assign_meter(bucket, key: "ai.openai")
-    RecordingStudioAI.configuration.usage_key_resolver = ->(**) { key }
-    RecordingStudioAI.configuration.usage_handler = lambda do |**kwargs|
+    configuration.usage_precheck = precheck
+    configuration.usage_handler = lambda do |**kwargs|
       bucket << kwargs
     end
+  end
+
+  def charge_on(attempt, result, operation: :generation)
+    RecordingStudioAI::Usage.charge_attempt!(
+      attempt: attempt,
+      result: result,
+      request: { attribution: attribution },
+      operation: operation
+    )
   end
 
   def success_result(text, usage: nil, cost: nil)
@@ -668,8 +539,9 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     )
   end
 
-  def tool_result(call_id, key, arguments)
+  def tool_result(call_id, key, arguments, usage: nil)
     RecordingStudioAI::Providers::Result.new(
+      usage: usage,
       tool_calls: [
         RecordingStudioAI::Providers::ToolCall.new(
           provider_tool_call_id: call_id,
@@ -710,11 +582,7 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
   end
 
   def spend_on(attempt)
-    RecordingStudioAI::Usage.spend!(
-      attempt: attempt,
-      attribution: attribution,
-      operation: :generation
-    )
+    charge_on(attempt, success_result("Done", usage: usage(2, 2)))
   end
 
   def attribution
@@ -724,7 +592,7 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     )
   end
 
-  def register_echo(executor: nil)
+  def register_echo(executor: nil, credit_fee: 0, credit_multiplier: 1)
     supplied = executor
     RecordingStudioAI.tools.register(
       key: :echo_text,
@@ -743,6 +611,8 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
       destructive: false,
       requires_confirmation: false,
       idempotent: true,
+      credit_fee: credit_fee,
+      credit_multiplier: credit_multiplier,
       executor_label: "Echo.text",
       executor: lambda { |arguments, context|
         if supplied

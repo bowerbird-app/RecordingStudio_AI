@@ -28,7 +28,7 @@ module RecordingStudioAI
       candidate = stored_candidate!(batch, cancellation: false)
       result = provider_for!(candidate).refresh_batch(batch: batch, candidate: candidate)
       ensure_batch_result!(result)
-      result = apply_result!(batch, result)
+      result = apply_result!(batch, result, attribution: request.fetch(:attribution))
       build_response(batch.reload, result, operation: "batch_refresh", transient_items: result.items)
     end
 
@@ -37,7 +37,7 @@ module RecordingStudioAI
       candidate = stored_candidate!(batch, cancellation: true)
       result = provider_for!(candidate).cancel_batch(batch: batch, candidate: candidate)
       ensure_batch_result!(result)
-      result = apply_result!(batch, result)
+      result = apply_result!(batch, result, attribution: request.fetch(:attribution))
       build_response(batch.reload, result, operation: "batch_cancel", transient_items: result.items)
     rescue Errors::ResolutionError => e
       build_response(batch, error_result(e, batch&.provider), operation: "batch_cancel")
@@ -46,11 +46,7 @@ module RecordingStudioAI
     private
 
     def meter_submission!(batch, request)
-      Usage.spend_batch_submission!(
-        batch: batch,
-        attribution: request.fetch(:attribution),
-        provider_native_tools: request.fetch(:items).flat_map { |item| item.fetch(:provider_native_tools) }
-      )
+      Usage.precheck!(attribution: request.fetch(:attribution))
     rescue StandardError => e
       record_usage_refusal!(batch, e)
       raise
@@ -60,13 +56,15 @@ module RecordingStudioAI
       result = provider_for!(candidate).submit_batch(request: request, candidate: candidate)
       ensure_batch_result!(result)
       result = normalize_submission_result(result, candidate)
-      result = apply_result!(batch, result, fail_pending_items: !result.success?)
+      result = apply_result!(
+        batch, result, fail_pending_items: !result.success?, attribution: request.fetch(:attribution)
+      )
       build_response(batch, result, operation: "batch_submit", transient_items: result.items)
     rescue Errors::ResolutionError
       raise
     rescue StandardError => e
       result = submission_failure(e, candidate)
-      apply_result!(batch, result, fail_pending_items: true)
+      apply_result!(batch, result, fail_pending_items: true, attribution: request.fetch(:attribution))
       build_response(batch, result, operation: "batch_submit")
     end
 
@@ -157,13 +155,13 @@ module RecordingStudioAI
       end
     end
 
-    def apply_result!(batch, result, fail_pending_items: false)
+    def apply_result!(batch, result, fail_pending_items: false, attribution: nil)
       accepted_items = []
       Batch.transaction do
         batch.lock!
         items_index = batch_items_index(batch)
         result.items.each do |item_result|
-          applied = apply_item_result!(batch, item_result, items_index: items_index)
+          applied = apply_item_result!(batch, item_result, items_index: items_index, attribution: attribution)
           accepted_items << applied if applied
         end
         fail_pending_items!(batch, result.error, items_index: items_index) if fail_pending_items
@@ -195,12 +193,20 @@ module RecordingStudioAI
         apply_item_result!(
           batch,
           Providers::BatchItemResult.new(reference: item.reference, status: item_status, error: error),
-          items_index: items_index
+          items_index: items_index,
+          attribution: nil
         )
       end
     end
 
-    def apply_item_result!(batch, result, items_index: nil)
+    def charge_reported_usage!(batch, item, result, attribution)
+      return false unless result.terminal? && attribution
+      return false if item.metadata.to_h["usage_charged"] == true
+
+      Usage.charge_batch_item!(item: item, result: result, batch: batch, attribution: attribution)
+    end
+
+    def apply_item_result!(batch, result, items_index: nil, attribution: nil)
       item = find_batch_item(batch, result, items_index: items_index)
       return unless item
 
@@ -215,15 +221,18 @@ module RecordingStudioAI
       end
       return if item_status_rank(result.status) < item_status_rank(item.status)
 
+      charged = charge_reported_usage!(batch, item, result, attribution)
       transition_at = Time.current
       completed_at = result.terminal? ? transition_at : nil
+      metadata = item.metadata.merge(result.metadata)
+      metadata = metadata.merge("usage_charged" => true) if charged
       item.update!(metrics(result).merge(
                      status: result.status, provider_item_id: result.provider_item_id,
                      started_at: item.started_at || (transition_at if result.status != "pending"),
                      completed_at: completed_at, finish_reason: result.finish_reason,
                      error_category: result.error&.category, error_code: result.error&.code,
                      error_message: result.error&.message,
-                     metadata: item.metadata.merge(result.metadata)
+                     metadata: metadata
                    ))
       update_run_from_item!(item.run, result, completed_at)
       Retention.retain_batch_item!(item, result, configuration: @configuration) if result.terminal?

@@ -88,4 +88,37 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "dummy-echo-batch"
   end
+
+  test "staff can read credit prices and a catch-all warning" do
+    sign_in @user
+    RecordingStudioAI.configuration.credit_prices = {
+      "*" => { input: 100, output: 400 },
+      openai: { "gpt-priced" => { output: 900 } }
+    }
+
+    get "/admin/screens/credit_prices"
+
+    assert_response :success
+    assert_includes response.body, "AI credit prices"
+    assert_includes response.body, "flat_pack/variables"
+    assert_includes response.body, "flat_pack/rich_text"
+    assert_includes response.body, "tailwind-"
+
+    get "/admin/screens/credit_prices/table"
+
+    assert_response :success
+    assert_includes response.body, "input 100 per 1000000"
+    assert_includes response.body, "gpt-priced"
+    assert_includes response.body, "No price of its own. Uses the global catch-all."
+    assert_includes response.body, "gpt-5"
+  end
+
+  test "someone without the admin grant cannot read credit prices" do
+    outsider = User.create!(email: "outsider-#{SecureRandom.hex(4)}@example.com", password: "password123")
+    sign_in outsider
+
+    get "/admin/screens/credit_prices"
+
+    assert_response :forbidden
+  end
 end

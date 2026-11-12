@@ -17,7 +17,7 @@ module RecordingStudioAI
         response_error = normalize_response_error(candidate_response)
         citations = normalize_citations(candidate_response)
         web_search_used = !grounding_metadata(candidate_response).nil?
-        usage = normalize_usage(read_value(response, :usage_metadata, :usageMetadata))
+        usage = usage_for(candidate_response, read_value(response, :usage_metadata, :usageMetadata))
         Result.new(
           text: response_text(response, candidate_response),
           citations: citations,
@@ -49,6 +49,7 @@ module RecordingStudioAI
         provider_request_id = nil
         response_error = nil
         web_search_used = false
+        search_count = 0
 
         client.models.stream_generate_content(
           model: candidate.model,
@@ -67,6 +68,7 @@ module RecordingStudioAI
           chunk_error = normalize_response_error(candidate_response) if candidate_response
           response_error = chunk_error if chunk_error
           web_search_used ||= !grounding_metadata(candidate_response).nil?
+          search_count = [search_count, web_search_count(candidate_response)].max
           chunk_text = response_text(chunk, candidate_response).to_s
           delta = if text_mode == :cumulative && chunk_text.start_with?(text)
                     chunk_text.delete_prefix(text)
@@ -96,6 +98,7 @@ module RecordingStudioAI
         end
 
         response_error ||= normalize_response_error(final_candidate)
+        usage = usage_with_search_count(usage, search_count)
         Result.new(
           text: text,
           citations: citations,
@@ -186,7 +189,7 @@ module RecordingStudioAI
         candidate_response = Array(read_value(response, :candidates)).first
         error = normalize_response_error(candidate_response)
         citations = normalize_citations(candidate_response)
-        usage = normalize_usage(read_value(response, :usage_metadata, :usageMetadata))
+        usage = usage_for(candidate_response, read_value(response, :usage_metadata, :usageMetadata))
         BatchItemResult.new(
           reference: reference, provider_item_id: read_value(response, :response_id, :responseId),
           status: error ? "failed" : "completed", text: response_text(response, candidate_response),
@@ -405,6 +408,26 @@ module RecordingStudioAI
 
       def normalize_finish_reason(value)
         value&.to_s&.downcase
+      end
+
+      def usage_for(candidate_response, raw_usage)
+        usage_with_search_count(normalize_usage(raw_usage), web_search_count(candidate_response))
+      end
+
+      def usage_with_search_count(usage, count)
+        return usage if count.to_i.zero?
+
+        (usage || RecordingStudioAI::Contracts::Usage.new).with_count(:web_search, count)
+      end
+
+      def web_search_count(candidate_response)
+        grounding = grounding_metadata(candidate_response)
+        return 0 unless grounding
+
+        queries = read_value(grounding, :web_search_queries, :webSearchQueries)
+        return Array(queries).length unless queries.nil?
+
+        1
       end
 
       def normalize_usage(usage)

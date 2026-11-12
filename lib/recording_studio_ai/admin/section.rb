@@ -82,6 +82,11 @@ module AdminScreens
          url: ->(context) { context.admin_screen_path("profiles") },
          style: :secondary
 
+    link :credit_prices,
+         text: ->(_context) { Copy.t("admin.section.links.credit_prices") },
+         url: ->(context) { context.admin_screen_path("credit_prices") },
+         style: :secondary
+
     widget "widgets.recording_studio_ai.ai_calls_windows"
     widget "widgets.recording_studio_ai.tool_calls"
     widget "widgets.recording_studio_ai.registered_custom_tools"

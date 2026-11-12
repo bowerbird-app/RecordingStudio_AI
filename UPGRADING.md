@@ -1,5 +1,43 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.21.0
+
+`0.21.0` replaces the flat per-attempt usage key with optional credit prices. Apps that leave `usage_handler` nil stay free. There is no migration.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.21.0`.
+2. Delete `config.usage_key_resolver`. The gem no longer accepts it.
+3. Leave `usage_handler` nil if you do not charge. Do not add prices.
+4. If you charge, set `credit_prices` with a global `"*"` catch-all, `usage_precheck`, and the new `usage_handler`. Boot fails when the handler is set and either the pre-check or the global catch-all is missing.
+
+```ruby
+config.minimum_credit_balance = 1
+config.credit_prices = {
+  "*" => { input: 100, output: 400, cached_input: 25, reasoning: 400, web_search: 5, decision: 2 }
+}
+config.usage_precheck = lambda do |attribution:, minimum:|
+  # The Stripe method names below are the host's choice. That gem adds them separately.
+  RecordingStudioStripe::Billing
+    .for_recording(attribution.root_recording)
+    .line(:pressbot)
+    .credits_available?(minimum:)
+end
+config.usage_handler = lambda do |credits:, breakdown:, idempotency_key:, attribution:|
+  RecordingStudioStripe::Billing
+    .for_recording(attribution.root_recording)
+    .line(:pressbot)
+    .record_credits(credits:, breakdown:, idempotency_key:)
+end
+```
+
+5. Stop reading `key`, `quantity`, and `metadata` from the handler. It now receives `credits`, `breakdown`, `idempotency_key`, and `attribution`.
+6. Treat `ai-attempt:<attempt id>` as the attempt key, `ai-batch-item:<item id>` as the batch item key, and `ai-hosted-agent-turn:<provider turn id>` as the hosted turn key. The old `ai-batch:<batch id>:submission` key is gone. A repeat of the same key must not charge again.
+7. Expect the pre-check before the provider call, and the charge after reported usage. A denied pre-check does not call the provider. A failed attempt that reported usage is still charged. Retries and fallbacks are separate attempts.
+8. Optional. Set `credit_fee:` and `credit_multiplier:` on a registered prompt or tool. Both default to a fee of 0 and a multiplier of 1.
+9. `cost_catalogs` is unchanged and still only estimates money for admin. It does not bill.
+10. Staff can read prices at Admin → Recording Studio AI → AI credit prices.
+
 ## Upgrading to 0.20.0
 
 Hosted agent sessions can call function tools. No migration. Sessions created without `tools`, and sessions created with `tools: []`, send the same create request as 0.19.6.

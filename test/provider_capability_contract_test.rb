@@ -231,6 +231,7 @@ class ProviderCapabilityContractTest < Minitest::Test
     assert result.success?
     assert_equal({ "summary" => "grounded" }, JSON.parse(result.text))
     assert_equal ["web_search"], result.provider_native_tools
+    assert_equal 1, result.usage.counts[:web_search]
     assert_equal "lookup_topic", result.tool_calls.first.key
     assert_advanced_translation(provider, client)
 

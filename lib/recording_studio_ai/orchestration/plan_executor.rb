@@ -50,7 +50,7 @@ module RecordingStudioAI
             parameter_overrides: planned.parameter_overrides,
             attempt: attempt
           )
-          @persistence.complete_attempt!(attempt, result)
+          finish_attempt!(run, request, attempt, result, operation)
           executions << ExecutedAttempt.new(record: attempt, result: result)
 
           if custom_tool_rounds?(result, operation) && result.tool_calls.any?
@@ -62,6 +62,18 @@ module RecordingStudioAI
         end
 
         nil
+      end
+
+      def finish_attempt!(run, request, attempt, result, operation)
+        @persistence.complete_attempt!(attempt, result)
+        RecordingStudioAI::Usage.charge_attempt!(
+          attempt: attempt, result: result, request: request, operation: operation
+        )
+      rescue StandardError => e
+        raise if attempt.status == "running"
+
+        RecordingStudioAI::Usage.record_charge_failure!(run, e)
+        raise
       end
 
       def custom_tool_rounds?(result, operation)

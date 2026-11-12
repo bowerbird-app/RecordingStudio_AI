@@ -22,6 +22,9 @@ module RecordingStudioAI
       :custom_tool_confirmation_handler,
       :custom_tool_timeout,
       :cost_catalogs,
+      :credit_prices,
+      :credit_price_per,
+      :minimum_credit_balance,
       :discovery_enabled,
       :execution_history_retention_period,
       :gemini_api_key,
@@ -64,7 +67,7 @@ module RecordingStudioAI
       :typesafe_api_key,
       :typesafe_client,
       :usage_handler,
-      :usage_key_resolver
+      :usage_precheck
     )
     attr_reader :layout
 
@@ -78,7 +81,10 @@ module RecordingStudioAI
       @stuck_run_threshold = 15.minutes
       @authorization_handler = ->(**) { false }
       @usage_handler = nil
-      @usage_key_resolver = nil
+      @usage_precheck = nil
+      @minimum_credit_balance = 1
+      @credit_prices = {}
+      @credit_price_per = {}
       @providers = {}
       install_shipped_providers
       @allowed_provider_overrides = []
@@ -233,7 +239,7 @@ module RecordingStudioAI
       if !admin_runs_scope.nil? && !admin_runs_scope.respond_to?(:call)
         invalid_configuration!("admin_runs_scope must be nil or respond to call")
       end
-      validate_usage_meter!
+      validate_credit_billing!
       normalize_model_fallbacks!
       self
     end
@@ -324,16 +330,15 @@ module RecordingStudioAI
       invalid_configuration!("#{name} must be a finite number #{range}")
     end
 
-    def validate_usage_meter!
+    def validate_credit_billing!
       if present_but_not_callable?(usage_handler)
         invalid_configuration!("usage_handler must respond to call")
       end
-      if present_but_not_callable?(usage_key_resolver)
-        invalid_configuration!("usage_key_resolver must respond to call")
+      if present_but_not_callable?(usage_precheck)
+        invalid_configuration!("usage_precheck must respond to call")
       end
-      return if usage_handler.nil? || usage_key_resolver.respond_to?(:call)
-
-      invalid_configuration!("usage_handler requires a usage_key_resolver that responds to call")
+      validate_integer!(:minimum_credit_balance, minimum: 1)
+      Credits.normalize_configuration!(self)
     end
 
     def present_but_not_callable?(value)

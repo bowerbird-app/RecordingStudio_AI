@@ -123,7 +123,8 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     @fake = FakeAdapter.new(configuration: @configuration)
     RecordingStudioAI.register_provider(:openai, @fake)
     @spends = []
-    @configuration.usage_key_resolver = ->(**) { "ai.hosted_agent" }
+    @configuration.usage_precheck = ->(**) { true }
+    @configuration.credit_prices = { "*" => { input: 1_000_000, output: 1_000_000 } }
     @configuration.usage_handler = ->(**kwargs) { @spends << kwargs }
     @configuration.cost_catalogs = {
       openai: { "gpt-6-astra" => { input_tokens: 3_000_000, output_tokens: 15_000_000, currency: "USD" } }
@@ -162,9 +163,11 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "turn_1", run.provider_turn_id
     assert_equal 14, run.total_tokens
     assert_equal 1, @spends.length
-    assert_equal 14, @spends.first[:quantity]
+    assert_equal 14, @spends.first[:credits]
     assert_equal "ai-hosted-agent-turn:turn_1", @spends.first[:idempotency_key]
-    refute_includes @spends.first[:metadata].to_s, "do-not-store-this-prompt"
+    refute_includes @spends.first[:breakdown].to_s, "do-not-store-this-prompt"
+    assert_equal({ input: 10, output: 4 }, @spends.first.dig(:breakdown, :counts))
+    assert_equal "ai-hosted-agent-turn:turn_1", @spends.first[:idempotency_key]
 
     @fake.default_turn = completed_turn
     again = []
@@ -532,7 +535,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "cancelled", paused_run.status
     assert_equal 14, paused_run.total_tokens
     assert_equal 1, @spends.length
-    assert_equal 14, @spends.first[:quantity]
+    assert_equal 14, @spends.first[:credits]
     assert_equal "ai-hosted-agent-turn:turn_1", @spends.first[:idempotency_key]
     assert_equal ["sess_1"], @fake.cancels
     assert_equal "next-1", @fake.submits.last[:idempotency_key]
@@ -659,7 +662,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "completed", turn.status
     assert_equal "completed", run.status
     assert_equal 1, @spends.length
-    assert_equal 14, @spends.first[:quantity]
+    assert_equal 14, @spends.first[:credits]
     assert_equal 1, @fake.tool_results.length
   end
 
@@ -724,7 +727,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "completed", turn.status
     assert_equal "completed", run.reload.status
     assert_equal 1, @spends.length
-    assert_equal 14, @spends.first[:quantity]
+    assert_equal 14, @spends.first[:credits]
     assert_equal 2, @fake.tool_results.length
   end
 

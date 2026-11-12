@@ -13,7 +13,12 @@ module RecordingStudioAI
           reported = usages.map { |usage| usage.public_send(field) }
           [field, reported.any?(&:nil?) ? nil : reported.sum]
         end
-        RecordingStudioAI::Contracts::Usage.new(**values)
+        extra_kinds = usages.flat_map { |usage| usage.counts.keys }.uniq
+        extra_kinds -= RecordingStudioAI::Contracts::Usage::KIND_FOR_FIELD.values
+        counts = extra_kinds.to_h do |kind|
+          [kind, usages.sum { |usage| usage.counts[kind].to_i }]
+        end
+        RecordingStudioAI::Contracts::Usage.new(**values, counts: counts)
       end
 
       def cost(executions)
