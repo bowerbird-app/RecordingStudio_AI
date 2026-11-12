@@ -110,6 +110,20 @@ class ConfigController < ApplicationController
       explanation: "Whole-number credit prices per usage kind. Token kinds are per 1,000,000. Other kinds are per use."
     },
     {
+      key: "credit_price_per",
+      required: "No",
+      accepted_values: "Hash of usage kind => positive whole number",
+      default: "{}",
+      explanation: "Units one price covers. Token kinds default to 1,000,000. Other kinds default to 1."
+    },
+    {
+      key: "minimum_credit_balance",
+      required: "No",
+      accepted_values: "Positive whole number",
+      default: "1",
+      explanation: "Credits the pre-check asks the account to hold before a provider call."
+    },
+    {
       key: "attribution_validator",
       required: "No",
       accepted_values: "Callable(root_recording:, context_recording:)",
@@ -495,6 +509,7 @@ class ConfigController < ApplicationController
       config.usage_handler = nil
       config.usage_precheck = nil
       config.credit_prices = {}
+      config.credit_price_per = {}
       config.minimum_credit_balance = 1
 
       # The gem already checks that the workspace root and context match.
