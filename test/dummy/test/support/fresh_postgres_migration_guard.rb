@@ -10,7 +10,8 @@ require_relative "../../config/environment"
 # The migration name is the middle part. The scope suffix is not part of the class.
 module FreshPostgresMigrationGuard
   GUARD_DATABASE = "recording_studio_ai_migration_guard"
-  LEGACY_STOP = 20260812150000
+  # Stop before history integrity so dropped columns are baked into the guards.
+  BEFORE_HISTORY_GUARDS = 20260811120000
 
   module_function
 
@@ -103,6 +104,19 @@ module FreshPostgresMigrationGuard
                          name: "idx_rsai_tool_arguments_digest"
   end
 
+  def install_cost_columns(connection)
+    load RecordingStudioAI::Engine.root.join(
+      "db/migrate/20260814130000_remove_cost_columns_from_recording_studio_ai.rb"
+    ).to_s
+    RemoveCostColumnsFromRecordingStudioAI::COST_COLUMNS.each do |table, columns|
+      columns.each do |column|
+        next if connection.column_exists?(table, column)
+
+        connection.add_column(table, column, :string)
+      end
+    end
+  end
+
   def assert_shape!(connection)
     checks = [
       [:recording_studio_ai_runs, :prompt_key, true],
@@ -141,7 +155,9 @@ module FreshPostgresMigrationGuard
     update_execution!(connection, :recording_studio_ai_runs, run_id, purpose: "draft")
     update_execution!(connection, :recording_studio_ai_runs, run_id, status: "completed")
     update_execution!(connection, :recording_studio_ai_runs, run_id, metadata: "{\"kept\":true}")
+    update_execution!(connection, :recording_studio_ai_runs, run_id, provider_turn_id: "turn-1")
     assert_terminal_change_blocked!(connection, :recording_studio_ai_runs, run_id, status: "cancelled")
+    assert_terminal_change_blocked!(connection, :recording_studio_ai_runs, run_id, prompt_key: "summarize")
 
     update_execution!(connection, :recording_studio_ai_batches, batch_id, profile_key: "medium")
     update_execution!(connection, :recording_studio_ai_batches, batch_id, status: "completed")
@@ -190,13 +206,53 @@ module FreshPostgresMigrationGuard
   end
 
   def refute_guard_names_correlation_id!(connection)
-    %w[rsai_terminal_runs_guard rsai_terminal_batches_guard].each do |function|
+    %w[
+      rsai_terminal_runs_guard
+      rsai_terminal_attempts_guard
+      rsai_terminal_custom_tool_invocations_guard
+      rsai_terminal_batches_guard
+      rsai_terminal_batch_items_guard
+    ].each do |function|
       source = connection.select_value(
         "SELECT pg_get_functiondef(p.oid) FROM pg_proc p WHERE p.proname = #{connection.quote(function)}"
       )
       abort "#{function} is missing" if source.nil?
-      abort "#{function} still names correlation_id" if source.include?("correlation_id")
+      %w[correlation_id arguments_digest input_digest cost_amount_microunits cost_source cost_category].each do |column|
+        abort "#{function} still names #{column}" if source.include?(column)
+      end
+      abort "#{function} does not protect prompt_key" if function == "rsai_terminal_runs_guard" && !source.include?("prompt_key")
     end
+  end
+
+  def assert_related_updates!(connection, root_id)
+    run_id = insert_execution!(connection, :recording_studio_ai_runs, root_id, status: "pending", operation: "generation")
+    attempt_id = insert_row!(connection, :recording_studio_ai_attempts, run_id: run_id, sequence: 1, kind: "primary", status: "pending")
+    invocation_id = insert_row!(
+      connection, :recording_studio_ai_custom_tool_invocations,
+      run_id: run_id, tool_key: "lookup", tool_version: 1, status: "requested",
+      read_only: true, destructive: false, requires_confirmation: false, idempotent: true
+    )
+    batch_id = insert_execution!(connection, :recording_studio_ai_batches, root_id, status: "preparing")
+    item_id = insert_row!(
+      connection, :recording_studio_ai_batch_items,
+      batch_id: batch_id, run_id: run_id, position: 0, reference: "item-1", status: "pending"
+    )
+
+    update_execution!(connection, :recording_studio_ai_attempts, attempt_id, status: "completed")
+    update_execution!(connection, :recording_studio_ai_custom_tool_invocations, invocation_id, status: "completed")
+    update_execution!(connection, :recording_studio_ai_batch_items, item_id, status: "completed")
+    update_execution!(connection, :recording_studio_ai_attempts, attempt_id, metadata: "{\"kept\":true}")
+    update_execution!(connection, :recording_studio_ai_custom_tool_invocations, invocation_id, metadata: "{\"kept\":true}")
+    update_execution!(connection, :recording_studio_ai_batch_items, item_id, metadata: "{\"kept\":true}")
+  end
+
+  def insert_row!(connection, table, **attributes)
+    columns = { created_at: Time.now.utc, updated_at: Time.now.utc }.merge(attributes)
+    names = columns.keys.map { |name| connection.quote_column_name(name) }
+    values = columns.values.map { |value| connection.quote(value) }
+    connection.select_value(
+      "INSERT INTO #{table} (#{names.join(', ')}) VALUES (#{values.join(', ')}) RETURNING id"
+    )
   end
 
   def assert_legacy_indexes_gone!(connection)
@@ -220,12 +276,15 @@ module FreshPostgresMigrationGuard
         assert_shape!(connection)
         assert_terminal_guards!(connection)
       when "legacy"
-        migrate_to(LEGACY_STOP)
+        migrate_to(BEFORE_HISTORY_GUARDS)
         install_legacy_columns(connection)
-        apply_migrations_after(LEGACY_STOP)
+        install_cost_columns(connection)
+        apply_migrations_after(BEFORE_HISTORY_GUARDS)
         assert_shape!(connection)
         assert_legacy_indexes_gone!(connection)
         assert_terminal_guards!(connection)
+        root_id = connection.select_value("SELECT id FROM recording_studio_recordings LIMIT 1")
+        assert_related_updates!(connection, root_id)
       else
         abort "unknown scenario #{scenario}"
       end

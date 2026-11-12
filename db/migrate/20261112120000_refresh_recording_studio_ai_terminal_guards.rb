@@ -1,17 +1,27 @@
 # frozen_string_literal: true
 
-# History integrity builds rsai_terminal_* while correlation_id still exists.
-# The later drop never replaces those guards. PostgreSQL then raises
-# "record old has no field correlation_id" on every run or batch update.
-# SQLite drops the triggers when it rewrites the table. Rebuild both from
-# the columns that exist now. Mutable columns and terminal statuses stay
-# the same as the original guards.
+# History integrity builds rsai_terminal_* from the columns present at that
+# moment. Later migrations drop correlation_id, legacy digests, and cost
+# columns without replacing the functions. PostgreSQL then rejects every
+# update. SQLite drops the triggers, including the run and batch ownership
+# guards, when it rewrites the table. Rebuild all five terminal guards from
+# the columns that exist now. provider_session_id and provider_turn_id stay
+# writable so a finished run can record a turn id. prompt_* columns do not.
 class RefreshRecordingStudioAITerminalGuards < ActiveRecord::Migration[8.1]
   TABLES = {
     recording_studio_ai_runs: %w[completed failed cancelled],
-    recording_studio_ai_batches: %w[completed partially_completed failed cancelled expired]
+    recording_studio_ai_attempts: %w[completed failed cancelled],
+    recording_studio_ai_custom_tool_invocations: %w[completed denied rejected failed cancelled],
+    recording_studio_ai_batches: %w[completed partially_completed failed cancelled expired],
+    recording_studio_ai_batch_items: %w[completed failed cancelled expired]
   }.freeze
-  MUTABLE = %w[id metadata lock_version created_at updated_at].freeze
+  MUTABLE = %w[
+    id metadata lock_version created_at updated_at provider_session_id provider_turn_id
+  ].freeze
+  OWNERSHIP = {
+    "run_root" => [:recording_studio_ai_runs, %w[root_recording_id context_recording_id]],
+    "batch_root" => [:recording_studio_ai_batches, %w[root_recording_id context_recording_id]]
+  }.freeze
 
   def up
     case connection.adapter_name
@@ -19,6 +29,7 @@ class RefreshRecordingStudioAITerminalGuards < ActiveRecord::Migration[8.1]
       TABLES.each { |table, statuses| replace_postgresql_guard(table, statuses) }
     when /SQLite/i
       TABLES.each { |table, statuses| replace_sqlite_guard(table, statuses) }
+      OWNERSHIP.each { |name, (table, columns)| replace_sqlite_ownership_guard(name, table, columns) }
     else
       say "Database trigger enforcement is unavailable for #{connection.adapter_name}; model guards remain active", true
     end
@@ -59,7 +70,7 @@ class RefreshRecordingStudioAITerminalGuards < ActiveRecord::Migration[8.1]
       CREATE TRIGGER #{trigger}
       BEFORE UPDATE ON #{table}
       FOR EACH ROW
-      WHEN OLD.status IN (#{quoted_statuses(statuses)}) AND (#{sqlite_comparisons(table)})
+      WHEN OLD.status IN (#{quoted_statuses(statuses)}) AND (#{changed(connection.columns(table).map(&:name) - MUTABLE)})
       BEGIN
         SELECT RAISE(ABORT, 'terminal execution history is immutable');
       END;
@@ -75,28 +86,37 @@ class RefreshRecordingStudioAITerminalGuards < ActiveRecord::Migration[8.1]
     statuses.map { |status| connection.quote(status) }.join(", ")
   end
 
-  def immutable_names(table)
-    connection.columns(table).map(&:name) - MUTABLE
-  end
-
   def postgresql_comparisons(table)
     columns = connection.columns(table).index_by(&:name)
-    immutable_names(table).map { |name| postgresql_comparison(columns.fetch(name)) }.join(" OR ")
+    names = columns.keys - MUTABLE
+    names.map { |name| postgresql_comparison(columns.fetch(name)) }.join(" OR ")
   end
 
   def postgresql_comparison(column)
     quoted = connection.quote_column_name(column.name)
-    if column.sql_type == "json"
-      "(OLD.#{quoted})::jsonb IS DISTINCT FROM (NEW.#{quoted})::jsonb"
-    else
-      "OLD.#{quoted} IS DISTINCT FROM NEW.#{quoted}"
-    end
+    json = ["(OLD.#{quoted})::jsonb", "(NEW.#{quoted})::jsonb"]
+    plain = ["OLD.#{quoted}", "NEW.#{quoted}"]
+    (column.sql_type == "json" ? json : plain).join(" IS DISTINCT FROM ")
   end
 
-  def sqlite_comparisons(table)
-    immutable_names(table).map do |name|
+  def changed(names)
+    names.map do |name|
       quoted = connection.quote_column_name(name)
       "OLD.#{quoted} IS NOT NEW.#{quoted}"
     end.join(" OR ")
+  end
+
+  def replace_sqlite_ownership_guard(name, table, columns)
+    trigger = "rsai_#{name}_ownership_guard"
+    execute "DROP TRIGGER IF EXISTS #{trigger}"
+    execute <<~SQL
+      CREATE TRIGGER #{trigger}
+      BEFORE UPDATE ON #{table}
+      FOR EACH ROW
+      WHEN #{changed(columns)}
+      BEGIN
+        SELECT RAISE(ABORT, 'execution ownership columns are immutable');
+      END;
+    SQL
   end
 end

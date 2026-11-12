@@ -90,8 +90,6 @@ module RecordingStudioAI
           error_category
           error_code
           error_message
-          provider_session_id
-          provider_turn_id
         ]
       end
     end

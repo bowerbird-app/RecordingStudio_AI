@@ -93,20 +93,24 @@ class FreshDatabaseMigrationsTest < Minitest::Test
     update_row(:recording_studio_ai_runs, run_id, purpose: "draft")
     update_row(:recording_studio_ai_runs, run_id, status: "completed")
     update_row(:recording_studio_ai_runs, run_id, metadata: "{\"kept\":true}")
+    update_row(:recording_studio_ai_runs, run_id, provider_turn_id: "turn-1")
     assert_terminal_change_blocked(:recording_studio_ai_runs, run_id, status: "cancelled")
+    assert_terminal_change_blocked(:recording_studio_ai_runs, run_id, prompt_key: "summarize")
 
     update_row(:recording_studio_ai_batches, batch_id, profile_key: "medium")
     update_row(:recording_studio_ai_batches, batch_id, status: "completed")
     update_row(:recording_studio_ai_batches, batch_id, metadata: "{\"kept\":true}")
     assert_terminal_change_blocked(:recording_studio_ai_batches, batch_id, provider: "openai")
 
-    %w[rsai_terminal_runs rsai_terminal_batches].each do |trigger|
-      sql = ActiveRecord::Base.connection.select_value(
-        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = #{ActiveRecord::Base.connection.quote(trigger)}"
-      )
+    %w[runs attempts custom_tool_invocations batches batch_items].each do |suffix|
+      sql = trigger_sql("rsai_terminal_#{suffix}")
       assert_includes sql, "terminal execution history is immutable"
       refute_includes sql, "correlation_id"
     end
+    %w[rsai_run_root_ownership_guard rsai_batch_root_ownership_guard].each do |trigger|
+      assert_includes trigger_sql(trigger), "execution ownership columns are immutable"
+    end
+    assert_related_updates(root_id)
 
     ActiveRecord::Migration.suppress_messages { RefreshRecordingStudioAITerminalGuards.migrate(:up) }
     update_row(:recording_studio_ai_runs, run_id, metadata: "{\"again\":true}")
@@ -194,6 +198,48 @@ class FreshDatabaseMigrationsTest < Minitest::Test
     RemoveLegacyRecordingStudioAIPersistenceColumns::LEGACY_COLUMNS.each do |table, columns|
       columns.each_key { |column| block.call(table, column) }
     end
+  end
+
+  def trigger_sql(name)
+    connection = ActiveRecord::Base.connection
+    sql = connection.select_value(
+      "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = #{connection.quote(name)}"
+    )
+    assert sql, "#{name} is missing"
+    sql
+  end
+
+  def assert_related_updates(root_id)
+    run_id = insert_execution(:recording_studio_ai_runs, root_id, status: "pending", operation: "generation")
+    attempt_id = insert_row(
+      :recording_studio_ai_attempts,
+      run_id: run_id, sequence: 1, kind: "primary", status: "pending"
+    )
+    invocation_id = insert_row(
+      :recording_studio_ai_custom_tool_invocations,
+      run_id: run_id, tool_key: "lookup", tool_version: 1, status: "requested",
+      read_only: true, destructive: false, requires_confirmation: false, idempotent: true
+    )
+    batch_id = insert_execution(:recording_studio_ai_batches, root_id, status: "preparing")
+    item_id = insert_row(
+      :recording_studio_ai_batch_items,
+      batch_id: batch_id, run_id: run_id, position: 0, reference: "item-1", status: "pending"
+    )
+
+    update_row(:recording_studio_ai_attempts, attempt_id, status: "completed")
+    update_row(:recording_studio_ai_custom_tool_invocations, invocation_id, status: "completed")
+    update_row(:recording_studio_ai_batch_items, item_id, status: "completed")
+    update_row(:recording_studio_ai_attempts, attempt_id, metadata: "{\"kept\":true}")
+    update_row(:recording_studio_ai_custom_tool_invocations, invocation_id, metadata: "{\"kept\":true}")
+    update_row(:recording_studio_ai_batch_items, item_id, metadata: "{\"kept\":true}")
+  end
+
+  def insert_row(table, **attributes)
+    connection = ActiveRecord::Base.connection
+    columns = { created_at: Time.now.utc, updated_at: Time.now.utc }.merge(attributes)
+    names = columns.keys.map { |name| connection.quote_column_name(name) }
+    values = columns.values.map { |value| connection.quote(value) }
+    connection.insert("INSERT INTO #{table} (#{names.join(', ')}) VALUES (#{values.join(', ')})")
   end
 
   def insert_recording

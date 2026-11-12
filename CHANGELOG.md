@@ -11,7 +11,10 @@ Versioning and Keep a Changelog.
 ## [0.21.1] - 2026-11-12
 
 ### Fixed
-- Run and batch updates work again after every migration. The terminal-state guards were built while `correlation_id` still existed. Dropping that column left PostgreSQL functions that reject every update, and left SQLite without those triggers. `RefreshRecordingStudioAITerminalGuards` rebuilds `rsai_terminal_runs` and `rsai_terminal_batches` from the columns that exist now. Terminal rows still cannot change their other history fields. `metadata`, `lock_version`, `created_at`, and `updated_at` stay writable.
+- Updates to runs, attempts, custom tool invocations, batches, and batch items work again after every migration. Those terminal-state guards were built from the columns present at the time, including `correlation_id`, legacy digest columns, and `cost_*` columns. Later drops left PostgreSQL functions that reject every update, and left SQLite without those triggers. `RefreshRecordingStudioAITerminalGuards` rebuilds all five guards from the columns that exist now. `prompt_key`, `prompt_version`, and `prompt_name_snapshot` are protected on a terminal run. `provider_session_id` and `provider_turn_id` stay writable, so a finished run can still record a turn id. `metadata`, `lock_version`, `created_at`, and `updated_at` stay writable. SQLite also recreates `rsai_run_root_ownership_guard` and `rsai_batch_root_ownership_guard`.
+
+### Changed
+- A Ruby `schema.rb` load does not create these guards. Rails does not write triggers or functions into `schema.rb`. Hosts get them by running the migrations.
 
 ### Upgrade notes
 - Bump to `0.21.1`. See [UPGRADING.md](UPGRADING.md#upgrading-to-0211).

@@ -115,6 +115,8 @@ bin/rails recording_studio_ai:install:migrations
 bin/rails db:migrate
 ```
 
+Run the migrations. `db:schema:load` from a Ruby `schema.rb` creates the tables and does not create the terminal-state guards. Rails does not dump triggers or functions into `schema.rb`.
+
 ## Configuration
 
 Prefer Rails credentials for secrets:

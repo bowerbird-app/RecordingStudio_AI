@@ -849,6 +849,28 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_match(/HostedAgentFailure/, messages.join(" "))
   end
 
+  def test_recover_after_an_early_cancel_records_the_provider_turn_id
+    session = create_session
+    @fake.recovery_failure = hosted_failure(
+      "provider_unavailable", code: "503", message: "Provider is unavailable.", retryable: true
+    )
+    logger = ActiveSupport::Logger.new(File::NULL)
+    Rails.stub(:logger, logger) do
+      RecordingStudioAI::Agents.cancel(**session_args(session))
+    end
+    run = RecordingStudioAI::Run.find(session.run_id)
+    assert_equal "cancelled", run.status
+    assert_nil run.provider_turn_id
+
+    @fake.recovery_failure = nil
+    @fake.recovery_turns = [completed_turn]
+    recovery = RecordingStudioAI::Agents.recover(**session_args(session))
+
+    assert_equal "turn_1", recovery.turn.provider_turn_id
+    assert_equal "cancelled", run.reload.status
+    assert_equal "turn_1", run.provider_turn_id
+  end
+
   def test_cancel_usage_fetch_raises_unexpected_errors
     session = create_session
     run = RecordingStudioAI::Run.find(session.run_id)
