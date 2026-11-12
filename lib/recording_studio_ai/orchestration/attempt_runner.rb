@@ -15,7 +15,7 @@ module RecordingStudioAI
         request = prepare_request(request, candidate, operation: operation, parameter_overrides: parameter_overrides)
         return request if request.is_a?(RecordingStudioAI::Providers::ExecutionResult)
 
-        spend_usage!(request, attempt, operation: operation)
+        precheck_credits!(request, attempt)
         invoke_provider(request, candidate, operation: operation)
       end
 
@@ -33,14 +33,8 @@ module RecordingStudioAI
         end
       end
 
-      def spend_usage!(request, attempt, operation:)
-        RecordingStudioAI::Usage.spend!(
-          attempt: attempt,
-          attribution: request[:attribution],
-          operation: operation,
-          purpose: request[:purpose],
-          provider_native_tools: request[:provider_native_tools]
-        )
+      def precheck_credits!(request, attempt)
+        RecordingStudioAI::Usage.precheck!(attribution: request[:attribution])
       rescue StandardError => e
         record_usage_refusal!(attempt, e)
         raise

@@ -75,6 +75,7 @@ en:
             registered_providers: "Registered Providers"
             registered_models: "Registered Models"
             profiles: "Profiles"
+            credit_prices: "AI credit prices"
         attempt_kinds:
           primary: "1st attempt"
           retry: "Retry"
@@ -125,6 +126,27 @@ en:
           profiles:
             title: "Profiles"
             subtitle: "Generative and decision models each profile tries, in order."
+          credit_prices:
+            title: "AI credit prices"
+            subtitle: "What each model costs in credits. A catch-all covers the rest."
+            any_provider: "Any provider"
+            any_model: "Any model"
+            per_use: "%{kind} %{credits} per use"
+            per_many: "%{kind} %{credits} per %{per}"
+            notices:
+              provider: "No price of its own. Uses this provider's catch-all."
+              global: "No price of its own. Uses the global catch-all."
+              none: "No price of its own, and no catch-all."
+            columns:
+              provider: "Provider"
+              model: "Model"
+              prices: "Prices"
+              notice: "Notice"
+            tooltips:
+              provider: "Who publishes this model."
+              model: "The model name, or any model this catch-all covers."
+              prices: "Whole credits for each usage kind."
+              notice: "A profile or fallback model with no price of its own."
           estimated_spend:
             title: "Estimated token usage"
             subtitle: "How much we sent and got back, by model."

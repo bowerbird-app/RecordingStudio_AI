@@ -7,6 +7,16 @@ RecordingStudioAI.configure do |config|
   config.allowed_provider_overrides = %i[openai gemini typesafe]
 
   config.default_profile = :medium
+  # Example prices for the admin screen. No usage_handler, so calls stay free.
+  config.credit_prices = {
+    "*" => {
+      input: 100, output: 400, cached_input: 25, reasoning: 400, web_search: 5, decision: 2
+    },
+    openai: {
+      "*" => { input: 150, output: 600 },
+      "gpt-5" => { input: 200, output: 800 }
+    }
+  }
   config.profiles = {
     low: [
       { provider: :openai, model: "gpt-5-mini" },

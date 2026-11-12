@@ -8,6 +8,32 @@ Versioning and Keep a Changelog.
 ### Changed
 - Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
 
+## [0.21.0] - 2026-11-12
+
+Optional credit billing replaces the flat per-attempt usage key.
+
+### Added
+
+- `credit_prices` holds whole-number credit prices per usage kind. Lookup is the exact model, then the provider `"*"`, then the global `"*"`. Token kinds are priced per 1,000,000. Other kinds are priced per use unless `credit_price_per` says otherwise.
+- `usage_precheck` runs before each provider attempt. `usage_handler` then receives whole `credits`, a `breakdown`, an `idempotency_key`, and the `attribution`.
+- Registered prompts and tools accept `credit_fee:` and `credit_multiplier:`.
+- OpenAI web search calls, Gemini grounding, and a successful decision are counted as usage kinds.
+- Admin → AI credit prices lists those prices and warns when a profile or fallback model has no price of its own.
+
+### Changed
+
+- `usage_key_resolver` is gone. A nil `usage_handler` still leaves calls free.
+- Attempts, including retries, fallbacks, and failures that reported usage, are charged after the provider returns. The key is `ai-attempt:<attempt id>`.
+- Batches are checked before submit and charged per item at refresh. The key is `ai-batch-item:<item id>`. The old submission key is gone.
+- Hosted agent turns use the same per-kind prices. The key stays `ai-hosted-agent-turn:<provider turn id>`.
+- `cost_catalogs` remains a real-money estimate for admin display. It does not change a credit charge.
+
+### Upgrade notes
+
+- Bump to `0.21.0`. No migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0210).
+- Delete `usage_key_resolver`. When `usage_handler` is set, add a global `"*"` price and a `usage_precheck`.
+- The handler arguments are now `credits:`, `breakdown:`, `idempotency_key:`, and `attribution:`.
+
 ## [0.20.0] - 2026-11-11
 
 ### Added
@@ -1153,7 +1179,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.6...v0.20.0
 [0.19.6]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.5...v0.19.6
 [0.19.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.2...v0.19.3

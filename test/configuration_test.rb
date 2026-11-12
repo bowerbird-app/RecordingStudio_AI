@@ -49,6 +49,10 @@ class ConfigurationTest < Minitest::Test
     assert_equal 256.kilobytes, configuration.maximum_custom_tool_result_size
     assert_equal 64.kilobytes, configuration.maximum_custom_tool_arguments_size
     assert_empty configuration.cost_catalogs
+    assert_empty configuration.credit_prices
+    assert_empty configuration.credit_price_per
+    assert_equal 1, configuration.minimum_credit_balance
+    assert_nil configuration.usage_precheck
     assert_equal "RecordingStudioAI::BatchSynchronizationJob", configuration.batch_synchronization_job
     assert_equal 1.minute, configuration.batch_synchronization_interval
     assert_nil configuration.openai_webhook_secret
@@ -160,26 +164,34 @@ class ConfigurationTest < Minitest::Test
     assert_includes error.message, "maximum_decision_characters"
   end
 
-  def test_usage_meter_defaults_are_nil_and_validate_as_a_pair
+  def test_credit_billing_is_optional_until_a_handler_is_set
     configuration = RecordingStudioAI::Configuration.new
 
     assert_nil configuration.usage_handler
-    assert_nil configuration.usage_key_resolver
+    assert_nil configuration.usage_precheck
+    refute_respond_to configuration, :usage_key_resolver
     assert_same configuration, configuration.validate!
 
-    configuration.usage_key_resolver = ->(**) {}
-    configuration.validate!
-
     configuration.usage_handler = ->(**) {}
-    configuration.usage_key_resolver = ->(**) { "ai.openai" }
-    configuration.validate!
+    configuration.usage_precheck = ->(**) { true }
+    configuration.credit_prices = { "*" => { input: 100, output: 400 } }
+    assert_same configuration, configuration.validate!
+    assert_equal({ input: 100, output: 400 }, configuration.credit_prices.fetch("*"))
 
     configuration = RecordingStudioAI::Configuration.new
     configuration.usage_handler = ->(**) {}
+    configuration.usage_precheck = ->(**) { true }
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
 
     assert_equal "configuration", error.code
-    assert_includes error.message, "usage_key_resolver"
+    assert_includes error.message, "catch-all"
+
+    configuration = RecordingStudioAI::Configuration.new
+    configuration.usage_handler = ->(**) {}
+    configuration.credit_prices = { "*" => { input: 1 } }
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
+
+    assert_includes error.message, "usage_precheck"
 
     configuration = RecordingStudioAI::Configuration.new
     configuration.usage_handler = "not-callable"
@@ -187,13 +199,6 @@ class ConfigurationTest < Minitest::Test
 
     assert_equal "configuration", error.code
     assert_includes error.message, "usage_handler"
-
-    configuration = RecordingStudioAI::Configuration.new
-    configuration.usage_key_resolver = "not-callable"
-    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
-
-    assert_equal "configuration", error.code
-    assert_includes error.message, "usage_key_resolver"
   end
 
   def test_admin_runs_scope_accepts_nil_or_a_callable

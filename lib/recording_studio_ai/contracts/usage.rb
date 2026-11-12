@@ -11,14 +11,23 @@ module RecordingStudioAI
         reasoning_tokens
       ].freeze
 
-      attr_reader(*TOKEN_FIELDS)
+      KIND_FOR_FIELD = {
+        input_tokens: :input,
+        output_tokens: :output,
+        cached_input_tokens: :cached_input,
+        reasoning_tokens: :reasoning
+      }.freeze
 
-      def initialize(**kwargs)
-        TOKEN_FIELDS.each do |field|
-          value = kwargs[field]
-          instance_variable_set("@#{field}", value)
-          validate_non_negative_integer!(field, value)
-        end
+      attr_reader(*TOKEN_FIELDS, :counts)
+
+      def initialize(counts: nil, **kwargs)
+        @counts = {}
+        assign_token_fields!(kwargs, counts.to_h.transform_keys(&:to_sym))
+        @counts.freeze
+      end
+
+      def with_count(kind, value)
+        self.class.new(**to_h, counts: counts.merge(kind.to_sym => value))
       end
 
       def to_h
@@ -28,6 +37,28 @@ module RecordingStudioAI
       end
 
       private
+
+      def assign_token_fields!(kwargs, extra)
+        TOKEN_FIELDS.each { |field| assign_token_field!(field, kwargs, extra) }
+        assign_extra_counts!(extra)
+      end
+
+      def assign_token_field!(field, kwargs, extra)
+        kind = KIND_FOR_FIELD[field]
+        value = kwargs.key?(field) ? kwargs[field] : (kind && extra[kind])
+        instance_variable_set("@#{field}", value)
+        validate_non_negative_integer!(field, value)
+        @counts[kind] = value if kind && !value.nil?
+      end
+
+      def assign_extra_counts!(extra)
+        extra.each do |kind, value|
+          next if KIND_FOR_FIELD.value?(kind) || kind == :total
+
+          validate_non_negative_integer!(kind, value)
+          @counts[kind] = value unless value.nil?
+        end
+      end
 
       def validate_non_negative_integer!(field, value)
         return if value.nil?

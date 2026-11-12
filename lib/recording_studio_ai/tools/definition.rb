@@ -10,7 +10,8 @@ module RecordingStudioAI
 
       attr_reader :key, :version, :name, :description, :use_when, :do_not_use_when,
                   :parameters, :returns, :cost, :latency, :read_only, :destructive,
-                  :requires_confirmation, :idempotent, :examples, :executor_label, :executor
+                  :requires_confirmation, :idempotent, :examples, :executor_label, :executor,
+                  :credit_fee, :credit_multiplier
 
       def initialize(
         key:,
@@ -29,7 +30,9 @@ module RecordingStudioAI
         idempotent:,
         executor_label:,
         executor:,
-        examples: nil
+        examples: nil,
+        credit_fee: 0,
+        credit_multiplier: 1
       )
         @key = key.to_s
         @version = version
@@ -51,6 +54,10 @@ module RecordingStudioAI
         )
         @executor_label = executor_label.to_s
         @executor = executor
+        @credit_fee = RecordingStudioAI::Credits.normalize_fee(credit_fee, "tool credit_fee", code: "invalid_request")
+        @credit_multiplier = RecordingStudioAI::Credits.normalize_multiplier(
+          credit_multiplier, "tool credit_multiplier", code: "invalid_request"
+        )
 
         validate!
       end

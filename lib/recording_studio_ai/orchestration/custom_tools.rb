@@ -43,6 +43,14 @@ module RecordingStudioAI
           )
           result = enforce_round_limit(result, rounds)
           @persistence.complete_attempt!(continuation, result)
+          begin
+            RecordingStudioAI::Usage.charge_attempt!(
+              attempt: continuation, result: result, request: request.merge(history), operation: operation
+            )
+          rescue StandardError => e
+            RecordingStudioAI::Usage.record_charge_failure!(run, e)
+            raise
+          end
           executions << ExecutedAttempt.new(record: continuation, result: result)
           request = request.merge(history)
         end

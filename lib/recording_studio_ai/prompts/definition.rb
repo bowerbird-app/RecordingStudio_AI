@@ -7,7 +7,8 @@ module RecordingStudioAI
       ROLES = %w[system user assistant].freeze
 
       attr_reader :owner, :key, :version, :name, :description,
-                  :messages, :inputs, :tools, :defaults, :overridable
+                  :messages, :inputs, :tools, :defaults, :overridable,
+                  :credit_fee, :credit_multiplier
 
       def initialize(
         owner: nil,
@@ -19,7 +20,9 @@ module RecordingStudioAI
         inputs:,
         tools: [],
         defaults: {},
-        overridable: true
+        overridable: true,
+        credit_fee: 0,
+        credit_multiplier: 1
       )
         @owner = owner.nil? ? nil : normalize_owner(owner)
         @key = normalize_identifier(key, "prompt key")
@@ -31,6 +34,10 @@ module RecordingStudioAI
         @tools = normalize_tools(tools)
         @defaults = RecordingStudioAI::Contracts::Containment.ensure_serializable!(defaults, path: "prompt.defaults").freeze
         @overridable = normalize_overridable(overridable)
+        @credit_fee = RecordingStudioAI::Credits.normalize_fee(credit_fee, "prompt credit_fee", code: "invalid_request")
+        @credit_multiplier = RecordingStudioAI::Credits.normalize_multiplier(
+          credit_multiplier, "prompt credit_multiplier", code: "invalid_request"
+        )
 
         validate!
         freeze

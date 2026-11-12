@@ -219,54 +219,53 @@ overrides carry through every hop when the next model supports them;
 unsupported ones are dropped rather than failing the hop.
 Usage and compatible-currency cost aggregate across every reported attempt.
 
-## Usage credits
+## Credit billing
 
-`usage_key_resolver` and `usage_handler` meter each external provider attempt before that attempt calls the provider. When a handler is set, `submit_batch` spends once after the local batch row exists and before provider HTTP. Leave `usage_handler` nil to keep attempts and batch submit unmetered. There is no migration.
+Leave `usage_handler` nil and calls stay free. No balance check, no prices, and no boot error. `cost_catalogs` is only the real-money estimate on admin screens. It never decides what a user is charged.
 
-The resolver requires `provider_native_tools:`. A strict lambda that omits it raises `ArgumentError` and the provider does not run. Lambdas that take `**` already accept it. There is no compatibility shim.
+Set `usage_handler` to bill. Boot then requires `usage_precheck` and a global `"*"` entry in `credit_prices`. Prices are whole credits per usage kind. `input`, `output`, `cached_input`, and `reasoning` are priced per 1,000,000 tokens. Every other kind, including `web_search` and `decision`, is priced per use unless `credit_price_per` says otherwise. Add a new kind by putting it in the price hash. The gem does not hard-code model names.
 
-The value is `[]` or `[:web_search]`. Decisions pass `[]`. The host may return `ai.gemini_flash` or `ai.gemini_flash_search`. The gem does not hard-code those keys. A nil return leaves that attempt, or that batch submission, unmetered. Recording Studio Stripe `usage_costs` turns the key into credits. This gem does not know those rates. Token columns and `CostCalculator` stay on the provider result.
+Lookup for each kind is the exact model, then that provider's `"*"`, then the global `"*"`. A registered prompt or tool can add `credit_fee:` and `credit_multiplier:` on top of that price.
+
+Before each provider attempt the pre-check asks whether the account holds at least `minimum_credit_balance` credits. Return `true` to continue. Any other result, including a raised error, fails that attempt before the provider runs. The attempt and the run are recorded as `usage` / `usage_declined`, and no later retry or fallback starts.
+
+After the attempt, including a retry, a fallback, or a failed attempt that still reported usage, the gem rounds the exact credits up once to a whole number. Any reported usage costs at least 1. The handler is called once with that total, a breakdown, and an idempotency key. The breakdown names the provider, model, counts, rates, extras, and prompt or tool keys. It does not include prompts, inputs, or outputs. The same attempt repeats `ai-attempt:<attempt id>`, so the host does not charge it twice.
+
+If the handler raises, the attempt keeps the provider result and the reported usage. The run is failed as `usage` / `usage_charge_failed`, the exception propagates, and no later retry or fallback starts. Charging that same attempt again sends the same `ai-attempt:<attempt id>` key.
+
+A batch is checked before submit and charged when refresh reports each item's usage. The item key is `ai-batch-item:<item id>`. A hosted agent turn uses the same per-kind prices and keeps `ai-hosted-agent-turn:<provider turn id>`. `perform_tool` and local tool execution are not billed.
+
+The Stripe method names below are the host's choice. That gem is adding them separately. This gem never calls them.
 
 ```ruby
 RecordingStudioAI.configure do |config|
-  config.usage_key_resolver = lambda do |operation:, provider:, model:, profile:, purpose:, attribution:, provider_native_tools:|
-    case [operation, provider.to_s, model.to_s]
-    when ["decision", "typesafe", "jev-latest"]
-      "ai.jev"
-    else
-      case provider.to_s
-      when "gemini"
-        if model.to_s.include?("flash")
-          provider_native_tools.include?(:web_search) ? "ai.gemini_flash_search" : "ai.gemini_flash"
-        end
-      when "openai"
-        "ai.openai"
-      end
-    end
-  end
+  config.minimum_credit_balance = 1
+  config.credit_prices = {
+    "*" => {
+      input: 100,
+      output: 400,
+      cached_input: 25,
+      reasoning: 400,
+      web_search: 5,
+      decision: 2
+    }
+  }
 
-  config.usage_handler = lambda do |key:, quantity:, attribution:, idempotency_key:, metadata:|
+  config.usage_precheck = lambda do |attribution:, minimum:|
     RecordingStudioStripe::Billing
       .for_recording(attribution.root_recording)
       .line(:pressbot)
-      .spend_usage(key:, quantity:, idempotency_key:)
+      .credits_available?(minimum:)
+  end
+
+  config.usage_handler = lambda do |credits:, breakdown:, idempotency_key:, attribution:|
+    RecordingStudioStripe::Billing
+      .for_recording(attribution.root_recording)
+      .line(:pressbot)
+      .record_credits(credits:, breakdown:, idempotency_key:)
   end
 end
 ```
-
-Hosts with more than one subscription line call `.line`. Unscoped `spend_usage` raises `AmbiguousSubscriptionLine` when more than one live plan holds credits. It raises `SubscriptionLineRequired` when more than one subscription type is configured and no live plan holds credits.
-
-The handler receives `key`, `quantity`, the live attribution, `idempotency_key`, and metadata. An attempt uses quantity 1 and idempotency key `ai-attempt:<attempt id>`. The same attempt repeats that key. Metadata names the operation, provider, model, profile, purpose, run id, attempt id, attempt kind, and `provider_native_tools`. `provider_native_tools` in metadata is an array of name strings. It does not include prompts, queries, or bodies. The charge follows the request, not whether the provider later used the tool.
-
-Each attempt spends once. That includes retries, fallbacks, and tool continuations. A handler exception propagates unchanged, and the provider call does not run. There is no refund if the provider fails after the handler returns.
-
-A batch submission uses quantity equal to the item count. The idempotency key is `ai-batch:<batch id>:submission`. The operation is `batch`. Purpose is nil. `provider_native_tools` is the union of requested tools. A mixed batch shares one key. Hosts who need different tariffs submit separate batches. One combined key is enough. Separate events per tool could be added later.
-
-A hosted agent turn spends when that turn reports token usage, after the provider call, not before it. Quantity is `total_tokens`. The idempotency key is `ai-hosted-agent-turn:<provider turn id>`. Reconnects and retries repeat that key. A turn with no reported tokens is not metered. Metadata names the operation, provider, model, profile, purpose, run id, provider session id, and provider turn id. It does not include instructions, input, or output text. `provider_native_tools` is `[]`.
-
-A handler exception from `submit_batch` propagates unchanged. The provider is not called. The batch, items, and runs are `usage` / `usage_declined`. A nil handler leaves batch submit unmetered. A nil resolver result leaves that submission unmetered. There is no refund if the provider fails after the handler returns.
-
-Refresh, cancel, polling, webhook sync, `perform_tool`, and local tool execution stay unmetered.
 
 ## Operations
 

@@ -33,6 +33,7 @@ module AdminScreens
     registered_providers/screen
     registered_models/screen
     profiles/screen
+    credit_prices/screen
     estimated_spend/screen
     ai_runs_health/screen
     calls_by_provider_model/screen
@@ -78,6 +79,7 @@ module AdminScreens
     RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredProvidersScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIRegisteredModelsScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIProfilesScreen)
+    RecordingStudioAdmin.register_screen(RecordingStudioAICreditPricesScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIEstimatedSpendScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAIRunsHealthScreen)
     RecordingStudioAdmin.register_screen(RecordingStudioAICallsByProviderModelScreen)

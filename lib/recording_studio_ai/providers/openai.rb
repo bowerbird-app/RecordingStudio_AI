@@ -23,7 +23,7 @@ module RecordingStudioAI
         response_error = normalize_response_error(response)
         citations = normalize_citations(response)
         web_search_used = web_search_used?(response)
-        usage = normalize_usage(read_value(response, :usage))
+        usage = usage_for(response)
         Result.new(
           text: read_value(response, :output_text),
           citations: citations,
@@ -236,7 +236,7 @@ module RecordingStudioAI
 
         citations = normalize_citations(response)
         web_search_used = web_search_used?(response)
-        usage = normalize_usage(read_value(response, :usage))
+        usage = usage_for(response)
         error = fallback_error || normalize_response_error(response)
         Result.new(
           text: read_value(response, :output_text) || response_output_text(response),
@@ -470,6 +470,14 @@ module RecordingStudioAI
         messages
       end
 
+      def usage_for(response)
+        usage = normalize_usage(read_value(response, :usage))
+        count = web_search_count(response)
+        return usage if count.zero?
+
+        (usage || RecordingStudioAI::Contracts::Usage.new).with_count(:web_search, count)
+      end
+
       def normalize_usage(usage)
         return nil unless usage
 
@@ -525,7 +533,11 @@ module RecordingStudioAI
       end
 
       def web_search_used?(response)
-        Array(read_value(response, :output)).any? do |item|
+        web_search_count(response).positive?
+      end
+
+      def web_search_count(response)
+        Array(read_value(response, :output)).count do |item|
           read_value(item, :type).to_s.include?("web_search")
         end
       end

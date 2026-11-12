@@ -25,6 +25,7 @@ module RecordingStudioAI
         authorize!(request)
         candidate = Resolution.call(profile: request[:profile], model: request[:model], provider: request[:provider])
         run = insert_run(request, candidate, request[:input])
+        ensure_credits!(request.fetch(:attribution), run)
         hosted = call_provider(run) do
           adapter_for(candidate.provider).create_hosted_agent_session(
             instructions: request[:instructions], model: candidate.model,
@@ -42,6 +43,7 @@ module RecordingStudioAI
         session = request.fetch(:session)
         guard_session!(session, request)
         run = run_for_input(session, request)
+        ensure_credits!(request.fetch(:attribution), run)
         call_provider(run) do
           adapter_for(session.provider).submit_hosted_agent_input(
             provider_session_id: session.provider_session_id,
@@ -132,6 +134,7 @@ module RecordingStudioAI
       end
 
       def watch(session, run, &block)
+        ensure_credits!(attribution_for(run), run)
         consume(session, run, block) do |on_event|
           adapter_for(session.provider).stream_hosted_agent_session(
             provider_session_id: session.provider_session_id, &on_event
@@ -140,6 +143,7 @@ module RecordingStudioAI
       end
 
       def continue_stream(session, run, results, &block)
+        ensure_credits!(attribution_for(run), run)
         consume(session, run, block, reject_provider_failure: true, submitted_results: results) do |on_event|
           adapter_for(session.provider).continue_hosted_agent_after_tool_results(
             provider_session_id: session.provider_session_id, results: results, &on_event
@@ -248,7 +252,7 @@ module RecordingStudioAI
         return if run.class.terminal_statuses.include?(run.status)
 
         assign_usage(run, usage)
-        charge(run)
+        charge(run, usage)
         run.update!(terminal_attributes(run, status, error, text))
       end
 
@@ -262,12 +266,33 @@ module RecordingStudioAI
         )
       end
 
-      def charge(run)
-        return if run.provider_turn_id.blank? || run.total_tokens.to_i <= 0
+      def charge(run, usage)
+        return if run.provider_turn_id.blank?
         return if turn_charged?(run.provider_turn_id, nil)
+        return unless Usage.charge_hosted_agent_turn!(run: run, usage: usage, attribution: attribution_for(run))
 
-        Usage.spend_hosted_agent_turn!(run: run, attribution: attribution_for(run))
         run.update!(metadata: metadata_with(run, "usage_charged" => true))
+      end
+
+      def ensure_credits!(attribution, run)
+        Usage.precheck!(attribution: attribution)
+      rescue StandardError => e
+        refuse_run!(run, e)
+        raise
+      end
+
+      def refuse_run!(run, error)
+        return if run.nil? || run.class.terminal_statuses.include?(run.status)
+
+        run.update!(
+          status: "failed",
+          error_category: Usage::DECLINED_CATEGORY,
+          error_code: Usage::DECLINED_CODE,
+          error_message: error.message.to_s[0, Usage::MESSAGE_LIMIT],
+          completed_at: Time.current
+        )
+      rescue StandardError
+        nil
       end
 
       def turn_charged?(turn_id, except_id)
