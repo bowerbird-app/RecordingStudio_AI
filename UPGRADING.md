@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.21.1
+
+Run and batch rows can be updated again. From `0.3.0` through `0.21.0`, the terminal-state guards on those tables still named `correlation_id` after that column was dropped. PostgreSQL rejected every update. SQLite had dropped the triggers.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.21.1`. A dependency of `~> 0.20.0` stays below `0.21` and does not install this release. Use `~> 0.21.1` or `>= 0.21.1`.
+2. Run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`. The new migration rebuilds `rsai_terminal_runs` and `rsai_terminal_batches`. It is safe to run on a database that already applied every earlier migration, and on a fresh install.
+3. No host config change. Completed, failed, and cancelled runs still cannot change their history fields. Batch terminal statuses are unchanged. `metadata`, `lock_version`, `created_at`, and `updated_at` stay writable.
+
 ## Upgrading to 0.21.0
 
 `0.21.0` replaces the flat per-attempt usage key with optional credit prices. Apps that leave `usage_handler` nil stay free. There is no migration.

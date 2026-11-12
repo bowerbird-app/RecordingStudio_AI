@@ -8,6 +8,16 @@ Versioning and Keep a Changelog.
 ### Changed
 - Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
 
+## [0.21.1] - 2026-11-12
+
+### Fixed
+- Run and batch updates work again after every migration. The terminal-state guards were built while `correlation_id` still existed. Dropping that column left PostgreSQL functions that reject every update, and left SQLite without those triggers. `RefreshRecordingStudioAITerminalGuards` rebuilds `rsai_terminal_runs` and `rsai_terminal_batches` from the columns that exist now. Terminal rows still cannot change their other history fields. `metadata`, `lock_version`, `created_at`, and `updated_at` stay writable.
+
+### Upgrade notes
+- Bump to `0.21.1`. See [UPGRADING.md](UPGRADING.md#upgrading-to-0211).
+- Releases `0.3.0` through `0.21.0` are affected. Run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`.
+- A dependency of `~> 0.20.0` does not allow `0.21.1`. Use `~> 0.21.1` or `>= 0.21.1`.
+
 ## [0.21.0] - 2026-11-12
 
 Optional credit billing replaces the flat per-attempt usage key.
@@ -1179,7 +1189,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.6...v0.20.0
 [0.19.6]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.5...v0.19.6

@@ -123,8 +123,79 @@ module FreshPostgresMigrationGuard
       abort "#{table}.#{column} present=#{exists}, expected #{present}"
     end
     versions = connection.select_values("SELECT version FROM schema_migrations")
-    %w[20260813120000 20260814130000].each do |version|
+    %w[20260813120000 20260814130000 20261112120000].each do |version|
       abort "schema_migrations missing #{version}" unless versions.include?(version)
+    end
+  end
+
+  def assert_terminal_guards!(connection)
+    root_id = connection.select_value(<<~SQL)
+      INSERT INTO recording_studio_recordings
+        (recordable_id, recordable_type, created_at, updated_at)
+      VALUES (gen_random_uuid(), 'Folder', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING id
+    SQL
+    run_id = insert_execution!(connection, :recording_studio_ai_runs, root_id, status: "pending", operation: "generation")
+    batch_id = insert_execution!(connection, :recording_studio_ai_batches, root_id, status: "preparing")
+
+    update_execution!(connection, :recording_studio_ai_runs, run_id, purpose: "draft")
+    update_execution!(connection, :recording_studio_ai_runs, run_id, status: "completed")
+    update_execution!(connection, :recording_studio_ai_runs, run_id, metadata: "{\"kept\":true}")
+    assert_terminal_change_blocked!(connection, :recording_studio_ai_runs, run_id, status: "cancelled")
+
+    update_execution!(connection, :recording_studio_ai_batches, batch_id, profile_key: "medium")
+    update_execution!(connection, :recording_studio_ai_batches, batch_id, status: "completed")
+    update_execution!(connection, :recording_studio_ai_batches, batch_id, metadata: "{\"kept\":true}")
+    assert_terminal_change_blocked!(connection, :recording_studio_ai_batches, batch_id, provider: "openai")
+
+    refute_guard_names_correlation_id!(connection)
+
+    ActiveRecord::Migration.suppress_messages { RefreshRecordingStudioAITerminalGuards.migrate(:up) }
+    update_execution!(connection, :recording_studio_ai_runs, run_id, metadata: "{\"again\":true}")
+    assert_terminal_change_blocked!(connection, :recording_studio_ai_runs, run_id, purpose: "changed")
+  end
+
+  def insert_execution!(connection, table, root_id, attributes)
+    columns = {
+      root_recording_id: root_id,
+      initiator_type: "User",
+      initiator_id: "user-1",
+      initiator_kind: "user",
+      created_at: Time.now.utc,
+      updated_at: Time.now.utc
+    }.merge(attributes)
+    names = columns.keys.map { |name| connection.quote_column_name(name) }
+    values = columns.values.map { |value| connection.quote(value) }
+    connection.select_value(
+      "INSERT INTO #{table} (#{names.join(', ')}) VALUES (#{values.join(', ')}) RETURNING id"
+    )
+  end
+
+  def update_execution!(connection, table, id, attributes)
+    assignments = attributes.map { |name, value|
+      "#{connection.quote_column_name(name)} = #{connection.quote(value)}"
+    }.join(", ")
+    connection.execute(
+      "UPDATE #{table} SET #{assignments} WHERE #{connection.quote_column_name('id')} = #{connection.quote(id)}"
+    )
+  end
+
+  def assert_terminal_change_blocked!(connection, table, id, attributes)
+    update_execution!(connection, table, id, attributes)
+    abort "#{table} accepted a terminal change #{attributes.inspect}"
+  rescue ActiveRecord::StatementInvalid => error
+    return if error.message.include?("terminal execution history is immutable")
+
+    abort error.message
+  end
+
+  def refute_guard_names_correlation_id!(connection)
+    %w[rsai_terminal_runs_guard rsai_terminal_batches_guard].each do |function|
+      source = connection.select_value(
+        "SELECT pg_get_functiondef(p.oid) FROM pg_proc p WHERE p.proname = #{connection.quote(function)}"
+      )
+      abort "#{function} is missing" if source.nil?
+      abort "#{function} still names correlation_id" if source.include?("correlation_id")
     end
   end
 
@@ -147,12 +218,14 @@ module FreshPostgresMigrationGuard
       when "fresh"
         migrate_to(nil)
         assert_shape!(connection)
+        assert_terminal_guards!(connection)
       when "legacy"
         migrate_to(LEGACY_STOP)
         install_legacy_columns(connection)
         apply_migrations_after(LEGACY_STOP)
         assert_shape!(connection)
         assert_legacy_indexes_gone!(connection)
+        assert_terminal_guards!(connection)
       else
         abort "unknown scenario #{scenario}"
       end

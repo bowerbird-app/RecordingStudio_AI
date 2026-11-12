@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.21.0", RecordingStudioAI::VERSION
+    assert_equal "0.21.1", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -80,7 +80,12 @@ class RecordingStudioAITest < Minitest::Test
     root = File.expand_path("..", __dir__)
     migration_files = Dir[File.join(root, "db/migrate/*.rb")]
 
-    assert_equal 12, migration_files.size
+    assert_equal 13, migration_files.size
+    migrate_paths = RecordingStudioAI::Engine.paths["db/migrate"].existent
+    guard = migrate_paths.any? do |dir|
+      Dir.children(dir).any? { |name| name.end_with?("refresh_recording_studio_ai_terminal_guards.rb") }
+    end
+    assert guard, "install:migrations reads Engine db/migrate"
     expected_migration_fragments.each do |fragment|
       assert migration_files.any? { |file| file.include?(fragment) }, fragment
     end
@@ -102,6 +107,7 @@ class RecordingStudioAITest < Minitest::Test
       add_root_recording_id_to_recording_studio_ai_call_logs
       add_prompt_attribution_to_recording_studio_ai_runs
       remove_prompt_namespace_and_short_name_from_recording_studio_ai_runs
+      refresh_recording_studio_ai_terminal_guards
     ]
   end
 

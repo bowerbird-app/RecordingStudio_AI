@@ -82,6 +82,37 @@ class FreshDatabaseMigrationsTest < Minitest::Test
     assert column_exists?(:recording_studio_ai_runs, :cost_amount_microunits)
   end
 
+  def test_terminal_guards_allow_updates_and_block_terminal_changes
+    apply(migrations)
+    assert_equal "20261112120000", migrations.last.first
+
+    root_id = insert_recording
+    run_id = insert_execution(:recording_studio_ai_runs, root_id, status: "pending", operation: "generation")
+    batch_id = insert_execution(:recording_studio_ai_batches, root_id, status: "preparing")
+
+    update_row(:recording_studio_ai_runs, run_id, purpose: "draft")
+    update_row(:recording_studio_ai_runs, run_id, status: "completed")
+    update_row(:recording_studio_ai_runs, run_id, metadata: "{\"kept\":true}")
+    assert_terminal_change_blocked(:recording_studio_ai_runs, run_id, status: "cancelled")
+
+    update_row(:recording_studio_ai_batches, batch_id, profile_key: "medium")
+    update_row(:recording_studio_ai_batches, batch_id, status: "completed")
+    update_row(:recording_studio_ai_batches, batch_id, metadata: "{\"kept\":true}")
+    assert_terminal_change_blocked(:recording_studio_ai_batches, batch_id, provider: "openai")
+
+    %w[rsai_terminal_runs rsai_terminal_batches].each do |trigger|
+      sql = ActiveRecord::Base.connection.select_value(
+        "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = #{ActiveRecord::Base.connection.quote(trigger)}"
+      )
+      assert_includes sql, "terminal execution history is immutable"
+      refute_includes sql, "correlation_id"
+    end
+
+    ActiveRecord::Migration.suppress_messages { RefreshRecordingStudioAITerminalGuards.migrate(:up) }
+    update_row(:recording_studio_ai_runs, run_id, metadata: "{\"again\":true}")
+    assert_terminal_change_blocked(:recording_studio_ai_runs, run_id, purpose: "changed")
+  end
+
   def test_cost_columns_are_removed_when_present
     apply(migrations_before(COST_MIGRATION))
     RemoveCostColumnsFromRecordingStudioAI::COST_COLUMNS.each do |table, columns|
@@ -163,6 +194,43 @@ class FreshDatabaseMigrationsTest < Minitest::Test
     RemoveLegacyRecordingStudioAIPersistenceColumns::LEGACY_COLUMNS.each do |table, columns|
       columns.each_key { |column| block.call(table, column) }
     end
+  end
+
+  def insert_recording
+    ActiveRecord::Base.connection.insert(
+      "INSERT INTO recording_studio_recordings (created_at, updated_at) " \
+      "VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+    )
+  end
+
+  def insert_execution(table, root_id, attributes)
+    connection = ActiveRecord::Base.connection
+    columns = {
+      root_recording_id: root_id,
+      initiator_type: "User",
+      initiator_id: "user-1",
+      initiator_kind: "user",
+      created_at: Time.now.utc,
+      updated_at: Time.now.utc
+    }.merge(attributes)
+    names = columns.keys.map { |name| connection.quote_column_name(name) }
+    values = columns.values.map { |value| connection.quote(value) }
+    connection.insert("INSERT INTO #{table} (#{names.join(', ')}) VALUES (#{values.join(', ')})")
+  end
+
+  def update_row(table, id, attributes)
+    connection = ActiveRecord::Base.connection
+    assignments = attributes.map do |name, value|
+      "#{connection.quote_column_name(name)} = #{connection.quote(value)}"
+    end.join(", ")
+    connection.execute(
+      "UPDATE #{table} SET #{assignments} WHERE #{connection.quote_column_name('id')} = #{connection.quote(id)}"
+    )
+  end
+
+  def assert_terminal_change_blocked(table, id, attributes)
+    error = assert_raises(ActiveRecord::StatementInvalid) { update_row(table, id, attributes) }
+    assert_includes error.message, "terminal execution history is immutable"
   end
 
   def assert_cost_columns_absent
