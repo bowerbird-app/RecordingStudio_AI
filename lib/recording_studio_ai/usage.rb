@@ -20,63 +20,49 @@ module RecordingStudioAI
     end
 
     def charge_attempt!(attempt:, result:, request:, operation:)
-      charge!(
-        subject: attempt,
-        label: "attempt",
-        counts: counts_for(result, operation),
-        provider: attempt.provider,
-        model: attempt.model,
-        prompt: request[:prompt_definition],
-        tools: request[:custom_tool_definitions],
-        idempotency_key: "ai-attempt:#{attempt.id}",
-        attribution: request[:attribution] || request.fetch(:attribution)
+      deliver_charge(
+        subject: attempt, label: "attempt", counts: counts_for(result, operation),
+        provider: attempt.provider, model: attempt.model, prompt: request[:prompt_definition],
+        tools: request[:custom_tool_definitions], key: "ai-attempt:#{attempt.id}",
+        attribution: request[:attribution]
       )
     end
 
     def charge_batch_item!(item:, result:, batch:, attribution:)
-      charge!(
-        subject: item,
-        label: "batch item",
-        counts: counts_for(result, :generation),
-        provider: batch.provider,
-        model: batch.model,
-        prompt: nil,
-        tools: [],
-        idempotency_key: "ai-batch-item:#{item.id}",
-        attribution: attribution
+      deliver_charge(
+        subject: item, label: "batch item", counts: counts_for(result, :generation),
+        provider: batch.provider, model: batch.model, prompt: nil, tools: [],
+        key: "ai-batch-item:#{item.id}", attribution: attribution
       )
     end
 
     def charge_hosted_agent_turn!(run:, usage:, attribution:)
-      charge!(
-        subject: run,
-        label: "run",
-        counts: usage&.counts || {},
-        provider: run.resolved_provider,
-        model: run.resolved_model,
-        prompt: nil,
-        tools: [],
-        idempotency_key: "ai-hosted-agent-turn:#{run.provider_turn_id}",
-        attribution: attribution
+      deliver_charge(
+        subject: run, label: "run", counts: usage&.counts || {},
+        provider: run.resolved_provider, model: run.resolved_model, prompt: nil, tools: [],
+        key: "ai-hosted-agent-turn:#{run.provider_turn_id}", attribution: attribution
       )
     end
 
-    def charge!(subject:, label:, counts:, provider:, model:, prompt:, tools:, idempotency_key:, attribution:)
+    def deliver_charge(**charge)
       return unless billing?
 
-      require_id!(subject, label)
-      quote = Credits.quote(
-        counts: counts, provider: provider, model: model, prompt: prompt, tools: tools
-      )
+      require_id!(charge.fetch(:subject), charge.fetch(:label))
+      quote = quoted(charge)
       return if quote.nil?
 
       RecordingStudioAI.configuration.usage_handler.call(
-        credits: quote.credits,
-        breakdown: quote.breakdown,
-        idempotency_key: idempotency_key,
-        attribution: attribution
+        credits: quote.credits, breakdown: quote.breakdown,
+        idempotency_key: charge.fetch(:key), attribution: charge.fetch(:attribution)
       )
       quote
+    end
+
+    def quoted(charge)
+      Credits.quote(
+        counts: charge.fetch(:counts), provider: charge.fetch(:provider), model: charge.fetch(:model),
+        prompt: charge[:prompt], tools: charge[:tools]
+      )
     end
 
     def counts_for(result, operation)
@@ -130,7 +116,7 @@ module RecordingStudioAI
       raise RecordingStudioAI::Errors::ContractValidationError.new(message, code: "invalid_request")
     end
 
-    private_class_method :charge!, :counts_for, :count_successful_decision!, :billing?,
+    private_class_method :deliver_charge, :quoted, :counts_for, :count_successful_decision!, :billing?,
                          :require_precheck!, :require_id!, :configuration_error!, :request_error!
   end
 end

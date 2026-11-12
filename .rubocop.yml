@@ -38,8 +38,6 @@ Metrics/ClassLength:
     - 'lib/recording_studio_ai/prompts/definition.rb'
     - 'lib/recording_studio_ai/orchestration/**/*'
     - 'lib/recording_studio_ai/agents/**/*'
-    - 'lib/recording_studio_ai/credits.rb'
-    - 'lib/recording_studio_ai/contracts/usage.rb'
 
 Metrics/ModuleLength:
   Exclude:
@@ -47,8 +45,6 @@ Metrics/ModuleLength:
     - 'lib/recording_studio_ai/agents/**/*'
     - 'lib/recording_studio_ai/metrics.rb'
     - 'lib/recording_studio_ai/providers/openai_hosted_agent.rb'
-    - 'lib/recording_studio_ai/credits.rb'
-    - 'lib/recording_studio_ai/usage.rb'
 
 Metrics/MethodLength:
   Exclude:
@@ -62,9 +58,6 @@ Metrics/MethodLength:
     - 'lib/recording_studio_ai/webhooks/**/*'
     - 'lib/recording_studio_ai/agents/**/*'
     - 'lib/recording_studio_ai/providers/openai_hosted_agent.rb'
-    - 'lib/recording_studio_ai/credits.rb'
-    - 'lib/recording_studio_ai/usage.rb'
-    - 'lib/recording_studio_ai/contracts/usage.rb'
 
 Metrics/AbcSize:
   Exclude:
@@ -76,9 +69,6 @@ Metrics/AbcSize:
     - 'lib/recording_studio_ai/webhooks/**/*'
     - 'lib/recording_studio_ai/agents/**/*'
     - 'lib/recording_studio_ai/providers/openai_hosted_agent.rb'
-    - 'lib/recording_studio_ai/credits.rb'
-    - 'lib/recording_studio_ai/usage.rb'
-    - 'lib/recording_studio_ai/contracts/usage.rb'
 
 Metrics/BlockLength:
   Exclude:
@@ -93,9 +83,6 @@ Metrics/CyclomaticComplexity:
     - 'lib/recording_studio_ai/webhooks/**/*'
     - 'lib/recording_studio_ai/agents/**/*'
     - 'lib/recording_studio_ai/providers/openai_hosted_agent.rb'
-    - 'lib/recording_studio_ai/credits.rb'
-    - 'lib/recording_studio_ai/usage.rb'
-    - 'lib/recording_studio_ai/contracts/usage.rb'
 
 Metrics/PerceivedComplexity:
   Exclude:
@@ -105,9 +92,6 @@ Metrics/PerceivedComplexity:
     - 'lib/recording_studio_ai/webhooks/**/*'
     - 'lib/recording_studio_ai/agents/**/*'
     - 'lib/recording_studio_ai/providers/openai_hosted_agent.rb'
-    - 'lib/recording_studio_ai/credits.rb'
-    - 'lib/recording_studio_ai/usage.rb'
-    - 'lib/recording_studio_ai/contracts/usage.rb'
 
 Metrics/ParameterLists:
   Exclude:
@@ -115,8 +99,6 @@ Metrics/ParameterLists:
     - 'lib/recording_studio_ai/webhooks/**/*'
     - 'lib/recording_studio_ai/providers/stream_event.rb'
     - 'lib/recording_studio_ai/agents/**/*'
-    - 'lib/recording_studio_ai/credits.rb'
-    - 'lib/recording_studio_ai/usage.rb'
 
 # Model catalog files are keyed by the provider model slug (dots become hyphens),
 # so their filenames are intentionally not snake_case.

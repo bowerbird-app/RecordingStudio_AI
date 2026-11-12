@@ -718,7 +718,7 @@ class PhaseElevenProviderBatchesTest < RecordingStudioAI::Test::PersistenceCase
     refute_includes spends.inspect, "answer one"
   end
 
-  def test_usage_refusal_on_submit_raises_and_does_not_call_the_provider
+  def test_precheck_refusal_on_submit_raises_and_does_not_call_the_provider
     refusal = RuntimeError.new("credits exhausted")
     RecordingStudioAI.configuration.credit_prices = { "*" => { input: 1 } }
     RecordingStudioAI.configuration.usage_precheck = ->(**) { raise refusal }

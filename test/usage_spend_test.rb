@@ -135,7 +135,7 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     refute_includes spend.fetch(:breakdown).inspect, "hidden-note"
   end
 
-  def test_handler_refusal_fails_the_attempt_without_calling_the_provider
+  def test_precheck_refusal_fails_the_attempt_without_calling_the_provider
     provider = QueueProvider.new(success_result("must not run"))
     configure_single_candidate(:medium, :first, provider)
     RecordingStudioAI.configuration.credit_prices = { "*" => { input: 1 } }
@@ -176,7 +176,111 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal message[0, 255], RecordingStudioAI::Run.sole.error_message
   end
 
-  def test_retry_then_fallback_spends_once_per_attempt_and_sums_tokens
+  def test_failed_attempt_with_usage_is_charged_before_retry_and_fallback
+    configuration = RecordingStudioAI.configuration
+    configuration.maximum_attempts = 3
+    configuration.maximum_retries_per_candidate = 1
+    configuration.maximum_provider_fallbacks = 1
+    order = []
+    spends = []
+    assign_meter(spends)
+    RecordingStudioAI.configuration.usage_handler = lambda do |**kwargs|
+      order << :charge
+      spends << kwargs
+    end
+    first_provider = QueueProvider.new(
+      failed_result("provider_error", usage: usage(6, 1)),
+      failed_result("provider_error", usage: usage(2, 0))
+    )
+    first_provider.on_call = -> { order << :first_provider }
+    second_provider = QueueProvider.new(success_result("Recovered", usage: usage(1, 1)))
+    second_provider.on_call = -> { order << :fallback_provider }
+    configure_candidates(first: first_provider, second: second_provider, profile: :medium)
+
+    response = generate
+
+    assert_predicate response, :success?
+    assert_equal "Recovered", response.text
+    attempts = RecordingStudioAI::Attempt.order(:sequence).to_a
+    assert_equal %w[failed failed completed], attempts.map(&:status)
+    assert_equal [6, 2, 1], attempts.map(&:input_tokens)
+    keys = attempts.map { |attempt| "ai-attempt:#{attempt.id}" }
+    assert_equal(keys, spends.map { |spend| spend.fetch(:idempotency_key) })
+    assert_equal keys.uniq, keys
+    assert_equal %i[first_provider charge first_provider charge fallback_provider charge], order
+  end
+
+  def test_post_call_handler_failure_keeps_usage_and_reuses_the_attempt_key
+    keys = []
+    calls = 0
+    assign_meter([])
+    RecordingStudioAI.configuration.usage_handler = lambda do |**kwargs|
+      calls += 1
+      keys << kwargs.fetch(:idempotency_key)
+      raise "ledger down" if calls == 1
+    end
+    provider = QueueProvider.new(success_result("Done", usage: usage(3, 1)))
+    second = QueueProvider.new(success_result("must not run"))
+    configure_candidates(first: provider, second: second, profile: :medium)
+    RecordingStudioAI.configuration.maximum_retries_per_candidate = 1
+    RecordingStudioAI.configuration.maximum_provider_fallbacks = 1
+
+    error = assert_raises(RuntimeError) { generate }
+
+    assert_equal "ledger down", error.message
+    assert_equal 1, provider.calls.length
+    assert_empty second.calls
+    attempt = RecordingStudioAI::Attempt.sole
+    assert_equal "completed", attempt.status
+    assert_equal 3, attempt.input_tokens
+    assert_equal 1, attempt.output_tokens
+    assert_equal 4, attempt.total_tokens
+    run = attempt.run.reload
+    assert_equal "failed", run.status
+    assert_equal "usage", run.error_category
+    assert_equal "usage_charge_failed", run.error_code
+    assert_equal "ledger down", run.error_message
+    assert charge_on(attempt, success_result("Done", usage: usage(3, 1)))
+    assert_equal ["ai-attempt:#{attempt.id}", "ai-attempt:#{attempt.id}"], keys
+  end
+
+  def test_precheck_refusal_on_a_fallback_hop_stops_later_hops
+    RecordingStudioAI.configuration.maximum_attempts = 3
+    RecordingStudioAI.configuration.maximum_retries_per_candidate = 0
+    RecordingStudioAI.configuration.maximum_provider_fallbacks = 2
+    hops = 0
+    assign_meter([])
+    RecordingStudioAI.configuration.usage_precheck = lambda do |**|
+      hops += 1
+      hops == 1
+    end
+    first = QueueProvider.new(failed_result("provider_error", usage: usage(4, 0)))
+    second = QueueProvider.new(success_result("must not run"))
+    third = QueueProvider.new(success_result("must not run"))
+    configuration = RecordingStudioAI.configuration
+    configuration.providers = { first: first, second: second, third: third }
+    configuration.profiles[:medium] = [
+      { provider: :first, model: "first-model", capabilities: %i[generation] },
+      { provider: :second, model: "second-model", capabilities: %i[generation] },
+      { provider: :third, model: "third-model", capabilities: %i[generation] }
+    ]
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { generate }
+
+    assert_equal "Not enough credits for this call.", error.message
+    assert_equal 1, first.calls.length
+    assert_empty second.calls
+    assert_empty third.calls
+    attempts = RecordingStudioAI::Attempt.order(:sequence).to_a
+    assert_equal 2, attempts.length
+    assert_equal "failed", attempts.first.status
+    assert_equal "provider_error", attempts.first.error_code
+    assert_equal 4, attempts.first.input_tokens
+    assert_equal "usage_declined", attempts.second.error_code
+    assert_equal "usage_declined", attempts.second.run.reload.error_code
+  end
+
+  def test_retry_then_fallback_charges_once_per_attempt_and_sums_tokens
     configuration = RecordingStudioAI.configuration
     configuration.maximum_attempts = 3
     configuration.maximum_retries_per_candidate = 1
@@ -293,7 +397,7 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal({ "echo" => "argument-body" }, performance.result)
   end
 
-  def test_stream_usage_refusal_stays_usage_declined
+  def test_stream_precheck_refusal_stays_usage_declined
     provider = StreamProbe.new
     configure_single_candidate(:medium, :test, provider, capabilities: %i[generation streaming])
     RecordingStudioAI.configuration.credit_prices = { "*" => { input: 1 } }

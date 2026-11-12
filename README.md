@@ -227,7 +227,11 @@ Set `usage_handler` to bill. Boot then requires `usage_precheck` and a global `"
 
 Lookup for each kind is the exact model, then that provider's `"*"`, then the global `"*"`. A registered prompt or tool can add `credit_fee:` and `credit_multiplier:` on top of that price.
 
-Before each provider attempt the pre-check asks whether the account holds at least `minimum_credit_balance` credits. Return `true` to continue. Anything else blocks the call, and the provider is not called. After the attempt, including a retry, a fallback, or a failed attempt that still reported usage, the gem rounds the exact credits up once to a whole number. Any reported usage costs at least 1. The handler is called once with that total, a breakdown, and an idempotency key. The breakdown names the provider, model, counts, rates, extras, and prompt or tool keys. It does not include prompts, inputs, or outputs. The same attempt repeats `ai-attempt:<attempt id>`, so the host does not charge it twice.
+Before each provider attempt the pre-check asks whether the account holds at least `minimum_credit_balance` credits. Return `true` to continue. Any other result, including a raised error, fails that attempt before the provider runs. The attempt and the run are recorded as `usage` / `usage_declined`, and no later retry or fallback starts.
+
+After the attempt, including a retry, a fallback, or a failed attempt that still reported usage, the gem rounds the exact credits up once to a whole number. Any reported usage costs at least 1. The handler is called once with that total, a breakdown, and an idempotency key. The breakdown names the provider, model, counts, rates, extras, and prompt or tool keys. It does not include prompts, inputs, or outputs. The same attempt repeats `ai-attempt:<attempt id>`, so the host does not charge it twice.
+
+If the handler raises, the attempt keeps the provider result and the reported usage. The run is failed as `usage` / `usage_charge_failed`, the exception propagates, and no later retry or fallback starts. Charging that same attempt again sends the same `ai-attempt:<attempt id>` key.
 
 A batch is checked before submit and charged when refresh reports each item's usage. The item key is `ai-batch-item:<item id>`. A hosted agent turn uses the same per-kind prices and keeps `ai-hosted-agent-turn:<provider turn id>`. `perform_tool` and local tool execution are not billed.
 

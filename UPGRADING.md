@@ -33,10 +33,11 @@ end
 
 5. Stop reading `key`, `quantity`, and `metadata` from the handler. It now receives `credits`, `breakdown`, `idempotency_key`, and `attribution`.
 6. Treat `ai-attempt:<attempt id>` as the attempt key, `ai-batch-item:<item id>` as the batch item key, and `ai-hosted-agent-turn:<provider turn id>` as the hosted turn key. The old `ai-batch:<batch id>:submission` key is gone. A repeat of the same key must not charge again.
-7. Expect the pre-check before the provider call, and the charge after reported usage. A denied pre-check does not call the provider. A failed attempt that reported usage is still charged. Retries and fallbacks are separate attempts.
-8. Optional. Set `credit_fee:` and `credit_multiplier:` on a registered prompt or tool. Both default to a fee of 0 and a multiplier of 1.
-9. `cost_catalogs` is unchanged and still only estimates money for admin. It does not bill.
-10. Staff can read prices at Admin → Recording Studio AI → AI credit prices.
+7. Expect `usage_precheck` before the provider call, and `usage_handler` after reported usage. A pre-check that returns anything other than `true`, or that raises, records `usage` / `usage_declined` and does not call the provider. A failed attempt that reported usage is still charged, then the next retry or fallback can run. Each attempt has its own `ai-attempt:<attempt id>` key.
+8. If `usage_handler` raises, the attempt stays saved with its provider result and usage. The run is failed as `usage` / `usage_charge_failed`. The exception propagates, and no later retry or fallback starts. A repeat charge of that attempt sends the same key, so the host must not charge it twice.
+9. Optional. Set `credit_fee:` and `credit_multiplier:` on a registered prompt or tool. Both default to a fee of 0 and a multiplier of 1.
+10. `cost_catalogs` is unchanged and still only estimates money for admin. It does not bill.
+11. Staff can read prices at Admin → Recording Studio AI → AI credit prices.
 
 ## Upgrading to 0.20.0
 
