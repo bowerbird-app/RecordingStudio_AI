@@ -117,6 +117,25 @@ class FreshDatabaseMigrationsTest < Minitest::Test
     assert_terminal_change_blocked(:recording_studio_ai_runs, run_id, purpose: "changed")
   end
 
+  def test_legacy_sqlite_column_drops_restore_ownership_guards
+    apply(migrations_before(LEGACY_MIGRATION))
+    install_legacy_columns
+    install_cost_columns
+
+    apply(migrations_from(LEGACY_MIGRATION))
+
+    {
+      "rsai_attempt_run_ownership_guard" => "execution ownership columns are immutable",
+      "rsai_invocation_attempt_run_guard_insert" => "invocation attempts must belong to invocation run",
+      "rsai_invocation_attempt_run_guard_update" => "invocation attempts must belong to invocation run",
+      "rsai_batch_item_root_guard_insert" => "batch item run must match batch attribution",
+      "rsai_batch_item_root_guard_update" => "batch item run must match batch attribution"
+    }.each do |trigger, message|
+      assert_includes trigger_sql(trigger), message
+    end
+    assert_mismatched_owners_blocked
+  end
+
   def test_cost_columns_are_removed_when_present
     apply(migrations_before(COST_MIGRATION))
     RemoveCostColumnsFromRecordingStudioAI::COST_COLUMNS.each do |table, columns|
@@ -159,6 +178,12 @@ class FreshDatabaseMigrationsTest < Minitest::Test
   def install_legacy_columns
     RemoveLegacyRecordingStudioAIPersistenceColumns::LEGACY_COLUMNS.each do |table, columns|
       columns.each { |column, type| add_column table, column, type }
+    end
+  end
+
+  def install_cost_columns
+    RemoveCostColumnsFromRecordingStudioAI::COST_COLUMNS.each do |table, columns|
+      columns.each { |column| add_column table, column, :string }
     end
   end
 
@@ -277,6 +302,46 @@ class FreshDatabaseMigrationsTest < Minitest::Test
   def assert_terminal_change_blocked(table, id, attributes)
     error = assert_raises(ActiveRecord::StatementInvalid) { update_row(table, id, attributes) }
     assert_includes error.message, "terminal execution history is immutable"
+  end
+
+  def assert_mismatched_owners_blocked
+    first_root = insert_recording
+    second_root = insert_recording
+    first_run = insert_execution(:recording_studio_ai_runs, first_root, status: "pending", operation: "generation")
+    second_run = insert_execution(:recording_studio_ai_runs, second_root, status: "pending", operation: "generation")
+    attempt_id = insert_row(
+      :recording_studio_ai_attempts,
+      run_id: first_run, sequence: 1, kind: "primary", status: "pending"
+    )
+    assert_owner_blocked { update_row(:recording_studio_ai_attempts, attempt_id, run_id: second_run) }
+
+    invocation = {
+      tool_key: "lookup", tool_version: 1, status: "requested",
+      read_only: true, destructive: false, requires_confirmation: false, idempotent: true,
+      requested_by_attempt_id: attempt_id
+    }
+    assert_owner_blocked("invocation attempts must belong to invocation run") do
+      insert_row(:recording_studio_ai_custom_tool_invocations, run_id: second_run, **invocation)
+    end
+    invocation_id = insert_row(:recording_studio_ai_custom_tool_invocations, run_id: first_run, **invocation)
+    assert_owner_blocked("invocation attempts must belong to invocation run") do
+      update_row(:recording_studio_ai_custom_tool_invocations, invocation_id, run_id: second_run)
+    end
+
+    batch_id = insert_execution(:recording_studio_ai_batches, first_root, status: "preparing")
+    item = { batch_id: batch_id, position: 0, reference: "item-1", status: "pending" }
+    assert_owner_blocked("batch item run must match batch attribution") do
+      insert_row(:recording_studio_ai_batch_items, run_id: second_run, **item)
+    end
+    item_id = insert_row(:recording_studio_ai_batch_items, run_id: first_run, **item)
+    assert_owner_blocked("batch item run must match batch attribution") do
+      update_row(:recording_studio_ai_batch_items, item_id, run_id: second_run)
+    end
+  end
+
+  def assert_owner_blocked(message = "execution ownership columns are immutable", &)
+    error = assert_raises(ActiveRecord::StatementInvalid, &)
+    assert_includes error.message, message
   end
 
   def assert_cost_columns_absent
