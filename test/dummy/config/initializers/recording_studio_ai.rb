@@ -41,6 +41,7 @@ RecordingStudioAI.configure do |config|
   # Do not copy `->(**) { true }` into a real host.
   config.authorization_handler = DummyAccessibleAIAuthorization.method(:call)
   # Host check. A root UUID is loaded to a Recording before this runs.
+  # An unknown UUID raises before this lambda.
   config.attribution_validator = lambda do |root_recording:, context_recording:|
     unless root_recording.is_a?(RecordingStudio::Recording) &&
            root_recording.parent_recording_id.nil? &&

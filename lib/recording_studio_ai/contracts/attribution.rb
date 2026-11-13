@@ -32,6 +32,11 @@ module RecordingStudioAI
         @root_recording = loaded_root_recording(root_recording)
 
         validate!
+      rescue ArgumentError => e
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          e.message,
+          code: "invalid_request"
+        )
       end
 
       def to_h
@@ -91,8 +96,10 @@ module RecordingStudioAI
       def loaded_root_recording(value)
         return value if value.nil?
 
-        found = RecordingStudioAI.configuration.send(:resolved_root_recording, value)
-        found || value
+        found = RecordingStudioAI.configuration.resolved_root_recording(value)
+        return found if found
+
+        raise ArgumentError, "root_recording must be a Recording Studio root"
       end
 
       def validate_recording_tenancy!

@@ -16,7 +16,7 @@ Versioning and Keep a Changelog.
 
 ### Upgrade notes
 - Bump to `0.21.2`. No migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0212).
-- Recording ids are UUIDs. A host `attribution_validator` still runs after the load and can reject the recording.
+- Recording ids are UUIDs. An unknown UUID raises `root_recording must be a Recording Studio root` before a host validator runs. A host `attribution_validator` still runs after a recording is loaded and can reject it.
 
 ## [0.21.1] - 2026-11-12
 

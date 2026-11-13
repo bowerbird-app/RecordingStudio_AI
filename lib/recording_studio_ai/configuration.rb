@@ -256,6 +256,19 @@ module RecordingStudioAI
 
     RECORDING_ID_FORMAT = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
 
+    # A loaded Recording, or +value+ when it is not a recording id.
+    # Nil means that id was looked up and no recording exists.
+    def resolved_root_recording(value)
+      recording_class = studio_recording_class
+      return value unless recording_class
+      return value if value.is_a?(recording_class)
+
+      id = recording_lookup_id(value)
+      return value if id.nil?
+
+      recording_class.find_by(id: id)
+    end
+
     private
 
     def normalize_model_fallbacks!
@@ -362,15 +375,6 @@ module RecordingStudioAI
              context_recording.root_recording_id == root.id
         raise ArgumentError, "context_recording must belong to root_recording"
       end
-    end
-
-    def resolved_root_recording(value)
-      recording_class = studio_recording_class
-      return unless recording_class
-      return value if value.is_a?(recording_class)
-
-      id = recording_lookup_id(value)
-      recording_class.find_by(id: id) unless id.nil?
     end
 
     def recording_lookup_id(value)

@@ -9,7 +9,7 @@ An object that carries `root_recording_id` for a root is also accepted. A non-ro
 ### Upgrade steps
 
 1. Install RecordingStudioAI `0.21.2`. No migration.
-2. Leave `config.attribution_validator` in place when the host set one. It still runs, after the UUID has been loaded, and it can reject that recording.
+2. Leave `config.attribution_validator` in place when the host set one. It still runs after a recording is loaded, and it can reject that recording. An unknown UUID raises before that validator runs.
 3. Pass a root recording or its UUID. `Agents.create_session` and a later turn on that run use the loaded root.
 
 ## Upgrading to 0.21.1

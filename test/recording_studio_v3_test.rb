@@ -141,6 +141,24 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
     assert_equal "context_recording must belong to root_recording", error.message
   end
 
+  test "a missing root uuid raises instead of keeping the raw value" do
+    configuration = RecordingStudioAI.configuration
+    previous = configuration.attribution_validator
+    configuration.attribution_validator = ->(**) { raise "validator should not run" }
+    missing = SecureRandom.uuid
+    carried = Struct.new(:root_recording_id).new(missing)
+    initiator = User.create!(email: "missing-#{SecureRandom.hex(4)}@example.test", password: "Password")
+
+    [missing, carried].each do |root|
+      error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+        RecordingStudioAI::Contracts::Attribution.new(root_recording: root, initiator: initiator)
+      end
+      assert_equal "root_recording must be a Recording Studio root", error.message
+    end
+  ensure
+    configuration.attribution_validator = previous
+  end
+
   test "attribution keeps the loaded root before validation" do
     root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Loaded Root")))
     configuration = RecordingStudioAI.configuration

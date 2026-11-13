@@ -494,7 +494,7 @@ RecordingStudioAI.generate(
 )
 ```
 
-`root_recording` is a Recording Studio root, or the UUID of one. That UUID is loaded into the recording before validation and authorization, so the saved run and Accessible see the recording. An integer, a partial numeric string, or another model is rejected. A host `attribution_validator` still runs after the load and can reject the recording.
+`root_recording` is a Recording Studio root, or the UUID of one. That UUID is loaded into the recording before validation and authorization, so the saved run and Accessible see the recording. An unknown UUID raises before the host validator. An integer, a partial numeric string, or another model is rejected. A host `attribution_validator` still runs after a recording is loaded and can reject it.
 
 Flat generation parameters (`temperature`, `verbosity`, `max_output_tokens`,
 `reasoning_effort`) are validated against the model registry. On profile or
