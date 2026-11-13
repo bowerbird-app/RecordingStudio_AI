@@ -46,15 +46,10 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
     root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Child Workspace")))
     folder = Folder.new(name: unique_name("Allowed Folder"))
 
-    event = RecordingStudio.record!(
-      action: "created",
-      recordable: folder,
-      root_recording: root_recording,
-      parent_recording: root_recording
-    )
+    recording = record_child(folder, root_recording, root_recording)
 
-    assert_equal folder, event.recording.recordable
-    assert_equal root_recording, event.recording.parent_recording
+    assert_equal folder, recording.recordable
+    assert_equal root_recording, recording.parent_recording
   end
 
   test "page can be recorded under allowed workspace and folder parents" do
@@ -264,12 +259,25 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   private
 
   def record_child(recordable, root_recording, parent_recording)
+    actor = Current.actor
+    unless actor.is_a?(User) && actor.persisted?
+      actor = User.first || User.create!(
+        email: "writer-#{SecureRandom.hex(4)}@example.test",
+        password: "Password"
+      )
+    end
+    previous_actor = Current.actor
+    Current.actor = actor
+    grant_accessible!(recording: root_recording, actor: actor, role: :edit)
+
     RecordingStudio.record!(
       action: "created",
       recordable: recordable,
       root_recording: root_recording,
       parent_recording: parent_recording
     ).recording
+  ensure
+    Current.actor = previous_actor if defined?(previous_actor)
   end
 
   def unique_name(prefix)

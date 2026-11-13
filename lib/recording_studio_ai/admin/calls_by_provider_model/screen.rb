@@ -18,11 +18,22 @@ module AdminScreens
       (options[:param] || key).to_sym
     end
 
-    def allowed_values
+    def allowed_values(_context = nil)
       ALLOWED.dup
     end
 
-    def normalize(params)
+    def present_entries(_context = nil)
+      ALLOWED.map(&:to_s)
+    end
+
+    def label_text(_context = nil)
+      raw = options[:label]
+      return key.to_s.humanize if raw.nil? || raw.to_s.strip.empty?
+
+      raw.to_s
+    end
+
+    def normalize(params, _context = nil)
       raw = params[param_key] || params[param_key.to_s]
       value = raw.to_s
       return default_value if value.empty?

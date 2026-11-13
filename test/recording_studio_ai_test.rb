@@ -68,10 +68,10 @@ class RecordingStudioAITest < Minitest::Test
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.expand_path("../#{path}", __dir__))
       assert_includes contents, "RecordingStudio_logs", path
-      assert_includes contents, 'tag: "v0.7.3"', path
-      assert_includes contents, 'tag: "v0.7.2"', path
-      assert_includes contents, 'tag: "v6.3.0"', path
-      assert_includes contents, 'tag: "v0.1.341"', path
+      assert_includes contents, 'tag: "v0.7.4"', path
+      assert_includes contents, 'tag: "v0.8.0"', path
+      assert_includes contents, 'tag: "v6.7.0"', path
+      assert_includes contents, 'tag: "v0.1.356"', path
       assert_includes contents, 'gem "view_component", "4.19.0"', path
     end
   end

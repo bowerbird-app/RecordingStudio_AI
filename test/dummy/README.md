@@ -59,9 +59,9 @@ The layout loads Flatpack stylesheets before Tailwind. Dummy
 `app/views/recording_studio/_default_layout_head.html.erb` adds the host
 application stylesheet and importmap. The gem page-nav right slot is Access
 only. No Sign out, Root Switchable, or admin/root dropdown. Devise sign-in
-keeps `layouts/application`. Admin `v2.7.0` sets `content_for :title` and close
+keeps `layouts/application`. Admin `v2.13.0` sets `content_for :title` and close
 through `flat_pack_page_nav`, so the default layout renders one heading. The
 dummy still maps leftover Card `style:`. Root Switchable is
-`v0.11.4`. The dummy has no `admin_audit_logs` table, so Admin 2.6's
+`v0.15.0`. The dummy has no `admin_audit_logs` table, so Admin 2.6's
 `root_recording_id` migration is not installed. Admin and the saved-reply page
 discard leftover Devise sign-in notices.

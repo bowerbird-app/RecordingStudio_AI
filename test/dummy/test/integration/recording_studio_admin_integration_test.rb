@@ -2540,6 +2540,9 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     document = Nokogiri::HTML(html)
     heading = document.css("h3").find { |node| node.text.strip == title }
     assert heading, "expected heading #{title}"
+    chart_owner = heading.ancestors.find { |node| node.at_css("[data-flat-pack--chart-series-value]") }
+    return chart_owner.to_html if chart_owner
+
     heading.ancestors.find { |node| node.name == "div" && node["class"].to_s.include?("space-y-4") }&.to_html ||
       heading.ancestors.find { |node| node.name == "div" && node["class"].to_s.include?("space-y") }&.to_html ||
       heading.parent.to_html
