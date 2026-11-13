@@ -2,13 +2,15 @@
 
 ## Upgrading to 0.21.2
 
-The default attribution check accepts a Recording Studio root recording or the id of one. It loads the id and still requires that record to be a root. A missing id, a recording that is not a root, an unknown id, and an unrelated object are still rejected. A host that assigns `attribution_validator` keeps that validator.
+A caller can pass a Recording Studio root or the UUID of one. The UUID is loaded into that recording before validation and authorization. The saved run and Accessible see the recording. An actor without access to that root is denied.
+
+An object that carries `root_recording_id` for a root is also accepted. A non-root recording, an unknown UUID, a missing id, an integer, a partial numeric string such as `"12abc"`, and another model are rejected. Recording ids are UUIDs.
 
 ### Upgrade steps
 
 1. Install RecordingStudioAI `0.21.2`. No migration.
-2. Leave `config.attribution_validator` as it is when the host set one. That assignment still replaces the default check.
-3. Callers that only have a root id, including a later `Agents.stream` on an existing run, can pass that id to the default check.
+2. Leave `config.attribution_validator` in place when the host set one. It still runs, after the UUID has been loaded, and it can reject that recording.
+3. Pass a root recording or its UUID. `Agents.create_session` and a later turn on that run use the loaded root.
 
 ## Upgrading to 0.21.1
 

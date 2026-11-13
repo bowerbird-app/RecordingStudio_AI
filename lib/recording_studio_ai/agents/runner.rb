@@ -644,9 +644,8 @@ module RecordingStudioAI
 
       def attribution_for(run)
         actor = Struct.new(:id).new(run.initiator_id)
-        root = Struct.new(:id).new(run.root_recording_id)
         Contracts::Attribution.new(
-          root_recording: root, initiator: actor, initiator_kind: run.initiator_kind,
+          root_recording: run.root_recording_id, initiator: actor, initiator_kind: run.initiator_kind,
           execution_source: run.execution_source, request_id: run.request_id, job_id: run.job_id
         )
       end

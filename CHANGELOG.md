@@ -11,11 +11,12 @@ Versioning and Keep a Changelog.
 ## [0.21.2] - 2026-11-13
 
 ### Fixed
-- The default `attribution_validator` accepts a Recording Studio root or the id of one. It loads that id and still requires a real root. A missing id, a non-root recording, an unknown id, and an unrelated object are rejected with `root_recording must be a Recording Studio root`. A validator the host assigned still replaces this check. `Agents.stream` can rebuild a root from the run id without a 400.
+- A caller can pass a Recording Studio root or the UUID of one. The UUID is loaded into that recording before validation and authorization, so `Attribution`, the saved run, and Accessible all see the recording. `Agents.create_session` with that UUID stores `root_recording_id` and asks Accessible about the loaded root. An actor without access to that root is denied.
+- Also accepted: an object that carries `root_recording_id` for a root. Rejected: a non-root recording, an unknown UUID, a missing id, an integer, a partial numeric string such as `"12abc"`, and another model.
 
 ### Upgrade notes
 - Bump to `0.21.2`. No migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0212).
-- Hosts that set `attribution_validator` keep that validator. Hosts on the default check can pass a root recording or its id.
+- Recording ids are UUIDs. A host `attribution_validator` still runs after the load and can reject the recording.
 
 ## [0.21.1] - 2026-11-12
 

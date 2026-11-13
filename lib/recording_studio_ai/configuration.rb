@@ -254,6 +254,8 @@ module RecordingStudioAI
       batch_synchronization_job
     end
 
+    RECORDING_ID_FORMAT = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+
     private
 
     def normalize_model_fallbacks!
@@ -372,10 +374,21 @@ module RecordingStudioAI
     end
 
     def recording_lookup_id(value)
-      return value if value.is_a?(String) || value.is_a?(Integer)
-      return value.id if value.respond_to?(:id)
+      return value if recording_id?(value)
+      return unless carries_root_recording_id?(value)
 
-      nil
+      nested = value.root_recording_id
+      nested if recording_id?(nested)
+    end
+
+    def recording_id?(value)
+      value.is_a?(String) && RECORDING_ID_FORMAT.match?(value)
+    end
+
+    def carries_root_recording_id?(value)
+      return false if value.is_a?(studio_recording_class)
+
+      value.respond_to?(:root_recording_id)
     end
 
     def studio_root?(recording)

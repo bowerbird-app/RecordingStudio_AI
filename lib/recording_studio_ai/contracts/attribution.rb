@@ -29,6 +29,7 @@ module RecordingStudioAI
         @execution_source = execution_source&.to_s
         @request_id = request_id&.to_s
         @job_id = job_id&.to_s
+        @root_recording = loaded_root_recording(root_recording)
 
         validate!
       end
@@ -85,6 +86,13 @@ module RecordingStudioAI
           "execution_source must be one of: #{EXECUTION_SOURCES.join(', ')}",
           code: "invalid_request"
         )
+      end
+
+      def loaded_root_recording(value)
+        return value if value.nil?
+
+        found = RecordingStudioAI.configuration.send(:resolved_root_recording, value)
+        found || value
       end
 
       def validate_recording_tenancy!
