@@ -1,5 +1,17 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.21.2
+
+A caller can pass a Recording Studio root or the UUID of one. The UUID is loaded into that recording before validation and authorization. The saved run and Accessible see the recording. An actor without access to that root is denied.
+
+An object that carries `root_recording_id` for a root is also accepted. A non-root recording, an unknown UUID, a missing id, an integer, a partial numeric string such as `"12abc"`, and another model are rejected. Recording ids are UUIDs.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.21.2`. No migration.
+2. Leave `config.attribution_validator` in place when the host set one. It still runs after a recording is loaded, and it can reject that recording. An unknown UUID raises before that validator runs.
+3. Pass a root recording or its UUID. `Agents.create_session` and a later turn on that run use the loaded root.
+
 ## Upgrading to 0.21.1
 
 Runs, attempts, custom tool invocations, batches, and batch items can be updated again. From `0.3.0` through `0.21.0`, the terminal-state guards still named columns that later migrations dropped (`correlation_id`, legacy digests, and `cost_*`). PostgreSQL rejected every update. SQLite had dropped the triggers, including the ownership and relationship guards.

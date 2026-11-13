@@ -85,6 +85,8 @@ class FreshDatabaseMigrationsTest < Minitest::Test
   def test_terminal_guards_allow_updates_and_block_terminal_changes
     apply(migrations)
     assert_equal "20261112120000", migrations.last.first
+    refute Object.const_defined?(:RefreshRecordingStudioAISqliteGuards)
+    assert RefreshRecordingStudioAITerminalGuards.const_defined?(:RefreshRecordingStudioAISqliteGuards)
 
     root_id = insert_recording
     run_id = insert_execution(:recording_studio_ai_runs, root_id, status: "pending", operation: "generation")

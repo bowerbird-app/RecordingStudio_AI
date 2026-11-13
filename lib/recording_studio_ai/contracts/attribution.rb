@@ -29,8 +29,14 @@ module RecordingStudioAI
         @execution_source = execution_source&.to_s
         @request_id = request_id&.to_s
         @job_id = job_id&.to_s
+        @root_recording = loaded_root_recording(root_recording)
 
         validate!
+      rescue ArgumentError => e
+        raise RecordingStudioAI::Errors::ContractValidationError.new(
+          e.message,
+          code: "invalid_request"
+        )
       end
 
       def to_h
@@ -85,6 +91,15 @@ module RecordingStudioAI
           "execution_source must be one of: #{EXECUTION_SOURCES.join(', ')}",
           code: "invalid_request"
         )
+      end
+
+      def loaded_root_recording(value)
+        return value if value.nil?
+
+        found = RecordingStudioAI.configuration.resolved_root_recording(value)
+        return found if found
+
+        raise ArgumentError, "root_recording must be a Recording Studio root"
       end
 
       def validate_recording_tenancy!

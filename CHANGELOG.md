@@ -8,6 +8,16 @@ Versioning and Keep a Changelog.
 ### Changed
 - Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
 
+## [0.21.2] - 2026-11-13
+
+### Fixed
+- A caller can pass a Recording Studio root or the UUID of one. The UUID is loaded into that recording before validation and authorization, so `Attribution`, the saved run, and Accessible all see the recording. `Agents.create_session` with that UUID stores `root_recording_id` and asks Accessible about the loaded root. An actor without access to that root is denied.
+- Also accepted: an object that carries `root_recording_id` for a root. Rejected: a non-root recording, an unknown UUID, a missing id, an integer, a partial numeric string such as `"12abc"`, and another model.
+
+### Upgrade notes
+- Bump to `0.21.2`. No migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0212).
+- Recording ids are UUIDs. An unknown UUID raises `root_recording must be a Recording Studio root` before a host validator runs. A host `attribution_validator` still runs after a recording is loaded and can reject it.
+
 ## [0.21.1] - 2026-11-12
 
 ### Fixed
@@ -1192,7 +1202,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.2...HEAD
+[0.21.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.6...v0.20.0
