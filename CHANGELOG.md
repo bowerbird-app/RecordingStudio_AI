@@ -6,6 +6,8 @@ Versioning and Keep a Changelog.
 ## [Unreleased]
 
 ### Changed
+- Development pins Recording Studio `v6.7.0`, Flatpack `v0.1.356`, Logs `v0.7.4`, and Metrics `v0.8.0`. Dummy pins Trashable `v0.14.0`, Cache `v0.6.3`, Root Switchable `v0.15.0`, Accessible `v0.32.0`, and Admin `v2.13.0`.
+- Dummy `RecordingStudio.configure` sets `config.authorize_write`. Recording Studio 6.5 denies a write when that authorizer is missing.
 - Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
 
 ## [0.21.2] - 2026-11-13

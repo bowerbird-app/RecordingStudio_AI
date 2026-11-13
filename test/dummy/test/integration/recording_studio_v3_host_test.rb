@@ -4,9 +4,9 @@ require "test_helper"
 
 class RecordingStudioV3HostTest < ActiveSupport::TestCase
   test "dummy app loads root switchable config and host sidebar layout" do
-    assert_equal "0.11.4", RecordingStudioRootSwitchable::VERSION
-    assert_equal "0.24.0", RecordingStudioAccessible::VERSION
-    assert_equal "2.7.0", RecordingStudioAdmin::VERSION
+    assert_equal "0.15.0", RecordingStudioRootSwitchable::VERSION
+    assert_equal "0.32.0", RecordingStudioAccessible::VERSION
+    assert_equal "2.13.0", RecordingStudioAdmin::VERSION
     assert_equal [ "all_workspaces" ], RecordingStudioRootSwitchable.configuration.scopes.keys
     assert_equal "flat_pack_sidebar", RecordingStudioRootSwitchable.configuration.layout
     assert_includes ApplicationController.ancestors, RecordingStudio::RootSwitchable::ControllerSupport

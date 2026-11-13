@@ -39,10 +39,6 @@ begin
   accessible_root_recording = RecordingStudio.root_recording_for(accessible_workspace)
   private_root_recording = RecordingStudio.root_recording_for(private_workspace)
 
-  folder_recording = find_or_record_child.call(folder, root_recording, root_recording)
-
-  find_or_record_child.call(page, root_recording, folder_recording)
-
   previous_access_authorizer = RecordingStudioAccessible.configuration.access_management_authorizer
   RecordingStudioAccessible.configuration.access_management_authorizer = ->(**) { true }
 
@@ -56,6 +52,11 @@ begin
     )
     raise("Failed to bootstrap owner access for root #{seed_root.id}: #{bootstrap_result.error}") unless bootstrap_result.success?
   end
+
+  # Recording Studio 6.5 requires an actor with :edit before child writes.
+  folder_recording = find_or_record_child.call(folder, root_recording, root_recording)
+
+  find_or_record_child.call(page, root_recording, folder_recording)
 
   srand(42)
 
