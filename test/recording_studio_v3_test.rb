@@ -110,6 +110,49 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
     assert_equal context_recording.id, attribution.to_h.fetch(:context_recording_id)
   end
 
+  test "default attribution check accepts a root id and a root recording" do
+    configuration = RecordingStudioAI::Configuration.new
+    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Default Root")))
+    context_recording = record_child(Folder.new(name: unique_name("Default Folder")), root_recording, root_recording)
+    other_root = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Other Root")))
+    other_child = record_child(Folder.new(name: unique_name("Other Folder")), other_root, other_root)
+    validator = configuration.attribution_validator
+    id_only = Struct.new(:id).new(root_recording.id)
+
+    validator.call(root_recording: root_recording.id, context_recording: nil)
+    validator.call(root_recording: id_only, context_recording: context_recording)
+    validator.call(root_recording: root_recording, context_recording: context_recording)
+
+    [context_recording.id, SecureRandom.uuid, Object.new, context_recording, Struct.new(:id).new(nil)].each do |root|
+      error = assert_raises(ArgumentError) do
+        validator.call(root_recording: root, context_recording: nil)
+      end
+      assert_equal "root_recording must be a Recording Studio root", error.message
+    end
+
+    error = assert_raises(ArgumentError) do
+      validator.call(root_recording: root_recording.id, context_recording: other_child)
+    end
+    assert_equal "context_recording must belong to root_recording", error.message
+  end
+
+  test "a host attribution validator takes precedence over the default" do
+    configuration = RecordingStudioAI.configuration
+    previous = configuration.attribution_validator
+    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Host Root")))
+    configuration.attribution_validator = lambda do |root_recording:, context_recording:|
+      raise ArgumentError, "host rejected #{root_recording.id}" if context_recording.nil?
+    end
+    initiator = User.first || User.create!(email: "ai-#{SecureRandom.hex(4)}@example.test", password: "Password")
+
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) do
+      RecordingStudioAI::Contracts::Attribution.new(root_recording: root_recording, initiator: initiator)
+    end
+    assert_equal "host rejected #{root_recording.id}", error.message
+  ensure
+    configuration.attribution_validator = previous
+  end
+
   test "AI attribution rejects a child root and cross-root context" do
     first_root = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("First AI Workspace")))
     second_root = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Second AI Workspace")))

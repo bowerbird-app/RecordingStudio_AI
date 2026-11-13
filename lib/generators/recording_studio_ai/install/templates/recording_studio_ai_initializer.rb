@@ -69,7 +69,8 @@ RecordingStudioAI.configure do |config|
   # onto Accessible :view / :edit / :admin for attribution.root_recording.
   # Never use `->(**) { true }` in a real host.
   config.authorization_handler = ->(**) { false }
-  # Core validates Recording Studio root/context tenancy. Override only for a stricter host policy.
+  # Core accepts a Recording Studio root, or the id of one, and checks that
+  # context belongs to it. A validator assigned here replaces that check.
   # config.attribution_validator = ->(root_recording:, context_recording:) { ... }
   # Normal application code should use profiles. Enable only intentional overrides.
   config.allowed_provider_overrides = []

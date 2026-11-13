@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.21.2
+
+The default attribution check accepts a Recording Studio root recording or the id of one. It loads the id and still requires that record to be a root. A missing id, a recording that is not a root, an unknown id, and an unrelated object are still rejected. A host that assigns `attribution_validator` keeps that validator.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.21.2`. No migration.
+2. Leave `config.attribution_validator` as it is when the host set one. That assignment still replaces the default check.
+3. Callers that only have a root id, including a later `Agents.stream` on an existing run, can pass that id to the default check.
+
 ## Upgrading to 0.21.1
 
 Runs, attempts, custom tool invocations, batches, and batch items can be updated again. From `0.3.0` through `0.21.0`, the terminal-state guards still named columns that later migrations dropped (`correlation_id`, legacy digests, and `cost_*`). PostgreSQL rejected every update. SQLite had dropped the triggers, including the ownership and relationship guards.

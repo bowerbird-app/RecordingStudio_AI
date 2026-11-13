@@ -350,18 +350,43 @@ module RecordingStudioAI
     end
 
     def validate_recording_attribution!(root_recording:, context_recording:)
-      recording_class = defined?(RecordingStudio::Recording) && RecordingStudio::Recording
-      unless recording_class && root_recording.is_a?(recording_class) &&
-             root_recording.parent_recording_id.nil? &&
-             root_recording.root_recording_id == root_recording.id
+      root = resolved_root_recording(root_recording)
+      unless studio_root?(root)
         raise ArgumentError, "root_recording must be a Recording Studio root"
       end
       return if context_recording.nil?
 
-      unless context_recording.is_a?(recording_class) &&
-             context_recording.root_recording_id == root_recording.id
+      unless context_recording.is_a?(studio_recording_class) &&
+             context_recording.root_recording_id == root.id
         raise ArgumentError, "context_recording must belong to root_recording"
       end
+    end
+
+    def resolved_root_recording(value)
+      recording_class = studio_recording_class
+      return unless recording_class
+      return value if value.is_a?(recording_class)
+
+      id = recording_lookup_id(value)
+      recording_class.find_by(id: id) unless id.nil?
+    end
+
+    def recording_lookup_id(value)
+      return value if value.is_a?(String) || value.is_a?(Integer)
+      return value.id if value.respond_to?(:id)
+
+      nil
+    end
+
+    def studio_root?(recording)
+      recording_class = studio_recording_class
+      recording_class && recording.is_a?(recording_class) &&
+        recording.parent_recording_id.nil? &&
+        recording.root_recording_id == recording.id
+    end
+
+    def studio_recording_class
+      defined?(RecordingStudio::Recording) && RecordingStudio::Recording
     end
   end
 end

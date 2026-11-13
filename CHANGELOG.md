@@ -8,6 +8,15 @@ Versioning and Keep a Changelog.
 ### Changed
 - Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
 
+## [0.21.2] - 2026-11-13
+
+### Fixed
+- The default `attribution_validator` accepts a Recording Studio root or the id of one. It loads that id and still requires a real root. A missing id, a non-root recording, an unknown id, and an unrelated object are rejected with `root_recording must be a Recording Studio root`. A validator the host assigned still replaces this check. `Agents.stream` can rebuild a root from the run id without a 400.
+
+### Upgrade notes
+- Bump to `0.21.2`. No migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0212).
+- Hosts that set `attribution_validator` keep that validator. Hosts on the default check can pass a root recording or its id.
+
 ## [0.21.1] - 2026-11-12
 
 ### Fixed
@@ -1192,7 +1201,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.2...HEAD
+[0.21.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.6...v0.20.0
