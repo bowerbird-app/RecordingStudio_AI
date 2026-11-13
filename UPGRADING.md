@@ -1,5 +1,16 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.21.1
+
+Runs, attempts, custom tool invocations, batches, and batch items can be updated again. From `0.3.0` through `0.21.0`, the terminal-state guards still named columns that later migrations dropped (`correlation_id`, legacy digests, and `cost_*`). PostgreSQL rejected every update. SQLite had dropped the triggers, including the ownership and relationship guards.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.21.1`. A dependency of `~> 0.20.0` stays below `0.21` and does not install this release. Use `~> 0.21.1` or `>= 0.21.1`.
+2. Run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`. The new migration rebuilds the five `rsai_terminal_*` guards and, on SQLite, the ownership and relationship triggers those rewrites removed. It is safe on a fresh install and on a database that already applied every earlier migration.
+3. Do not rely on `db:schema:load`. A Ruby `schema.rb` does not contain triggers or functions, so a schema load builds the tables without these guards.
+4. No host config change. `prompt_key`, `prompt_version`, and `prompt_name_snapshot` stay protected on a terminal run. `provider_session_id` and `provider_turn_id` stay writable. `metadata`, `lock_version`, `created_at`, and `updated_at` stay writable.
+
 ## Upgrading to 0.21.0
 
 `0.21.0` replaces the flat per-attempt usage key with optional credit prices. Apps that leave `usage_handler` nil stay free. There is no migration.

@@ -82,6 +82,60 @@ class FreshDatabaseMigrationsTest < Minitest::Test
     assert column_exists?(:recording_studio_ai_runs, :cost_amount_microunits)
   end
 
+  def test_terminal_guards_allow_updates_and_block_terminal_changes
+    apply(migrations)
+    assert_equal "20261112120000", migrations.last.first
+
+    root_id = insert_recording
+    run_id = insert_execution(:recording_studio_ai_runs, root_id, status: "pending", operation: "generation")
+    batch_id = insert_execution(:recording_studio_ai_batches, root_id, status: "preparing")
+
+    update_row(:recording_studio_ai_runs, run_id, purpose: "draft")
+    update_row(:recording_studio_ai_runs, run_id, status: "completed")
+    update_row(:recording_studio_ai_runs, run_id, metadata: "{\"kept\":true}")
+    update_row(:recording_studio_ai_runs, run_id, provider_turn_id: "turn-1")
+    assert_terminal_change_blocked(:recording_studio_ai_runs, run_id, status: "cancelled")
+    assert_terminal_change_blocked(:recording_studio_ai_runs, run_id, prompt_key: "summarize")
+
+    update_row(:recording_studio_ai_batches, batch_id, profile_key: "medium")
+    update_row(:recording_studio_ai_batches, batch_id, status: "completed")
+    update_row(:recording_studio_ai_batches, batch_id, metadata: "{\"kept\":true}")
+    assert_terminal_change_blocked(:recording_studio_ai_batches, batch_id, provider: "openai")
+
+    %w[runs attempts custom_tool_invocations batches batch_items].each do |suffix|
+      sql = trigger_sql("rsai_terminal_#{suffix}")
+      assert_includes sql, "terminal execution history is immutable"
+      refute_includes sql, "correlation_id"
+    end
+    %w[rsai_run_root_ownership_guard rsai_batch_root_ownership_guard].each do |trigger|
+      assert_includes trigger_sql(trigger), "execution ownership columns are immutable"
+    end
+    assert_related_updates(root_id)
+
+    ActiveRecord::Migration.suppress_messages { RefreshRecordingStudioAITerminalGuards.migrate(:up) }
+    update_row(:recording_studio_ai_runs, run_id, metadata: "{\"again\":true}")
+    assert_terminal_change_blocked(:recording_studio_ai_runs, run_id, purpose: "changed")
+  end
+
+  def test_legacy_sqlite_column_drops_restore_ownership_guards
+    apply(migrations_before(LEGACY_MIGRATION))
+    install_legacy_columns
+    install_cost_columns
+
+    apply(migrations_from(LEGACY_MIGRATION))
+
+    {
+      "rsai_attempt_run_ownership_guard" => "execution ownership columns are immutable",
+      "rsai_invocation_attempt_run_guard_insert" => "invocation attempts must belong to invocation run",
+      "rsai_invocation_attempt_run_guard_update" => "invocation attempts must belong to invocation run",
+      "rsai_batch_item_root_guard_insert" => "batch item run must match batch attribution",
+      "rsai_batch_item_root_guard_update" => "batch item run must match batch attribution"
+    }.each do |trigger, message|
+      assert_includes trigger_sql(trigger), message
+    end
+    assert_mismatched_owners_blocked
+  end
+
   def test_cost_columns_are_removed_when_present
     apply(migrations_before(COST_MIGRATION))
     RemoveCostColumnsFromRecordingStudioAI::COST_COLUMNS.each do |table, columns|
@@ -127,6 +181,12 @@ class FreshDatabaseMigrationsTest < Minitest::Test
     end
   end
 
+  def install_cost_columns
+    RemoveCostColumnsFromRecordingStudioAI::COST_COLUMNS.each do |table, columns|
+      columns.each { |column| add_column table, column, :string }
+    end
+  end
+
   def add_column(table, column, type)
     ActiveRecord::Migration.suppress_messages do
       ActiveRecord::Base.connection.add_column(table, column, type)
@@ -163,6 +223,125 @@ class FreshDatabaseMigrationsTest < Minitest::Test
     RemoveLegacyRecordingStudioAIPersistenceColumns::LEGACY_COLUMNS.each do |table, columns|
       columns.each_key { |column| block.call(table, column) }
     end
+  end
+
+  def trigger_sql(name)
+    connection = ActiveRecord::Base.connection
+    sql = connection.select_value(
+      "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = #{connection.quote(name)}"
+    )
+    assert sql, "#{name} is missing"
+    sql
+  end
+
+  def assert_related_updates(root_id)
+    run_id = insert_execution(:recording_studio_ai_runs, root_id, status: "pending", operation: "generation")
+    attempt_id = insert_row(
+      :recording_studio_ai_attempts,
+      run_id: run_id, sequence: 1, kind: "primary", status: "pending"
+    )
+    invocation_id = insert_row(
+      :recording_studio_ai_custom_tool_invocations,
+      run_id: run_id, tool_key: "lookup", tool_version: 1, status: "requested",
+      read_only: true, destructive: false, requires_confirmation: false, idempotent: true
+    )
+    batch_id = insert_execution(:recording_studio_ai_batches, root_id, status: "preparing")
+    item_id = insert_row(
+      :recording_studio_ai_batch_items,
+      batch_id: batch_id, run_id: run_id, position: 0, reference: "item-1", status: "pending"
+    )
+
+    update_row(:recording_studio_ai_attempts, attempt_id, status: "completed")
+    update_row(:recording_studio_ai_custom_tool_invocations, invocation_id, status: "completed")
+    update_row(:recording_studio_ai_batch_items, item_id, status: "completed")
+    update_row(:recording_studio_ai_attempts, attempt_id, metadata: "{\"kept\":true}")
+    update_row(:recording_studio_ai_custom_tool_invocations, invocation_id, metadata: "{\"kept\":true}")
+    update_row(:recording_studio_ai_batch_items, item_id, metadata: "{\"kept\":true}")
+  end
+
+  def insert_row(table, **attributes)
+    connection = ActiveRecord::Base.connection
+    columns = { created_at: Time.now.utc, updated_at: Time.now.utc }.merge(attributes)
+    names = columns.keys.map { |name| connection.quote_column_name(name) }
+    values = columns.values.map { |value| connection.quote(value) }
+    connection.insert("INSERT INTO #{table} (#{names.join(', ')}) VALUES (#{values.join(', ')})")
+  end
+
+  def insert_recording
+    ActiveRecord::Base.connection.insert(
+      "INSERT INTO recording_studio_recordings (created_at, updated_at) " \
+      "VALUES (CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+    )
+  end
+
+  def insert_execution(table, root_id, attributes)
+    connection = ActiveRecord::Base.connection
+    columns = {
+      root_recording_id: root_id,
+      initiator_type: "User",
+      initiator_id: "user-1",
+      initiator_kind: "user",
+      created_at: Time.now.utc,
+      updated_at: Time.now.utc
+    }.merge(attributes)
+    names = columns.keys.map { |name| connection.quote_column_name(name) }
+    values = columns.values.map { |value| connection.quote(value) }
+    connection.insert("INSERT INTO #{table} (#{names.join(', ')}) VALUES (#{values.join(', ')})")
+  end
+
+  def update_row(table, id, attributes)
+    connection = ActiveRecord::Base.connection
+    assignments = attributes.map do |name, value|
+      "#{connection.quote_column_name(name)} = #{connection.quote(value)}"
+    end.join(", ")
+    connection.execute(
+      "UPDATE #{table} SET #{assignments} WHERE #{connection.quote_column_name('id')} = #{connection.quote(id)}"
+    )
+  end
+
+  def assert_terminal_change_blocked(table, id, attributes)
+    error = assert_raises(ActiveRecord::StatementInvalid) { update_row(table, id, attributes) }
+    assert_includes error.message, "terminal execution history is immutable"
+  end
+
+  def assert_mismatched_owners_blocked
+    first_root = insert_recording
+    second_root = insert_recording
+    first_run = insert_execution(:recording_studio_ai_runs, first_root, status: "pending", operation: "generation")
+    second_run = insert_execution(:recording_studio_ai_runs, second_root, status: "pending", operation: "generation")
+    attempt_id = insert_row(
+      :recording_studio_ai_attempts,
+      run_id: first_run, sequence: 1, kind: "primary", status: "pending"
+    )
+    assert_owner_blocked { update_row(:recording_studio_ai_attempts, attempt_id, run_id: second_run) }
+
+    invocation = {
+      tool_key: "lookup", tool_version: 1, status: "requested",
+      read_only: true, destructive: false, requires_confirmation: false, idempotent: true,
+      requested_by_attempt_id: attempt_id
+    }
+    assert_owner_blocked("invocation attempts must belong to invocation run") do
+      insert_row(:recording_studio_ai_custom_tool_invocations, run_id: second_run, **invocation)
+    end
+    invocation_id = insert_row(:recording_studio_ai_custom_tool_invocations, run_id: first_run, **invocation)
+    assert_owner_blocked("invocation attempts must belong to invocation run") do
+      update_row(:recording_studio_ai_custom_tool_invocations, invocation_id, run_id: second_run)
+    end
+
+    batch_id = insert_execution(:recording_studio_ai_batches, first_root, status: "preparing")
+    item = { batch_id: batch_id, position: 0, reference: "item-1", status: "pending" }
+    assert_owner_blocked("batch item run must match batch attribution") do
+      insert_row(:recording_studio_ai_batch_items, run_id: second_run, **item)
+    end
+    item_id = insert_row(:recording_studio_ai_batch_items, run_id: first_run, **item)
+    assert_owner_blocked("batch item run must match batch attribution") do
+      update_row(:recording_studio_ai_batch_items, item_id, run_id: second_run)
+    end
+  end
+
+  def assert_owner_blocked(message = "execution ownership columns are immutable", &)
+    error = assert_raises(ActiveRecord::StatementInvalid, &)
+    assert_includes error.message, message
   end
 
   def assert_cost_columns_absent

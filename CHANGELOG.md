@@ -8,6 +8,19 @@ Versioning and Keep a Changelog.
 ### Changed
 - Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
 
+## [0.21.1] - 2026-11-12
+
+### Fixed
+- Updates to runs, attempts, custom tool invocations, batches, and batch items work again after every migration. Those terminal-state guards were built from the columns present at the time, including `correlation_id`, legacy digest columns, and `cost_*` columns. Later drops left PostgreSQL functions that reject every update, and left SQLite without those triggers. `RefreshRecordingStudioAITerminalGuards` rebuilds all five guards from the columns that exist now. `prompt_key`, `prompt_version`, and `prompt_name_snapshot` are protected on a terminal run. `provider_session_id` and `provider_turn_id` stay writable, so a finished run can still record a turn id. `metadata`, `lock_version`, `created_at`, and `updated_at` stay writable. SQLite also recreates `rsai_run_root_ownership_guard`, `rsai_batch_root_ownership_guard`, `rsai_attempt_run_ownership_guard`, `rsai_invocation_attempt_run_guard_insert`, `rsai_invocation_attempt_run_guard_update`, `rsai_batch_item_root_guard_insert`, and `rsai_batch_item_root_guard_update`.
+
+### Changed
+- A Ruby `schema.rb` load does not create these guards. Rails does not write triggers or functions into `schema.rb`. Hosts get them by running the migrations.
+
+### Upgrade notes
+- Bump to `0.21.1`. See [UPGRADING.md](UPGRADING.md#upgrading-to-0211).
+- Releases `0.3.0` through `0.21.0` are affected. Run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`.
+- A dependency of `~> 0.20.0` does not allow `0.21.1`. Use `~> 0.21.1` or `>= 0.21.1`.
+
 ## [0.21.0] - 2026-11-12
 
 Optional credit billing replaces the flat per-attempt usage key.
@@ -1179,7 +1192,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.6...v0.20.0
 [0.19.6]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.19.5...v0.19.6
