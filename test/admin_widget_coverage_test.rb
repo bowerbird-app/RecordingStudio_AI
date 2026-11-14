@@ -1142,20 +1142,32 @@ class AdminWidgetCoverageTest < RecordingStudioAI::Test::PersistenceCase
   end
 
   def with_admin_period
-    if defined?(RecordingStudioAdmin::Period)
-      yield
-      return
+    installed = false
+    created_admin = false
+    unless defined?(RecordingStudioAdmin::Period)
+      created_admin = install_coverage_admin_period
+      installed = true
     end
-
-    admin = defined?(RecordingStudioAdmin) ? RecordingStudioAdmin : Object.const_set(:RecordingStudioAdmin, Module.new)
-    admin.const_set(:Period, AdminWidgetCoveragePeriod)
-    @installed_admin_period = true
     yield
   ensure
-    if @installed_admin_period
-      RecordingStudioAdmin.send(:remove_const, :Period) if RecordingStudioAdmin.const_defined?(:Period, false)
-      @installed_admin_period = false
-    end
+    teardown_coverage_admin_period(installed, created_admin)
+  end
+
+  def install_coverage_admin_period
+    created_admin = !defined?(RecordingStudioAdmin)
+    admin = created_admin ? Object.const_set(:RecordingStudioAdmin, Module.new) : RecordingStudioAdmin
+    admin.const_set(:Period, AdminWidgetCoveragePeriod)
+    created_admin
+  end
+
+  def teardown_coverage_admin_period(installed, created_admin)
+    return unless installed && defined?(RecordingStudioAdmin)
+
+    period_defined = RecordingStudioAdmin.const_defined?(:Period, false)
+    RecordingStudioAdmin.send(:remove_const, :Period) if period_defined
+    return unless created_admin
+
+    Object.send(:remove_const, :RecordingStudioAdmin)
   end
 
   def find_row(rows, &)

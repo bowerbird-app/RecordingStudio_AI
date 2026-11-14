@@ -696,11 +696,17 @@ class LibraryGapCoverageTest < RecordingStudioAI::Test::PersistenceCase
   end
 
   def with_admin_configuration(&)
-    if Object.const_defined?(:RecordingStudioAdmin, false)
+    if admin_configuration_present?
       yield_existing_admin(&)
     else
-      yield_temporary_admin(&)
+      without_constant(:RecordingStudioAdmin) { yield_temporary_admin(&) }
     end
+  end
+
+  def admin_configuration_present?
+    Object.const_defined?(:RecordingStudioAdmin, false) &&
+      RecordingStudioAdmin.respond_to?(:configuration) &&
+      !RecordingStudioAdmin.configuration.nil?
   end
 
   def yield_existing_admin
@@ -709,8 +715,10 @@ class LibraryGapCoverageTest < RecordingStudioAI::Test::PersistenceCase
     original_access = config.access_recording_resolver
     yield config
   ensure
-    config.site_admin_recording_resolver = original_site
-    config.access_recording_resolver = original_access
+    if config
+      config.site_admin_recording_resolver = original_site
+      config.access_recording_resolver = original_access
+    end
   end
 
   def yield_temporary_admin
