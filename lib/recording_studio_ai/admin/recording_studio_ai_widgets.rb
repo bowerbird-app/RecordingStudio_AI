@@ -101,8 +101,8 @@ module AdminScreens
 
     def normalize_sql_date(value)
       case value
-      when Date then value
       when Time, DateTime, ActiveSupport::TimeWithZone then value.to_date
+      when Date then value
       else Date.parse(value.to_s)
       end
     end
@@ -444,7 +444,7 @@ module AdminScreens
         }
       end
 
-      expensive_last_day = last_day.where("resolved_model ~* ?", EXPENSIVE_MODEL_MATCHER.source).count
+      expensive_last_day = expensive_model_count(last_day)
       expensive_share = percentage(expensive_last_day, last_day.count)
       if expensive_last_day >= 3 || expensive_share >= 35.0
         warnings << {
@@ -455,6 +455,16 @@ module AdminScreens
 
       warnings
     end
+
+    # Postgres matches with ~*. SQLite (the gem unit database) has no such operator,
+    # and the check always runs, so a non-Postgres adapter must not raise.
+    def expensive_model_count(scope)
+      source = EXPENSIVE_MODEL_MATCHER.source
+      return scope.where("resolved_model ~* ?", source).count if scope.connection.adapter_name.match?(/postg/i)
+
+      scope.pluck(:resolved_model).count { |model| EXPENSIVE_MODEL_MATCHER.match?(model.to_s) }
+    end
+    private :expensive_model_count
 
     require_relative "attempts/widget_helpers"
     require_relative "recording_studio_ai_responses/widget_helpers"

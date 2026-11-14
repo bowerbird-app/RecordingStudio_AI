@@ -10,6 +10,16 @@ Versioning and Keep a Changelog.
 - Dummy `RecordingStudio.configure` sets `config.authorize_write`. Recording Studio 6.5 denies a write when that authorizer is missing.
 - Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
 
+## [0.21.3] - 2026-11-14
+
+### Fixed
+- Admin warning rows count expensive models on SQLite. The check used Postgres `~*`, so any SQLite host raised before the warning list was returned. Postgres still uses `~*`.
+- `DateTime` values passed through admin date normalization become dates. `DateTime` is a `Date`, so the previous order left them unchanged.
+- The oldest-stuck-age metric reads SQLite timestamps. `minimum()` of the stuck-since SQL comes back as a String there, and subtracting that String from `Time` raised.
+
+### Upgrade notes
+- Bump to `0.21.3`. No migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0213).
+
 ## [0.21.2] - 2026-11-13
 
 ### Fixed
@@ -1204,7 +1214,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.2...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.3...HEAD
+[0.21.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.2...v0.21.3
 [0.21.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.20.0...v0.21.0

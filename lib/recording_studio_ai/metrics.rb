@@ -20,6 +20,7 @@ module RecordingStudioAI
     end
     OLDEST_STUCK_AGE = lambda do |relation, _context|
       oldest = relation.minimum(Arel.sql(STUCK_SINCE_SQL))
+      oldest = oldest.to_time if oldest.is_a?(String)
       oldest && (Time.current - oldest).to_i
     end
     STUCK_OVER_TIME = lambda do |relation, context|
