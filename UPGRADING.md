@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.21.3
+
+Admin warning rows count expensive models on SQLite as well as Postgres. Date-time values in admin date normalization become dates. The oldest-stuck-age metric accepts the string timestamps SQLite returns.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.21.3`. No migration and no config change.
+
 ## Upgrading to 0.21.2
 
 A caller can pass a Recording Studio root or the UUID of one. The UUID is loaded into that recording before validation and authorization. The saved run and Accessible see the recording. An actor without access to that root is denied.
