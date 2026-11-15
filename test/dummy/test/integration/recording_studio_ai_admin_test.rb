@@ -8,7 +8,7 @@ class RecordingStudioAIAdminTest < ActionDispatch::IntegrationTest
   setup do
     @user = User.create!(email: "admin-#{SecureRandom.hex(4)}@example.com", password: "password123")
     workspace = Workspace.create!(name: "Admin only workspace")
-    @root_recording = RecordingStudio.root_recording_for(workspace)
+    @root_recording = ensure_root_recording!(workspace)
 
     @original_access_recording_resolver = RecordingStudioAdmin.configuration.access_recording_resolver
     @original_required_access_role = RecordingStudioAdmin.configuration.required_access_role

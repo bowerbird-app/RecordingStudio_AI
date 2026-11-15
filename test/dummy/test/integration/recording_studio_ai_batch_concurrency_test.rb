@@ -41,7 +41,7 @@ class RecordingStudioAIBatchConcurrencyTest < ActiveSupport::TestCase
 
     @user = User.create!(email: "batch-concurrency-#{SecureRandom.hex(4)}@example.com", password: "password123")
     @workspace = Workspace.create!(name: "Batch concurrency #{SecureRandom.hex(4)}")
-    @root = RecordingStudio.root_recording_for(@workspace)
+    @root = ensure_root_recording!(@workspace)
     @batch = RecordingStudioAI::Batch.create!(
       status: "processing",
       provider: "concurrent",

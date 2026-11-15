@@ -5,10 +5,22 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-15
+
 ### Changed
-- Development pins Recording Studio `v6.7.0`, Flatpack `v0.1.356`, Logs `v0.7.4`, and Metrics `v0.8.0`. Dummy pins Trashable `v0.14.0`, Cache `v0.6.3`, Root Switchable `v0.15.0`, Accessible `v0.32.0`, and Admin `v2.13.0`.
-- Dummy `RecordingStudio.configure` sets `config.authorize_write`. Recording Studio 6.5 denies a write when that authorizer is missing.
-- Dummy host no longer remaps FlatPack Button `url:` to `href:`. Locked sibling gems already pass `href:` on Button. Card `style:` and PageNav `anchor_url:` shims stay.
+- Require Recording Studio `>= 7.0`, `< 8.0`. `RecordingStudio.root_recording_for` only finds a root. A missing root is `nil`. Create one with `RecordingStudio.create_root_recording!`.
+- Require Logs `>= 0.8.0`, `< 1.0` and Metrics `>= 0.9.0`, `< 1.0`.
+- Development pins Recording Studio `v7.0.0`, Logs `v0.8.0`, and Metrics `v0.9.0`. Flatpack stays `v0.1.356`.
+- Dummy pins that rejected core 7 move to Accessible `v0.43.1`, Trashable `v0.17.0`, Root Switchable `v0.15.1`, and Admin `v2.16.0`. Cache stays `v0.6.3`.
+- The dummy `authorize_write` allows a write when an actor is present, including a new root where `root_recording` is nil. It does not set `allow_unauthorized_writes`.
+- Dummy seeds and tests that created a workspace root with `root_recording_for` call `create_root_recording!`. Seeds find kept children with `Recording.kept`.
+- Dummy events store `root_recording_id`.
+- `RecordingStudioAI::Api::Access` reads `RecordingStudioAccessible.admin_root`. Admin no longer has `site_admin_recording_resolver`.
+
+### Upgrade notes
+- Bump to `0.22.0`. No RecordingStudioAI migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0220).
+- Hosts on Recording Studio 6.x need 7.0 before this gem, and Logs 0.8.0 and Metrics 0.9.0. Paths that created a root by looking it up call `create_root_recording!` with an actor. `authorize_write` must allow that create when `root_recording` is nil.
+- Set `RecordingStudioAccessible.configuration.admin_root_resolver` for site-wide AI metrics. Delete `site_admin_recording_resolver`.
 
 ## [0.21.3] - 2026-11-14
 
@@ -1214,7 +1226,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.3...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.3...v0.22.0
 [0.21.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.2...v0.21.3
 [0.21.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.0...v0.21.1

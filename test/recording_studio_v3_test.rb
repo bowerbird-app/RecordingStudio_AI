@@ -34,7 +34,7 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   test "root recordable creates a root recording" do
     workspace = Workspace.create!(name: unique_name("Root Workspace"))
 
-    root_recording = RecordingStudio.root_recording_for(workspace)
+    root_recording = ensure_root_recording!(workspace)
 
     assert_predicate root_recording, :persisted?
     assert_equal workspace, root_recording.recordable
@@ -43,7 +43,7 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   end
 
   test "allowed child can be recorded under a workspace root" do
-    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Child Workspace")))
+    root_recording = ensure_root_recording!(Workspace.create!(name: unique_name("Child Workspace")))
     folder = Folder.new(name: unique_name("Allowed Folder"))
 
     recording = record_child(folder, root_recording, root_recording)
@@ -53,7 +53,7 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   end
 
   test "page can be recorded under allowed workspace and folder parents" do
-    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Page Workspace")))
+    root_recording = ensure_root_recording!(Workspace.create!(name: unique_name("Page Workspace")))
     folder_recording = record_child(Folder.new(name: unique_name("Page Folder")), root_recording, root_recording)
 
     workspace_page_recording = record_child(
@@ -76,7 +76,7 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   end
 
   test "parentless child under an existing root is invalid" do
-    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Parentless Workspace")))
+    root_recording = ensure_root_recording!(Workspace.create!(name: unique_name("Parentless Workspace")))
     folder = Folder.create!(name: unique_name("Parentless Folder"))
     recording = RecordingStudio::Recording.new(root_recording: root_recording, recordable: folder)
 
@@ -85,7 +85,7 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   end
 
   test "page cannot be recorded under another page" do
-    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Invalid Page Workspace")))
+    root_recording = ensure_root_recording!(Workspace.create!(name: unique_name("Invalid Page Workspace")))
     page_recording = record_child(Page.new(title: unique_name("Parent Page")), root_recording, root_recording)
 
     error = assert_raises(RecordingStudio::InvalidParent) do
@@ -95,7 +95,7 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   end
 
   test "AI attribution accepts a root and context from the same recording tree" do
-    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("AI Workspace")))
+    root_recording = ensure_root_recording!(Workspace.create!(name: unique_name("AI Workspace")))
     context_recording = record_child(Folder.new(name: unique_name("AI Folder")), root_recording, root_recording)
 
     attribution = RecordingStudioAI::Contracts::Attribution.new(
@@ -110,9 +110,9 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
 
   test "default attribution check accepts a root uuid and a root recording" do
     configuration = RecordingStudioAI::Configuration.new
-    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Default Root")))
+    root_recording = ensure_root_recording!(Workspace.create!(name: unique_name("Default Root")))
     context_recording = record_child(Folder.new(name: unique_name("Default Folder")), root_recording, root_recording)
-    other_root = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Other Root")))
+    other_root = ensure_root_recording!(Workspace.create!(name: unique_name("Other Root")))
     other_child = record_child(Folder.new(name: unique_name("Other Folder")), other_root, other_root)
     validator = configuration.attribution_validator
     carried = Struct.new(:root_recording_id).new(root_recording.id)
@@ -155,7 +155,7 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   end
 
   test "attribution keeps the loaded root before validation" do
-    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Loaded Root")))
+    root_recording = ensure_root_recording!(Workspace.create!(name: unique_name("Loaded Root")))
     configuration = RecordingStudioAI.configuration
     previous = configuration.attribution_validator
     configuration.attribution_validator = default_attribution_validator(configuration)
@@ -174,7 +174,7 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   test "a host attribution validator still runs on the loaded root" do
     configuration = RecordingStudioAI.configuration
     previous = configuration.attribution_validator
-    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Host Root")))
+    root_recording = ensure_root_recording!(Workspace.create!(name: unique_name("Host Root")))
     seen = nil
     configuration.attribution_validator = lambda do |root_recording:, context_recording:|
       seen = root_recording
@@ -192,7 +192,7 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   end
 
   test "create session with a root uuid saves that root and passes Accessible" do
-    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Session Root")))
+    root_recording = ensure_root_recording!(Workspace.create!(name: unique_name("Session Root")))
     actor = User.create!(email: "member-#{SecureRandom.hex(4)}@example.test", password: "Password123!")
     grant_accessible!(recording: root_recording, actor: actor, role: :edit)
     seen = []
@@ -214,7 +214,7 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   end
 
   test "create session with a root uuid denies an actor without access" do
-    root_recording = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Closed Root")))
+    root_recording = ensure_root_recording!(Workspace.create!(name: unique_name("Closed Root")))
     actor = User.create!(email: "outsider-#{SecureRandom.hex(4)}@example.test", password: "Password123!")
     seen = []
     runs = RecordingStudioAI::Run.count
@@ -238,8 +238,8 @@ class RecordingStudioV3Test < ActiveSupport::TestCase
   end
 
   test "AI attribution rejects a child root and cross-root context" do
-    first_root = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("First AI Workspace")))
-    second_root = RecordingStudio.root_recording_for(Workspace.create!(name: unique_name("Second AI Workspace")))
+    first_root = ensure_root_recording!(Workspace.create!(name: unique_name("First AI Workspace")))
+    second_root = ensure_root_recording!(Workspace.create!(name: unique_name("Second AI Workspace")))
     child = record_child(Folder.new(name: unique_name("Cross-root Folder")), second_root, second_root)
     initiator = User.first || User.create!(email: "ai-#{SecureRandom.hex(4)}@example.test", password: "Password")
 

@@ -7,6 +7,19 @@ module AccessibleTestHelpers
     "admin" => 3
   }.freeze
 
+  def ensure_root_recording!(recordable, actor: nil)
+    writer = actor
+    if writer.nil? && defined?(Current) && Current.actor.is_a?(User) && Current.actor.persisted?
+      writer = Current.actor
+    end
+    writer ||= User.order(:created_at).first
+    writer ||= User.create!(
+      email: "root-writer-#{SecureRandom.hex(4)}@example.com",
+      password: "Password123!"
+    )
+    RecordingStudio.create_root_recording!(recordable, actor: writer)
+  end
+
   def grant_accessible!(recording:, actor:, role:)
     raise ArgumentError, "recording must be persisted" unless recording.respond_to?(:persisted?) && recording.persisted?
     raise ArgumentError, "actor must be persisted" unless actor.respond_to?(:persisted?) && actor.persisted?

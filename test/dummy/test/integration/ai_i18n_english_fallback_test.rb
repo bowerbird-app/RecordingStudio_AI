@@ -25,7 +25,7 @@ class AiI18nEnglishFallbackTest < ActionDispatch::IntegrationTest
   setup do
     @user = User.create!(email: "ai-fallback-#{SecureRandom.hex(4)}@example.com", password: "Password123!")
     workspace = Workspace.create!(name: "AI fallback workspace")
-    @root = RecordingStudio.root_recording_for(workspace)
+    @root = ensure_root_recording!(workspace)
     grant_accessible!(recording: @root, actor: @user, role: :admin)
     sign_in @user
     switch_to_root!(@root, return_to: "/")

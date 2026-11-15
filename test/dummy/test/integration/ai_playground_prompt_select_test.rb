@@ -98,7 +98,7 @@ class AIPlaygroundPromptSelectTest < ActionDispatch::IntegrationTest
   def post_generate!(prompt_key, extra: {})
     user = User.create!(email: "playground-prompt-#{SecureRandom.hex(4)}@example.com", password: "password123")
     workspace = Workspace.create!(name: "Prompt run workspace")
-    root = RecordingStudio.root_recording_for(workspace)
+    root = ensure_root_recording!(workspace)
     grant_accessible!(recording: root, actor: user, role: :edit)
     sign_in user
     switch_to_root!(root)

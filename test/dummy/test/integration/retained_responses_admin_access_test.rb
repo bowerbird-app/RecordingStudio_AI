@@ -8,9 +8,9 @@ class RetainedResponsesAdminAccessTest < ActionDispatch::IntegrationTest
   setup do
     @user = User.create!(email: "retained-#{SecureRandom.hex(4)}@example.com", password: "password123")
     @workspace = Workspace.create!(name: "Retained view workspace")
-    @root_recording = RecordingStudio.root_recording_for(@workspace)
+    @root_recording = ensure_root_recording!(@workspace)
     @other_workspace = Workspace.create!(name: "Retained other workspace")
-    @other_root = RecordingStudio.root_recording_for(@other_workspace)
+    @other_root = ensure_root_recording!(@other_workspace)
   end
 
   test "unauthenticated visitors are sent to sign in" do

@@ -17,7 +17,7 @@ class DummyAccessibleHostHardeningTest < ActionDispatch::IntegrationTest
   test "AI authorization maps Accessible roles instead of always allowing" do
     user = User.create!(email: "ai-auth-#{SecureRandom.hex(4)}@example.com", password: "password123")
     workspace = Workspace.create!(name: "AI auth workspace")
-    root = RecordingStudio.root_recording_for(workspace)
+    root = ensure_root_recording!(workspace)
     grant_accessible!(recording: root, actor: user, role: :view)
 
     attribution = RecordingStudioAI::Contracts::Attribution.new(
@@ -53,7 +53,7 @@ class DummyAccessibleHostHardeningTest < ActionDispatch::IntegrationTest
   test "admin access recording resolver fails closed without grants" do
     user = User.create!(email: "admin-fail-closed-#{SecureRandom.hex(4)}@example.com", password: "password123")
     Workspace.create!(name: "Ungranted admin fallback workspace")
-    RecordingStudio.root_recording_for(Workspace.order(:created_at).last)
+    ensure_root_recording!(Workspace.order(:created_at).last)
 
     context = Struct.new(:current_actor, :controller).new(
       user,
@@ -67,7 +67,7 @@ class DummyAccessibleHostHardeningTest < ActionDispatch::IntegrationTest
     viewer = User.create!(email: "sidekiq-view-#{SecureRandom.hex(4)}@example.com", password: "password123")
     operator = User.create!(email: "sidekiq-admin-#{SecureRandom.hex(4)}@example.com", password: "password123")
     workspace = Workspace.create!(name: "Sidekiq workspace")
-    root = RecordingStudio.root_recording_for(workspace)
+    root = ensure_root_recording!(workspace)
     grant_accessible!(recording: root, actor: viewer, role: :view)
     grant_accessible!(recording: root, actor: operator, role: :admin)
 

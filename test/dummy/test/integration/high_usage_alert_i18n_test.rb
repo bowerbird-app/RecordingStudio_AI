@@ -5,7 +5,7 @@ require "test_helper"
 class HighUsageAlertI18nTest < ActionDispatch::IntegrationTest
   setup do
     workspace = Workspace.create!(name: "High usage workspace")
-    @root = RecordingStudio.root_recording_for(workspace)
+    @root = ensure_root_recording!(workspace)
     @user = User.create!(email: "high-usage-#{SecureRandom.hex(4)}@example.com", password: "Password123!")
   end
 
