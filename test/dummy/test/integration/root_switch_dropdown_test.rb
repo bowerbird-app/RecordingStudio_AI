@@ -23,8 +23,8 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
 
     granted = Workspace.create!(name: "Dropdown Workspace")
     hidden = Workspace.create!(name: "Hidden Workspace")
-    granted_root = RecordingStudio.root_recording_for(granted)
-    RecordingStudio.root_recording_for(hidden)
+    granted_root = ensure_root_recording!(granted)
+    ensure_root_recording!(hidden)
     grant_accessible!(recording: granted_root, actor: user, role: :view)
 
     get "/recording_studio_root_switchable/v1/root_switch?scope=all_workspaces"
@@ -43,7 +43,7 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     sign_in user
 
     workspace = Workspace.create!(name: "Switch Page Workspace")
-    root = RecordingStudio.root_recording_for(workspace)
+    root = ensure_root_recording!(workspace)
     grant_accessible!(recording: root, actor: user, role: :view)
 
     get "/recording_studio_root_switchable/v1/root_switch?scope=all_workspaces"
@@ -66,8 +66,8 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
 
     source_workspace = Workspace.create!(name: "Source Workspace")
     target_workspace = Workspace.create!(name: "Target Workspace")
-    target_root_recording = RecordingStudio.root_recording_for(target_workspace)
-    RecordingStudio.root_recording_for(source_workspace)
+    target_root_recording = ensure_root_recording!(target_workspace)
+    ensure_root_recording!(source_workspace)
     grant_accessible!(recording: target_root_recording, actor: user, role: :view)
 
     switch_to_root!(target_root_recording, return_to: "/")
@@ -85,8 +85,8 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
 
     source_workspace = Workspace.create!(name: "Fallback Source Workspace")
     target_workspace = Workspace.create!(name: "Fallback Target Workspace")
-    target_root_recording = RecordingStudio.root_recording_for(target_workspace)
-    RecordingStudio.root_recording_for(source_workspace)
+    target_root_recording = ensure_root_recording!(target_workspace)
+    ensure_root_recording!(source_workspace)
     grant_accessible!(recording: target_root_recording, actor: user, role: :view)
 
     switch_to_root!(target_root_recording, return_to: "/not-a-real-route")
@@ -99,7 +99,7 @@ class RootSwitchDropdownTest < ActionDispatch::IntegrationTest
     sign_in user
 
     private_workspace = Workspace.create!(name: "Private Switch Workspace")
-    private_root = RecordingStudio.root_recording_for(private_workspace)
+    private_root = ensure_root_recording!(private_workspace)
 
     assert_no_difference -> { RecordingStudio::RootSwitchable::Selection.where(actor: user).count } do
       switch_to_root!(private_root, return_to: "/")

@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.21.3", RecordingStudioAI::VERSION
+    assert_equal "0.22.0", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -57,9 +57,9 @@ class RecordingStudioAITest < Minitest::Test
       recording_studio recording_studio_logs recording_studio_metrics
     ]
     assert_equal expected, dependencies.keys.sort
-    assert_equal ">= 0.3.0, < 1.0", dependencies.fetch("recording_studio_metrics").to_s
-    assert_equal ">= 0.4.1, < 1.0", dependencies.fetch("recording_studio_logs").to_s
-    assert_equal ">= 6.1.0", dependencies.fetch("recording_studio").to_s
+    assert_equal ">= 0.9.0, < 1.0", dependencies.fetch("recording_studio_metrics").to_s
+    assert_equal ">= 0.8.0, < 1.0", dependencies.fetch("recording_studio_logs").to_s
+    assert_equal ">= 7.0, < 8.0", dependencies.fetch("recording_studio").to_s
     assert_equal ">= 0.1.315", dependencies.fetch("flat_pack").to_s
     assert_equal "~> 0.103", dependencies.fetch("openai").to_s
     refute_includes dependencies.keys, "recording_studio_accessible"
@@ -68,9 +68,9 @@ class RecordingStudioAITest < Minitest::Test
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.expand_path("../#{path}", __dir__))
       assert_includes contents, "RecordingStudio_logs", path
-      assert_includes contents, 'tag: "v0.7.4"', path
       assert_includes contents, 'tag: "v0.8.0"', path
-      assert_includes contents, 'tag: "v6.7.0"', path
+      assert_includes contents, 'tag: "v0.9.0"', path
+      assert_includes contents, 'tag: "v7.0.0"', path
       assert_includes contents, 'tag: "v0.1.356"', path
       assert_includes contents, 'gem "view_component", "4.19.0"', path
     end

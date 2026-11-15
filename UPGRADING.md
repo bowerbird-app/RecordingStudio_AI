@@ -1,5 +1,17 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.22.0
+
+Recording Studio AI requires Recording Studio 7. `root_recording_for` only finds a root. Creating a root goes through `create_root_recording!`, which authorizes with `root_recording` nil. Logs 0.8.0 and Metrics 0.9.0 are the matching runtime floors. There is no RecordingStudioAI migration. Copy Recording Studio's events migration so `recording_studio_events.root_recording_id` exists before events are written.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.22.0`, Recording Studio `>= 7.0`, `< 8.0`, Logs `>= 0.8.0`, `< 1.0`, and Metrics `>= 0.9.0`, `< 1.0`.
+2. Replace lookup calls that created a missing root with `RecordingStudio.create_root_recording!(recordable, actor:)`. Leave real lookups on `root_recording_for` and handle `nil`.
+3. Set `config.authorize_write`. Allow a create when `root_recording` is nil. Do not set `allow_unauthorized_writes`.
+4. Run `bin/rails recording_studio:install:migrations` if the host is missing `20261114090000` (`root_recording_id` on events), then `bin/rails db:migrate`.
+5. Point site-wide AI metrics at `RecordingStudioAccessible.configuration.admin_root_resolver`. `RecordingStudioAI::Api::Access` calls `RecordingStudioAccessible.admin_root`. `RecordingStudioAdmin.configuration.site_admin_recording_resolver` is gone.
+
 ## Upgrading to 0.21.3
 
 Admin warning rows count expensive models on SQLite as well as Postgres. Date-time values in admin date normalization become dates. The oldest-stuck-age metric accepts the string timestamps SQLite returns.

@@ -17,7 +17,7 @@ class RecordingTreePageTest < ActionDispatch::IntegrationTest
     sign_in user
 
     workspace = Workspace.create!(name: "Tree Workspace")
-    root_recording = RecordingStudio.root_recording_for(workspace)
+    root_recording = ensure_root_recording!(workspace)
     grant_accessible!(recording: root_recording, actor: user, role: :view)
 
     switch_to_root!(root_recording, return_to: "/recording_tree")

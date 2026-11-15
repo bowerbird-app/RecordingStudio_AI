@@ -11,7 +11,7 @@ class AICallLogsTest < ActiveSupport::TestCase
       password_confirmation: "Password"
     )
     @workspace = Workspace.create!(name: "AI logs #{SecureRandom.hex(4)}")
-    @root = RecordingStudio.root_recording_for(@workspace)
+    @root = ensure_root_recording!(@workspace)
   end
 
   test "Metrics still reads raw runs" do

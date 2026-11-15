@@ -21,19 +21,22 @@ class AIMetricsTest < ActiveSupport::TestCase
     )
     Current.actor = @staff
     @workspace = Workspace.create!(name: "Metrics #{SecureRandom.hex(4)}")
-    @root = RecordingStudio.root_recording_for(@workspace)
-    @admin_root = RecordingStudio.root_recording_for(Workspace.find_or_create_by!(name: "Admin"))
+    @root = ensure_root_recording!(@workspace)
+    @admin_root = ensure_root_recording!(Workspace.find_or_create_by!(name: "Admin"))
     AdminRoot.find_or_create_by!(name: "Admin")
     grant!(@admin_root, @staff, :admin)
     bootstrap_owner!(@root, @staff)
     @original_resolver = RecordingStudioAdmin.configuration.access_recording_resolver
+    @original_admin_root_resolver = RecordingStudioAccessible.configuration.admin_root_resolver
     RecordingStudioAdmin.configuration.access_recording_resolver = ->(_context) { @admin_root }
+    RecordingStudioAccessible.configuration.admin_root_resolver = -> { @admin_root }
     seed_runs!
     Current.actor = nil
   end
 
   teardown do
     RecordingStudioAdmin.configuration.access_recording_resolver = @original_resolver
+    RecordingStudioAccessible.configuration.admin_root_resolver = @original_admin_root_resolver
     Current.actor = nil
   end
 

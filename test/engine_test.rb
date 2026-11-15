@@ -19,6 +19,6 @@ class EngineTest < Minitest::Test
 
   def test_recording_studio_dependency_is_loaded
     assert defined?(RecordingStudio)
-    assert_operator RecordingStudio::VERSION, :>=, "4.6.0"
+    assert_operator Gem::Version.new(RecordingStudio::VERSION), :>=, Gem::Version.new("7.0.0")
   end
 end

@@ -9,7 +9,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
   setup do
     @user = User.create!(email: "admin-surface-#{SecureRandom.hex(4)}@example.com", password: "password123")
     workspace = Workspace.create!(name: "Admin surface workspace")
-    @root_recording = RecordingStudio.root_recording_for(workspace)
+    @root_recording = ensure_root_recording!(workspace)
     @original_access_recording_resolver = RecordingStudioAdmin.configuration.access_recording_resolver
     @original_required_access_role = RecordingStudioAdmin.configuration.required_access_role
     @original_access_management_authorizer = RecordingStudioAccessible.configuration.access_management_authorizer
@@ -840,7 +840,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
 
   test "provider batches table matches the site-wide by_status chart" do
     authenticate_for_admin!
-    other_root = RecordingStudio.root_recording_for(Workspace.create!(name: "Other #{SecureRandom.hex(4)}"))
+    other_root = ensure_root_recording!(Workspace.create!(name: "Other #{SecureRandom.hex(4)}"))
     RecordingStudioAI::Batch.create!(
       status: "failed",
       provider: "openai",
@@ -873,7 +873,7 @@ class RecordingStudioAdminIntegrationTest < ActionDispatch::IntegrationTest
     authenticate_for_admin!
     range = AdminScreens::RecordingStudioAIWidgets.trailing_weeks_range(weeks_back: 4)
     before = RecordingStudioAI::Run.where(created_at: range).count
-    other_root = RecordingStudio.root_recording_for(Workspace.create!(name: "Other #{SecureRandom.hex(4)}"))
+    other_root = ensure_root_recording!(Workspace.create!(name: "Other #{SecureRandom.hex(4)}"))
     RecordingStudioAI::Run.create!(
       operation: "generation",
       status: "completed",

@@ -180,8 +180,8 @@ class LibraryGapCoverageTest < RecordingStudioAI::Test::PersistenceCase
     assert_operator total, :>=, 1
   end
 
-  def test_admin_root_recording_is_nil_without_the_admin_constant
-    without_constant(:RecordingStudioAdmin) do
+  def test_admin_root_recording_is_nil_without_accessible
+    without_constant(:RecordingStudioAccessible) do
       assert_nil RecordingStudioAI::Api::Access.admin_root_recording
       refute RecordingStudioAI::Api::Access.can_view?(nil)
       refute RecordingStudioAI::Api::Access.can_view?(access_context(nil))
@@ -189,42 +189,43 @@ class LibraryGapCoverageTest < RecordingStudioAI::Test::PersistenceCase
     end
   end
 
-  def test_admin_root_recording_resolver_nil_raise_and_value
+  def test_admin_root_recording_follows_accessible_admin_root
     recording = Object.new
-    with_admin_configuration do |config|
-      config.site_admin_recording_resolver = nil
-      config.access_recording_resolver = nil
-      assert_nil RecordingStudioAI::Api::Access.admin_root_recording
+    seen = nil
+    install_accessible_double
+    RecordingStudioAccessible.define_singleton_method(:admin_root) { |**| nil }
+    assert_nil RecordingStudioAI::Api::Access.admin_root_recording
 
-      config.access_recording_resolver = ->(_context) { recording }
-      assert_same recording, RecordingStudioAI::Api::Access.admin_root_recording
-
-      config.site_admin_recording_resolver = ->(_context) { raise StandardError, "resolver failed" }
-      assert_nil RecordingStudioAI::Api::Access.admin_root_recording
-
-      config.site_admin_recording_resolver = lambda { |context|
-        recording if context.is_a?(RecordingStudioAI::Api::Access::ResolverContext) && context.controller.nil?
-      }
-      assert_same recording, RecordingStudioAI::Api::Access.admin_root_recording
+    RecordingStudioAccessible.define_singleton_method(:admin_root) do |context:|
+      seen = context
+      raise StandardError, "resolver failed"
     end
+    assert_nil RecordingStudioAI::Api::Access.admin_root_recording
+    assert_equal({}, seen)
+
+    RecordingStudioAccessible.define_singleton_method(:admin_root) do |context:|
+      recording if context == {}
+    end
+    assert_same recording, RecordingStudioAI::Api::Access.admin_root_recording
+  ensure
+    remove_accessible_double
   end
 
   def test_can_view_is_false_without_an_actor_or_accessible
     recording = Object.new
     actor = Object.new
-    with_admin_configuration do |config|
-      config.site_admin_recording_resolver = ->(_context) { recording }
-      refute RecordingStudioAI::Api::Access.can_view?(access_context(nil))
-      refute RecordingStudioAI::Api::Access.authorized_on_admin_root?(access_context(nil), :view)
-
-      without_constant(:RecordingStudioAccessible) do
-        refute RecordingStudioAI::Api::Access.can_view?(access_context(actor))
-        install_accessible_double
-        assert RecordingStudioAI::Api::Access.can_view?(access_context(actor))
-        refute RecordingStudioAI::Api::Access.authorized_on_admin_root?(access_context(actor), :edit)
-        remove_accessible_double
-      end
+    without_constant(:RecordingStudioAccessible) do
+      refute RecordingStudioAI::Api::Access.can_view?(access_context(actor))
+      refute RecordingStudioAI::Api::Access.authorized_on_admin_root?(access_context(actor), :view)
     end
+
+    install_accessible_double(admin_root: recording)
+    refute RecordingStudioAI::Api::Access.can_view?(access_context(nil))
+    refute RecordingStudioAI::Api::Access.authorized_on_admin_root?(access_context(nil), :view)
+    assert RecordingStudioAI::Api::Access.can_view?(access_context(actor))
+    refute RecordingStudioAI::Api::Access.authorized_on_admin_root?(access_context(actor), :edit)
+  ensure
+    remove_accessible_double
   end
 
   def test_discover_providers_registers_each_missing_subclass_once
@@ -695,44 +696,9 @@ class LibraryGapCoverageTest < RecordingStudioAI::Test::PersistenceCase
     Object.const_set(name, value) if hidden && !Object.const_defined?(name, false)
   end
 
-  def with_admin_configuration(&)
-    if admin_configuration_present?
-      yield_existing_admin(&)
-    else
-      without_constant(:RecordingStudioAdmin) { yield_temporary_admin(&) }
-    end
-  end
-
-  def admin_configuration_present?
-    Object.const_defined?(:RecordingStudioAdmin, false) &&
-      RecordingStudioAdmin.respond_to?(:configuration) &&
-      !RecordingStudioAdmin.configuration.nil?
-  end
-
-  def yield_existing_admin
-    config = RecordingStudioAdmin.configuration
-    original_site = config.site_admin_recording_resolver
-    original_access = config.access_recording_resolver
-    yield config
-  ensure
-    if config
-      config.site_admin_recording_resolver = original_site
-      config.access_recording_resolver = original_access
-    end
-  end
-
-  def yield_temporary_admin
-    config = Struct.new(:site_admin_recording_resolver, :access_recording_resolver).new
-    admin = Module.new
-    admin.define_singleton_method(:configuration) { config }
-    Object.const_set(:RecordingStudioAdmin, admin)
-    yield config
-  ensure
-    Object.send(:remove_const, :RecordingStudioAdmin) if Object.const_defined?(:RecordingStudioAdmin, false)
-  end
-
-  def install_accessible_double
+  def install_accessible_double(admin_root: nil)
     accessible = Module.new
+    accessible.define_singleton_method(:admin_root) { |context: {}| context == {} ? admin_root : nil }
     accessible.define_singleton_method(:authorized?) do |actor:, recording:, role:|
       !actor.nil? && !recording.nil? && role == :view
     end

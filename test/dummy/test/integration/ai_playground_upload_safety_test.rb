@@ -87,7 +87,7 @@ class AIPlaygroundUploadSafetyTest < ActionDispatch::IntegrationTest
   def sign_in_playground_editor!
     user = User.create!(email: "playground-upload-#{SecureRandom.hex(4)}@example.com", password: "password123")
     workspace = Workspace.create!(name: "Upload playground workspace")
-    root = RecordingStudio.root_recording_for(workspace)
+    root = ensure_root_recording!(workspace)
     grant_accessible!(recording: root, actor: user, role: :edit)
     sign_in user
     switch_to_root!(root)
