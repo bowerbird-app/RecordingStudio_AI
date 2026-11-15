@@ -14,7 +14,7 @@ Versioning and Keep a Changelog.
 - Dummy pins that rejected core 7 move to Accessible `v0.43.1`, Trashable `v0.17.0`, Root Switchable `v0.15.1`, and Admin `v2.16.0`. Cache stays `v0.6.3`.
 - The dummy `authorize_write` allows a write when an actor is present, including a new root where `root_recording` is nil. It does not set `allow_unauthorized_writes`.
 - Dummy seeds and tests that created a workspace root with `root_recording_for` call `create_root_recording!`. Seeds find kept children with `Recording.kept`.
-- Dummy events store `root_recording_id`.
+- Dummy events store `root_recording_id`. Dummy lockfile updates `msgpack` to `1.8.7` and `puma` to `8.1.0`.
 - `RecordingStudioAI::Api::Access` reads `RecordingStudioAccessible.admin_root`. Admin no longer has `site_admin_recording_resolver`.
 
 ### Upgrade notes
