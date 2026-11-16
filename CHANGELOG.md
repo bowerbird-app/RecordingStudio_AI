@@ -5,6 +5,10 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+### Changed
+- Development pins move to Recording Studio `v7.3.0` and Flatpack `v0.1.377`. Logs stays `v0.8.0`. Metrics stays `v0.9.0`.
+- Dummy pins move to Accessible `v0.45.1`, Admin `v2.18.0`, Trashable `v1.0.1`, Root Switchable `v0.16.0`, and Cache `v0.7.0`.
+
 ## [0.22.0] - 2026-11-15
 
 ### Changed

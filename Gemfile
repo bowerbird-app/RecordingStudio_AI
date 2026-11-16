@@ -6,10 +6,10 @@ source "https://rubygems.org"
 # from GitHub. The runtime constraint is declared in the gemspec.
 gem "recording_studio",
     github: "bowerbird-app/RecordingStudio",
-    tag: "v7.0.0"
+    tag: "v7.3.0"
 gem "flat_pack",
     github: "bowerbird-app/flatpack",
-    tag: "v0.1.356"
+    tag: "v0.1.377"
 gem "view_component", "4.19.0"
 gem "recording_studio_logs",
     github: "bowerbird-app/RecordingStudio_logs",
