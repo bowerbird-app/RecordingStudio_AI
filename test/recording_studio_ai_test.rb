@@ -70,8 +70,8 @@ class RecordingStudioAITest < Minitest::Test
       assert_includes contents, "RecordingStudio_logs", path
       assert_includes contents, 'tag: "v0.8.0"', path
       assert_includes contents, 'tag: "v0.9.0"', path
-      assert_includes contents, 'tag: "v7.0.0"', path
-      assert_includes contents, 'tag: "v0.1.356"', path
+      assert_includes contents, 'tag: "v7.3.0"', path
+      assert_includes contents, 'tag: "v0.1.377"', path
       assert_includes contents, 'gem "view_component", "4.19.0"', path
     end
   end
