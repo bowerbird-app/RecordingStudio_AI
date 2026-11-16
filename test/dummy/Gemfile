@@ -10,7 +10,7 @@ gem "recording_studio_accessible", github: "bowerbird-app/RecordingStudio_access
 gem "recording_studio_admin", github: "bowerbird-app/RecordingStudio_admin", tag: "v2.18.0"
 # Admin query helpers only (Trashable gemspec still lists Metrics for Bundler).
 gem "recording_studio_trashable", github: "bowerbird-app/RecordingStudio_trashable",
-                                  tag: "v1.0.0", require: false
+                                  tag: "v1.0.1", require: false
 
 # Host registers Metrics definitions. AI does not depend on RecordingStudio API.
 gem "recording_studio_logs", github: "bowerbird-app/RecordingStudio_logs", tag: "v0.8.0"
