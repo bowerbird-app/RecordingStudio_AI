@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.23.0
+
+Development and test warn at boot when the host has not copied a Recording Studio AI migration. The check compares migration names, so an `install:migrations` copy with a new timestamp (`<timestamp>_<name>.recording_studio_ai.rb`) counts as installed. Production boot does not read `db/migrate` and does not warn or raise. This release adds no migration.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.23.0`.
+2. When development or test warns, run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`.
+3. Leave `config.raise_on_missing_migrations` unset to warn. Set it to `true` in test when a missing migration should fail the process. `bin/rails recording_studio_ai:check_migrations` prints the result and exits non-zero in any environment.
+
 ## Upgrading to 0.22.0
 
 Recording Studio AI requires Recording Studio 7. `root_recording_for` only finds a root. Creating a root goes through `create_root_recording!`, which authorizes with `root_recording` nil. Logs 0.8.0 and Metrics 0.9.0 are the matching runtime floors. There is no RecordingStudioAI migration. Copy Recording Studio's events migration so `recording_studio_events.root_recording_id` exists before events are written.

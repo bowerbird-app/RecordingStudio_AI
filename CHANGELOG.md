@@ -5,9 +5,20 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-17
+
+### Added
+- Development and test warn at boot when the host app is missing a Recording Studio AI migration. The check matches the migration name, including an `install:migrations` copy named `<timestamp>_<name>.recording_studio_ai.rb`. Production boot does not check.
+- `config.raise_on_missing_migrations` (default `false`) raises instead of warning. Use it in test or CI.
+- `bin/rails recording_studio_ai:check_migrations` prints missing migrations and the copy command, and exits non-zero when any are missing.
+
 ### Changed
 - Development pins move to Recording Studio `v7.3.0` and Flatpack `v0.1.377`. Logs stays `v0.8.0`. Metrics stays `v0.9.0`.
 - Dummy pins move to Accessible `v0.45.1`, Admin `v2.18.0`, Trashable `v1.0.1`, Root Switchable `v0.16.0`, and Cache `v0.7.0`.
+
+### Upgrade notes
+- Bump to `0.23.0`. No migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0230).
+- A missing copy warns in development and test. Run `bin/rails recording_studio_ai:install:migrations` and `bin/rails db:migrate`. Set `config.raise_on_missing_migrations = true` in test when that should fail the process.
 
 ## [0.22.0] - 2026-11-15
 
@@ -1230,7 +1241,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.3...v0.22.0
 [0.21.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.2...v0.21.3
 [0.21.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.1...v0.21.2

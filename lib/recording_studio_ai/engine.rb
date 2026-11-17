@@ -29,5 +29,9 @@ module RecordingStudioAI
       require "recording_studio_ai/admin_screens"
       AdminScreens.register!
     end
+
+    initializer "recording_studio_ai.missing_migrations" do |app|
+      MissingMigrations.watch(app)
+    end
   end
 end
