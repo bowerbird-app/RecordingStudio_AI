@@ -67,7 +67,8 @@ module RecordingStudioAI
       :typesafe_api_key,
       :typesafe_client,
       :usage_handler,
-      :usage_precheck
+      :usage_precheck,
+      :raise_on_missing_migrations
     )
     attr_reader :layout
 
@@ -190,6 +191,7 @@ module RecordingStudioAI
       @total_execution_timeout = 300
       @typesafe_api_key = ENV.fetch("TYPESAFE_API_KEY", nil)
       @typesafe_client = nil
+      @raise_on_missing_migrations = false
     end
 
     def validate!

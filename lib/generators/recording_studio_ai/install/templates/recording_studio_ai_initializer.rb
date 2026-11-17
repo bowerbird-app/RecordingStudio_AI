@@ -145,4 +145,7 @@ RecordingStudioAI.configure do |config|
   config.total_execution_timeout = 300
   config.request_timeout = 120
   config.stream_idle_timeout = 30
+  # Development and test warn when a migration from this gem is not in db/migrate.
+  # Production does not check. Uncomment to raise in test or CI.
+  # config.raise_on_missing_migrations = true
 end

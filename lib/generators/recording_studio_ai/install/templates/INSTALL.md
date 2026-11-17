@@ -23,6 +23,8 @@ bin/rails recording_studio_ai:install:migrations
 bin/rails db:migrate
 ```
 
+Development and test warn at boot when a copied migration is missing. Production does not check. `bin/rails recording_studio_ai:check_migrations` prints that result and exits non-zero when a migration is missing. Set `config.raise_on_missing_migrations = true` to raise instead of warning in test or CI.
+
 Profiles select configured OpenAI and Gemini candidates by capability. The
 OpenAI SDK is installed with the addon; Gemini uses the provider's REST API.
 Provider overrides remain disabled unless explicitly enabled in the initializer.

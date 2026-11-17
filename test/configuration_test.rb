@@ -17,6 +17,7 @@ class ConfigurationTest < Minitest::Test
     configuration = RecordingStudioAI::Configuration.new
 
     assert_equal :medium, configuration.default_profile
+    refute configuration.raise_on_missing_migrations
     assert_equal false, configuration.retain_responses
     assert_equal 7.days, configuration.response_retention_period
     assert_equal 1_048_576, configuration.maximum_retained_response_size

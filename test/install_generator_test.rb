@@ -93,6 +93,7 @@ class InstallGeneratorTest < Minitest::Test
       refute_includes initializer, "config.admin_visible_roots_resolver"
       refute_includes initializer, "config.admin_layout"
       assert_includes initializer, "config.attribution_validator"
+      assert_includes initializer, "config.raise_on_missing_migrations = true"
     end
   end
 
@@ -101,6 +102,8 @@ class InstallGeneratorTest < Minitest::Test
 
     assert_includes install_guide, "Confirm Recording Studio is configured"
     assert_includes install_guide, "recording_studio_ai:install:migrations"
+    assert_includes install_guide, "recording_studio_ai:check_migrations"
+    assert_includes install_guide, "raise_on_missing_migrations"
     assert_includes install_guide, "recording_studio_logs:migrations"
     assert_includes install_guide, "bin/rails db:migrate"
     assert_includes install_guide, "Configure at least one OpenAI or Gemini credential"
