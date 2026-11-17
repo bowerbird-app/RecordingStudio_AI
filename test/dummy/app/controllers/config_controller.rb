@@ -445,6 +445,13 @@ class ConfigController < ApplicationController
       accepted_values: "nil, false, a layout name, or a callable that takes controller:",
       default: "nil",
       explanation: "Saved-reply layout. nil follows RecordingStudio.configuration.layout, then recording_studio/default_layout."
+    },
+    {
+      key: "raise_on_missing_migrations",
+      required: "No",
+      accepted_values: "true or false",
+      default: "false",
+      explanation: "Development and test warn when a migration from this gem is not in db/migrate. true raises instead. Production never checks."
     }
   ].freeze
 
@@ -586,6 +593,9 @@ class ConfigController < ApplicationController
 
       # Saved replies. nil follows RecordingStudio.configuration.layout.
       config.layout = nil
+
+      # Development and test warn when a copied migration is missing. Production does not check.
+      config.raise_on_missing_migrations = false
     end
   RUBY
 
