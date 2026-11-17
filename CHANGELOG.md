@@ -5,6 +5,15 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-17
+
+### Added
+- `RecordingStudioAI::Errors::UsageDeclined` subclasses `ContractValidationError` and uses code `usage_declined`. A `usage_precheck` that returns anything other than `true` raises it before the provider runs. An error raised by the pre-check still propagates as that error. A rescue of `ContractValidationError` still catches a decline. The caller's prompt or session message stays unpersisted.
+
+### Upgrade notes
+- Bump to `0.24.0`. No migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0240).
+- Rescue `UsageDeclined`, or read `error.code` `usage_declined`, when a host needs to tell an out-of-credits decline from other contract errors.
+
 ## [0.23.0] - 2026-11-17
 
 ### Added
@@ -1241,7 +1250,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.3...v0.22.0
 [0.21.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.2...v0.21.3

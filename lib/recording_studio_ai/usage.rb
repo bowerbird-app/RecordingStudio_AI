@@ -3,7 +3,7 @@
 module RecordingStudioAI
   module Usage
     DECLINED_CATEGORY = "usage"
-    DECLINED_CODE = "usage_declined"
+    DECLINED_CODE = Errors::UsageDeclined::CODE
     MESSAGE_LIMIT = 255
 
     module_function
@@ -16,7 +16,7 @@ module RecordingStudioAI
       minimum = RecordingStudioAI.configuration.minimum_credit_balance
       return if checker.call(attribution: attribution, minimum: minimum) == true
 
-      request_error!("Not enough credits for this call.")
+      raise Errors::UsageDeclined
     end
 
     def charge_attempt!(attempt:, result:, request:, operation:)

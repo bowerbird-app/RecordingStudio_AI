@@ -231,7 +231,7 @@ Set `usage_handler` to bill. Boot then requires `usage_precheck` and a global `"
 
 Lookup for each kind is the exact model, then that provider's `"*"`, then the global `"*"`. A registered prompt or tool can add `credit_fee:` and `credit_multiplier:` on top of that price.
 
-Before each provider attempt the pre-check asks whether the account holds at least `minimum_credit_balance` credits. Return `true` to continue. Any other result, including a raised error, fails that attempt before the provider runs. The attempt and the run are recorded as `usage` / `usage_declined`, and no later retry or fallback starts.
+Before each provider attempt the pre-check asks whether the account holds at least `minimum_credit_balance` credits. Return `true` to continue. Any other result raises `RecordingStudioAI::Errors::UsageDeclined` with code `usage_declined`. That class is a `ContractValidationError`, so a rescue of `ContractValidationError` still catches it. An error the pre-check itself raises propagates unchanged. Either way the attempt and the run are recorded as `usage` / `usage_declined`, the provider is not called, and no later retry or fallback starts. The caller's prompt or session message is not stored.
 
 After the attempt, including a retry, a fallback, or a failed attempt that still reported usage, the gem rounds the exact credits up once to a whole number. Any reported usage costs at least 1. The handler is called once with that total, a breakdown, and an idempotency key. The breakdown names the provider, model, counts, rates, extras, and prompt or tool keys. It does not include prompts, inputs, or outputs. The same attempt repeats `ai-attempt:<attempt id>`, so the host does not charge it twice.
 

@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.24.0
+
+A `usage_precheck` that returns anything other than `true` raises `RecordingStudioAI::Errors::UsageDeclined`. Its `code` is `usage_declined`. It is a `ContractValidationError`, so an existing rescue of that class still catches the decline. Rescue `UsageDeclined`, or compare `error.code`, when the host needs to show an out-of-credits state. An error raised inside the pre-check still propagates as that error. The attempt, run, batch, and hosted-agent run are still recorded as `usage` / `usage_declined`. The caller's prompt or session message is not stored.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.24.0`. No migration and no config change.
+2. Leave rescues of `ContractValidationError` in place. Add a `UsageDeclined` rescue where the screen should tell a credit decline from other contract errors.
+
 ## Upgrading to 0.23.0
 
 Development and test warn at boot when the host has not copied a Recording Studio AI migration. The check compares migration names, so an `install:migrations` copy with a new timestamp (`<timestamp>_<name>.recording_studio_ai.rb`) counts as installed. Production boot does not read `db/migrate` and does not warn or raise. This release adds no migration.

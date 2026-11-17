@@ -550,6 +550,35 @@ class LibraryGapCoverageTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal({ "count" => 3, "label" => "note" }, definition.validate_arguments!("count" => 3))
   end
 
+  def test_hosted_agent_precheck_decline_raises_usage_declined_without_persisting_the_message
+    message = "private session note that stays live"
+    adapter = install_hosted_adapter
+    RecordingStudioAI.configuration.usage_handler = ->(**) { flunk "handler must not run" }
+    RecordingStudioAI.configuration.credit_prices = { "*" => { input: 1 } }
+    RecordingStudioAI.configuration.usage_precheck = ->(**) { false }
+
+    error = assert_raises(RecordingStudioAI::Errors::UsageDeclined) do
+      RecordingStudioAI::Agents.create_session(
+        instructions: "Be brief.",
+        input: message,
+        idempotency_key: "gap-declined-1",
+        purpose: "agent_chat",
+        profile: :low,
+        root_recording: @root,
+        initiator: @initiator
+      )
+    end
+    run = RecordingStudioAI::Run.sole
+
+    assert_equal "usage_declined", error.code
+    assert_kind_of RecordingStudioAI::Errors::ContractValidationError, error
+    assert_empty adapter.creates
+    assert_equal "failed", run.status
+    assert_equal RecordingStudioAI::Usage::DECLINED_CODE, run.error_code
+    refute_includes run.attributes.inspect, message
+    refute_includes run.error_message.to_s, message
+  end
+
   def test_hosted_agent_precheck_refusal_fails_the_run_without_calling_the_provider
     adapter = install_hosted_adapter
     RecordingStudioAI.configuration.usage_handler = ->(**) { flunk "handler must not run" }
