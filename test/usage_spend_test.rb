@@ -267,6 +267,8 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
 
     error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { generate }
 
+    assert_instance_of RecordingStudioAI::Errors::UsageDeclined, error
+    assert_equal "usage_declined", error.code
     assert_equal "Not enough credits for this call.", error.message
     assert_equal 1, first.calls.length
     assert_empty second.calls
@@ -450,18 +452,49 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal attempt_ids.map { |id| "ai-attempt:#{id}" }, keys
   end
 
-  def test_precheck_false_blocks_the_provider
+  def test_precheck_true_still_reaches_the_provider
+    order = []
+    assign_meter([])
+    RecordingStudioAI.configuration.usage_precheck = lambda do |**|
+      order << :precheck
+      true
+    end
+    RecordingStudioAI.configuration.usage_handler = ->(**) { order << :handler }
+    provider = QueueProvider.new(success_result("Done", usage: usage(1, 0)))
+    provider.on_call = -> { order << :provider }
+    configure_single_candidate(:medium, :first, provider)
+
+    response = generate
+
+    assert_predicate response, :success?
+    assert_equal "Done", response.text
+    assert_equal %i[precheck provider handler], order
+    assert_nil RecordingStudioAI::Run.sole.error_code
+    assert_nil RecordingStudioAI::Usage.precheck!(attribution: Object.new)
+  end
+
+  def test_precheck_false_raises_usage_declined_and_does_not_persist_the_message
+    prompt = "declined-live-only-prompt"
     provider = QueueProvider.new(success_result("must not run"))
     configure_single_candidate(:medium, :first, provider)
+    RecordingStudioAI.configuration.retain_responses = true
     assign_meter([])
     RecordingStudioAI.configuration.usage_precheck = ->(**) { false }
     RecordingStudioAI.configuration.usage_handler = ->(**) { raise "handler must not run" }
 
-    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { generate }
+    error = assert_raises(RecordingStudioAI::Errors::UsageDeclined) { generate(prompt: prompt) }
 
+    assert_equal "usage_declined", error.code
     assert_equal "Not enough credits for this call.", error.message
+    assert_kind_of RecordingStudioAI::Errors::ContractValidationError, error
     assert_empty provider.calls
-    assert_equal "usage_declined", RecordingStudioAI::Attempt.sole.error_code
+    attempt = RecordingStudioAI::Attempt.sole
+    assert_equal "usage_declined", attempt.error_code
+    assert_equal "usage", attempt.error_category
+    assert_equal 0, RecordingStudioAI::Response.count
+    stored = recording_studio_ai_rows.join("\n")
+    refute_includes stored, prompt
+    refute_includes stored, "must not run"
   end
 
   def test_missing_attempt_id_is_rejected_before_the_handler
@@ -595,6 +628,13 @@ class UsageSpendTest < RecordingStudioAI::Test::PersistenceCase
     configuration.profiles[profile] = [
       { provider: provider_key, model: "#{provider_key}-model", capabilities: capabilities }
     ]
+  end
+
+  def recording_studio_ai_rows
+    connection = ActiveRecord::Base.connection
+    connection.tables.grep(/\Arecording_studio_ai_/).flat_map do |table|
+      connection.select_all("SELECT * FROM #{connection.quote_table_name(table)}").rows.flatten
+    end.map(&:to_s)
   end
 
   def assign_meter(bucket, precheck: ->(**) { true })

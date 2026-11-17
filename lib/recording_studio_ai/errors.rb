@@ -22,6 +22,14 @@ module RecordingStudioAI
       end
     end
 
+    class UsageDeclined < ContractValidationError
+      CODE = "usage_declined"
+
+      def initialize(message = "Not enough credits for this call.", details: {})
+        super(message, code: CODE, details: details)
+      end
+    end
+
     class ExecutionError < StandardError
       attr_reader :response
 
