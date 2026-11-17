@@ -1,5 +1,16 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.24.1
+
+Development pins move to Recording Studio `v7.7.0`, Logs `v0.8.1`, and Metrics `v0.9.1`. The dummy app also moves Accessible to `v0.48.0` and Trashable to `v1.0.2`. Gemspec ranges are unchanged. Flatpack stays `v0.1.377`. `view_component` stays `4.19.0`.
+
+Recording Studio 7.4, 7.5, and 7.7 migrations are intentionally not copied into the dummy app. This release adds no RecordingStudioAI migration.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.24.1`. No migration and no config change.
+2. Hosts that pin these git tags move to the tags above. Hosts on the gemspec ranges can stay there.
+
 ## Upgrading to 0.24.0
 
 A `usage_precheck` that returns anything other than `true` raises `RecordingStudioAI::Errors::UsageDeclined`. Its `code` is `usage_declined`. It is a `ContractValidationError`, so an existing rescue of that class still catches the decline. Rescue `UsageDeclined`, or compare `error.code`, when the host needs to show an out-of-credits state. An error raised inside the pre-check still propagates as that error. The attempt, run, batch, and hosted-agent run are still recorded as `usage` / `usage_declined`. The caller's prompt or session message is not stored.

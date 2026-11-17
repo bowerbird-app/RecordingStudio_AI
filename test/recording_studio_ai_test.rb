@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.24.0", RecordingStudioAI::VERSION
+    assert_equal "0.24.1", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -68,12 +68,16 @@ class RecordingStudioAITest < Minitest::Test
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.expand_path("../#{path}", __dir__))
       assert_includes contents, "RecordingStudio_logs", path
-      assert_includes contents, 'tag: "v0.8.0"', path
-      assert_includes contents, 'tag: "v0.9.0"', path
-      assert_includes contents, 'tag: "v7.3.0"', path
+      assert_includes contents, 'tag: "v0.8.1"', path
+      assert_includes contents, 'tag: "v0.9.1"', path
+      assert_includes contents, 'tag: "v7.7.0"', path
       assert_includes contents, 'tag: "v0.1.377"', path
       assert_includes contents, 'gem "view_component", "4.19.0"', path
     end
+
+    dummy_gemfile = File.read(File.expand_path("../test/dummy/Gemfile", __dir__))
+    assert_includes dummy_gemfile, 'tag: "v0.48.0"'
+    assert_includes dummy_gemfile, 'tag: "v1.0.2"'
   end
 
   def test_phase_six_ships_concrete_providers_without_example_surfaces

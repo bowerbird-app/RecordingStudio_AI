@@ -5,6 +5,16 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-11-17
+
+### Changed
+- Development pins move to Recording Studio `v7.7.0`, Logs `v0.8.1`, and Metrics `v0.9.1`. Flatpack stays `v0.1.377`. `view_component` stays `4.19.0`.
+- Dummy pins move to Accessible `v0.48.0` and Trashable `v1.0.2`. Admin `v2.18.0`, Cache `v0.7.0`, and Root Switchable `v0.16.0` stay put.
+
+### Upgrade notes
+- Bump to `0.24.1`. Gemspec ranges are unchanged. No RecordingStudioAI migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0241).
+- Recording Studio 7.4, 7.5, and 7.7 migrations are intentionally not copied into the dummy app.
+
 ## [0.24.0] - 2026-11-17
 
 ### Added
@@ -1250,7 +1260,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.24.1...HEAD
+[0.24.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.21.3...v0.22.0
