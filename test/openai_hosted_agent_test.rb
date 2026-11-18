@@ -74,15 +74,17 @@ class OpenAIHostedAgentTest < Minitest::Test
   end
 
   class Turns
-    attr_reader :list_calls, :items
+    attr_reader :list_calls, :retrieve_calls, :items
 
     def initialize(sessions)
       @sessions = sessions
       @list_calls = []
+      @retrieve_calls = []
       @items = TurnItems.new
     end
 
     def retrieve(turn_id, session_id:)
+      retrieve_calls << [turn_id, session_id]
       { id: turn_id, session_id: session_id, status: "completed", usage: token_usage }
     end
 
@@ -97,7 +99,14 @@ class OpenAIHostedAgentTest < Minitest::Test
   end
 
   class Items
-    def list(_session_id, **_params)
+    attr_reader :calls
+
+    def initialize
+      @calls = []
+    end
+
+    def list(session_id, **params)
+      calls << [session_id, params]
       Struct.new(:data, :next_page?).new(
         [{ id: "item_1", role: "assistant", text: "saved", status: "completed", turn_id: "turn_1" }],
         false
@@ -106,7 +115,7 @@ class OpenAIHostedAgentTest < Minitest::Test
   end
 
   class Sessions
-    attr_reader :events, :turns, :create_params, :deleted, :retrieved, :order
+    attr_reader :events, :turns, :create_params, :deleted, :retrieved, :retrieve_calls, :order
     attr_accessor :items, :error, :post_error, :stream, :required_actions
 
     def initialize
@@ -115,6 +124,7 @@ class OpenAIHostedAgentTest < Minitest::Test
       @items = Items.new
       @stream = Stream.new([])
       @order = []
+      @retrieve_calls = []
       @required_actions = []
     end
 
@@ -139,6 +149,7 @@ class OpenAIHostedAgentTest < Minitest::Test
     def retrieve(session_id)
       raise error if error
 
+      retrieve_calls << session_id
       @retrieved = session_id
       { id: session_id, status: "idle", agent: { model: "gpt-6-astra" }, required_actions: required_actions }
     end
@@ -420,6 +431,25 @@ class OpenAIHostedAgentTest < Minitest::Test
   def test_unexpected_errors_propagate
     @sessions.error = RuntimeError.new("boom")
     assert_raises(RuntimeError) { create_session }
+  end
+
+  def test_tool_call_recovery_skips_item_lists
+    @sessions.required_actions = [
+      {
+        type: "function_call", turn_id: "turn_1", call_id: "call_1", name: "list_recordings",
+        arguments: "{\"limit\":1}"
+      }
+    ]
+    recovery = @adapter.recover_hosted_agent_session(
+      provider_session_id: "sess_1", provider_turn_id: "turn_1", item_scope: :tool_calls
+    )
+
+    assert_equal %w[sess_1], @sessions.retrieve_calls
+    assert_equal [%w[turn_1 sess_1]], @sessions.turns.retrieve_calls
+    assert_empty @sessions.items.calls
+    assert_empty @sessions.turns.items.calls
+    assert_equal ["call_1"], recovery.tool_calls.map(&:call_id)
+    assert_empty recovery.items
   end
 
   def test_turn_items_use_the_turn_from_the_same_read

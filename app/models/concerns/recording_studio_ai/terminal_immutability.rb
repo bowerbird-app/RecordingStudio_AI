@@ -24,11 +24,17 @@ module RecordingStudioAI
 
     private
 
+    # Columns a finished row may fill while the stored value is still blank.
+    def late_fill_columns
+      []
+    end
+
     def prevent_terminal_mutations
       return unless self.class.terminal_statuses.include?(status_in_database.to_s)
 
       immutable_columns = self.class.immutable_after_terminal_columns + [self.class.terminal_status_column]
       changed_immutable_fields = changes_to_save.keys & immutable_columns.map(&:to_s)
+      changed_immutable_fields -= late_fill_columns
       return if changed_immutable_fields.empty?
 
       errors.add(

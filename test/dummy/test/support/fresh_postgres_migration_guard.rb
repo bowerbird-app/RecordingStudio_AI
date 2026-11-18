@@ -137,7 +137,7 @@ module FreshPostgresMigrationGuard
       abort "#{table}.#{column} present=#{exists}, expected #{present}"
     end
     versions = connection.select_values("SELECT version FROM schema_migrations")
-    %w[20260813120000 20260814130000 20261112120000].each do |version|
+    %w[20260813120000 20260814130000 20261112120000 20261118120000].each do |version|
       abort "schema_migrations missing #{version}" unless versions.include?(version)
     end
   end
@@ -156,6 +156,8 @@ module FreshPostgresMigrationGuard
     update_execution!(connection, :recording_studio_ai_runs, run_id, status: "completed")
     update_execution!(connection, :recording_studio_ai_runs, run_id, metadata: "{\"kept\":true}")
     update_execution!(connection, :recording_studio_ai_runs, run_id, provider_turn_id: "turn-1")
+    update_execution!(connection, :recording_studio_ai_runs, run_id, input_tokens: 10, output_tokens: 4, total_tokens: 14)
+    assert_terminal_change_blocked!(connection, :recording_studio_ai_runs, run_id, input_tokens: 15)
     assert_terminal_change_blocked!(connection, :recording_studio_ai_runs, run_id, status: "cancelled")
     assert_terminal_change_blocked!(connection, :recording_studio_ai_runs, run_id, prompt_key: "summarize")
 

@@ -5,6 +5,20 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.25.2] - 2026-11-18
+
+### Fixed
+- A completed hosted turn whose `turn_completed` event has no usage reads `turns.retrieve` once on the request. A retryable error still gets one more read. A null result does not. `HostedTurnUsageJob` reads the turn again after about 5 seconds, 30 seconds, 2 minutes, and 10 minutes. Usage that arrives is stored on the run and charged with `ai-hosted-agent-turn:<provider turn id>`. A run already marked `usage_charged` is not charged again. Null or empty usage does not set `usage_charged`. The request path does not sleep.
+- A missing usage log, and the job's final outcome, include the run id, turn status, `completed_at`, and whether the usage came from the event, the turn retrieve, or job attempt N. Keys and payloads are not logged.
+- Posting tool results reads the pending calls once (`sessions.retrieve` and `turns.retrieve`, no session item list) and reuses that snapshot for the reconcile after the post.
+
+### Changed
+- A finished hosted run may fill blank token columns once. A token total that is already stored stays put. Other terminal columns stay fixed. Run `allow_late_hosted_turn_usage_on_recording_studio_ai_runs`.
+- Development stays on Recording Studio `v7.7.0`. The gemspec range stays `>= 7.0`, `< 8.0`.
+
+### Upgrade notes
+- Bump to `0.25.2`. Copy the new migration and migrate. See [UPGRADING.md](UPGRADING.md#upgrading-to-0252).
+
 ## [0.25.1] - 2026-11-18
 
 ### Fixed
@@ -1290,7 +1304,9 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.2...HEAD
+[0.25.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.1...v0.25.2
+[0.25.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.23.0...v0.24.0

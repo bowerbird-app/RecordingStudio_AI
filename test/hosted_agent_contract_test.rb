@@ -9,7 +9,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     provider_key :openai
 
     attr_reader :creates, :submits, :streams, :cancels, :deletes, :recoveries, :tool_results, :opens,
-                :usage_fetches, :trace
+                :usage_fetches, :trace, :provider_calls
     attr_accessor :events, :items, :item_batches, :stream_failure, :drop_after_events, :tool_result_failure,
                   :default_turn, :tool_calls, :on_tool_results, :recovery_failure, :retrieved_usages,
                   :retrieve_errors
@@ -32,6 +32,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       @opens = []
       @trace = []
       @usage_fetches = []
+      @provider_calls = []
       @retrieved_usages = []
       @retrieve_errors = []
       @on_tool_results = nil
@@ -106,11 +107,12 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       recoveries << {
         provider_session_id: provider_session_id, provider_turn_id: provider_turn_id, item_scope: item_scope
       }
+      record_provider_reads(item_scope)
       turn = next_turn
       RecordingStudioAI::Providers::HostedRecovery.new(
         session: hosted_session(provider_session_id, "gpt-6-astra"),
         turn: turn,
-        items: listed_items(turn, provider_turn_id, item_scope),
+        items: item_scope.to_sym == :tool_calls ? [] : listed_items(turn, provider_turn_id, item_scope),
         tool_calls: next_tool_calls
       )
     end
@@ -154,6 +156,19 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       items
     end
 
+    def record_provider_reads(item_scope)
+      provider_calls << :sessions_retrieve
+      provider_calls << :turns_retrieve
+      case item_scope.to_sym
+      when :turn
+        provider_calls << :turn_items_list
+      when :tool_calls
+        nil
+      else
+        provider_calls << :session_items_list
+      end
+    end
+
     def next_tool_calls
       return @tool_call_batches.shift unless @tool_call_batches.empty?
 
@@ -183,7 +198,16 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     @configuration.cost_catalogs = {
       openai: { "gpt-6-luna" => { input_tokens: 100_000, output_tokens: 500_000, currency: "USD" } }
     }
+    @usage_waits = []
+    @configuration.retry_sleeper = ->(seconds) { @usage_waits << seconds }
+    @previous_queue_adapter = ActiveJob::Base.queue_adapter
+    ActiveJob::Base.queue_adapter = :test
     setup_stream_events
+  end
+
+  def teardown
+    ActiveJob::Base.queue_adapter = @previous_queue_adapter if @previous_queue_adapter
+    super
   end
 
   def test_hosted_chat_uses_profile_order_and_sends_effort_only_when_one_resolves
@@ -1160,33 +1184,144 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "running", RecordingStudioAI::Run.find(session.run_id).status
   end
 
-  def test_null_turn_usage_is_read_from_the_turn
+  def test_null_turn_usage_is_read_once_and_charged_by_the_job
     session = create_session
     @fake.events = [turn_event_for("turn_1", usage: nil)]
-    @fake.retrieved_usages = [nil, usage]
-    turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
-
-    assert_equal 2, @fake.usage_fetches.length
-    assert_equal "sess_1", @fake.usage_fetches.first[:provider_session_id]
-    assert_equal "turn_1", @fake.usage_fetches.first[:provider_turn_id]
-    assert_equal 14, turn.usage.total_tokens
-    assert_equal 1, @spends.length
-    assert_equal 14, @spends.first[:credits]
-  end
-
-  def test_turn_usage_still_null_after_reread_is_not_billed
-    session = create_session
-    @fake.events = [turn_event_for("turn_1", usage: nil)]
-    @fake.retrieved_usages = [nil, nil]
-    turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    @fake.retrieved_usages = [nil, nil, usage]
+    messages = []
+    turn = nil
+    with_usage_logs(messages) do
+      turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    end
     run = RecordingStudioAI::Run.find(session.run_id)
 
-    assert_equal 2, @fake.usage_fetches.length
+    assert_equal 1, @fake.usage_fetches.length
+    assert_equal "sess_1", @fake.usage_fetches.first[:provider_session_id]
+    assert_equal "turn_1", @fake.usage_fetches.first[:provider_turn_id]
     assert_nil turn.usage
     assert_empty @spends
     assert_equal "completed", run.status
-    assert_nil run.total_tokens
     refute run.metadata.to_h["usage_charged"]
+    assert_equal([[run.id]], enqueued_usage_jobs.map { |job| job[:args] })
+    assert_empty @usage_waits
+    assert_match(/source=turn_retrieve/, messages.join("\n"))
+    assert_match(/run_id=#{run.id}/, messages.join("\n"))
+    assert_match(/status=completed/, messages.join("\n"))
+    assert_match(/turn_status=completed/, messages.join("\n"))
+    assert_match(/completed_at=\d{4}-\d{2}-\d{2}T/, messages.join("\n"))
+    assert_match(/usage=nil/, messages.join("\n"))
+
+    with_usage_logs(messages) do
+      RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id)
+    end
+    run.reload
+
+    assert_equal [5], @usage_waits
+    assert_equal 10, run.input_tokens
+    assert_equal 4, run.output_tokens
+    assert_equal 14, run.total_tokens
+    assert_equal 1, @spends.length
+    assert_equal 14, @spends.first[:credits]
+    assert_equal "ai-hosted-agent-turn:turn_1", @spends.first[:idempotency_key]
+    assert run.metadata["usage_charged"]
+    assert_match(/source=job_attempt_2/, messages.join("\n"))
+    assert_match(/turn_status=completed/, messages.join("\n"))
+    refute_match(/idempotency|api_key|sk-/i, messages.join("\n"))
+
+    @usage_waits.clear
+    RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id)
+
+    assert_equal 1, @spends.length
+    assert_empty @usage_waits
+    assert run.metadata["usage_charged"]
+    run.total_tokens = 15
+    refute run.save
+    assert_includes run.errors.full_messages.join(" "), "terminal"
+    assert_equal 14, run.reload.total_tokens
+  end
+
+  def test_null_usage_retries_leave_the_run_uncharged
+    session = create_session
+    @fake.events = [turn_event_for("turn_1", usage: nil)]
+    @fake.retrieved_usages = []
+    messages = []
+    with_usage_logs(messages) do
+      RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+      run = RecordingStudioAI::Run.find(session.run_id)
+      RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id)
+    end
+    run = RecordingStudioAI::Run.find(session.run_id)
+    logged = messages.join("\n")
+
+    assert_equal 6, @fake.usage_fetches.length
+    assert_equal [5, 30, 120, 600], @usage_waits
+    assert_nil run.total_tokens
+    assert_empty @spends
+    assert_equal "completed", run.status
+    refute run.metadata.to_h["usage_charged"]
+    assert_match(/run_id=#{run.id}/, logged)
+    assert_match(/status=completed/, logged)
+    assert_match(/turn_status=completed/, logged)
+    assert_match(/completed_at=\d{4}-\d{2}-\d{2}T/, logged)
+    assert_match(/source=turn_retrieve/, logged)
+    assert_match(/source=job_attempt_5/, logged)
+    assert_match(/usage=nil/, logged)
+    refute_match(/idempotency|api_key|sk-/i, logged)
+  end
+
+  def test_empty_usage_does_not_mark_the_run_charged
+    session = create_session
+    empty = RecordingStudioAI::Contracts::Usage.new
+    @fake.events = [turn_event_for("turn_1", usage: empty)]
+    @fake.retrieved_usages = [empty]
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    run = RecordingStudioAI::Run.find(session.run_id)
+    RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id)
+    run.reload
+
+    assert_nil run.total_tokens
+    assert_empty @spends
+    refute run.metadata.to_h["usage_charged"]
+  end
+
+  def test_inline_usage_read_does_not_sleep
+    session = create_session
+    @fake.events = [turn_event_for("turn_1", usage: nil)]
+    @fake.retrieved_usages = [nil, usage]
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+
+    assert_operator elapsed, :<, 1
+    assert_empty @usage_waits
+    assert_equal 1, @fake.usage_fetches.length
+    assert_equal 1, enqueued_usage_jobs.length
+  end
+
+  def test_a_tool_pause_reads_the_turn_once_and_skips_the_session_item_list
+    session = create_session
+    call = tool_call("call_1")
+    @fake.events = [tool_calls_event(call)]
+    paused = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+
+    assert_equal "requires_action", paused.status
+    @fake.provider_calls.clear
+    @fake.recoveries.clear
+    @fake.tool_calls = [call]
+    @fake.events = [
+      RecordingStudioAI::Providers::StreamEvent.new(
+        type: "turn_completed", usage: usage, metadata: { provider_turn_id: "turn_9" }
+      )
+    ]
+    turn = RecordingStudioAI::Agents.submit_tool_results(
+      **session_args(session), results: [tool_result(call)]
+    ) { |_event| }
+
+    assert_equal "completed", turn.status
+    assert_equal %i[sessions_retrieve turns_retrieve], @fake.provider_calls
+    assert_equal([:tool_calls], @fake.recoveries.map { |recovery| recovery[:item_scope] })
+    refute_includes @fake.provider_calls, :session_items_list
+    refute_includes @fake.provider_calls, :turn_items_list
   end
 
   def test_turn_usage_read_retries_a_retryable_failure_once
@@ -1201,6 +1336,8 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal 2, @fake.usage_fetches.length
     assert_equal 14, turn.usage.total_tokens
     assert_equal 1, @spends.length
+    assert_empty enqueued_usage_jobs
+    assert_empty @usage_waits
   end
 
   def test_turn_usage_read_does_not_retry_a_non_retryable_failure
@@ -1216,6 +1353,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_nil turn.usage
     assert_empty @spends
     assert_equal "completed", RecordingStudioAI::Run.find(session.run_id).status
+    assert_empty enqueued_usage_jobs
   end
 
   def test_turn_usage_timeout_leaves_the_completed_run_unbilled
@@ -1229,6 +1367,8 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_nil turn.usage
     assert_empty @spends
     assert_equal 2, @fake.usage_fetches.length
+    assert_empty enqueued_usage_jobs
+    assert_empty @usage_waits
   end
 
   def test_null_usage_skips_a_turn_that_was_already_charged
@@ -1422,6 +1562,17 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       category: "connection", code: "network", message: "Provider connection failed.", retryable: true
     )
     RecordingStudioAI::Providers::HostedAgentFailure.new(connection, dropped: true)
+  end
+
+  def enqueued_usage_jobs
+    ActiveJob::Base.queue_adapter.enqueued_jobs.select do |job|
+      job[:job] == RecordingStudioAI::HostedTurnUsageJob
+    end
+  end
+
+  def with_usage_logs(messages, &)
+    write = ->(message = nil) { messages << message.to_s }
+    Rails.logger.stub(:warn, write, &)
   end
 
   def delivered_ids(session)

@@ -1,5 +1,21 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.25.2
+
+Hosted turn usage from OpenAI can be null on `turn_completed` and show up later. The request reads the turn once. A retryable error gets one more read. A null result does not. The request does not sleep. `RecordingStudioAI::HostedTurnUsageJob` reads the turn again after about 5 seconds, 30 seconds, 2 minutes, and 10 minutes. When usage arrives it stores the token columns and charges `ai-hosted-agent-turn:<provider turn id>`. A second run of the job sees `usage_charged` and does not charge again. Null or empty usage leaves the run uncharged.
+
+A missing usage line, and the job's last outcome, include the run id, the turn status, `completed_at`, and the source: `event`, `turn_retrieve`, or `job_attempt_N`. The line does not include keys or the provider payload.
+
+Posting tool results reads pending calls with one session retrieve and one turn retrieve. It does not list every saved item. The reconcile after the post reuses that snapshot.
+
+Recording Studio stays `v7.7.0`. The gemspec range stays `>= 7.0`, `< 8.0`.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.25.2`.
+2. Copy migrations with `bin/rails recording_studio_ai:install:migrations` and run `bin/rails db:migrate`. The new migration lets a finished run fill blank token columns once. A stored total cannot be replaced. Other terminal columns stay fixed.
+3. Run `HostedTurnUsageJob` from the same Active Job queue as the other Recording Studio AI jobs. A completed hosted run with no token totals is waiting on that job, or usage never arrived.
+
 ## Upgrading to 0.25.1
 
 Hosted chat replay no longer repeats assistant text that was already delivered. The stream opens first, then reads items for the current turn. Delivered assistant item ids are stored on the run under `delivered_item_ids`. `Agents.recover` still returns the session's saved items.

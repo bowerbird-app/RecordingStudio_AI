@@ -84,7 +84,7 @@ class FreshDatabaseMigrationsTest < Minitest::Test
 
   def test_terminal_guards_allow_updates_and_block_terminal_changes
     apply(migrations)
-    assert_equal "20261112120000", migrations.last.first
+    assert_equal "20261118120000", migrations.last.first
     refute Object.const_defined?(:RefreshRecordingStudioAISqliteGuards)
     assert RefreshRecordingStudioAITerminalGuards.const_defined?(:RefreshRecordingStudioAISqliteGuards)
 
@@ -96,6 +96,8 @@ class FreshDatabaseMigrationsTest < Minitest::Test
     update_row(:recording_studio_ai_runs, run_id, status: "completed")
     update_row(:recording_studio_ai_runs, run_id, metadata: "{\"kept\":true}")
     update_row(:recording_studio_ai_runs, run_id, provider_turn_id: "turn-1")
+    update_row(:recording_studio_ai_runs, run_id, input_tokens: 10, output_tokens: 4, total_tokens: 14)
+    assert_terminal_change_blocked(:recording_studio_ai_runs, run_id, input_tokens: 15)
     assert_terminal_change_blocked(:recording_studio_ai_runs, run_id, status: "cancelled")
     assert_terminal_change_blocked(:recording_studio_ai_runs, run_id, prompt_key: "summarize")
 
