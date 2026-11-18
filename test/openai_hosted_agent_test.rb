@@ -57,16 +57,37 @@ class OpenAIHostedAgentTest < Minitest::Test
     end
   end
 
+  class TurnItems
+    attr_reader :calls
+
+    def initialize
+      @calls = []
+    end
+
+    def list(turn_id, **params)
+      calls << [turn_id, params]
+      Struct.new(:data, :next_page?).new(
+        [{ id: "item_turn", role: "assistant", text: "from-turn", status: "completed", turn_id: turn_id }],
+        false
+      )
+    end
+  end
+
   class Turns
+    attr_reader :list_calls, :items
+
     def initialize(sessions)
       @sessions = sessions
+      @list_calls = []
+      @items = TurnItems.new
     end
 
     def retrieve(turn_id, session_id:)
       { id: turn_id, session_id: session_id, status: "completed", usage: token_usage }
     end
 
-    def list(_session_id, **_params)
+    def list(_session_id, **params)
+      list_calls << params
       Struct.new(:data).new([{ id: "turn_latest", status: "in_progress" }])
     end
 
@@ -85,8 +106,8 @@ class OpenAIHostedAgentTest < Minitest::Test
   end
 
   class Sessions
-    attr_reader :events, :turns, :items, :create_params, :deleted, :retrieved, :order
-    attr_accessor :error, :post_error, :stream, :required_actions
+    attr_reader :events, :turns, :create_params, :deleted, :retrieved, :order
+    attr_accessor :items, :error, :post_error, :stream, :required_actions
 
     def initialize
       @events = Events.new(self)
@@ -401,6 +422,67 @@ class OpenAIHostedAgentTest < Minitest::Test
     assert_raises(RuntimeError) { create_session }
   end
 
+  def test_turn_items_use_the_turn_from_the_same_read
+    recovery = @adapter.recover_hosted_agent_session(
+      provider_session_id: "sess_1", provider_turn_id: "turn_9", item_scope: :turn
+    )
+
+    assert_empty @sessions.turns.list_calls
+    assert_equal [["turn_9", { session_id: "sess_1", order: "asc", limit: 100 }]], @sessions.turns.items.calls
+    assert_equal "from-turn", recovery.items.first.text
+    assert_equal "turn_9", recovery.items.first.provider_turn_id
+  end
+
+  def test_turn_items_without_a_turn_id_use_the_snapshot_turn
+    recovery = @adapter.recover_hosted_agent_session(provider_session_id: "sess_1", item_scope: :turn)
+
+    assert_equal [{ order: "desc", limit: 1 }], @sessions.turns.list_calls
+    assert_equal ["turn_latest"], @sessions.turns.items.calls.map(&:first)
+    assert_equal "turn_latest", recovery.turn.provider_turn_id
+    assert_equal "from-turn", recovery.items.first.text
+  end
+
+  def test_item_list_over_the_page_cap_raises
+    @sessions.items = PagedItems.new(21)
+    error = assert_raises(RecordingStudioAI::Providers::ItemListTooLong) do
+      @adapter.recover_hosted_agent_session(provider_session_id: "sess_1", provider_turn_id: "turn_1")
+    end
+
+    assert_equal "Hosted agent item list exceeded 20 pages.", error.message
+
+    @sessions.items = PagedItems.new(20)
+    recovery = @adapter.recover_hosted_agent_session(provider_session_id: "sess_1", provider_turn_id: "turn_1")
+    assert_equal 20, recovery.items.length
+  end
+
+  def test_stream_opens_before_the_before_events_hook
+    @sessions.stream = Stream.new(stream_events.last(1))
+    seen = []
+    @adapter.stream_hosted_agent_session(
+      provider_session_id: "sess_1",
+      before_events: lambda {
+        seen << :before
+        assert_equal [:stream], @sessions.order
+        false
+      }
+    ) { |event| seen << event.type }
+
+    assert_equal [:before, "turn_completed"], seen
+    assert @sessions.stream.closed
+  end
+
+  def test_before_events_can_skip_the_read_after_the_stream_opens
+    @sessions.stream = Stream.new(stream_events.last(1))
+    seen = []
+    @adapter.stream_hosted_agent_session(provider_session_id: "sess_1", before_events: -> { true }) do |event|
+      seen << event
+    end
+
+    assert_empty seen
+    assert_equal [:stream], @sessions.order
+    assert @sessions.stream.closed
+  end
+
   private
 
   def requires_action_event
@@ -443,6 +525,28 @@ class OpenAIHostedAgentTest < Minitest::Test
         turn: { id: "turn_1" }
       }
     ]
+  end
+
+  class PagedItems
+    def initialize(pages)
+      @pages = pages
+    end
+
+    def list(*)
+      page(@pages)
+    end
+
+    def page(remaining)
+      more = remaining > 1
+      pager = self
+      row = Object.new
+      row.define_singleton_method(:data) do
+        [{ id: "item_#{remaining}", role: "assistant", text: "x", status: "completed", turn_id: "turn_1" }]
+      end
+      row.define_singleton_method(:next_page?) { more }
+      row.define_singleton_method(:next_page) { pager.page(remaining - 1) }
+      row
+    end
   end
 
   def continue_with_tool_result

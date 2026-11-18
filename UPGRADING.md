@@ -1,5 +1,21 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.25.1
+
+Hosted chat replay no longer repeats assistant text that was already delivered. The stream opens first, then reads items for the current turn. Delivered assistant item ids are stored on the run under `delivered_item_ids`. `Agents.recover` still returns the session's saved items.
+
+A hosted turn that finishes from saved items stores `output_character_count` as that turn's completed assistant text. User messages and earlier turns are not counted.
+
+When `turn_completed` has no usage, the adapter reads the turn, and reads it once more if that read is retryable or still blank. If usage is still null, the run is completed and not billed. A turn id already charged on another run is left alone.
+
+An item list with another page after 20 pages raises `RecordingStudioAI::Providers::ItemListTooLong`.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.25.1`. No migration and no config change.
+2. Hosts that show recovered chat should keep using `Agents.recover` for the saved transcript. Live `stream` yields each new assistant message once.
+3. Treat a completed hosted run with no token totals as unbilled. Usage was null after the turn read.
+
 ## Upgrading to 0.25.0
 
 `gpt-6-luna` is the default hosted-chat model. Default profiles list it before `gpt-6-astra`. Hosted chat uses the first entry whose model declares the `hosted_agent` operation, so entry order is how a host picks the hosted model. Put astra above luna to keep astra. There is no migration. Recording Studio stays `v7.7.0`. The gemspec range stays `>= 7.0`, `< 8.0`.

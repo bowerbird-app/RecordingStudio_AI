@@ -49,13 +49,18 @@ class LibraryGapCoverageTest < RecordingStudioAI::Test::PersistenceCase
       hosted_session(model)
     end
 
-    def stream_hosted_agent_session(provider_session_id:, &)
+    def stream_hosted_agent_session(provider_session_id:, before_events: nil, &)
       streams << provider_session_id
+      stop = before_events&.call
+      return if stop
+
       Array(events).each(&)
     end
 
-    def recover_hosted_agent_session(provider_session_id:, provider_turn_id: nil)
-      recoveries << { provider_session_id: provider_session_id, provider_turn_id: provider_turn_id }
+    def recover_hosted_agent_session(provider_session_id:, provider_turn_id: nil, item_scope: :session)
+      recoveries << {
+        provider_session_id: provider_session_id, provider_turn_id: provider_turn_id, item_scope: item_scope
+      }
       raise recovery_error if recovery_failure_at && recoveries.length >= recovery_failure_at
 
       hosted_recovery(provider_session_id)
