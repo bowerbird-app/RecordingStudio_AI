@@ -109,6 +109,7 @@ module RecordingStudioAI
 
       # +item_scope+ :session lists every saved item. :turn lists items for
       # +provider_turn_id+, or for the turn this same read already resolved.
+      # :tool_calls reads the session and that turn and skips item lists.
       def recover_hosted_agent_session(provider_session_id:, provider_turn_id: nil, item_scope: :session)
         hosted_request(session_lookup: true) do
           session = client.beta.agents.sessions.retrieve(provider_session_id)
@@ -285,6 +286,7 @@ module RecordingStudioAI
       end
 
       def recovery_items(provider_session_id, item_scope, provider_turn_id, turn)
+        return [] if item_scope == :tool_calls
         return fetch_hosted_items(provider_session_id) unless item_scope == :turn
 
         turn_id = provider_turn_id.presence || turn&.provider_turn_id

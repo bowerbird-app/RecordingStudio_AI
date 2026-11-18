@@ -627,9 +627,11 @@ end
 ```
 
 `submit_tool_results` without a block returns an Enumerator of the continuation.
-A dropped stream, a later `stream` on a session that is already waiting, and
-`recover` all report unanswered calls on `tool_calls`, including calls whose
-arguments did not parse. Saved messages are not pending calls.
+The post reads pending calls once: one session retrieve and one turn retrieve,
+and no session-wide item list. The reconcile after the post reuses that
+snapshot. A dropped stream, a later `stream` on a session that is already
+waiting, and `recover` all report unanswered calls on `tool_calls`, including
+calls whose arguments did not parse. Saved messages are not pending calls.
 `recovery.tool_calls` is empty when nothing is waiting.
 
 A new message while the run is waiting on tool calls cancels that run at the
@@ -638,10 +640,16 @@ It then starts the new message as its own turn. `cancel` does the same billing.
 OpenAI reports turn usage on a best-effort basis. It can be null when unknown,
 including after `agent.session.turn.cancelled`, and a later read can change
 the counts. Null is not billed as zero. If `turn_completed` has no usage, the
-run reads that turn with `turns.retrieve`, and reads it once more when the
-read is retryable or the usage is still blank. Usage that is still null after
-that leaves the run completed and unbilled. The run id is logged. A turn id
-that another run already charged is not read again and is not charged again.
+request reads that turn once with `turns.retrieve`. A retryable error gets one
+more read. A null result does not, and the request does not sleep.
+`HostedTurnUsageJob` reads the turn again after about 5 seconds, 30 seconds,
+2 minutes, and 10 minutes. Usage that arrives is stored on the run and charged
+with `ai-hosted-agent-turn:<provider turn id>`. A run already marked
+`usage_charged` is not charged again. Null or empty usage does not set that
+flag. A missing usage line, and the job's final outcome, log the run id, turn
+status, `completed_at`, and the source (`event`, `turn_retrieve`, or
+`job_attempt_N`). Keys and payloads are not logged. A turn id that another run
+already charged is not read again and is not charged again.
 If the usage read after `cancel` fails with a hosted-agent provider error, the
 run id and error class are logged and the run stays cancelled. Any other error
 from that cancel read is raised. Cancelling a finished run does not bill it

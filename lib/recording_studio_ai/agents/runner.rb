@@ -98,8 +98,34 @@ module RecordingStudioAI
         guard_session!(session, request)
         run = running_run(session, request) || latest_run(session, request)
         results = request.fetch(:results)
-        claim_pending_results!(session, run, results)
-        continue_stream(session, run, results, &)
+        claimed = claim_pending_results!(session, run, results)
+        continue_stream(session, run, results, claimed: claimed, &)
+      end
+
+      # A completed turn can bill after the stream returns. The job calls this.
+      # Already-charged turns and blank usage return without a second charge.
+      def record_deferred_turn_usage(run_id, attempt:, final:)
+        run = RecordingStudioAI::Run.find_by(id: run_id)
+        return true if run.nil? || run.status != "completed"
+        return true if run.provider_turn_id.blank? || run.provider_session_id.blank?
+        return true if turn_charged?(run.provider_turn_id, nil)
+
+        turn = read_deferred_turn(run)
+        usage = turn&.usage
+        if usage_reported?(usage)
+          assign_usage(run, usage)
+          charge(run, usage)
+          log_usage_outcome(run, source: "job_attempt_#{attempt}", missing: false, turn_status: turn.status)
+          return true
+        end
+
+        log_deferred_miss(run, attempt, turn&.status) if final
+        false
+      rescue Providers::HostedAgentFailure => e
+        log_usage_fetch_failure(run, e) if run
+        stop = final || !e.error.retryable?
+        log_deferred_miss(run, attempt, nil) if stop && run
+        stop
       end
 
       def recover(raw)
@@ -147,12 +173,12 @@ module RecordingStudioAI
         end
       end
 
-      def continue_stream(session, run, results, &block)
+      def continue_stream(session, run, results, claimed: nil, &block)
         ensure_credits!(attribution_for(run), run)
         consume(session, run, block, reject_provider_failure: true, submitted_results: results) do |on_event|
           adapter_for(session.provider).continue_hosted_agent_after_tool_results(
             provider_session_id: session.provider_session_id, results: results,
-            before_events: -> { reconcile(session, run, on_event, stop_for_tools: false) },
+            before_events: -> { reconcile(session, run, on_event, stop_for_tools: false, claimed: claimed) },
             &on_event
           )
         end
@@ -222,8 +248,8 @@ module RecordingStudioAI
       # live stream will not repeat, and skip the read when that snapshot has
       # already settled. A snapshot failure other than a timeout still lets the
       # open stream play.
-      def reconcile(session, run, on_event, stop_for_tools:)
-        snapshot = fetch_recovery(session, run, item_scope: :turn)
+      def reconcile(session, run, on_event, stop_for_tools:, claimed: nil)
+        snapshot = claimed || fetch_recovery(session, run, item_scope: :turn)
         apply_recovery(session, run, snapshot)
         replay_completed_items(run, snapshot, on_event)
         deliver_settled(snapshot, on_event, stop_for_tools: stop_for_tools)
@@ -297,56 +323,120 @@ module RecordingStudioAI
       def finish_run(run, status, usage, error, text, session: nil)
         return if run.class.terminal_statuses.include?(run.status)
 
-        usage = usage_for_completed_turn(session, run, usage) if status == "completed"
+        settlement = nil
+        if status == "completed"
+          settlement = settle_inline_usage(session, run, usage)
+          usage = settlement[:usage]
+        end
         assign_usage(run, usage)
         charge(run, usage)
         run.update!(terminal_attributes(run, status, error, text))
+        log_inline_settlement(run, settlement) if settlement
       end
 
       # Turn.usage is best-effort and often null on turn_completed. Read the
-      # turn once, and once more when that read is retryable or still blank.
-      # A turn that is still without usage completes and is not billed.
-      def usage_for_completed_turn(session, run, usage)
-        return usage if usage
-        return if session.nil? || run.provider_turn_id.blank?
-        return if turn_charged?(run.provider_turn_id, nil)
+      # turn once on this request. A retryable error gets one more read. A
+      # null result does not. Null usage is billed later by HostedTurnUsageJob.
+      # This path does not sleep.
+      def settle_inline_usage(session, run, usage)
+        return { usage: usage, source: "event", missing: false, silent: true } if usage_reported?(usage)
 
+        blank_turn = session.nil? || run.provider_turn_id.blank?
+        return { usage: nil, source: "event", missing: true, silent: false } if blank_turn
+        return { usage: nil, source: "event", missing: false, silent: true } if turn_charged?(run.provider_turn_id, nil)
+
+        fetched, saw_null, gave_up = read_inline_usage(session, run)
+        return { usage: fetched, source: "turn_retrieve", missing: false, silent: true } if usage_reported?(fetched)
+
+        enqueue_deferred_usage(run) if saw_null && !gave_up
+        { usage: nil, source: "turn_retrieve", missing: true, silent: false }
+      end
+
+      def read_inline_usage(session, run)
+        saw_null = false
+        gave_up = false
+        fetched = nil
         USAGE_FETCH_LIMIT.times do |attempt|
           fetched = read_turn_usage(session, run)
-          return fetched if fetched
+          saw_null = !usage_reported?(fetched)
+          break
         rescue Providers::HostedAgentFailure => e
           log_usage_fetch_failure(run, e)
-          break unless e.error.retryable? && attempt < USAGE_FETCH_LIMIT - 1
+          retryable = e.error.retryable? && attempt < USAGE_FETCH_LIMIT - 1
+          gave_up = !retryable
+          break unless retryable
         end
-        log_usage_missing(run)
-        nil
+        [fetched, saw_null, gave_up]
       end
 
       def read_turn_usage(session, run)
-        turn = adapter_for(session.provider).retrieve_hosted_agent_turn(
+        read_hosted_turn(session, run)&.usage
+      end
+
+      def read_deferred_turn(run)
+        read_hosted_turn(session_for_run(run), run)
+      end
+
+      def read_hosted_turn(session, run)
+        adapter_for(session.provider).retrieve_hosted_agent_turn(
           provider_session_id: session.provider_session_id,
           provider_turn_id: run.provider_turn_id
         )
-        turn&.usage
+      end
+
+      def enqueue_deferred_usage(run)
+        HostedTurnUsageJob.perform_later(run.id)
+      end
+
+      def usage_reported?(usage)
+        return false unless usage
+
+        token_counts = [
+          usage.input_tokens, usage.output_tokens, usage.total_tokens,
+          usage.cached_input_tokens, usage.reasoning_tokens
+        ]
+        return true if token_counts.any? { |count| count.to_i.positive? }
+
+        usage.respond_to?(:counts) && usage.counts.values.any? { |count| count.to_i.positive? }
+      end
+
+      def log_inline_settlement(run, settlement)
+        return if settlement[:silent]
+
+        log_usage_outcome(run, source: settlement[:source], missing: true, turn_status: run.status)
+      end
+
+      def log_deferred_miss(run, attempt, turn_status)
+        log_usage_outcome(run, source: "job_attempt_#{attempt}", missing: true, turn_status: turn_status || run.status)
+      end
+
+      def log_usage_outcome(run, source:, missing:, turn_status:)
+        completed = run.completed_at&.iso8601
+        state = missing ? "unavailable" : "recorded"
+        blank = missing ? " usage=nil" : ""
+        message = "recording_studio_ai hosted turn usage #{state} run_id=#{run.id} " \
+                  "status=#{run.status} turn_status=#{turn_status} completed_at=#{completed} " \
+                  "source=#{source}#{blank}"
+        warn_hosted(message)
       end
 
       def log_usage_fetch_failure(run, error)
         warn_hosted("recording_studio_ai hosted turn usage fetch failed run_id=#{run.id} error=#{error.class}")
       end
 
-      def log_usage_missing(run)
-        warn_hosted("recording_studio_ai hosted turn usage unavailable run_id=#{run.id} usage=nil")
-      end
-
       # Unit tests stub warn on a nil logger. A real logger is used in the app.
       def warn_hosted(message)
-        Rails.logger.warn(message)
+        report_hosted(:warn, message)
+      end
+
+      def report_hosted(level, message)
+        Rails.logger.public_send(level, message)
       rescue NoMethodError
         nil
       end
 
       def assign_usage(run, usage)
-        return unless usage
+        return unless usage_reported?(usage)
         return if turn_charged?(run.provider_turn_id, run.id)
 
         run.update!(
@@ -453,7 +543,8 @@ module RecordingStudioAI
       def claim_pending_results!(session, run, results)
         invalid_results!("hosted agent turn is not waiting on tool results") if run.nil? || terminal_run?(run)
 
-        pending = pending_tool_calls(session, run)
+        snapshot = tool_call_snapshot(session, run)
+        pending = pending_calls_from(snapshot)
         run.with_lock do
           invalid_results!("hosted agent turn is not waiting on tool results") if terminal_run?(run) || pending.empty?
 
@@ -461,6 +552,7 @@ module RecordingStudioAI
           reject_claimed_calls!(run, results)
           remember_submitted_calls!(run, results)
         end
+        snapshot
       end
 
       # A rejected, timed-out, or unsent post must not stick. Forget the claimed
@@ -481,7 +573,7 @@ module RecordingStudioAI
       end
 
       def still_pending_call_ids(session, run)
-        snapshot = fetch_recovery(session, run)
+        snapshot = fetch_recovery(session, run, item_scope: :tool_calls)
         return [] if snapshot.turn&.terminal?
 
         Array(snapshot.tool_calls).map { |call| call.call_id.to_s }
@@ -507,13 +599,16 @@ module RecordingStudioAI
         Array(run.metadata.to_h[SUBMITTED_CALLS_KEY]).map(&:to_s)
       end
 
-      def pending_tool_calls(session, run)
-        snapshot = fetch_recovery(session, run)
+      def tool_call_snapshot(session, run)
+        fetch_recovery(session, run, item_scope: :tool_calls)
+      rescue Providers::HostedAgentFailure => e
+        raise Failure, e.error
+      end
+
+      def pending_calls_from(snapshot)
         return [] if snapshot.turn&.terminal?
 
         Array(snapshot.tool_calls)
-      rescue Providers::HostedAgentFailure => e
-        raise Failure, e.error
       end
 
       def match_pending_results!(pending, results)
@@ -788,6 +883,13 @@ module RecordingStudioAI
         Session.new(
           provider: session.provider, provider_session_id: session.provider_session_id,
           model: session.model, profile: session.profile, status: status, run_id: session.run_id
+        )
+      end
+
+      def session_for_run(run)
+        Session.new(
+          provider: run.resolved_provider, provider_session_id: run.provider_session_id,
+          model: run.resolved_model, profile: run.profile_key, status: run.status, run_id: run.id
         )
       end
 

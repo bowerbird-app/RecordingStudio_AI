@@ -39,6 +39,10 @@ module RecordingStudioAI
               :root_recording_id, presence: true
     validates :operation, inclusion: { in: %w[generation stream batch decision tool hosted_agent] }
 
+    LATE_USAGE_COLUMNS = %w[
+      input_tokens output_tokens total_tokens cached_input_tokens reasoning_tokens
+    ].freeze
+
     class << self
       def terminal_statuses
         %w[completed failed cancelled]
@@ -91,6 +95,19 @@ module RecordingStudioAI
           error_code
           error_message
         ]
+      end
+    end
+
+    private
+
+    # Hosted usage can arrive after the turn is stored completed. A blank
+    # token column may be filled once. A value already stored stays put.
+    def late_fill_columns
+      return [] unless operation == "hosted_agent"
+
+      self.class::LATE_USAGE_COLUMNS.select do |column|
+        change = changes_to_save[column]
+        change && change.first.nil?
       end
     end
   end

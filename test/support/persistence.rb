@@ -17,6 +17,7 @@ module RecordingStudioAI
       ].freeze
       JOB_REQUIRES = %w[
         app/jobs/recording_studio_ai/batch_synchronization_job
+        app/jobs/recording_studio_ai/hosted_turn_usage_job
         app/jobs/recording_studio_ai/response_cleanup_job
       ].freeze
 
