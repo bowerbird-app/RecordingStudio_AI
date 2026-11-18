@@ -20,6 +20,7 @@ module RecordingStudioAI
         "error" => "failed"
       }.freeze
       TERMINAL_EVENT_TYPES = %w[turn_completed failed cancelled].freeze
+      ITEM_PAGE_LIMIT = 20
       MESSAGES = {
         "authentication" => "Provider authentication failed.",
         "unsupported_model" => "Provider model is not supported for hosted agents.",
@@ -56,9 +57,9 @@ module RecordingStudioAI
         nil
       end
 
-      def stream_hosted_agent_session(provider_session_id:, &)
+      def stream_hosted_agent_session(provider_session_id:, before_events: nil, &)
         stream = client.beta.agents.sessions.events.stream_streaming(provider_session_id)
-        each_hosted_event(stream, &)
+        read_open_stream(stream, before_events, &)
       rescue StandardError => e
         raise_hosted_failure(e, session_lookup: true, dropped: true)
       ensure
@@ -77,10 +78,10 @@ module RecordingStudioAI
 
       # Open the live stream before posting. The Agents API keeps writing events
       # on that stream after each agent.session.input.tool_result.
-      def continue_hosted_agent_after_tool_results(provider_session_id:, results:, &)
+      def continue_hosted_agent_after_tool_results(provider_session_id:, results:, before_events: nil, &)
         stream = client.beta.agents.sessions.events.stream_streaming(provider_session_id)
         submit_hosted_agent_tool_results(provider_session_id: provider_session_id, results: results)
-        each_hosted_event(stream, &)
+        read_open_stream(stream, before_events, &)
       rescue StandardError => e
         raise e if e.is_a?(HostedAgentFailure)
 
@@ -106,15 +107,26 @@ module RecordingStudioAI
         HostedSession.new(provider_session_id: provider_session_id.to_s, status: "deleted", model: nil)
       end
 
-      def recover_hosted_agent_session(provider_session_id:, provider_turn_id: nil)
+      # +item_scope+ :session lists every saved item. :turn lists items for
+      # +provider_turn_id+, or for the turn this same read already resolved.
+      def recover_hosted_agent_session(provider_session_id:, provider_turn_id: nil, item_scope: :session)
         hosted_request(session_lookup: true) do
           session = client.beta.agents.sessions.retrieve(provider_session_id)
           turn = fetch_hosted_turn(provider_session_id, provider_turn_id)
+          turn_record = turn && hosted_turn(turn)
           HostedRecovery.new(
             session: hosted_session(session),
-            turn: turn && hosted_turn(turn),
-            items: fetch_hosted_items(provider_session_id),
+            turn: turn_record,
+            items: recovery_items(provider_session_id, item_scope, provider_turn_id, turn_record),
             tool_calls: function_tool_calls_from(session)
+          )
+        end
+      end
+
+      def retrieve_hosted_agent_turn(provider_session_id:, provider_turn_id:)
+        hosted_request(session_lookup: true) do
+          hosted_turn(
+            client.beta.agents.sessions.turns.retrieve(provider_turn_id, session_id: provider_session_id)
           )
         end
       end
@@ -266,20 +278,52 @@ module RecordingStudioAI
         Array(read_value(page, :data)).first
       end
 
+      def read_open_stream(stream, before_events, &)
+        return if before_events&.call
+
+        each_hosted_event(stream, &)
+      end
+
+      def recovery_items(provider_session_id, item_scope, provider_turn_id, turn)
+        return fetch_hosted_items(provider_session_id) unless item_scope == :turn
+
+        turn_id = provider_turn_id.presence || turn&.provider_turn_id
+        return [] if turn_id.blank?
+
+        fetch_turn_items(provider_session_id, turn_id)
+      end
+
       def fetch_hosted_items(provider_session_id)
         page = client.beta.agents.sessions.items.list(provider_session_id, order: "asc", limit: 100)
         collect_pages(page).filter_map { |item| hosted_item(item) }
       end
 
+      def fetch_turn_items(provider_session_id, provider_turn_id)
+        page = client.beta.agents.sessions.turns.items.list(
+          provider_turn_id, session_id: provider_session_id, order: "asc", limit: 100
+        )
+        collect_pages(page).filter_map { |item| hosted_item(item) }
+      end
+
       def collect_pages(page)
         rows = []
-        20.times do
+        ITEM_PAGE_LIMIT.times do |index|
           break unless page
 
           rows.concat(Array(read_value(page, :data)))
-          page = page.respond_to?(:next_page?) && page.next_page? ? page.next_page : nil
+          return rows unless more_pages?(page)
+
+          if index == ITEM_PAGE_LIMIT - 1
+            raise ItemListTooLong, "Hosted agent item list exceeded #{ITEM_PAGE_LIMIT} pages."
+          end
+
+          page = page.next_page
         end
         rows
+      end
+
+      def more_pages?(page)
+        page.respond_to?(:next_page?) && page.next_page?
       end
 
       def hosted_turn(turn)

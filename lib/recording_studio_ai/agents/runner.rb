@@ -12,6 +12,8 @@ module RecordingStudioAI
 
       STREAMING_KEY = :recording_studio_ai_hosted_agent_streaming
       SUBMITTED_CALLS_KEY = "submitted_tool_call_ids"
+      DELIVERED_ITEMS_KEY = "delivered_item_ids"
+      USAGE_FETCH_LIMIT = 2
 
       # Fiber-local. The block form sets it on the caller's fiber. An external
       # Enumerator runs in its own fiber, so abandoning stream(...).next does
@@ -54,14 +56,14 @@ module RecordingStudioAI
         turn_from(run.reload)
       end
 
+      # Open the provider stream before reading saved items. A snapshot taken
+      # first misses work that finishes before the stream attaches.
       def stream(raw, &)
         request = Request.session!(**raw)
         authorize!(request)
         session = request.fetch(:session)
         guard_session!(session, request)
         run = running_run(session, request) || latest_run(session, request)
-        return recovered_turn(session, run, &) if settled_snapshot?(session, run)
-
         watch(session, run, &)
       end
 
@@ -107,7 +109,7 @@ module RecordingStudioAI
         guard_session!(session, request)
         run = running_run(session, request) || latest_run(session, request)
         snapshot = fetch_recovery(session, run)
-        apply_recovery(run, snapshot)
+        apply_recovery(session, run, snapshot)
         recovery_from(session, run, snapshot)
       end
 
@@ -138,7 +140,9 @@ module RecordingStudioAI
         ensure_credits!(attribution_for(run), run)
         consume(session, run, block) do |on_event|
           adapter_for(session.provider).stream_hosted_agent_session(
-            provider_session_id: session.provider_session_id, &on_event
+            provider_session_id: session.provider_session_id,
+            before_events: -> { reconcile(session, run, on_event, stop_for_tools: true) },
+            &on_event
           )
         end
       end
@@ -147,7 +151,9 @@ module RecordingStudioAI
         ensure_credits!(attribution_for(run), run)
         consume(session, run, block, reject_provider_failure: true, submitted_results: results) do |on_event|
           adapter_for(session.provider).continue_hosted_agent_after_tool_results(
-            provider_session_id: session.provider_session_id, results: results, &on_event
+            provider_session_id: session.provider_session_id, results: results,
+            before_events: -> { reconcile(session, run, on_event, stop_for_tools: false) },
+            &on_event
           )
         end
       end
@@ -157,9 +163,12 @@ module RecordingStudioAI
         pending = nil
         streaming do
           yield proc { |event|
-            finished = true if observe(run, event)
+            next if skip_delivered_event?(run, event)
+
+            finished = true if observe(session, run, event)
             pending = event.tool_calls if event.type == "tool_calls"
             handler.call(event)
+            remember_delivered_item!(run, event)
           }
         end
         return turn_from(run&.reload) if finished
@@ -189,15 +198,15 @@ module RecordingStudioAI
       end
 
       def recovered_turn(session, run, &block)
-        snapshot = fetch_recovery(session, run)
-        apply_recovery(run, snapshot)
+        snapshot = fetch_recovery(session, run, item_scope: :turn)
+        apply_recovery(session, run, snapshot)
         calls = Array(snapshot.tool_calls)
         streaming do
-          Array(snapshot.items).each { |item| block.call(item_event(item)) if replay_item?(item) }
+          replay_completed_items(run, snapshot) { |event| deliver_event(session, run, event, block) }
           if calls.any?
-            block.call(tool_calls_event(calls))
+            deliver_event(session, run, tool_calls_event(calls), block)
           elsif snapshot.turn&.terminal?
-            block.call(turn_event(snapshot.turn))
+            deliver_event(session, run, turn_event(snapshot.turn), block)
           end
         end
         return turn_from(run&.reload, snapshot.turn, session, tool_calls: calls) if calls.any?
@@ -209,52 +218,131 @@ module RecordingStudioAI
         fail_and_raise(run, e)
       end
 
-      # A finished turn can be replayed. A turn that is already waiting on the
-      # caller must be reported from the session, because a new event stream does
-      # not repeat requires_action.
-      def settled_snapshot?(session, run)
-        snapshot = fetch_recovery(session, run)
-        snapshot.turn&.terminal? || Array(snapshot.tool_calls).any?
+      # The stream is already open. Read this turn's items, yield anything the
+      # live stream will not repeat, and skip the read when that snapshot has
+      # already settled. A snapshot failure other than a timeout still lets the
+      # open stream play.
+      def reconcile(session, run, on_event, stop_for_tools:)
+        snapshot = fetch_recovery(session, run, item_scope: :turn)
+        apply_recovery(session, run, snapshot)
+        replay_completed_items(run, snapshot, on_event)
+        deliver_settled(snapshot, on_event, stop_for_tools: stop_for_tools)
       rescue Providers::HostedAgentFailure => e
         raise Failure, e.error if e.timeout?
 
-        false
+        nil
       end
 
-      def fetch_recovery(session, run)
+      # :stop skips the open stream. nil keeps reading it.
+      def deliver_settled(snapshot, on_event, stop_for_tools:)
+        calls = Array(snapshot.tool_calls)
+        terminal = snapshot.turn&.terminal?
+        if calls.any? && (stop_for_tools || !terminal)
+          return nil unless stop_for_tools
+
+          on_event.call(tool_calls_event(calls))
+          return :stop
+        end
+        return nil unless terminal
+
+        on_event.call(turn_event(snapshot.turn))
+        :stop
+      end
+
+      def fetch_recovery(session, run, item_scope: :session)
         adapter_for(session.provider).recover_hosted_agent_session(
           provider_session_id: session.provider_session_id,
-          provider_turn_id: run&.provider_turn_id
+          provider_turn_id: run&.provider_turn_id,
+          item_scope: item_scope
         )
       end
 
-      def observe(run, event) # rubocop:disable Naming/PredicateMethod -- records the event, then reports whether it ended the turn
+      def observe(session, run, event) # rubocop:disable Naming/PredicateMethod -- records the event, then reports whether it ended the turn
         return false unless run
 
         remember_turn(run, event.metadata["provider_turn_id"])
         return false unless TERMINAL_EVENTS.include?(event.type)
 
-        finish_run(run, STATUS_FOR_EVENT.fetch(event.type), event.usage, event.error, event.text)
+        finish_run(
+          run, STATUS_FOR_EVENT.fetch(event.type), event.usage, event.error, event.text, session: session
+        )
         true
       end
 
-      def apply_recovery(run, snapshot)
+      def apply_recovery(session, run, snapshot)
         return unless run && snapshot.turn
 
         remember_turn(run, snapshot.turn.provider_turn_id)
         return if Array(snapshot.tool_calls).any?
         return unless snapshot.turn.terminal?
 
-        text = Array(snapshot.items).map(&:text).join
-        finish_run(run, snapshot.turn.status, snapshot.turn.usage, snapshot.turn.error, text)
+        finish_run(
+          run, snapshot.turn.status, snapshot.turn.usage, snapshot.turn.error,
+          assistant_output(snapshot), session: session
+        )
       end
 
-      def finish_run(run, status, usage, error, text)
+      # Completed assistant text for this turn. User text and other turns are
+      # not part of the run's output size.
+      def assistant_output(snapshot)
+        turn_id = snapshot.turn.provider_turn_id
+        Array(snapshot.items).filter_map do |item|
+          next unless item.role == "assistant" && item.status == "completed"
+          next unless item.provider_turn_id.blank? || item.provider_turn_id == turn_id
+
+          item.text
+        end.join
+      end
+
+      def finish_run(run, status, usage, error, text, session: nil)
         return if run.class.terminal_statuses.include?(run.status)
 
+        usage = usage_for_completed_turn(session, run, usage) if status == "completed"
         assign_usage(run, usage)
         charge(run, usage)
         run.update!(terminal_attributes(run, status, error, text))
+      end
+
+      # Turn.usage is best-effort and often null on turn_completed. Read the
+      # turn once, and once more when that read is retryable or still blank.
+      # A turn that is still without usage completes and is not billed.
+      def usage_for_completed_turn(session, run, usage)
+        return usage if usage
+        return if session.nil? || run.provider_turn_id.blank?
+        return if turn_charged?(run.provider_turn_id, nil)
+
+        USAGE_FETCH_LIMIT.times do |attempt|
+          fetched = read_turn_usage(session, run)
+          return fetched if fetched
+        rescue Providers::HostedAgentFailure => e
+          log_usage_fetch_failure(run, e)
+          break unless e.error.retryable? && attempt < USAGE_FETCH_LIMIT - 1
+        end
+        log_usage_missing(run)
+        nil
+      end
+
+      def read_turn_usage(session, run)
+        turn = adapter_for(session.provider).retrieve_hosted_agent_turn(
+          provider_session_id: session.provider_session_id,
+          provider_turn_id: run.provider_turn_id
+        )
+        turn&.usage
+      end
+
+      def log_usage_fetch_failure(run, error)
+        warn_hosted("recording_studio_ai hosted turn usage fetch failed run_id=#{run.id} error=#{error.class}")
+      end
+
+      def log_usage_missing(run)
+        warn_hosted("recording_studio_ai hosted turn usage unavailable run_id=#{run.id} usage=nil")
+      end
+
+      # Unit tests stub warn on a nil logger. A real logger is used in the app.
+      def warn_hosted(message)
+        Rails.logger.warn(message)
+      rescue NoMethodError
+        nil
       end
 
       def assign_usage(run, usage)
@@ -272,7 +360,7 @@ module RecordingStudioAI
         return if turn_charged?(run.provider_turn_id, nil)
         return unless Usage.charge_hosted_agent_turn!(run: run, usage: usage, attribution: attribution_for(run))
 
-        run.update!(metadata: metadata_with(run, "usage_charged" => true))
+        merge_metadata!(run, "usage_charged" => true)
       end
 
       def ensure_credits!(attribution, run)
@@ -337,9 +425,7 @@ module RecordingStudioAI
       end
 
       def log_cancel_usage_failure(run, error)
-        Rails.logger.warn(
-          "recording_studio_ai cancel usage fetch failed run_id=#{run.id} error=#{error.class}"
-        )
+        warn_hosted("recording_studio_ai cancel usage fetch failed run_id=#{run.id} error=#{error.class}")
       end
 
       def cancel_run(run, snapshot = nil)
@@ -474,7 +560,7 @@ module RecordingStudioAI
         end
         return current unless snapshot.turn&.terminal?
 
-        apply_recovery(current, snapshot)
+        apply_recovery(session, current, snapshot)
         insert_follow_up(session, request)
       rescue Providers::HostedAgentFailure => e
         raise Failure, e.error
@@ -597,8 +683,70 @@ module RecordingStudioAI
         )
       end
 
-      def replay_item?(item)
-        !item.text.to_s.empty? && item.role != "user"
+      def replay_completed_items(run, snapshot, on_event = nil, &block)
+        handler = on_event || block
+        turn_id = run&.provider_turn_id.presence || snapshot.turn&.provider_turn_id
+        Array(snapshot.items).each do |item|
+          next unless replay_item?(item, run, turn_id)
+
+          handler.call(item_event(item))
+        end
+      end
+
+      def replay_item?(item, run, turn_id)
+        return false if item.text.to_s.empty? || item.role == "user"
+        return false unless item.status == "completed"
+        return false if turn_id.present? && item.provider_turn_id.present? && item.provider_turn_id != turn_id
+        return false if item.role == "assistant" && delivered_item?(run, item.id)
+
+        true
+      end
+
+      def deliver_event(session, run, event, handler)
+        return if skip_delivered_event?(run, event)
+
+        observe(session, run, event)
+        handler.call(event)
+        remember_delivered_item!(run, event)
+      end
+
+      def skip_delivered_event?(run, event)
+        return false unless run && event.type == "message_completed"
+
+        delivered_item?(run, event.metadata["item_id"])
+      end
+
+      def delivered_item?(run, item_id)
+        return false unless run
+
+        id = item_id.to_s
+        return false if id.empty?
+
+        delivered_item_ids(run).include?(id)
+      end
+
+      def delivered_item_ids(run)
+        Array(run.metadata.to_h[DELIVERED_ITEMS_KEY]).map(&:to_s)
+      end
+
+      def remember_delivered_item!(run, event)
+        return unless run && event.type == "message_completed"
+
+        id = event.metadata["item_id"].to_s
+        return if id.empty?
+
+        run.with_lock do
+          ids = delivered_item_ids(run)
+          next if ids.include?(id)
+
+          run.update!(metadata: metadata_with(run, DELIVERED_ITEMS_KEY => ids + [id]))
+        end
+      end
+
+      def merge_metadata!(run, extra)
+        run.with_lock do
+          run.update!(metadata: metadata_with(run, extra))
+        end
       end
 
       def item_event(item)

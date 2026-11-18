@@ -637,10 +637,15 @@ provider, then reads the turn and bills the usage that read reports, once.
 It then starts the new message as its own turn. `cancel` does the same billing.
 OpenAI reports turn usage on a best-effort basis. It can be null when unknown,
 including after `agent.session.turn.cancelled`, and a later read can change
-the counts. Null is not billed as zero. If the usage read fails with a
-hosted-agent provider error, the run id and error class are logged and the run
-stays cancelled. Any other error from that read is raised. Cancelling a finished
-run does not bill it again.
+the counts. Null is not billed as zero. If `turn_completed` has no usage, the
+run reads that turn with `turns.retrieve`, and reads it once more when the
+read is retryable or the usage is still blank. Usage that is still null after
+that leaves the run completed and unbilled. The run id is logged. A turn id
+that another run already charged is not read again and is not charged again.
+If the usage read after `cancel` fails with a hosted-agent provider error, the
+run id and error class are logged and the run stays cancelled. Any other error
+from that cancel read is raised. Cancelling a finished run does not bill it
+again.
 
 Each turn is one `hosted_agent` run, attributed with the caller's `root_recording` and
 authorized with `recording_studio_ai.execute`. `send_input`, `stream`,
@@ -653,9 +658,30 @@ follow-up after the turn is terminal records a new run.
 
 Pass `idempotency_key` on create and on every `send_input`. Follow-up submits
 send that key as the provider `Idempotency-Key`. Session create has no typed
-idempotency field, so the adapter sends the same header. A dropped stream fetches the saved session, turn, items, and any unanswered
-function calls. It does not send the input again. A timeout raises
-`Agents::Failure` and leaves the run running.
+idempotency field, so the adapter sends the same header.
+
+`stream` opens the provider stream, then reads the saved turn, then yields
+anything the live stream will not repeat. The turn id is `run.provider_turn_id`.
+When that is still blank, the read uses the turn on that same snapshot. Replay
+lists that turn's items. Assistant messages already delivered are skipped by
+item id (`delivered_item_ids` on the run). The comparison uses the live event's
+`item_id` and the saved item's `id`. Text is not a key. An id is stored only
+after `message_completed`, or after a replayed item whose status is
+`completed`, and only when the handler returns. An in-progress item is not
+stored, so a partial message still receives its final text after a drop.
+Events with no item id are not dropped. A stream that is already settled
+yields the saved messages and the terminal or tool-call event, and does not
+wait on the open stream. `recover` still returns every saved session item and
+does not apply that delivered-id filter.
+
+A dropped stream uses that same read. It does not send the input again. A
+timeout raises `Agents::Failure` and leaves the run running. An item list that
+still has another page after 20 pages raises
+`RecordingStudioAI::Providers::ItemListTooLong`.
+
+A hosted run finished from saved items stores `output_character_count` as the
+completed assistant text for that turn. User text and other turns are not
+counted.
 
 Hosted sessions are stored on the provider. OpenAI's Agents API is not Zero
 Data Retention eligible. The Responses adapter still sends `store: false`;

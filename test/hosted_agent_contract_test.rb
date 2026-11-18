@@ -8,9 +8,11 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
   class FakeAdapter < RecordingStudioAI::Providers::Base
     provider_key :openai
 
-    attr_reader :creates, :submits, :streams, :cancels, :deletes, :recoveries, :tool_results
-    attr_accessor :events, :items, :stream_failure, :tool_result_failure, :default_turn, :tool_calls,
-                  :on_tool_results, :recovery_failure
+    attr_reader :creates, :submits, :streams, :cancels, :deletes, :recoveries, :tool_results, :opens,
+                :usage_fetches, :trace
+    attr_accessor :events, :items, :item_batches, :stream_failure, :drop_after_events, :tool_result_failure,
+                  :default_turn, :tool_calls, :on_tool_results, :recovery_failure, :retrieved_usages,
+                  :retrieve_errors
 
     def initialize(configuration: nil)
       super
@@ -26,9 +28,16 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       @tool_calls = []
       @events = []
       @items = []
+      @item_batches = nil
+      @opens = []
+      @trace = []
+      @usage_fetches = []
+      @retrieved_usages = []
+      @retrieve_errors = []
       @on_tool_results = nil
       @recovery_failure = nil
       @tool_result_failure = nil
+      @drop_after_events = nil
     end
 
     def recovery_turns=(turns)
@@ -50,12 +59,11 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       nil
     end
 
-    def stream_hosted_agent_session(provider_session_id:, &)
+    def stream_hosted_agent_session(provider_session_id:, before_events: nil, &)
       @streams += 1
-      raise stream_failure if stream_failure
-
-      events.each(&)
-      provider_session_id
+      opens << :stream
+      trace << :open
+      finish_open_stream(provider_session_id, before_events, &)
     end
 
     def cancel_hosted_agent_turn(provider_session_id:)
@@ -68,25 +76,53 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       hosted_session(provider_session_id, nil).with(status: "deleted")
     end
 
-    def continue_hosted_agent_after_tool_results(provider_session_id:, results:, &)
+    def continue_hosted_agent_after_tool_results(provider_session_id:, results:, before_events: nil, &)
+      opens << :continue
+      trace << :open
       tool_results << { provider_session_id: provider_session_id, results: results }
       on_tool_results&.call
       raise tool_result_failure if tool_result_failure
+
+      finish_open_stream(provider_session_id, before_events, &)
+    end
+
+    def finish_open_stream(provider_session_id, before_events, &)
+      stop = before_events&.call
       raise stream_failure if stream_failure
 
+      return provider_session_id if stop
+
+      trace << :read
       events.each(&)
+      raise drop_after_events if drop_after_events
+
       provider_session_id
     end
 
-    def recover_hosted_agent_session(provider_session_id:, provider_turn_id: nil)
+    def recover_hosted_agent_session(provider_session_id:, provider_turn_id: nil, item_scope: :session)
       raise recovery_failure if recovery_failure
 
-      recoveries << { provider_session_id: provider_session_id, provider_turn_id: provider_turn_id }
+      trace << :recover
+      recoveries << {
+        provider_session_id: provider_session_id, provider_turn_id: provider_turn_id, item_scope: item_scope
+      }
+      turn = next_turn
       RecordingStudioAI::Providers::HostedRecovery.new(
         session: hosted_session(provider_session_id, "gpt-6-astra"),
-        turn: next_turn,
-        items: items,
+        turn: turn,
+        items: listed_items(turn, provider_turn_id, item_scope),
         tool_calls: next_tool_calls
+      )
+    end
+
+    def retrieve_hosted_agent_turn(provider_session_id:, provider_turn_id:)
+      usage_fetches << { provider_session_id: provider_session_id, provider_turn_id: provider_turn_id }
+      error = Array(retrieve_errors).shift
+      raise error if error
+
+      RecordingStudioAI::Providers::HostedTurn.new(
+        provider_turn_id: provider_turn_id, status: "completed",
+        usage: Array(retrieved_usages).shift, error: nil
       )
     end
 
@@ -100,6 +136,22 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       return @recovery_turns.shift unless @recovery_turns.empty?
 
       default_turn
+    end
+
+    def listed_items(turn, provider_turn_id, item_scope)
+      rows = next_item_batch
+      return rows unless item_scope == :turn
+
+      turn_id = provider_turn_id.presence || turn&.provider_turn_id
+      return [] if turn_id.blank?
+
+      Array(rows).select { |item| item.provider_turn_id.blank? || item.provider_turn_id == turn_id }
+    end
+
+    def next_item_batch
+      return item_batches.shift unless item_batches.nil? || item_batches.empty?
+
+      items
     end
 
     def next_tool_calls
@@ -917,7 +969,8 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     events = []
     turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |event| events << event }
 
-    assert_equal 0, @fake.streams
+    assert_equal 1, @fake.streams
+    assert_equal %i[open recover], @fake.trace
     assert_equal ["tool_calls"], events.map(&:type)
     assert_equal "call_9", turn.tool_calls.first.call_id
     assert_equal "requires_action", turn.status
@@ -944,6 +997,255 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal ["tool_calls"], events.map(&:type)
     assert_equal "call_drop", turn.tool_calls.first.call_id
     assert_equal "running", RecordingStudioAI::Run.find(session.run_id).status
+  end
+
+  def test_normal_stream_delivers_each_message_once
+    session = create_session
+    @fake.events = [
+      delta_event("Hi", "item_live"),
+      message_event("Hi", "item_live"),
+      message_event("Plain", nil),
+      turn_event_for("turn_1")
+    ]
+    events = []
+    turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |event| events << event }
+
+    assert_equal %w[text_delta message_completed message_completed turn_completed], events.map(&:type)
+    assert_equal %w[Hi Plain], events.filter_map(&:text)
+    assert_equal ["item_live"], delivered_ids(session)
+    assert_equal "completed", turn.status
+    assert_equal 1, @spends.length
+    assert_equal %i[open recover read], @fake.trace
+  end
+
+  def test_dropped_stream_delivers_the_final_partial_message_once
+    session = create_session
+    done = item("assistant", "Done", id: "item_done")
+    partial = item("assistant", "Hel", id: "item_partial", status: "in_progress")
+    finished = item("assistant", "Hello", id: "item_partial")
+    earlier = item("assistant", "Earlier", id: "item_old", turn_id: "turn_0")
+    prompt = item("user", "prompt-text", id: "item_user")
+    @fake.recovery_turns = [active_turn, completed_turn]
+    @fake.item_batches = [[done, partial], [prompt, done, finished, earlier]]
+    @fake.events = [message_event("Done", "item_done"), delta_event("Hel", "item_partial")]
+    @fake.drop_after_events = dropped_failure
+    events = []
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |event| events << event }
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal %w[Done Hello], events.filter_map(&:text)
+    assert_equal %w[item_done item_partial], delivered_ids(session)
+    assert_equal "DoneHello".length, run.output_character_count
+    assert_equal "completed", run.status
+    assert_equal 1, @spends.length
+  end
+
+  def test_tool_call_rounds_deliver_each_message_once
+    session = create_session
+    call = tool_call("call_round")
+    @fake.item_batches = [[], [], [item("assistant", "Alpha", id: "item_a", turn_id: "turn_9")]]
+    @fake.events = [message_event("Alpha", "item_a", turn_id: "turn_9"), tool_calls_event(call)]
+    first = []
+    paused = RecordingStudioAI::Agents.stream(**session_args(session)) { |event| first << event }
+
+    assert_equal ["Alpha"], first.filter_map(&:text)
+    assert_equal "requires_action", paused.status
+    assert_equal %i[open recover read], @fake.trace
+
+    @fake.tool_calls = [call]
+    @fake.events = [message_event("Beta", "item_b", turn_id: "turn_9"), turn_event_for("turn_9")]
+    second = []
+    turn = RecordingStudioAI::Agents.submit_tool_results(
+      **session_args(session), results: [tool_result(call)]
+    ) { |event| second << event }
+
+    assert_equal ["Beta"], second.filter_map(&:text)
+    assert_equal "completed", turn.status
+    assert_equal %w[item_a item_b], delivered_ids(session)
+    assert_equal %i[stream continue], @fake.opens
+    assert_equal 1, @spends.length
+  end
+
+  def test_one_turn_delivers_several_assistant_messages_once
+    session = create_session
+    @fake.events = [
+      message_event("One", "item_1"),
+      message_event("Two", "item_2"),
+      message_event("Three", "item_3"),
+      turn_event_for("turn_1")
+    ]
+    events = []
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |event| events << event }
+
+    assert_equal %w[One Two Three], events.filter_map(&:text)
+    assert_equal %w[item_1 item_2 item_3], delivered_ids(session)
+    assert_equal 1, @spends.length
+  end
+
+  def test_stream_after_the_turn_finished_delivers_each_message_once
+    session = create_session
+    @fake.default_turn = completed_turn
+    @fake.items = [
+      item("user", "prompt-text", id: "item_user"),
+      item("assistant", "Kept", id: "item_kept"),
+      item("assistant", "Also", id: "item_also"),
+      item("assistant", "Working", id: "item_open", status: "in_progress")
+    ]
+    @fake.events = [message_event("Kept", "item_kept"), message_event("Extra", "item_extra")]
+    events = []
+    turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |event| events << event }
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal %i[open recover], @fake.trace
+    assert_equal %w[Kept Also], events.filter_map(&:text)
+    assert_equal "turn_completed", events.last.type
+    assert_equal "completed", turn.status
+    assert_equal %w[item_kept item_also], delivered_ids(session)
+    assert_equal "KeptAlso".length, run.output_character_count
+    assert_equal 1, @spends.length
+  end
+
+  def test_a_new_runner_honors_delivered_item_ids
+    session = create_session
+    @fake.events = [message_event("Kept", "item_kept"), turn_event_for("turn_1")]
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    assert_equal ["item_kept"], RecordingStudioAI::Run.find(session.run_id).metadata["delivered_item_ids"]
+
+    @fake.trace.clear
+    @fake.default_turn = completed_turn
+    @fake.items = [
+      item("assistant", "Kept", id: "item_kept"),
+      item("assistant", "Next", id: "item_next")
+    ]
+    @fake.events = [message_event("Kept", "item_kept"), message_event("Next", "item_next")]
+    events = []
+    RecordingStudioAI::Agents::Runner.new.stream(session_args(session)) { |event| events << event }
+
+    assert_equal %i[open recover], @fake.trace
+    assert_equal ["Next"], events.filter_map(&:text)
+    assert_equal %w[item_kept item_next], delivered_ids(session)
+    assert_equal 1, @spends.length
+  end
+
+  def test_replay_skips_messages_from_earlier_turns
+    session = create_session
+    RecordingStudioAI::Run.find(session.run_id).update!(provider_turn_id: "turn_1")
+    @fake.default_turn = completed_turn
+    @fake.items = [
+      item("user", "prompt-text", id: "item_user"),
+      item("assistant", "Old", id: "item_old", turn_id: "turn_0"),
+      item("assistant", "New", id: "item_new"),
+      item("assistant", "Partial", id: "item_partial", status: "in_progress")
+    ]
+    events = []
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |event| events << event }
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal ["New"], events.filter_map(&:text)
+    assert_equal ["item_new"], run.metadata["delivered_item_ids"]
+    assert_equal "New".length, run.output_character_count
+  end
+
+  def test_a_failed_handler_does_not_mark_the_item_delivered
+    session = create_session
+    @fake.events = [message_event("Hi", "item_live"), turn_event_for("turn_1")]
+
+    assert_raises(RuntimeError) do
+      RecordingStudioAI::Agents.stream(**session_args(session)) do |event|
+        raise "stop" if event.type == "message_completed"
+      end
+    end
+
+    assert_nil delivered_ids(session)
+    assert_equal "running", RecordingStudioAI::Run.find(session.run_id).status
+  end
+
+  def test_null_turn_usage_is_read_from_the_turn
+    session = create_session
+    @fake.events = [turn_event_for("turn_1", usage: nil)]
+    @fake.retrieved_usages = [nil, usage]
+    turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+
+    assert_equal 2, @fake.usage_fetches.length
+    assert_equal "sess_1", @fake.usage_fetches.first[:provider_session_id]
+    assert_equal "turn_1", @fake.usage_fetches.first[:provider_turn_id]
+    assert_equal 14, turn.usage.total_tokens
+    assert_equal 1, @spends.length
+    assert_equal 14, @spends.first[:credits]
+  end
+
+  def test_turn_usage_still_null_after_reread_is_not_billed
+    session = create_session
+    @fake.events = [turn_event_for("turn_1", usage: nil)]
+    @fake.retrieved_usages = [nil, nil]
+    turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_equal 2, @fake.usage_fetches.length
+    assert_nil turn.usage
+    assert_empty @spends
+    assert_equal "completed", run.status
+    assert_nil run.total_tokens
+    refute run.metadata.to_h["usage_charged"]
+  end
+
+  def test_turn_usage_read_retries_a_retryable_failure_once
+    session = create_session
+    @fake.events = [turn_event_for("turn_1", usage: nil)]
+    @fake.retrieve_errors = [
+      hosted_failure("connection", code: "network", message: "Provider connection failed.", retryable: true)
+    ]
+    @fake.retrieved_usages = [usage]
+    turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+
+    assert_equal 2, @fake.usage_fetches.length
+    assert_equal 14, turn.usage.total_tokens
+    assert_equal 1, @spends.length
+  end
+
+  def test_turn_usage_read_does_not_retry_a_non_retryable_failure
+    session = create_session
+    @fake.events = [turn_event_for("turn_1", usage: nil)]
+    @fake.retrieve_errors = [
+      hosted_failure("provider_error", code: "provider_error", message: "Provider request failed.", retryable: false)
+    ]
+    @fake.retrieved_usages = [usage]
+    turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+
+    assert_equal 1, @fake.usage_fetches.length
+    assert_nil turn.usage
+    assert_empty @spends
+    assert_equal "completed", RecordingStudioAI::Run.find(session.run_id).status
+  end
+
+  def test_turn_usage_timeout_leaves_the_completed_run_unbilled
+    session = create_session
+    @fake.events = [turn_event_for("turn_1", usage: nil)]
+    timeout = hosted_failure("timeout", code: "timeout", message: "Provider request timed out.", retryable: true)
+    @fake.retrieve_errors = [timeout, timeout]
+    turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+
+    assert_equal "completed", turn.status
+    assert_nil turn.usage
+    assert_empty @spends
+    assert_equal 2, @fake.usage_fetches.length
+  end
+
+  def test_null_usage_skips_a_turn_that_was_already_charged
+    session = create_session
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    assert_equal 1, @spends.length
+
+    @fake.default_turn = completed_turn
+    RecordingStudioAI::Agents.send_input(**session_args(session), input: "next", idempotency_key: "turn-2")
+    @fake.default_turn = nil
+    @fake.events = [turn_event_for("turn_1", usage: nil)]
+    @fake.retrieved_usages = [usage]
+    @fake.usage_fetches.clear
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+
+    assert_empty @fake.usage_fetches
+    assert_equal 1, @spends.length
   end
 
   private
@@ -1091,10 +1393,39 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     RecordingStudioAI::Providers::HostedAgentFailure.new(error, tool_results_rejected: tool_results_rejected)
   end
 
-  def item(role, text)
+  def item(role, text, id: nil, status: "completed", turn_id: "turn_1")
     RecordingStudioAI::Providers::HostedItem.new(
-      id: "item-#{role}", role: role, text: text, status: "completed", provider_turn_id: "turn_1"
+      id: id || "item-#{role}", role: role, text: text, status: status, provider_turn_id: turn_id
     )
+  end
+
+  def message_event(text, item_id, turn_id: "turn_1")
+    metadata = { provider_turn_id: turn_id }
+    metadata[:item_id] = item_id if item_id
+    RecordingStudioAI::Providers::StreamEvent.new(type: "message_completed", text: text, metadata: metadata)
+  end
+
+  def delta_event(text, item_id, turn_id: "turn_1")
+    RecordingStudioAI::Providers::StreamEvent.new(
+      type: "text_delta", text_delta: text, metadata: { provider_turn_id: turn_id, item_id: item_id }
+    )
+  end
+
+  def turn_event_for(turn_id, usage: self.usage)
+    RecordingStudioAI::Providers::StreamEvent.new(
+      type: "turn_completed", usage: usage, metadata: { provider_turn_id: turn_id }
+    )
+  end
+
+  def dropped_failure
+    connection = RecordingStudioAI::Contracts::NormalizedError.new(
+      category: "connection", code: "network", message: "Provider connection failed.", retryable: true
+    )
+    RecordingStudioAI::Providers::HostedAgentFailure.new(connection, dropped: true)
+  end
+
+  def delivered_ids(session)
+    RecordingStudioAI::Run.find(session.run_id).reload.metadata["delivered_item_ids"]
   end
 
   def setup_stream_events

@@ -5,6 +5,19 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-11-18
+
+### Fixed
+- A hosted chat stream opens before it reads saved items. Replay is limited to the current turn (`run.provider_turn_id`, or the turn on that same read). Assistant items already delivered are skipped by item id. Text is not used as the key. An id is recorded only after a `message_completed` event, or a replayed item with status `completed`, and only when the handler returns. In-progress items are not recorded, so a partial message still gets its final text after a dropped stream. Events with no item id are kept. Delivered ids are stored on the run as `delivered_item_ids` and written under a row lock. `Agents.recover` still returns the session's saved items.
+- An item list that still has another page after 20 pages raises `RecordingStudioAI::Providers::ItemListTooLong`.
+- A completed hosted turn whose `turn_completed` usage is null reads the turn with `turns.retrieve`, and once more when that read is retryable or still blank. Usage that is still null is not billed. The turn is stored completed. A turn id that another run already charged is not read again and is not charged again.
+
+### Changed
+- `output_character_count` on a hosted run finished from saved items counts that turn's completed assistant text. User text and other turns are not included.
+
+### Upgrade notes
+- Bump to `0.25.1`. No migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0251).
+
 ## [0.25.0] - 2026-11-18
 
 ### Added

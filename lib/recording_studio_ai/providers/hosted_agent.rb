@@ -15,6 +15,10 @@ module RecordingStudioAI
       end
     end
 
+    # A turn or session item list still had another page after the page cap.
+    class ItemListTooLong < StandardError
+    end
+
     # Provider failure already mapped to a neutral error. +dropped+ means the
     # stream ended before a terminal event; the caller must fetch saved state
     # and must not send the input again. +tool_results_rejected+ means the
