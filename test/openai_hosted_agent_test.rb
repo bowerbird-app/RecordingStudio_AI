@@ -147,8 +147,18 @@ class OpenAIHostedAgentTest < Minitest::Test
     assert_equal({ extra_headers: { "idempotency-key" => "create-1" } }, params[:request_options])
     refute params.key?(:store)
     refute params[:agent].key?(:tools)
+    refute params[:agent].key?(:reasoning)
     assert_equal "sess_1", session.provider_session_id
     assert_equal "gpt-6-astra", session.model
+  end
+
+  def test_reasoning_effort_is_sent_as_agent_reasoning
+    @adapter.create_hosted_agent_session(
+      instructions: "Be brief.", model: "gpt-6-luna", input: "Hello", idempotency_key: "create-1",
+      reasoning_effort: "medium"
+    )
+
+    assert_equal({ effort: "medium" }, @sessions.create_params.dig(:agent, :reasoning))
   end
 
   def test_function_tools_are_sent_on_the_agent

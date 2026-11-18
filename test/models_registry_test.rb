@@ -186,6 +186,20 @@ class ModelsRegistryTest < Minitest::Test
     assert_equal [:hosted_agent], definition.capabilities
     refute_includes definition.capabilities, :generation
     refute_includes definition.capabilities, :decision
+    assert_equal %w[low medium high xhigh max], definition.parameter(:reasoning_effort)[:values]
+    assert_nil definition.parameter(:reasoning_effort)[:default]
+  end
+
+  def test_builtin_gpt_6_luna_generates_and_hosts_chat
+    definition = RecordingStudioAI.models.fetch(:openai, "gpt-6-luna")
+
+    assert_equal %i[generation hosted_agent], definition.operations
+    assert_includes definition.capabilities, :generation
+    assert_includes definition.capabilities, :hosted_agent
+    assert_includes definition.capabilities, :streaming
+    assert_equal %w[none low medium high xhigh max], definition.parameter(:reasoning_effort)[:values]
+    assert_equal "medium", definition.parameter(:reasoning_effort)[:default]
+    assert definition.supports_tool?(:web_search)
   end
 
   def test_duplicate_registration_raises_without_override
@@ -245,6 +259,8 @@ class ModelsRegistryTest < Minitest::Test
     assert registry.fetch(:gemini, "gemini-2.5-flash")
     assert registry.fetch(:gemini, "gemini-2.5-pro")
     assert registry.fetch(:typesafe, "jev-latest")
+    assert registry.fetch(:openai, "gpt-6-luna")
+    assert registry.fetch(:openai, "gpt-6-astra")
   end
 
   def test_resolver_derives_capabilities_from_registry_when_profile_omits_them

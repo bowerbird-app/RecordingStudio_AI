@@ -156,23 +156,27 @@ module RecordingStudioAI
       # Returns the initiator used when refresh_batch_from_webhook omits initiator:.
       # Example: ->(root_recording:, **) { SystemActor.instance }
       @webhook_batch_initiator = nil
+      # Hosted chat walks each tier in order and uses the first hosted_agent
+      # model. Luna is that default. Astra stays available after it.
+      # Luna's hosted reasoning effort defaults to medium on the model spec.
+      # Astra sends no effort unless the entry sets reasoning_effort.
       @profiles = {
         low: [
           { provider: :openai, model: "gpt-5-mini" },
           { provider: :gemini, model: "gemini-2.5-flash" },
-          { provider: :openai, model: "gpt-6-astra" },
+          *hosted_chat_entries,
           { provider: :typesafe, model: "jev-latest" }
         ],
         medium: [
           { provider: :openai, model: "gpt-5" },
           { provider: :gemini, model: "gemini-2.5-pro" },
-          { provider: :openai, model: "gpt-6-astra" },
+          *hosted_chat_entries,
           { provider: :typesafe, model: "jev-latest" }
         ],
         high: [
           { provider: :openai, model: "gpt-5-pro" },
           { provider: :gemini, model: "gemini-2.5-pro" },
-          { provider: :openai, model: "gpt-6-astra" },
+          *hosted_chat_entries,
           { provider: :typesafe, model: "jev-latest" }
         ]
       }
@@ -242,7 +246,9 @@ module RecordingStudioAI
         invalid_configuration!("admin_runs_scope must be nil or respond to call")
       end
       validate_credit_billing!
+      normalize_profiles!
       normalize_model_fallbacks!
+      validate_reasoning_efforts!
       self
     end
 
@@ -272,6 +278,78 @@ module RecordingStudioAI
     end
 
     private
+
+    def hosted_chat_entries
+      [
+        { provider: :openai, model: "gpt-6-luna" },
+        { provider: :openai, model: "gpt-6-astra" }
+      ]
+    end
+
+    def normalize_profiles!
+      raw = @profiles || {}
+      invalid_configuration!("profiles must be a Hash") unless raw.is_a?(Hash)
+
+      @profiles = raw.each_with_object({}) do |(profile, entries), normalized|
+        list = Array(entries)
+        normalized[profile.to_sym] = list.each_with_index.map do |entry, index|
+          normalize_profile_entry!(entry, path: "profiles[#{profile}][#{index}]")
+        end
+      end
+    end
+
+    def normalize_profile_entry!(entry, path)
+      return entry if entry.is_a?(RecordingStudioAI::Candidate)
+
+      as_configuration_error do
+        normalized = RecordingStudioAI::FallbackEntries.symbolize_entry!(
+          entry, path: path, extra_keys: [:capabilities]
+        )
+        built = {
+          provider: RecordingStudioAI::FallbackEntries.require_value!(normalized[:provider], path: "#{path}.provider"),
+          model: RecordingStudioAI::FallbackEntries.require_model!(normalized[:model], path: "#{path}.model")
+        }
+        if normalized.key?(:capabilities)
+          built[:capabilities] = Array(normalized[:capabilities]).map(&:to_sym)
+        end
+        built.merge(RecordingStudioAI::FallbackEntries.optional_parameters!(normalized))
+      end
+    end
+
+    def validate_reasoning_efforts!
+      profiles.each do |profile, entries|
+        Array(entries).each_with_index do |entry, index|
+          check_reasoning_effort!(entry, "profiles[#{profile}][#{index}]")
+        end
+      end
+      model_fallbacks.each do |(provider, model), entries|
+        entries.each_with_index do |entry, index|
+          check_reasoning_effort!(entry, "model_fallbacks[#{provider}/#{model}][#{index}]")
+        end
+      end
+    end
+
+    def check_reasoning_effort!(entry, path)
+      return unless entry.is_a?(Hash) && entry[:reasoning_effort]
+
+      provider = entry[:provider]
+      model = entry[:model]
+      spec = RecordingStudioAI.models.fetch(provider, model)&.parameter(:reasoning_effort)
+      unless spec
+        invalid_configuration!("#{path} reasoning_effort is not supported by #{provider}/#{model}")
+      end
+
+      allowed = Array(spec[:values]).map(&:to_s)
+      return if allowed.include?(entry[:reasoning_effort].to_s)
+
+      invalid_configuration!("#{path} reasoning_effort must be one of: #{allowed.join(', ')}")
+    end
+
+    def as_configuration_error
+      yield
+    rescue RecordingStudioAI::Errors::ContractValidationError => e
+      invalid_configuration!(e.message)
+    end
 
     def normalize_model_fallbacks!
       raw = @model_fallbacks || {}

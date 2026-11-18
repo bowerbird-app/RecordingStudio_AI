@@ -35,7 +35,7 @@ module RecordingStudioAI
       Models::Definition::KNOWN_PARAMETERS.index_with { |name| entry[name] }.compact
     end
 
-    def symbolize_entry!(entry, path:)
+    def symbolize_entry!(entry, path:, extra_keys: [])
       unless entry.is_a?(Hash)
         raise RecordingStudioAI::Errors::ContractValidationError.new(
           "#{path} must be a Hash",
@@ -44,12 +44,12 @@ module RecordingStudioAI
       end
 
       normalized = entry.transform_keys(&:to_sym)
-      reject_unknown_entry_keys!(normalized, path: path)
+      reject_unknown_entry_keys!(normalized, path: path, extra_keys: extra_keys)
       normalized
     end
 
-    def reject_unknown_entry_keys!(normalized, path:)
-      unknown = normalized.keys - ENTRY_KEYS
+    def reject_unknown_entry_keys!(normalized, path:, extra_keys: [])
+      unknown = normalized.keys - ENTRY_KEYS - Array(extra_keys)
       return if unknown.empty?
 
       raise RecordingStudioAI::Errors::ContractValidationError.new(

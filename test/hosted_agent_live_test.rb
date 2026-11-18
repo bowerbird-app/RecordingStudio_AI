@@ -23,7 +23,7 @@ class HostedAgentLiveTest < RecordingStudioAI::Test::PersistenceCase
     session = nil
     session = RecordingStudioAI::Agents.create_session(
       instructions: "Reply with the single word pong.",
-      model: "gpt-6-astra",
+      model: "gpt-6-luna",
       input: "ping",
       idempotency_key: "live-#{SecureRandom.hex(8)}",
       purpose: "agent_chat",

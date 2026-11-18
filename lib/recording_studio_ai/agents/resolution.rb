@@ -2,18 +2,47 @@
 
 module RecordingStudioAI
   module Agents
+    Resolved = Data.define(:candidate, :reasoning_effort)
+
     module Resolution
       module_function
 
       def call(profile:, model:, provider:)
-        return resolve_model(model, provider) if model && profile.nil?
+        if model && profile.nil?
+          candidate = resolve_model(model, provider)
+          return resolved(candidate, nil)
+        end
 
-        RecordingStudioAI::Resolver.new.resolve(
+        entry, candidate = RecordingStudioAI::Resolver.new.entry_pairs(
           profile: profile || RecordingStudioAI.configuration.default_profile,
           required_capabilities: [:hosted_agent],
           provider: provider,
           model: model
-        )
+        ).first
+        resolved(candidate, entry)
+      end
+
+      # Profile entry wins. Otherwise the model spec default is sent.
+      # Astra has no default, so an unset entry sends nothing.
+      def resolved(candidate, entry)
+        Resolved.new(candidate: candidate, reasoning_effort: reasoning_effort_for(candidate, entry))
+      end
+
+      def reasoning_effort_for(candidate, entry)
+        if entry.is_a?(Hash)
+          effort = entry.transform_keys(&:to_sym)[:reasoning_effort]
+          return effort.to_s unless effort.nil?
+        end
+
+        definition = RecordingStudioAI.models.fetch(candidate.provider, candidate.model)
+        default_effort(definition)
+      end
+
+      def default_effort(definition)
+        parameter = definition&.parameter(:reasoning_effort)
+        return if parameter.nil?
+
+        parameter[:default]&.to_s
       end
 
       def resolve_model(model, provider)

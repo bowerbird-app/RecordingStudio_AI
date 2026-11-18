@@ -22,12 +22,26 @@ module RecordingStudioAI
     end
 
     def candidates(profile:, required_capabilities:, provider: nil, model: nil, allow_empty: false)
+      entry_pairs(
+        profile: profile,
+        required_capabilities: required_capabilities,
+        provider: provider,
+        model: model,
+        allow_empty: allow_empty
+      ).map(&:last)
+    end
+
+    # Profile entry plus the candidate built from it, in profile order.
+    # Hosted chat and generation read reasoning_effort from the entry.
+    def entry_pairs(profile:, required_capabilities:, provider: nil, model: nil, allow_empty: false)
       provider_key = validate_override!(provider)
       model_key = model&.to_s
-      candidates = Array(@configuration.profiles[profile.to_sym]).map { |entry| build_candidate(entry) }
-      candidates.select! { |candidate| candidate.provider == provider_key } if provider_key
-      candidates.select! { |candidate| candidate.model == model_key } if model_key
-      select_configured_capable!(candidates, required_capabilities, allow_empty: allow_empty, model: model_key)
+      pairs = Array(@configuration.profiles[profile.to_sym]).map { |entry| [entry, build_candidate(entry)] }
+      pairs.select! { |_entry, candidate| candidate.provider == provider_key } if provider_key
+      pairs.select! { |_entry, candidate| candidate.model == model_key } if model_key
+      select_configured_capable_pairs!(
+        pairs, required_capabilities, allow_empty: allow_empty, model: model_key
+      )
     end
 
     # Explicit generate(fallbacks: [...]) list. Same shape as profile entries
@@ -57,15 +71,25 @@ module RecordingStudioAI
     end
 
     def select_configured_capable!(candidates, required_capabilities, allow_empty:, model: nil, source: :profile)
-      candidates.select! do |candidate|
+      select_configured_capable_pairs!(
+        candidates.map { |candidate| [nil, candidate] },
+        required_capabilities,
+        allow_empty: allow_empty,
+        model: model,
+        source: source
+      ).map(&:last)
+    end
+
+    def select_configured_capable_pairs!(pairs, required_capabilities, allow_empty:, model: nil, source: :profile)
+      pairs.select! do |_entry, candidate|
         provider = @configuration.providers[candidate.provider]
         provider && (!provider.respond_to?(:configured?) || provider.configured?)
       end
 
-      eligible = candidates.select { |candidate| candidate.supports?(required_capabilities) }
+      eligible = pairs.select { |_entry, candidate| candidate.supports?(required_capabilities) }
       return eligible if eligible.any? || allow_empty
 
-      raise_resolution_error!(candidates, required_capabilities, model: model, source: source)
+      raise_resolution_error!(pairs.map(&:last), required_capabilities, model: model, source: source)
     end
 
     def build_candidate(entry)
@@ -73,7 +97,7 @@ module RecordingStudioAI
 
       attributes = entry.transform_keys(&:to_sym)
       attributes[:capabilities] ||= registered_capabilities(attributes[:provider], attributes[:model])
-      RecordingStudioAI::Candidate.new(**attributes)
+      RecordingStudioAI::Candidate.new(**attributes.slice(:provider, :model, :capabilities))
     end
 
     # Profiles reference models by their provider API model string. When a

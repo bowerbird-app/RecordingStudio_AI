@@ -39,9 +39,10 @@ class LibraryGapCoverageTest < RecordingStudioAI::Test::PersistenceCase
       @events = []
     end
 
-    def create_hosted_agent_session(instructions:, model:, input:, idempotency_key:, tools: nil)
+    def create_hosted_agent_session(instructions:, model:, input:, idempotency_key:, **options)
       creates << {
-        instructions: instructions, model: model, input: input, idempotency_key: idempotency_key, tools: tools
+        instructions: instructions, model: model, input: input, idempotency_key: idempotency_key,
+        tools: options[:tools], reasoning_effort: options[:reasoning_effort]
       }
       raise create_failure if create_failure
 

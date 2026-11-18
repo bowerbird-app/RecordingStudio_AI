@@ -13,7 +13,10 @@ RecordingStudioAI.models.register(
     temperature: RecordingStudioAI::Models::Openai::Constants::TEMPERATURE,
     verbosity: RecordingStudioAI::Models::Openai::Constants.verbosity(default: "medium"),
     max_output_tokens: RecordingStudioAI::Models::Openai::Constants.max_output_tokens(default: 4_096),
-    reasoning_effort: RecordingStudioAI::Models::Openai::Constants.reasoning_effort(default: "medium")
+    reasoning_effort: RecordingStudioAI::Models::Openai::Constants.reasoning_effort(
+      default: "medium",
+      values: %w[minimal low medium high]
+    )
   },
   tools: RecordingStudioAI::Models::Openai::Constants::MINI_TOOLS,
   modalities: RecordingStudioAI::Models::Openai::Constants::MODALITIES

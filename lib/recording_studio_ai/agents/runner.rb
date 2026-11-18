@@ -23,14 +23,15 @@ module RecordingStudioAI
       def create(raw)
         request = Request.create!(**raw)
         authorize!(request)
-        candidate = Resolution.call(profile: request[:profile], model: request[:model], provider: request[:provider])
+        resolved = Resolution.call(profile: request[:profile], model: request[:model], provider: request[:provider])
+        candidate = resolved.candidate
         run = insert_run(request, candidate, request[:input])
         ensure_credits!(request.fetch(:attribution), run)
         hosted = call_provider(run) do
           adapter_for(candidate.provider).create_hosted_agent_session(
             instructions: request[:instructions], model: candidate.model,
             input: request[:input], idempotency_key: request[:idempotency_key],
-            tools: request[:tools]
+            tools: request[:tools], reasoning_effort: resolved.reasoning_effort
           )
         end
         remember_session(run, hosted)
