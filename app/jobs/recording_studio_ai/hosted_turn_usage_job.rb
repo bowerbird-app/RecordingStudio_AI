@@ -4,25 +4,20 @@ require "active_job"
 
 module RecordingStudioAI
   # Re-reads a completed hosted turn until usage arrives, then charges once.
-  # Waits sit between attempts. The request that enqueued the job does not sleep.
+  # The next wait is another job. +perform+ does not sleep, so a worker is
+  # not held for the whole backoff.
   class HostedTurnUsageJob < ::ActiveJob::Base
     queue_as :default
 
-    # Seconds before attempts 2, 3, 4, and 5. Attempt 1 runs immediately.
+    # Seconds before attempts 2, 3, 4, and 5. Attempt 1 is enqueued immediately.
     RETRY_WAITS = [5, 30, 120, 600].freeze
 
-    def perform(run_id)
-      runner = Agents::Runner.new
-      finished = false
-      RETRY_WAITS.each_with_index do |wait, index|
-        finished = runner.record_deferred_turn_usage(run_id, attempt: index + 1, final: false)
-        break if finished
+    def perform(run_id, attempt = 1)
+      final = attempt > RETRY_WAITS.length
+      finished = Agents::Runner.new.record_deferred_turn_usage(run_id, attempt: attempt, final: final)
+      return if finished || final
 
-        RecordingStudioAI.configuration.retry_sleeper.call(wait)
-      end
-      return if finished
-
-      runner.record_deferred_turn_usage(run_id, attempt: RETRY_WAITS.length + 1, final: true)
+      self.class.set(wait: RETRY_WAITS.fetch(attempt - 1)).perform_later(run_id, attempt + 1)
     end
   end
 end

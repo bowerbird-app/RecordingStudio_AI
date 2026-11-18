@@ -77,13 +77,11 @@ module RecordingStudioAI
         unsupported_hosted_agent!
       end
 
-      def delete_hosted_agent_session(**)
-        unsupported_hosted_agent!
-      end
+      def delete_hosted_agent_session(**) = unsupported_hosted_agent!
 
-      def recover_hosted_agent_session(**)
-        unsupported_hosted_agent!
-      end
+      def recover_hosted_agent_session(**) = unsupported_hosted_agent!
+
+      def list_hosted_agent_turns(**) = unsupported_hosted_agent!
 
       private
 

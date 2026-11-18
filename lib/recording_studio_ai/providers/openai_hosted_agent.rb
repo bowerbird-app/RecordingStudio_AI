@@ -21,6 +21,8 @@ module RecordingStudioAI
       }.freeze
       TERMINAL_EVENT_TYPES = %w[turn_completed failed cancelled].freeze
       ITEM_PAGE_LIMIT = 20
+      # More than one, so a follow-up is not stuck with only the latest turn.
+      TURN_LIST_LIMIT = 20
       MESSAGES = {
         "authentication" => "Provider authentication failed.",
         "unsupported_model" => "Provider model is not supported for hosted agents.",
@@ -129,6 +131,17 @@ module RecordingStudioAI
           hosted_turn(
             client.beta.agents.sessions.turns.retrieve(provider_turn_id, session_id: provider_session_id)
           )
+        end
+      end
+
+      # Oldest first, and more than one row. Callers choose a turn. This does
+      # not return only the latest turn.
+      def list_hosted_agent_turns(provider_session_id:)
+        hosted_request(session_lookup: true) do
+          page = client.beta.agents.sessions.turns.list(
+            provider_session_id, order: "asc", limit: TURN_LIST_LIMIT
+          )
+          Array(read_value(page, :data)).filter_map { |turn| listed_hosted_turn(turn) }
         end
       end
 
@@ -275,8 +288,40 @@ module RecordingStudioAI
         turns = client.beta.agents.sessions.turns
         return turns.retrieve(provider_turn_id, session_id: provider_session_id) if provider_turn_id
 
+        # Snapshot of the newest turn only. A follow-up that still has no turn
+        # id resolves billing with list_hosted_agent_turns, which reads more
+        # than this one row.
         page = turns.list(provider_session_id, order: "desc", limit: 1)
         Array(read_value(page, :data)).first
+      end
+
+      def listed_hosted_turn(turn)
+        id = read_value(turn, :id).to_s
+        return if id.empty?
+
+        ListedTurn.new(
+          provider_turn_id: id,
+          created_at: parse_turn_time(read_value(turn, :created_at)),
+          status: read_value(turn, :status).to_s
+        )
+      end
+
+      def parse_turn_time(value)
+        case value
+        when Time
+          value
+        when Numeric
+          Time.at(value).utc
+        when String
+          return if value.empty?
+
+          numeric = Float(value, exception: false)
+          return Time.at(numeric).utc if numeric
+
+          Time.iso8601(value)
+        end
+      rescue ArgumentError, TypeError
+        nil
       end
 
       def read_open_stream(stream, before_events, &)
