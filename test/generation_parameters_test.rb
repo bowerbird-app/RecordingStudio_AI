@@ -428,6 +428,45 @@ class GenerationParameterProfileFallbackTest < RecordingStudioAI::Test::Persiste
     assert_empty ignored.calls
   end
 
+  def test_profile_entry_reasoning_effort_applies_until_the_caller_sets_one
+    provider = QueueProvider.new(success_result)
+    configuration = RecordingStudioAI.configuration
+    configuration.providers = { openai: provider }
+    configuration.profiles[:low] = [
+      { provider: :openai, model: "gpt-6-luna", reasoning_effort: "low" }
+    ]
+
+    RecordingStudioAI.generate(
+      prompt: "hello", profile: :low, root_recording: @root_recording, initiator: @initiator
+    )
+    assert_equal "low", provider.calls.first[:request][:reasoning_effort]
+
+    caller_wins = QueueProvider.new(success_result)
+    configuration.providers = { openai: caller_wins }
+    RecordingStudioAI.generate(
+      prompt: "hello", profile: :low, root_recording: @root_recording, initiator: @initiator,
+      reasoning_effort: "high"
+    )
+    assert_equal "high", caller_wins.calls.first[:request][:reasoning_effort]
+  end
+
+  def test_reasoning_effort_on_a_later_entry_does_not_change_the_first_model
+    provider = QueueProvider.new(success_result)
+    configuration = RecordingStudioAI.configuration
+    configuration.providers = { openai: provider }
+    configuration.profiles[:low] = [
+      { provider: :openai, model: "gpt-5-mini" },
+      { provider: :openai, model: "gpt-6-luna", reasoning_effort: "max" }
+    ]
+
+    RecordingStudioAI.generate(
+      prompt: "hello", profile: :low, root_recording: @root_recording, initiator: @initiator
+    )
+
+    assert_equal "gpt-5-mini", provider.calls.first[:candidate].model
+    assert_nil provider.calls.first[:request][:reasoning_effort]
+  end
+
   private
 
   def configure_low_profile(first:, second:)

@@ -8,31 +8,38 @@ RecordingStudioAI.configure do |config|
 
   config.default_profile = :medium
   # Example prices for the admin screen. No usage_handler, so calls stay free.
+  # Luna and Astra credits are $0.001 of the published price per 1M tokens.
+  # A kind with no rate prices at 0, and any reported usage still costs at least 1.
   config.credit_prices = {
     "*" => {
       input: 100, output: 400, cached_input: 25, reasoning: 400, web_search: 5, decision: 2
     },
     openai: {
       "*" => { input: 150, output: 600 },
-      "gpt-5" => { input: 200, output: 800 }
+      "gpt-5" => { input: 200, output: 800 },
+      "gpt-6-luna" => { input: 100, cached_input: 10, output: 500, cache_write: 125 },
+      "gpt-6-astra" => { input: 10_000, cached_input: 1_000, output: 50_000, cache_write: 12_500 }
     }
   }
   config.profiles = {
     low: [
       { provider: :openai, model: "gpt-5-mini" },
       { provider: :gemini, model: "gemini-2.5-flash" },
+      { provider: :openai, model: "gpt-6-luna" },
       { provider: :openai, model: "gpt-6-astra" },
       { provider: :typesafe, model: "jev-latest" }
     ],
     medium: [
       { provider: :openai, model: "gpt-5" },
       { provider: :gemini, model: "gemini-2.5-pro" },
+      { provider: :openai, model: "gpt-6-luna" },
       { provider: :openai, model: "gpt-6-astra" },
       { provider: :typesafe, model: "jev-latest" }
     ],
     high: [
       { provider: :openai, model: "gpt-5-pro" },
       { provider: :gemini, model: "gemini-2.5-pro" },
+      { provider: :openai, model: "gpt-6-luna" },
       { provider: :openai, model: "gpt-6-astra" },
       { provider: :typesafe, model: "jev-latest" }
     ]

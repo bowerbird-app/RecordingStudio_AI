@@ -5,6 +5,23 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-18
+
+### Added
+- `gpt-6-luna` is a generation and hosted-agent model. Its reasoning efforts are `none`, `low`, `medium` (default), `high`, `xhigh`, and `max`.
+- Profile entries accept optional `reasoning_effort`, the same key `model_fallbacks` already accepts. Boot checks it against that model's allowed values. `gpt-6-astra` allows `low`, `medium`, `high`, `xhigh`, and `max`.
+- Hosted session create sends `agent.reasoning.effort` when an effort resolves. Luna sends `medium` when the entry omits it. Astra sends nothing unless the entry sets an effort. Generation uses the entry's effort, and an explicit caller value wins.
+
+### Changed
+- Default profiles list `gpt-6-luna` before `gpt-6-astra`. Hosted chat uses that order. Put astra first to keep it as the hosted model.
+- OpenAI reasoning efforts are declared per model. The shared list is no longer only `minimal`, `low`, `medium`, and `high`.
+- Development stays on Recording Studio `v7.7.0`. The gemspec range stays `>= 7.0`, `< 8.0`.
+
+### Upgrade notes
+- Bump to `~> 0.25`. No migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0250).
+- Hosts that bill set a `credit_prices` entry for `gpt-6-luna`. A missing kind prices at 0 and the charge is still at least 1 credit.
+- Published prices per 1M tokens: Luna `$0.10` input, `$0.01` cached input, `$0.50` output, `$0.125` cache write. Astra `$10`, `$1`, `$50`, `$12.50`.
+
 ## [0.24.1] - 2026-11-17
 
 ### Changed
@@ -1260,7 +1277,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.24.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.22.0...v0.23.0

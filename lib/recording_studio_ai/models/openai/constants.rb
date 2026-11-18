@@ -28,8 +28,12 @@ module RecordingStudioAI
           { type: :string, values: %w[low medium high], default: default }
         end
 
-        def reasoning_effort(default:)
-          { type: :string, values: %w[minimal low medium high], default: default }
+        # Allowed efforts are per model. Omit default when the provider should
+        # pick, which hosted chat treats as "send nothing".
+        def reasoning_effort(values:, default: nil)
+          spec = { type: :string, values: values }
+          spec[:default] = default unless default.nil?
+          spec
         end
 
         def max_output_tokens(default:)

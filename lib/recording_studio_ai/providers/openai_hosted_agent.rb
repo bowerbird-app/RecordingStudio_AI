@@ -32,10 +32,14 @@ module RecordingStudioAI
         "provider_error" => "Provider request failed."
       }.freeze
 
-      def create_hosted_agent_session(instructions:, model:, input:, idempotency_key:, tools: nil)
+      def create_hosted_agent_session(instructions:, model:, input:, idempotency_key:, **options)
         response = hosted_request(session_lookup: false) do
           client.beta.agents.sessions.create(
-            **session_create_params(instructions, model, input, idempotency_key, tools)
+            **session_create_params(
+              hosted_agent(instructions, model, options[:tools], options[:reasoning_effort]),
+              input,
+              idempotency_key
+            )
           )
         end
         hosted_session(response)
@@ -117,9 +121,15 @@ module RecordingStudioAI
 
       private
 
-      def session_create_params(instructions, model, input, idempotency_key, tools)
+      def hosted_agent(instructions, model, tools, reasoning_effort)
         agent = { model: model, instructions: instructions }.compact
         agent[:tools] = tools if tools.is_a?(Array) && !tools.empty?
+        # sessions.create: agent.reasoning.effort. Omit the object when no effort resolved.
+        agent[:reasoning] = { effort: reasoning_effort } if reasoning_effort
+        agent
+      end
+
+      def session_create_params(agent, input, idempotency_key)
         params = {
           agent: agent,
           environment: ENVIRONMENT,

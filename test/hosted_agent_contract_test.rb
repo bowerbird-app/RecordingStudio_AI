@@ -35,9 +35,10 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       @recovery_turns = turns.dup
     end
 
-    def create_hosted_agent_session(instructions:, model:, input:, idempotency_key:, tools: nil)
+    def create_hosted_agent_session(instructions:, model:, input:, idempotency_key:, **options)
       creates << {
-        instructions: instructions, model: model, input: input, idempotency_key: idempotency_key, tools: tools
+        instructions: instructions, model: model, input: input, idempotency_key: idempotency_key,
+        tools: options[:tools], reasoning_effort: options[:reasoning_effort]
       }
       hosted_session("sess_1", model)
     end
@@ -126,17 +127,37 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     @configuration.usage_precheck = ->(**) { true }
     @configuration.credit_prices = { "*" => { input: 1_000_000, output: 1_000_000 } }
     @configuration.usage_handler = ->(**kwargs) { @spends << kwargs }
+    # Published Luna rates: $0.10 input and $0.50 output per 1M tokens, in microunits.
     @configuration.cost_catalogs = {
-      openai: { "gpt-6-astra" => { input_tokens: 3_000_000, output_tokens: 15_000_000, currency: "USD" } }
+      openai: { "gpt-6-luna" => { input_tokens: 100_000, output_tokens: 500_000, currency: "USD" } }
     }
     setup_stream_events
+  end
+
+  def test_hosted_chat_uses_profile_order_and_sends_effort_only_when_one_resolves
+    @configuration.profiles[:low] = [{ provider: :openai, model: "gpt-6-astra" }]
+    create_session(idempotency_key: "astra-plain")
+    assert_equal "gpt-6-astra", @fake.creates.first[:model]
+    assert_nil @fake.creates.first[:reasoning_effort]
+
+    @configuration.profiles[:low] = [
+      { provider: :openai, model: "gpt-6-astra", reasoning_effort: "high" },
+      { provider: :openai, model: "gpt-6-luna", reasoning_effort: "low" }
+    ]
+    create_session(idempotency_key: "astra-high")
+    assert_equal "gpt-6-astra", @fake.creates.last[:model]
+    assert_equal "high", @fake.creates.last[:reasoning_effort]
+
+    create_session(model: "gpt-6-luna", profile: nil, idempotency_key: "luna-default")
+    assert_equal "medium", @fake.creates.last[:reasoning_effort]
   end
 
   def test_create_stream_and_follow_up_record_one_run_per_turn
     session = create_session
     assert_equal :openai, session.provider
     assert_equal "sess_1", session.provider_session_id
-    assert_equal "gpt-6-astra", session.model
+    assert_equal "gpt-6-luna", session.model
+    assert_equal "medium", @fake.creates.first[:reasoning_effort]
     assert_equal "create-1", @fake.creates.first[:idempotency_key]
     assert_equal "Be brief.", @fake.creates.first[:instructions]
     assert_nil @fake.creates.first[:tools]
@@ -155,7 +176,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "completed", turn.status
     assert_equal "turn_1", turn.provider_turn_id
     assert_equal 14, turn.usage.total_tokens
-    assert_equal 90, turn.cost.amount
+    assert_equal 3, turn.cost.amount
     assert_equal "USD", turn.cost.currency
     refute_includes RecordingStudioAI::Run.column_names, "cost"
     run.reload
@@ -927,11 +948,11 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
 
   private
 
-  def create_session(model: nil, profile: :low, tools: nil)
+  def create_session(model: nil, profile: :low, tools: nil, idempotency_key: "create-1")
     args = {
       instructions: "Be brief.",
       input: "do-not-store-this-prompt",
-      idempotency_key: "create-1",
+      idempotency_key: idempotency_key,
       purpose: "agent_chat",
       root_recording: @root,
       initiator: @initiator

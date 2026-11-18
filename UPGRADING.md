@@ -1,5 +1,44 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.25.0
+
+`gpt-6-luna` is the default hosted-chat model. Default profiles list it before `gpt-6-astra`. Hosted chat uses the first entry whose model declares the `hosted_agent` operation, so entry order is how a host picks the hosted model. Put astra above luna to keep astra. There is no migration. Recording Studio stays `v7.7.0`. The gemspec range stays `>= 7.0`, `< 8.0`.
+
+Luna also generates. `generate` still prefers the earlier generation models in the tier, and can fall through to luna. It still skips astra.
+
+A profile entry may set `reasoning_effort`. Boot rejects a value the model does not allow. Luna allows `none`, `low`, `medium`, `high`, `xhigh`, and `max`. Astra allows `low`, `medium`, `high`, `xhigh`, and `max`. `none` is not allowed for astra. Generation uses the entry's effort when the caller did not pass `reasoning_effort`. An explicit caller value wins. Hosted chat sends `agent.reasoning.effort` when an effort resolves. Luna's model default is `medium`, so an entry that omits the key still sends `medium`. Astra has no default, so an entry that omits the key sends no effort.
+
+Published prices per 1M tokens are Luna `$0.10` input, `$0.01` cached input, `$0.50` output, `$0.125` cache write, and Astra `$10`, `$1`, `$50`, `$12.50`. Credit prices are whole credits. A reported kind with no rate prices at 0, and the charge is still at least 1 credit. The example below uses 1 credit = `$0.001`.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `~> 0.25`. No migration.
+2. In each profile, list luna before astra when luna should host chat. Set `reasoning_effort` when you want a specific effort.
+
+```ruby
+config.profiles = {
+  medium: [
+    { provider: :openai, model: "gpt-5" },
+    { provider: :gemini, model: "gemini-2.5-pro" },
+    { provider: :openai, model: "gpt-6-luna", reasoning_effort: "medium" },
+    { provider: :openai, model: "gpt-6-astra" },
+    { provider: :typesafe, model: "jev-latest" }
+  ]
+}
+```
+
+3. When `usage_handler` is set, add a `credit_prices` entry for luna (and astra if you still host on it). Keep the global `"*"` catch-all.
+
+```ruby
+config.credit_prices = {
+  "*" => { input: 100, output: 400, cached_input: 25, reasoning: 400, web_search: 5, decision: 2 },
+  openai: {
+    "gpt-6-luna" => { input: 100, cached_input: 10, output: 500, cache_write: 125 },
+    "gpt-6-astra" => { input: 10_000, cached_input: 1_000, output: 50_000, cache_write: 12_500 }
+  }
+}
+```
+
 ## Upgrading to 0.24.1
 
 Development pins move to Recording Studio `v7.7.0`, Logs `v0.8.1`, and Metrics `v0.9.1`. The dummy app also moves Accessible to `v0.48.0` and Trashable to `v1.0.2`. Gemspec ranges are unchanged. Flatpack stays `v0.1.377`. `view_component` stays `4.19.0`.

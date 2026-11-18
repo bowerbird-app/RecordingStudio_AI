@@ -27,7 +27,8 @@ class DecisionsResolutionTest < RecordingStudioAI::Test::IsolatedCase
 
       assert_equal({ provider: :typesafe, model: "jev-latest" }, entries.last)
       assert_equal({ provider: :openai, model: "gpt-6-astra" }, entries[-2])
-      assert_equal(%i[openai gemini], entries[0..-3].map { |entry| entry.fetch(:provider) })
+      assert_equal({ provider: :openai, model: "gpt-6-luna" }, entries[-3])
+      assert_equal(%i[openai gemini], entries[0..-4].map { |entry| entry.fetch(:provider) })
     end
   end
 

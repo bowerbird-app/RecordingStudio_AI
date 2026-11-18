@@ -93,7 +93,30 @@ class ConfigurationTest < Minitest::Test
     end
     low_models = configuration.profiles.fetch(:low).map { |entry| entry.fetch(:model) }
 
-    assert_equal ["gpt-5-mini", "gemini-2.5-flash", "gpt-6-astra", "jev-latest"], low_models
+    assert_equal ["gpt-5-mini", "gemini-2.5-flash", "gpt-6-luna", "gpt-6-astra", "jev-latest"], low_models
+  end
+
+  def test_reasoning_effort_on_a_profile_entry_is_checked_against_the_model
+    configuration = RecordingStudioAI::Configuration.new
+    configuration.profiles[:medium] = [
+      { provider: :openai, model: "gpt-6-luna", reasoning_effort: "none" },
+      { provider: :openai, model: "gpt-6-astra", reasoning_effort: "max" }
+    ]
+    configuration.model_fallbacks = {
+      [:openai, "gpt-5"] => [{ provider: :openai, model: "gpt-5", reasoning_effort: "high" }]
+    }
+
+    assert_same configuration, configuration.validate!
+    assert_equal "none", configuration.profiles[:medium].first[:reasoning_effort]
+    assert_equal "max", configuration.profiles[:medium].last[:reasoning_effort]
+
+    configuration.profiles[:medium] = [{ provider: :openai, model: "gpt-6-astra", reasoning_effort: "none" }]
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
+    assert_match(/reasoning_effort must be one of: low, medium, high, xhigh, max/, error.message)
+
+    configuration.profiles[:medium] = [{ provider: :gemini, model: "gemini-2.5-pro", reasoning_effort: "low" }]
+    error = assert_raises(RecordingStudioAI::Errors::ContractValidationError) { configuration.validate! }
+    assert_match(%r{reasoning_effort is not supported by gemini/gemini-2.5-pro}, error.message)
   end
 
   def test_provider_credentials_default_from_environment

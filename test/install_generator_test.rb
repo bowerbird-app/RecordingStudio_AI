@@ -57,6 +57,8 @@ class InstallGeneratorTest < Minitest::Test
       assert_includes initializer, "config.profiles = {"
       assert_includes initializer, "gpt-5-mini"
       assert_includes initializer, "gpt-5-pro"
+      assert_includes initializer, "gpt-6-luna"
+      assert_includes initializer, "gpt-6-astra"
       assert_includes initializer, "config.cost_catalogs = {}"
       assert_includes initializer, "config.batch_synchronization_interval = 1.minute"
       assert_includes initializer, "config.allowed_provider_overrides"

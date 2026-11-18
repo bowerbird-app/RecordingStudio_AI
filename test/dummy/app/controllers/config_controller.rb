@@ -55,10 +55,12 @@ class ConfigController < ApplicationController
       key: "profiles",
       required: "No",
       accepted_values: "Hash of profile keys to ordered { provider:, model: } lists",
-      default: "low: gpt-5-mini, gemini-2.5-flash, jev-latest / medium: gpt-5, gemini-2.5-pro, jev-latest / " \
-               "high: gpt-5-pro, gemini-2.5-pro, jev-latest",
-      explanation: "Preferred provider and model order per operation. Resolution matches capabilities, " \
-                   "so generate never picks a decision model and decide never picks a generation model."
+      default: "low: gpt-5-mini, gemini-2.5-flash, gpt-6-luna, gpt-6-astra, jev-latest / " \
+               "medium: gpt-5, gemini-2.5-pro, gpt-6-luna, gpt-6-astra, jev-latest / " \
+               "high: gpt-5-pro, gemini-2.5-pro, gpt-6-luna, gpt-6-astra, jev-latest",
+      explanation: "Preferred provider and model order per operation. Hosted chat uses the first " \
+                   "hosted_agent entry. Resolution matches capabilities, so generate skips astra and " \
+                   "decide never picks a generation model."
     },
     {
       key: "allowed_provider_overrides",
@@ -471,8 +473,9 @@ class ConfigController < ApplicationController
       # Profile routing. Reference models by their provider API model string.
       # Capabilities, tunable parameters, native tools, and modalities come from
       # the model registry (RecordingStudioAI.models), not from the profile entry.
-      # Generation and decision candidates share a tier; resolution matches the
-      # operation, so generate never picks jev-latest and decide only picks it.
+      # Generation, hosted chat, and decision candidates share a tier. Resolution
+      # matches the operation. Hosted chat uses the first hosted_agent entry.
+      # generate skips gpt-6-astra and jev-latest. decide only picks jev-latest.
       config.default_profile = :medium
       config.allowed_provider_overrides = []
       config.discovery_enabled = false
@@ -480,16 +483,22 @@ class ConfigController < ApplicationController
         low: [
           { provider: :openai, model: "gpt-5-mini" },
           { provider: :gemini, model: "gemini-2.5-flash" },
+          { provider: :openai, model: "gpt-6-luna" },
+          { provider: :openai, model: "gpt-6-astra" },
           { provider: :typesafe, model: "jev-latest" }
         ],
         medium: [
           { provider: :openai, model: "gpt-5" },
           { provider: :gemini, model: "gemini-2.5-pro" },
+          { provider: :openai, model: "gpt-6-luna" },
+          { provider: :openai, model: "gpt-6-astra" },
           { provider: :typesafe, model: "jev-latest" }
         ],
         high: [
           { provider: :openai, model: "gpt-5-pro" },
           { provider: :gemini, model: "gemini-2.5-pro" },
+          { provider: :openai, model: "gpt-6-luna" },
+          { provider: :openai, model: "gpt-6-astra" },
           { provider: :typesafe, model: "jev-latest" }
         ]
       }
@@ -700,6 +709,10 @@ class ConfigController < ApplicationController
     # order and picks the first whose provider is configured and whose registered
     # model supports the request's required capabilities. Reference models by their
     # provider API model string; capabilities come from the model registry.
+    # Hosted chat takes the first entry with the hosted_agent operation.
+    # gpt-6-luna is before gpt-6-astra, so luna hosts chat. Swap them to use astra.
+    # reasoning_effort is optional and checked at boot. Luna defaults to medium
+    # for hosted chat when the key is omitted. Astra sends no effort unless set.
     #
     # For a one-off hop list that skips these profiles, pass fallbacks: on generate.
     # Each entry needs provider + model. Optional generation params on an entry
@@ -721,16 +734,22 @@ class ConfigController < ApplicationController
         low: [
           { provider: :openai, model: "gpt-5-mini" },
           { provider: :gemini, model: "gemini-2.5-flash" },
+          { provider: :openai, model: "gpt-6-luna", reasoning_effort: "medium" },
+          { provider: :openai, model: "gpt-6-astra" },
           { provider: :typesafe, model: "jev-latest" }
         ],
         medium: [
           { provider: :openai, model: "gpt-5" },
           { provider: :gemini, model: "gemini-2.5-pro" },
+          { provider: :openai, model: "gpt-6-luna", reasoning_effort: "medium" },
+          { provider: :openai, model: "gpt-6-astra" },
           { provider: :typesafe, model: "jev-latest" }
         ],
         high: [
           { provider: :openai, model: "gpt-5-pro" },
           { provider: :gemini, model: "gemini-2.5-pro" },
+          { provider: :openai, model: "gpt-6-luna", reasoning_effort: "medium" },
+          { provider: :openai, model: "gpt-6-astra" },
           { provider: :typesafe, model: "jev-latest" }
         ]
       }

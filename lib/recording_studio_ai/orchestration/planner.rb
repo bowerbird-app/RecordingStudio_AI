@@ -86,15 +86,25 @@ module RecordingStudioAI
       end
 
       def candidates_for(profile, request, capabilities)
-        @resolver.candidates(
+        @resolver.entry_pairs(
           profile: profile,
           provider: request[:provider],
           model: request[:model],
           required_capabilities: capabilities,
           allow_empty: profile != request[:profile]
-        ).map do |candidate|
-          PlannedCandidate.new(candidate: candidate, profile: profile.to_sym)
+        ).map do |entry, candidate|
+          PlannedCandidate.new(
+            candidate: candidate,
+            profile: profile.to_sym,
+            parameter_overrides: parameter_overrides_for(entry)
+          )
         end
+      end
+
+      def parameter_overrides_for(entry)
+        return {} unless entry.is_a?(Hash)
+
+        RecordingStudioAI::FallbackEntries.parameter_overrides_from(entry.transform_keys(&:to_sym))
       end
 
       def plan_from_entries(entries, request:, capabilities:, required:, seen: {})

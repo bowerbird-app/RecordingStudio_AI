@@ -208,10 +208,16 @@ end
 
 Profile candidate order expresses preference. Resolution selects the first
 candidate that has a configured provider and supports every requested
-capability. Each default tier lists generation candidates followed by the
-decision candidate `{ provider: :typesafe, model: "jev-latest" }`; because Jev
-declares no `:generation`, `generate` skips it and `decide` skips OpenAI and
-Gemini. Model names remain in configuration rather than application logic.
+capability. Each default tier lists generation candidates, then `gpt-6-luna`,
+then `gpt-6-astra`, then the decision candidate
+`{ provider: :typesafe, model: "jev-latest" }`. Hosted chat uses that order:
+luna is the default, and moving astra above luna selects astra. `generate`
+skips astra and Jev. `decide` skips OpenAI and Gemini. Model names remain in
+configuration rather than application logic. An optional `reasoning_effort` on
+an entry is checked at boot against that model's allowed values. Generation
+uses it when the caller did not pass one. Hosted chat sends the entry's effort,
+or the model default when the entry omits it. Luna's default is `medium`.
+Astra has no default, so it sends no effort unless the entry sets one.
 Retries remain on the same candidate. Same-profile provider fallback follows
 candidate order, while profile-tier fallback only follows explicit
 `profile_fallbacks` mappings. For a one-off hop list that skips profiles, pass
@@ -227,7 +233,7 @@ Usage and compatible-currency cost aggregate across every reported attempt.
 
 Leave `usage_handler` nil and calls stay free. No balance check, no prices, and no boot error. `cost_catalogs` is only the real-money estimate on admin screens. It never decides what a user is charged.
 
-Set `usage_handler` to bill. Boot then requires `usage_precheck` and a global `"*"` entry in `credit_prices`. Prices are whole credits per usage kind. `input`, `output`, `cached_input`, and `reasoning` are priced per 1,000,000 tokens. Every other kind, including `web_search` and `decision`, is priced per use unless `credit_price_per` says otherwise. Add a new kind by putting it in the price hash. The gem does not hard-code model names.
+Set `usage_handler` to bill. Boot then requires `usage_precheck` and a global `"*"` entry in `credit_prices`. Prices are whole credits per usage kind. `input`, `output`, `cached_input`, and `reasoning` are priced per 1,000,000 tokens. Every other kind, including `web_search` and `decision`, is priced per use unless `credit_price_per` says otherwise. Add a new kind by putting it in the price hash. The gem does not hard-code model names. A reported kind with no rate at the model, the provider `"*"`, or the global `"*"` prices at 0, and the attempt still costs at least 1 credit. Give `gpt-6-luna` its own entry when you bill hosted chat. The numbers below treat 1 credit as $0.001 of the published token price.
 
 Lookup for each kind is the exact model, then that provider's `"*"`, then the global `"*"`. A registered prompt or tool can add `credit_fee:` and `credit_multiplier:` on top of that price.
 
@@ -252,6 +258,10 @@ RecordingStudioAI.configure do |config|
       reasoning: 400,
       web_search: 5,
       decision: 2
+    },
+    openai: {
+      "gpt-6-luna" => { input: 100, cached_input: 10, output: 500, cache_write: 125 },
+      "gpt-6-astra" => { input: 10_000, cached_input: 1_000, output: 50_000, cache_write: 12_500 }
     }
   }
 
@@ -514,8 +524,12 @@ can implement the same methods on `Providers::Base`.
 Only models registered with the `hosted_agent` operation resolve. A name that is
 not in the registry raises a configuration error (`missing_model`). A registered
 generation model such as `gpt-5` raises `unsupported_capability`. The default
-profiles include `gpt-6-astra` for this operation. `generate` and `decide` skip
-it because it does not declare those operations.
+profiles list `gpt-6-luna` and then `gpt-6-astra`. Hosted chat takes the first
+of those whose provider is configured. `generate` can use luna as a later
+generation candidate. It skips astra. `decide` skips both. Luna sends
+`reasoning.effort` `medium` unless the profile entry sets another allowed
+value (`none`, `low`, `medium`, `high`, `xhigh`, `max`). Astra sends no effort
+unless the entry sets `low`, `medium`, `high`, `xhigh`, or `max`.
 
 ```ruby
 session = RecordingStudioAI::Agents.create_session(

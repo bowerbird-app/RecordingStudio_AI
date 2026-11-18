@@ -25,24 +25,31 @@ RecordingStudioAI.configure do |config|
   # quality targets.
   # Each tier lists generation, hosted-agent, and decision candidates together.
   # Resolution matches the operation's capabilities, so `decide` only ever sees
-  # Jev, `generate` never sees Jev or gpt-6-astra, and hosted sessions only see
-  # models registered with the hosted_agent operation.
+  # Jev. `generate` skips gpt-6-astra and Jev. Hosted chat uses the first entry
+  # whose model lists the hosted_agent operation. gpt-6-luna is that default.
+  # Put gpt-6-astra before it to prefer Astra. Optional reasoning_effort is
+  # checked at boot against that model's allowed values. Luna's hosted default
+  # is medium when the entry omits it. Astra sends no effort unless the entry
+  # sets one (`none` is not allowed for Astra).
   config.profiles = {
     low: [
       { provider: :openai, model: "gpt-5-mini" },
       { provider: :gemini, model: "gemini-2.5-flash" },
+      { provider: :openai, model: "gpt-6-luna" },
       { provider: :openai, model: "gpt-6-astra" },
       { provider: :typesafe, model: "jev-latest" }
     ],
     medium: [
       { provider: :openai, model: "gpt-5" },
       { provider: :gemini, model: "gemini-2.5-pro" },
+      { provider: :openai, model: "gpt-6-luna" },
       { provider: :openai, model: "gpt-6-astra" },
       { provider: :typesafe, model: "jev-latest" }
     ],
     high: [
       { provider: :openai, model: "gpt-5-pro" },
       { provider: :gemini, model: "gemini-2.5-pro" },
+      { provider: :openai, model: "gpt-6-luna" },
       { provider: :openai, model: "gpt-6-astra" },
       { provider: :typesafe, model: "jev-latest" }
     ]

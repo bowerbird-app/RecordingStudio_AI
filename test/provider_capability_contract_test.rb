@@ -166,6 +166,7 @@ class ProviderCapabilityContractTest < Minitest::Test
 
   def expected_profile_capabilities(attributes)
     return [:hosted_agent] if attributes.fetch(:model) == "gpt-6-astra"
+    return CONTRACT_CAPABILITIES + [:hosted_agent] if attributes.fetch(:model) == "gpt-6-luna"
     return DECISION_CONTRACT_CAPABILITIES if attributes.fetch(:provider) == :typesafe
 
     CONTRACT_CAPABILITIES
