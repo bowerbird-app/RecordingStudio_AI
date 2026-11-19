@@ -5,6 +5,19 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-19
+
+### Changed
+- Development pins move to Recording Studio `v7.8.0` (`~> 7.8`), Flatpack `v0.2.0` (`~> 0.2`), Logs `v0.9.0` (`~> 0.9`), and Metrics `v0.10.0` (`~> 0.10`). `view_component` stays `4.19.0`. Gemspec ranges stay `recording_studio >= 7.0, < 8.0` and `flat_pack >= 0.1.315`.
+- Dummy pins move to Accessible `v0.58.0` (`~> 0.58`), Admin `v2.19.1` (`~> 2.19`), Trashable `v1.3.0` (`~> 1.3`), Root Switchable `v0.17.0` (`~> 0.17`), and Cache `v0.8.0` (`~> 0.8`). Logs and Metrics match the development pins.
+- The dummy importmap drops the `flat_pack/heroicons` pin. There is no `flat-pack--icon` controller registration to remove.
+- Dummy Tailwind scans Flatpack through the generated gem root. The `vendor/bundle/**/flatpack*` and `/usr/local/bundle/.../flatpack-*` globs are not used.
+
+### Upgrade notes
+- Bump to `0.26.0`. No RecordingStudioAI migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0260).
+- Hosts MUST run the Recording Studio 7.4, 7.5 and 7.7 migrations if they have not.
+- flat_pack 0.2.0 is supported; hosts moving to 0.2 must remove the manual `flat_pack/heroicons` importmap pin and any `flat-pack--icon` controller registration.
+
 ## [0.25.3] - 2026-11-18
 
 ### Fixed
@@ -1318,7 +1331,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.3...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.3...v0.26.0
 [0.25.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.2...v0.25.3
 [0.25.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.0...v0.25.1

@@ -12,10 +12,10 @@ tables, and a read-only FlatPack admin surface.
 
 - Ruby 3.3 or newer
 - Rails 8.1
-- Recording Studio `>= 7.0`, `< 8.0` (development pin tag `v7.7.0`)
-- Recording Studio Logs `>= 0.8.0, < 1.0` (development pin tag `v0.8.1`)
-- Recording Studio Metrics `>= 0.9.0, < 1.0` (development pin tag `v0.9.1`)
-- Flatpack `>= 0.1.315` (development pin tag `v0.1.377`)
+- Recording Studio `>= 7.0`, `< 8.0` (development pin `~> 7.8`, tag `v7.8.0`)
+- Recording Studio Logs `>= 0.8.0, < 1.0` (development pin `~> 0.9`, tag `v0.9.0`)
+- Recording Studio Metrics `>= 0.9.0, < 1.0` (development pin `~> 0.10`, tag `v0.10.0`)
+- Flatpack `>= 0.1.315` (development pin `~> 0.2`, tag `v0.2.0`)
 
 The OpenAI provider uses the official `openai` Ruby SDK (`~> 0.103`, which includes
 the Agents API). Gemini uses its REST API
@@ -27,21 +27,13 @@ Ruby SDK. Both providers support injected clients.
 Add the addon and Recording Studio `>= 7.0`, `< 8.0` to the host application's `Gemfile`:
 
 ```ruby
-gem "recording_studio",
-    github: "bowerbird-app/RecordingStudio",
-    tag: "v7.7.0"
-gem "flat_pack",
-    github: "bowerbird-app/flatpack",
-    tag: "v0.1.377"
+gem "recording_studio", "~> 7.8", github: "bowerbird-app/RecordingStudio", tag: "v7.8.0"
+gem "flat_pack", "~> 0.2", github: "bowerbird-app/flatpack", tag: "v0.2.0"
 gem "view_component", "4.19.0"
 gem "recording_studio_ai",
     github: "bowerbird-app/RecordingStudio_AI"
-gem "recording_studio_logs",
-    github: "bowerbird-app/RecordingStudio_logs",
-    tag: "v0.8.1"
-gem "recording_studio_metrics",
-    github: "bowerbird-app/RecordingStudio_metrics",
-    tag: "v0.9.1"
+gem "recording_studio_logs", "~> 0.9", github: "bowerbird-app/RecordingStudio_logs", tag: "v0.9.0"
+gem "recording_studio_metrics", "~> 0.10", github: "bowerbird-app/RecordingStudio_metrics", tag: "v0.10.0"
 ```
 
 `RecordingStudioAI.configuration.layout` selects the saved-reply layout. Leave it `nil` to follow `RecordingStudio.configuration.layout`, then `recording_studio/default_layout`. A layout name, `false`, or a callable that takes `controller:` is also valid. Do not include `RecordingStudio::UsesDefaultLayout` or hard-code `layout "recording_studio/default_layout"`.
@@ -70,7 +62,7 @@ Staff with AdminRoot `:view` (`RecordingStudioAI::Api::Access.can_view?`) can re
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_runs/fallback_retry_rate`
 - `GET /recording_studio_api/apis/operations/v1/metrics/ai_batches/by_status`
 
-Failure and stuck-run metrics (Recording Studio Metrics `>= 0.9.0, < 1.0`, development pin tag `v0.9.1`):
+Failure and stuck-run metrics (Recording Studio Metrics `>= 0.9.0, < 1.0`, development pin `~> 0.10`, tag `v0.10.0`):
 
 | Metric | Type / unit | Definition | `group_by` |
 | --- | --- | --- | --- |
@@ -355,25 +347,15 @@ roots. Omitting `root_ids` fails closed (empty metrics).
 
 Staff use Recording Studio Admin only. Mount Admin, enable the
 `recording_studio_ai` section, and grant Accessible access on that admin root.
-There is no `/recording_studio_ai/admin` surface. Admin `2.18.0` and Accessible
-`0.48.0` need Trashable query helpers (`require: false`); pin Metrics for
-Bundler even when the host already exposes it elsewhere:
+There is no `/recording_studio_ai/admin` surface. Admin `2.19.1` needs
+Trashable query helpers (`require: false`). Accessible `0.58.0` does not. Pin
+Metrics for Bundler even when the host already exposes it elsewhere:
 
 ```ruby
-gem "recording_studio_accessible",
-    github: "bowerbird-app/RecordingStudio_accessible",
-    tag: "v0.48.0"
-gem "recording_studio_admin",
-    github: "bowerbird-app/RecordingStudio_admin",
-    tag: "v2.18.0"
-gem "recording_studio_metrics",
-    github: "bowerbird-app/RecordingStudio_metrics",
-    tag: "v0.9.1",
-    require: false
-gem "recording_studio_trashable",
-    github: "bowerbird-app/RecordingStudio_trashable",
-    tag: "v1.0.2",
-    require: false
+gem "recording_studio_accessible", "~> 0.58", github: "bowerbird-app/RecordingStudio_accessible", tag: "v0.58.0"
+gem "recording_studio_admin", "~> 2.19", github: "bowerbird-app/RecordingStudio_admin", tag: "v2.19.1"
+gem "recording_studio_metrics", "~> 0.10", github: "bowerbird-app/RecordingStudio_metrics", tag: "v0.10.0", require: false
+gem "recording_studio_trashable", "~> 1.3", github: "bowerbird-app/RecordingStudio_trashable", tag: "v1.3.0", require: false
 
 mount RecordingStudioAI::Engine, at: "/recording_studio_ai"
 recording_studio_admin_for :admin, at: "/admin", root_section: :recording_studio_ai

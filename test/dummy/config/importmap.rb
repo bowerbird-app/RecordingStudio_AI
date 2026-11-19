@@ -10,4 +10,3 @@ pin "controllers/recording_studio_admin/async_widgets_controller", to: "recordin
 
 # Pin FlatPack controllers
 pin_all_from FlatPack::Engine.root.join("app/javascript/flat_pack/controllers"), under: "controllers/flat_pack", to: "flat_pack/controllers", preload: false
-pin "flat_pack/heroicons", to: "flat_pack/heroicons.js", preload: false

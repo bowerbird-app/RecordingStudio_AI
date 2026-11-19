@@ -4,19 +4,11 @@ source "https://rubygems.org"
 
 # Recording Studio is pinned here because its source is currently distributed
 # from GitHub. The runtime constraint is declared in the gemspec.
-gem "recording_studio",
-    github: "bowerbird-app/RecordingStudio",
-    tag: "v7.7.0"
-gem "flat_pack",
-    github: "bowerbird-app/flatpack",
-    tag: "v0.1.377"
+gem "recording_studio", "~> 7.8", github: "bowerbird-app/RecordingStudio", tag: "v7.8.0"
+gem "flat_pack", "~> 0.2", github: "bowerbird-app/flatpack", tag: "v0.2.0"
 gem "view_component", "4.19.0"
-gem "recording_studio_logs",
-    github: "bowerbird-app/RecordingStudio_logs",
-    tag: "v0.8.1"
-gem "recording_studio_metrics",
-    github: "bowerbird-app/RecordingStudio_metrics",
-    tag: "v0.9.1"
+gem "recording_studio_logs", "~> 0.9", github: "bowerbird-app/RecordingStudio_logs", tag: "v0.9.0"
+gem "recording_studio_metrics", "~> 0.10", github: "bowerbird-app/RecordingStudio_metrics", tag: "v0.10.0"
 
 gemspec
 
