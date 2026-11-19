@@ -104,11 +104,30 @@ module RecordingStudioAI
 
       # A completed turn can bill after the stream returns. The job calls this.
       # Already-charged turns and blank usage return without a second charge.
+      # A run with no turn id is matched to a session turn before that.
+      # +false+ means the job should schedule another attempt.
       def record_deferred_turn_usage(run_id, attempt:, final:)
         run = RecordingStudioAI::Run.find_by(id: run_id)
-        return true if run.nil? || run.status != "completed"
-        return true if run.provider_turn_id.blank? || run.provider_session_id.blank?
-        return true if turn_charged?(run.provider_turn_id, nil)
+        unless run&.status == "completed"
+          log_usage_skip(run, "run_missing_or_not_completed", run_id: run_id)
+          return true
+        end
+
+        prepare_turn_for_usage!(session_for_run(run), run)
+        if run.provider_turn_id.blank? || run.provider_session_id.blank?
+          log_usage_skip(run, "blank_session_or_turn")
+          log_usage_skip(run, "gave_up") if final
+          return final
+        end
+        if turn_held_by_another_run?(run, run.provider_turn_id)
+          log_usage_skip(run, "conflict", turn_id: run.provider_turn_id)
+          log_usage_skip(run, "gave_up") if final
+          return final
+        end
+        if turn_charged?(run.provider_turn_id, nil)
+          log_usage_skip(run, "already_charged", turn_id: run.provider_turn_id)
+          return true
+        end
 
         turn = read_deferred_turn(run)
         usage = turn&.usage
@@ -120,12 +139,18 @@ module RecordingStudioAI
         end
 
         log_deferred_miss(run, attempt, turn&.status) if final
-        false
+        log_usage_skip(run, "gave_up") if final
+        final
       rescue Providers::HostedAgentFailure => e
         log_usage_fetch_failure(run, e) if run
-        stop = final || !e.error.retryable?
-        log_deferred_miss(run, attempt, nil) if stop && run
-        stop
+        if run && !e.error.retryable?
+          log_usage_skip(run, "fetch_not_retryable")
+          return true
+        end
+
+        log_deferred_miss(run, attempt, nil) if final && run
+        log_usage_skip(run, "gave_up") if final && run
+        final
       end
 
       def recover(raw)
@@ -225,6 +250,8 @@ module RecordingStudioAI
 
       def recovered_turn(session, run, &block)
         snapshot = fetch_recovery(session, run, item_scope: :turn)
+        return turn_from(run&.reload) if ignore_stale_snapshot(run, snapshot)
+
         apply_recovery(session, run, snapshot)
         calls = Array(snapshot.tool_calls)
         streaming do
@@ -250,6 +277,8 @@ module RecordingStudioAI
       # open stream play.
       def reconcile(session, run, on_event, stop_for_tools:, claimed: nil)
         snapshot = claimed || fetch_recovery(session, run, item_scope: :turn)
+        return nil if ignore_stale_snapshot(run, snapshot)
+
         apply_recovery(session, run, snapshot)
         replay_completed_items(run, snapshot, on_event)
         deliver_settled(snapshot, on_event, stop_for_tools: stop_for_tools)
@@ -297,6 +326,7 @@ module RecordingStudioAI
 
       def apply_recovery(session, run, snapshot)
         return unless run && snapshot.turn
+        return if ignore_stale_snapshot(run, snapshot)
 
         remember_turn(run, snapshot.turn.provider_turn_id)
         return if Array(snapshot.tool_calls).any?
@@ -339,17 +369,28 @@ module RecordingStudioAI
       # null result does not. Null usage is billed later by HostedTurnUsageJob.
       # This path does not sleep.
       def settle_inline_usage(session, run, usage)
-        return { usage: usage, source: "event", missing: false, silent: true } if usage_reported?(usage)
+        prepare_turn_for_usage!(session, run) if session
 
-        blank_turn = session.nil? || run.provider_turn_id.blank?
-        return { usage: nil, source: "event", missing: true, silent: false } if blank_turn
-        return { usage: nil, source: "event", missing: false, silent: true } if turn_charged?(run.provider_turn_id, nil)
+        if session.nil? || run.provider_session_id.blank? || run.provider_turn_id.blank?
+          log_usage_skip(run, "blank_session_or_turn")
+          enqueue_deferred_usage(run) if session && run.provider_session_id.present?
+          return { usage: nil, source: "event", missing: true, silent: true }
+        end
+        if turn_held_by_another_run?(run, run.provider_turn_id)
+          log_usage_skip(run, "conflict", turn_id: run.provider_turn_id)
+          return { usage: nil, source: "event", missing: false, silent: true }
+        end
+        if turn_charged?(run.provider_turn_id, nil)
+          log_usage_skip(run, "already_charged", turn_id: run.provider_turn_id)
+          return { usage: nil, source: "event", missing: false, silent: true }
+        end
+        return { usage: usage, source: "event", missing: false, silent: false } if usage_reported?(usage)
 
         fetched, saw_null, gave_up = read_inline_usage(session, run)
-        return { usage: fetched, source: "turn_retrieve", missing: false, silent: true } if usage_reported?(fetched)
+        return { usage: fetched, source: "turn_retrieve", missing: false, silent: false } if usage_reported?(fetched)
 
         enqueue_deferred_usage(run) if saw_null && !gave_up
-        { usage: nil, source: "turn_retrieve", missing: true, silent: false }
+        { usage: nil, source: "turn_retrieve", missing: true, silent: gave_up && !saw_null }
       end
 
       def read_inline_usage(session, run)
@@ -364,6 +405,11 @@ module RecordingStudioAI
           log_usage_fetch_failure(run, e)
           retryable = e.error.retryable? && attempt < USAGE_FETCH_LIMIT - 1
           gave_up = !retryable
+          if e.error.retryable?
+            log_usage_skip(run, "gave_up") unless retryable
+          else
+            log_usage_skip(run, "fetch_not_retryable")
+          end
           break unless retryable
         end
         [fetched, saw_null, gave_up]
@@ -403,7 +449,19 @@ module RecordingStudioAI
       def log_inline_settlement(run, settlement)
         return if settlement[:silent]
 
-        log_usage_outcome(run, source: settlement[:source], missing: true, turn_status: run.status)
+        log_usage_outcome(
+          run, source: settlement[:source], missing: settlement[:missing], turn_status: run.status
+        )
+      end
+
+      # Ids and statuses only. No payloads and no keys.
+      def log_usage_skip(run, reason, turn_id: nil, run_id: nil)
+        id = run&.id || run_id
+        status = run&.status || "missing"
+        turn_part = turn_id.present? ? " turn_id=#{turn_id}" : ""
+        warn_hosted(
+          "recording_studio_ai hosted turn usage skip=#{reason} run_id=#{id} status=#{status}#{turn_part}"
+        )
       end
 
       def log_deferred_miss(run, attempt, turn_status)
@@ -718,9 +776,92 @@ module RecordingStudioAI
       end
 
       def remember_turn(run, turn_id)
-        return if turn_id.blank? || run.provider_turn_id.present?
+        return if turn_id.blank? || run.nil? || run.provider_turn_id.present?
+
+        if turn_held_by_another_run?(run, turn_id)
+          log_usage_skip(run, "conflict", turn_id: turn_id)
+          return
+        end
 
         run.update!(provider_turn_id: turn_id.to_s)
+      end
+
+      # A snapshot of a turn another run in this session already holds.
+      # The open stream stays up. This run waits for its own turn id.
+      def stale_snapshot?(run, snapshot)
+        return false unless run && snapshot&.turn
+        return false if run.provider_turn_id.present?
+
+        turn_held_by_another_run?(run, snapshot.turn.provider_turn_id)
+      end
+
+      def ignore_stale_snapshot(run, snapshot)
+        return unless stale_snapshot?(run, snapshot)
+
+        log_usage_skip(run, "stale_snapshot", turn_id: snapshot.turn.provider_turn_id)
+        :stale
+      end
+
+      def prepare_turn_for_usage!(session, run)
+        return if run.nil?
+
+        clear_foreign_turn!(run)
+        bind_unclaimed_turn!(session, run)
+      end
+
+      def clear_foreign_turn!(run)
+        return if run.provider_turn_id.blank?
+        return unless turn_held_by_another_run?(run, run.provider_turn_id)
+
+        log_usage_skip(run, "conflict", turn_id: run.provider_turn_id)
+        run.update!(provider_turn_id: nil)
+      end
+
+      def bind_unclaimed_turn!(session, run)
+        return if run.nil? || run.provider_turn_id.present?
+        return if session.nil? || session.provider_session_id.blank?
+
+        remember_turn(run, unclaimed_turn_id(run, list_session_turns(session, run)))
+      end
+
+      # The first session turn created at or after this run started that no
+      # other run in the session holds. List order is not "latest".
+      def unclaimed_turn_id(run, turns)
+        eligible = Array(turns).select { |turn| turn_at_or_after_start?(run, turn) }
+        eligible = eligible.sort_by(&:created_at)
+        first = eligible.first
+        if first && turn_held_by_another_run?(run, first.provider_turn_id)
+          log_usage_skip(run, "conflict", turn_id: first.provider_turn_id)
+        end
+        chosen = eligible.find { |turn| !turn_held_by_another_run?(run, turn.provider_turn_id) }
+        chosen&.provider_turn_id
+      end
+
+      def turn_at_or_after_start?(run, turn)
+        created = turn.respond_to?(:created_at) ? turn.created_at : nil
+        return false if created.nil? || run.started_at.nil?
+
+        created >= run.started_at
+      end
+
+      def list_session_turns(session, run)
+        adapter_for(session.provider).list_hosted_agent_turns(
+          provider_session_id: session.provider_session_id
+        )
+      rescue Providers::HostedAgentFailure => e
+        log_usage_fetch_failure(run, e)
+        log_usage_skip(run, "fetch_not_retryable") unless e.error.retryable?
+        []
+      end
+
+      def turn_held_by_another_run?(run, turn_id)
+        return false if run.nil? || turn_id.blank? || run.provider_session_id.blank?
+
+        RecordingStudioAI::Run.where(
+          operation: "hosted_agent",
+          provider_session_id: run.provider_session_id,
+          provider_turn_id: turn_id.to_s
+        ).where.not(id: run.id).exists?
       end
 
       def running_run(session, request)

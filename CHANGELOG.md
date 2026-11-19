@@ -5,6 +5,20 @@ Versioning and Keep a Changelog.
 
 ## [Unreleased]
 
+## [0.25.3] - 2026-11-18
+
+### Fixed
+- A hosted follow-up keeps its own turn. `remember_turn` does not store a turn id another run in the same session already holds. When the run has no turn id and the snapshot turn belongs to another run, that snapshot is stale: the run is not finished, its items are not replayed, and it is not billed. The stream stays open. A later event stores the turn id it carries, when no other run holds that id.
+- A completed run that still has no turn id is matched to the first session turn created at or after `run.started_at` that no other run holds. The read is `turns.list` with more than one row, oldest first, not the latest turn alone. That match runs inline before a blank turn id is treated as missing, and in `HostedTurnUsageJob` instead of returning with no log. A turn id that belongs to another run is logged as a conflict and resolved the same way. It is not logged as already charged.
+- Hosted turn usage logs the source when a charge is recorded (`event`, `turn_retrieve`, or `job_attempt_N`). It also logs each skip: already charged, blank session or turn id, run missing or not completed, stale snapshot, non-retryable fetch failure, and gave up. The line has ids and statuses. It does not include payloads or keys.
+- `HostedTurnUsageJob` schedules the next read with `set(wait:)`. `perform` does not sleep. The waits stay about 5 seconds, 30 seconds, 2 minutes, and 10 minutes. The charge key stays `ai-hosted-agent-turn:<turn id>`.
+
+### Changed
+- Development stays on Recording Studio `v7.7.0`. The gemspec range stays `>= 7.0`, `< 8.0`.
+
+### Upgrade notes
+- Bump to `0.25.3`. No migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0253).
+
 ## [0.25.2] - 2026-11-18
 
 ### Fixed
@@ -1304,7 +1318,8 @@ See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
 - Rails and Recording Studio runtime dependencies; provider SDKs are deferred.
 - Dummy host validation for Recording Studio v3 integration.
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.2...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.3...HEAD
+[0.25.3]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.2...v0.25.3
 [0.25.2]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/bowerbird-app/RecordingStudio_AI/compare/v0.24.1...v0.25.0

@@ -643,13 +643,20 @@ the counts. Null is not billed as zero. If `turn_completed` has no usage, the
 request reads that turn once with `turns.retrieve`. A retryable error gets one
 more read. A null result does not, and the request does not sleep.
 `HostedTurnUsageJob` reads the turn again after about 5 seconds, 30 seconds,
-2 minutes, and 10 minutes. Usage that arrives is stored on the run and charged
-with `ai-hosted-agent-turn:<provider turn id>`. A run already marked
+2 minutes, and 10 minutes. Each wait is a new job (`set(wait:)`). `perform`
+does not sleep. Usage that arrives is stored on the run and charged with
+`ai-hosted-agent-turn:<provider turn id>`. A run already marked
 `usage_charged` is not charged again. Null or empty usage does not set that
-flag. A missing usage line, and the job's final outcome, log the run id, turn
-status, `completed_at`, and the source (`event`, `turn_retrieve`, or
-`job_attempt_N`). Keys and payloads are not logged. A turn id that another run
-already charged is not read again and is not charged again.
+flag. A recorded charge logs the run id, turn status, `completed_at`, and the
+source (`event`, `turn_retrieve`, or `job_attempt_N`). A skip logs the same
+ids and one reason: already charged, blank session or turn id, run missing or
+not completed, stale snapshot, non-retryable fetch failure, or gave up. Keys
+and payloads are not logged. A turn id another run in the session already
+holds is not stored on this run. It is logged as a conflict, then the run is
+matched to its own turn. It is not logged as already charged. If the run still
+has no turn id, settlement lists session turns (`turns.list`, more than one,
+oldest first) and stores the first turn created at or after the run started
+that no other run holds. That happens inline and in the job.
 If the usage read after `cancel` fails with a hosted-agent provider error, the
 run id and error class are logged and the run stays cancelled. Any other error
 from that cancel read is raised. Cancelling a finished run does not bill it
@@ -670,17 +677,20 @@ idempotency field, so the adapter sends the same header.
 
 `stream` opens the provider stream, then reads the saved turn, then yields
 anything the live stream will not repeat. The turn id is `run.provider_turn_id`.
-When that is still blank, the read uses the turn on that same snapshot. Replay
-lists that turn's items. Assistant messages already delivered are skipped by
-item id (`delivered_item_ids` on the run). The comparison uses the live event's
-`item_id` and the saved item's `id`. Text is not a key. An id is stored only
-after `message_completed`, or after a replayed item whose status is
-`completed`, and only when the handler returns. An in-progress item is not
-stored, so a partial message still receives its final text after a drop.
-Events with no item id are not dropped. A stream that is already settled
-yields the saved messages and the terminal or tool-call event, and does not
-wait on the open stream. `recover` still returns every saved session item and
-does not apply that delivered-id filter.
+When that is still blank, the read uses the turn on that same snapshot, unless
+another run in the session already holds it. That snapshot is stale. The run
+is not finished from it, its items are not replayed, and it is not billed.
+The stream stays open. A later event stores the turn id it carries when no
+other run holds that id. Replay lists the bound turn's items. Assistant
+messages already delivered are skipped by item id (`delivered_item_ids` on
+the run). The comparison uses the live event's `item_id` and the saved item's
+`id`. Text is not a key. An id is stored only after `message_completed`, or
+after a replayed item whose status is `completed`, and only when the handler
+returns. An in-progress item is not stored, so a partial message still
+receives its final text after a drop. Events with no item id are not dropped.
+A stream that is already settled yields the saved messages and the terminal
+or tool-call event, and does not wait on the open stream. `recover` still
+returns every saved session item and does not apply that delivered-id filter.
 
 A dropped stream uses that same read. It does not send the input again. A
 timeout raises `Agents::Failure` and leaves the run running. An item list that

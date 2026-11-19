@@ -8,6 +8,9 @@ module RecordingStudioAI
         %w[completed failed cancelled].include?(status.to_s)
       end
     end
+    # One row from a session turn list. +created_at+ is when the provider
+    # created the turn, so a follow-up can skip turns from earlier runs.
+    ListedTurn = Data.define(:provider_turn_id, :created_at, :status)
     HostedItem = Data.define(:id, :role, :text, :status, :provider_turn_id)
     HostedRecovery = Data.define(:session, :turn, :items, :tool_calls) do
       def initialize(session:, turn:, items:, tool_calls: [])

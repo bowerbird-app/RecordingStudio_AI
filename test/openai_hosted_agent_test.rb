@@ -90,7 +90,7 @@ class OpenAIHostedAgentTest < Minitest::Test
 
     def list(_session_id, **params)
       list_calls << params
-      Struct.new(:data).new([{ id: "turn_latest", status: "in_progress" }])
+      Struct.new(:data).new(@sessions.listed_turns || [{ id: "turn_latest", status: "in_progress" }])
     end
 
     def token_usage
@@ -116,7 +116,7 @@ class OpenAIHostedAgentTest < Minitest::Test
 
   class Sessions
     attr_reader :events, :turns, :create_params, :deleted, :retrieved, :retrieve_calls, :order
-    attr_accessor :items, :error, :post_error, :stream, :required_actions
+    attr_accessor :items, :error, :post_error, :stream, :required_actions, :listed_turns
 
     def initialize
       @events = Events.new(self)
@@ -461,6 +461,21 @@ class OpenAIHostedAgentTest < Minitest::Test
     assert_equal [["turn_9", { session_id: "sess_1", order: "asc", limit: 100 }]], @sessions.turns.items.calls
     assert_equal "from-turn", recovery.items.first.text
     assert_equal "turn_9", recovery.items.first.provider_turn_id
+  end
+
+  def test_turn_list_reads_past_the_latest_turn
+    created = Time.utc(2026, 11, 18, 12, 0, 0)
+    @sessions.listed_turns = [
+      { id: "turn_old", status: "completed", created_at: created.to_i },
+      { id: "turn_new", status: "completed", created_at: (created + 30).iso8601 }
+    ]
+    listed = @adapter.list_hosted_agent_turns(provider_session_id: "sess_1")
+
+    assert_equal [{ order: "asc", limit: 20 }], @sessions.turns.list_calls
+    assert_operator @sessions.turns.list_calls.first[:limit], :>, 1
+    assert_equal %w[turn_old turn_new], listed.map(&:provider_turn_id)
+    assert_equal created.to_i, listed.first.created_at.to_i
+    assert_in_delta (created + 30).to_i, listed.last.created_at.to_i, 1
   end
 
   def test_turn_items_without_a_turn_id_use_the_snapshot_turn

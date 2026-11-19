@@ -9,10 +9,10 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     provider_key :openai
 
     attr_reader :creates, :submits, :streams, :cancels, :deletes, :recoveries, :tool_results, :opens,
-                :usage_fetches, :trace, :provider_calls
+                :usage_fetches, :trace, :provider_calls, :turn_lists
     attr_accessor :events, :items, :item_batches, :stream_failure, :drop_after_events, :tool_result_failure,
                   :default_turn, :tool_calls, :on_tool_results, :recovery_failure, :retrieved_usages,
-                  :retrieve_errors
+                  :retrieve_errors, :listed_turns
 
     def initialize(configuration: nil)
       super
@@ -35,6 +35,8 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       @provider_calls = []
       @retrieved_usages = []
       @retrieve_errors = []
+      @listed_turns = []
+      @turn_lists = []
       @on_tool_results = nil
       @recovery_failure = nil
       @tool_result_failure = nil
@@ -115,6 +117,11 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
         items: item_scope.to_sym == :tool_calls ? [] : listed_items(turn, provider_turn_id, item_scope),
         tool_calls: next_tool_calls
       )
+    end
+
+    def list_hosted_agent_turns(provider_session_id:)
+      turn_lists << provider_session_id
+      Array(listed_turns)
     end
 
     def retrieve_hosted_agent_turn(provider_session_id:, provider_turn_id:)
@@ -1214,9 +1221,18 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     with_usage_logs(messages) do
       RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id)
     end
+    scheduled = enqueued_usage_jobs.select { |job| job[:args] == [run.id, 2] }
+
+    assert_empty @usage_waits
+    assert_equal 1, scheduled.length
+    assert_in_delta 5, scheduled.first[:at].to_f - Time.now.to_f, 2
+    assert_nil run.reload.total_tokens
+
+    with_usage_logs(messages) do
+      RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id, 2)
+    end
     run.reload
 
-    assert_equal [5], @usage_waits
     assert_equal 10, run.input_tokens
     assert_equal 4, run.output_tokens
     assert_equal 14, run.total_tokens
@@ -1225,15 +1241,22 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_equal "ai-hosted-agent-turn:turn_1", @spends.first[:idempotency_key]
     assert run.metadata["usage_charged"]
     assert_match(/source=job_attempt_2/, messages.join("\n"))
+    assert_match(/usage recorded/, messages.join("\n"))
     assert_match(/turn_status=completed/, messages.join("\n"))
     refute_match(/idempotency|api_key|sk-/i, messages.join("\n"))
 
-    @usage_waits.clear
-    RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id)
+    queued = enqueued_usage_jobs.length
+    with_usage_logs(messages) do
+      RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id)
+    end
 
     assert_equal 1, @spends.length
+    assert_equal queued, enqueued_usage_jobs.length
     assert_empty @usage_waits
     assert run.metadata["usage_charged"]
+    assert_match(/skip=already_charged/, messages.join("\n"))
+    assert_match(/turn_id=turn_1/, messages.join("\n"))
+    refute_match(/skip=conflict/, messages.join("\n"))
     run.total_tokens = 15
     refute run.save
     assert_includes run.errors.full_messages.join(" "), "terminal"
@@ -1245,16 +1268,30 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     @fake.events = [turn_event_for("turn_1", usage: nil)]
     @fake.retrieved_usages = []
     messages = []
+    waits = []
     with_usage_logs(messages) do
       RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
       run = RecordingStudioAI::Run.find(session.run_id)
-      RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id)
+      5.times do |index|
+        attempt = index + 1
+        RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id, attempt)
+        scheduled = enqueued_usage_jobs.select { |job| job[:args] == [run.id, attempt + 1] }
+        if attempt < 5
+          waits << (scheduled.last[:at].to_f - Time.now.to_f)
+        else
+          assert_empty scheduled
+        end
+      end
     end
     run = RecordingStudioAI::Run.find(session.run_id)
     logged = messages.join("\n")
 
     assert_equal 6, @fake.usage_fetches.length
-    assert_equal [5, 30, 120, 600], @usage_waits
+    assert_empty @usage_waits
+    assert_equal [5, 30, 120, 600].length, waits.length
+    waits.zip([5, 30, 120, 600]).each do |actual, expected|
+      assert_in_delta expected, actual, 2
+    end
     assert_nil run.total_tokens
     assert_empty @spends
     assert_equal "completed", run.status
@@ -1265,6 +1302,7 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_match(/completed_at=\d{4}-\d{2}-\d{2}T/, logged)
     assert_match(/source=turn_retrieve/, logged)
     assert_match(/source=job_attempt_5/, logged)
+    assert_match(/skip=gave_up/, logged)
     assert_match(/usage=nil/, logged)
     refute_match(/idempotency|api_key|sk-/i, logged)
   end
@@ -1331,13 +1369,21 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       hosted_failure("connection", code: "network", message: "Provider connection failed.", retryable: true)
     ]
     @fake.retrieved_usages = [usage]
-    turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    messages = []
+    turn = nil
+    with_usage_logs(messages) do
+      turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    end
+    logged = messages.join("\n")
 
     assert_equal 2, @fake.usage_fetches.length
     assert_equal 14, turn.usage.total_tokens
     assert_equal 1, @spends.length
     assert_empty enqueued_usage_jobs
     assert_empty @usage_waits
+    assert_match(/source=turn_retrieve/, logged)
+    assert_match(/usage recorded/, logged)
+    refute_match(/idempotency|api_key|sk-/i, logged)
   end
 
   def test_turn_usage_read_does_not_retry_a_non_retryable_failure
@@ -1347,13 +1393,20 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
       hosted_failure("provider_error", code: "provider_error", message: "Provider request failed.", retryable: false)
     ]
     @fake.retrieved_usages = [usage]
-    turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    messages = []
+    turn = nil
+    with_usage_logs(messages) do
+      turn = RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    end
 
     assert_equal 1, @fake.usage_fetches.length
     assert_nil turn.usage
     assert_empty @spends
     assert_equal "completed", RecordingStudioAI::Run.find(session.run_id).status
     assert_empty enqueued_usage_jobs
+    assert_match(/skip=fetch_not_retryable/, messages.join("\n"))
+    assert_match(/run_id=#{RecordingStudioAI::Run.find(session.run_id).id}/, messages.join("\n"))
+    refute_match(/idempotency|api_key|sk-/i, messages.join("\n"))
   end
 
   def test_turn_usage_timeout_leaves_the_completed_run_unbilled
@@ -1371,21 +1424,215 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
     assert_empty @usage_waits
   end
 
-  def test_null_usage_skips_a_turn_that_was_already_charged
+  def test_follow_up_charges_its_own_turn_when_the_list_starts_with_the_stale_turn
+    session = create_session
+    messages = []
+    with_usage_logs(messages) do
+      RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    end
+    assert_equal 1, @spends.length
+    assert_equal "ai-hosted-agent-turn:turn_1", @spends.first[:idempotency_key]
+    assert_match(/source=event/, messages.join("\n"))
+    assert_match(/usage recorded/, messages.join("\n"))
+
+    follow = RecordingStudioAI::Agents.send_input(**session_args(session), input: "next", idempotency_key: "turn-2")
+    run = RecordingStudioAI::Run.find(follow.run_id)
+    assert_nil run.provider_turn_id
+    @fake.default_turn = completed_turn
+    @fake.items = [item("assistant", "Earlier", id: "item_old", turn_id: "turn_1")]
+    @fake.listed_turns = [
+      listed_turn("turn_1", run.started_at - 1.minute),
+      listed_turn("turn_2", run.started_at + 1.second)
+    ]
+    @fake.events = [turn_event_for(nil, usage: usage)]
+    seen = []
+    with_usage_logs(messages) do
+      RecordingStudioAI::Agents.stream(**session_args(session)) { |event| seen << event }
+    end
+    run.reload
+
+    assert_includes @fake.trace, :read
+    assert_equal ["turn_completed"], seen.map(&:type)
+    assert_equal "turn_2", run.provider_turn_id
+    assert_equal "completed", run.status
+    assert_equal 14, run.total_tokens
+    assert_equal 2, @spends.length
+    assert_equal "ai-hosted-agent-turn:turn_2", @spends.last[:idempotency_key]
+    assert_equal ["sess_1"], @fake.turn_lists
+    assert run.metadata["usage_charged"]
+    assert_nil run.metadata["delivered_item_ids"]
+  end
+
+  def test_follow_up_keeps_the_stream_open_when_only_the_stale_turn_exists
     session = create_session
     RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
-    assert_equal 1, @spends.length
-
+    follow = RecordingStudioAI::Agents.send_input(**session_args(session), input: "next", idempotency_key: "turn-2")
+    run = RecordingStudioAI::Run.find(follow.run_id)
     @fake.default_turn = completed_turn
-    RecordingStudioAI::Agents.send_input(**session_args(session), input: "next", idempotency_key: "turn-2")
-    @fake.default_turn = nil
-    @fake.events = [turn_event_for("turn_1", usage: nil)]
-    @fake.retrieved_usages = [usage]
-    @fake.usage_fetches.clear
-    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    @fake.items = [item("assistant", "Earlier", id: "item_old", turn_id: "turn_1")]
+    @fake.listed_turns = [listed_turn("turn_1", run.started_at - 1.minute)]
+    @fake.events = []
+    @fake.trace.clear
+    seen = []
+    messages = []
+    with_usage_logs(messages) do
+      RecordingStudioAI::Agents.stream(**session_args(session)) { |event| seen << event }
+    end
+    run.reload
 
-    assert_empty @fake.usage_fetches
+    assert_includes @fake.trace, :read
+    assert_empty seen
+    assert_equal "running", run.status
+    assert_nil run.provider_turn_id
+    assert_nil run.metadata["delivered_item_ids"]
     assert_equal 1, @spends.length
+    assert_match(/skip=stale_snapshot/, messages.join("\n"))
+    assert_match(/turn_id=turn_1/, messages.join("\n"))
+    assert_match(/run_id=#{run.id}/, messages.join("\n"))
+    refute_match(/idempotency|api_key|sk-/i, messages.join("\n"))
+  end
+
+  def test_missing_turn_id_resolves_from_the_turn_list_inline_and_in_the_job
+    session = create_session
+    run = RecordingStudioAI::Run.find(session.run_id)
+    @fake.events = [turn_event_for(nil, usage: usage)]
+    @fake.listed_turns = [listed_turn("turn_inline", run.started_at + 1.second)]
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    run.reload
+
+    assert_equal ["sess_1"], @fake.turn_lists
+    assert_equal "turn_inline", run.provider_turn_id
+    assert_equal "ai-hosted-agent-turn:turn_inline", @spends.first[:idempotency_key]
+    assert_equal 1, @spends.length
+    assert_empty enqueued_usage_jobs
+
+    session = create_session(idempotency_key: "create-2")
+    @fake.turn_lists.clear
+    @fake.events = [turn_event_for(nil, usage: nil)]
+    @fake.listed_turns = []
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    run = RecordingStudioAI::Run.find(session.run_id)
+
+    assert_nil run.provider_turn_id
+    assert_empty @spends.drop(1)
+    queued_for_run = enqueued_usage_jobs.count { |job| job[:args] == [run.id] }
+    assert_equal 1, queued_for_run
+
+    @fake.listed_turns = [listed_turn("turn_job", run.started_at)]
+    @fake.retrieved_usages = [usage]
+    RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id)
+    run.reload
+
+    assert_equal "turn_job", run.provider_turn_id
+    assert_equal "ai-hosted-agent-turn:turn_job", @spends.last[:idempotency_key]
+    assert_equal 2, @spends.length
+    assert run.metadata["usage_charged"]
+
+    RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id)
+    assert_equal 2, @spends.length
+  end
+
+  def test_remember_turn_rejects_a_turn_id_held_by_another_run
+    session = create_session
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    follow = RecordingStudioAI::Agents.send_input(**session_args(session), input: "next", idempotency_key: "turn-2")
+    run = RecordingStudioAI::Run.find(follow.run_id)
+    @fake.default_turn = nil
+    @fake.events = [turn_event_for("turn_1", usage: usage)]
+    @fake.listed_turns = [listed_turn("turn_1", run.started_at - 1.minute)]
+    messages = []
+    with_usage_logs(messages) do
+      RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    end
+    run.reload
+    logged = messages.join("\n")
+
+    assert_nil run.provider_turn_id
+    assert_equal "completed", run.status
+    assert_equal 1, @spends.length
+    assert_match(/skip=conflict/, logged)
+    assert_match(/turn_id=turn_1/, logged)
+    assert_match(/run_id=#{run.id}/, logged)
+    refute_match(/skip=already_charged/, logged)
+    refute_match(/idempotency|api_key|sk-/i, logged)
+  end
+
+  def test_a_run_without_a_turn_id_binds_the_turn_id_from_the_event
+    session = create_session
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    follow = RecordingStudioAI::Agents.send_input(**session_args(session), input: "next", idempotency_key: "turn-2")
+    run = RecordingStudioAI::Run.find(follow.run_id)
+    assert_nil run.provider_turn_id
+    @fake.default_turn = completed_turn
+    @fake.events = [turn_event_for("turn_2", usage: usage)]
+    @fake.listed_turns = []
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    run.reload
+
+    assert_equal "turn_2", run.provider_turn_id
+    assert_equal "completed", run.status
+    assert_equal 2, @spends.length
+    assert_equal "ai-hosted-agent-turn:turn_2", @spends.last[:idempotency_key]
+    assert_empty @fake.turn_lists
+  end
+
+  def test_a_turn_id_owned_by_another_run_is_a_conflict_and_resolves_to_a_free_turn
+    session = create_session
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    follow = RecordingStudioAI::Agents.send_input(**session_args(session), input: "next", idempotency_key: "turn-2")
+    run = RecordingStudioAI::Run.find(follow.run_id)
+    @fake.default_turn = nil
+    @fake.events = [turn_event_for(nil, usage: nil)]
+    @fake.listed_turns = []
+    RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    run.reload.update!(provider_turn_id: "turn_1")
+    @fake.listed_turns = [
+      listed_turn("turn_1", run.started_at - 1.minute),
+      listed_turn("turn_9", run.started_at + 1.second)
+    ]
+    @fake.retrieved_usages = [usage]
+    messages = []
+    with_usage_logs(messages) do
+      RecordingStudioAI::HostedTurnUsageJob.perform_now(run.id)
+    end
+    run.reload
+    logged = messages.join("\n")
+
+    assert_equal "turn_9", run.provider_turn_id
+    assert_equal "ai-hosted-agent-turn:turn_9", @spends.last[:idempotency_key]
+    assert_equal 2, @spends.length
+    assert_match(/skip=conflict/, logged)
+    assert_match(/turn_id=turn_1/, logged)
+    assert_match(/source=job_attempt_1/, logged)
+    refute_match(/skip=already_charged/, logged)
+  end
+
+  def test_usage_skip_branches_name_the_run_and_not_the_payload
+    session = create_session
+    run = RecordingStudioAI::Run.find(session.run_id)
+    runner = RecordingStudioAI::Agents::Runner.new
+    messages = []
+    with_usage_logs(messages) do
+      assert runner.record_deferred_turn_usage(0, attempt: 1, final: true)
+      assert runner.record_deferred_turn_usage(run.id, attempt: 1, final: false)
+    end
+    logged = messages.join("\n")
+
+    assert_match(/skip=run_missing_or_not_completed run_id=0 status=missing/, logged)
+    assert_match(/skip=run_missing_or_not_completed run_id=#{run.id} status=running/, logged)
+    refute_match(/idempotency|api_key|sk-/i, logged)
+
+    @fake.events = [turn_event_for(nil, usage: nil)]
+    @fake.listed_turns = []
+    messages = []
+    with_usage_logs(messages) do
+      RecordingStudioAI::Agents.stream(**session_args(session)) { |_event| }
+    end
+
+    assert_match(/skip=blank_session_or_turn/, messages.join("\n"))
+    assert_match(/run_id=#{run.id}/, messages.join("\n"))
+    assert_match(/status=running/, messages.join("\n"))
+    refute_match(/idempotency|api_key|sk-/i, messages.join("\n"))
   end
 
   private
@@ -1552,8 +1799,14 @@ class HostedAgentContractTest < RecordingStudioAI::Test::PersistenceCase
   end
 
   def turn_event_for(turn_id, usage: self.usage)
-    RecordingStudioAI::Providers::StreamEvent.new(
-      type: "turn_completed", usage: usage, metadata: { provider_turn_id: turn_id }
+    metadata = {}
+    metadata[:provider_turn_id] = turn_id if turn_id
+    RecordingStudioAI::Providers::StreamEvent.new(type: "turn_completed", usage: usage, metadata: metadata)
+  end
+
+  def listed_turn(id, created_at, status: "completed")
+    RecordingStudioAI::Providers::ListedTurn.new(
+      provider_turn_id: id, created_at: created_at, status: status
     )
   end
 

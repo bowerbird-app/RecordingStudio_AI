@@ -1,5 +1,22 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.25.3
+
+A hosted follow-up no longer adopts the previous turn. If the run has no turn id and the saved snapshot is a turn another run in that session already holds, the snapshot is ignored. The run stays unfinished, the old items are not replayed, and nothing is billed from that snapshot. The stream stays open until the new turn's events arrive. An event stores its turn id only when no other run holds it.
+
+If the run is completed and still has no turn id, usage settlement lists the session's turns (`turns.list`, more than one, oldest first). It stores the first turn created at or after the run started that no other run holds. The same resolution runs in `HostedTurnUsageJob`. A turn id owned by another run is logged as a conflict, then resolved the same way. It is not treated as already charged.
+
+`HostedTurnUsageJob` no longer sleeps inside `perform`. It enqueues the next attempt with `set(wait:)`. The waits are still about 5 seconds, 30 seconds, 2 minutes, and 10 minutes. The charge key is still `ai-hosted-agent-turn:<provider turn id>`.
+
+A recorded charge logs its source: `event`, `turn_retrieve`, or `job_attempt_N`. Skips are logged too: already charged, blank session or turn id, run missing or not completed, stale snapshot, non-retryable fetch failure, and gave up. The log has ids and statuses, not payloads or keys.
+
+Recording Studio stays `v7.7.0`. The gemspec range stays `>= 7.0`, `< 8.0`. There is no migration.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.25.3`. No migration and no config change.
+2. Keep `HostedTurnUsageJob` on the same Active Job queue. A completed hosted run with no token totals is waiting on that job, or usage never arrived. The worker is free between attempts.
+
 ## Upgrading to 0.25.2
 
 Hosted turn usage from OpenAI can be null on `turn_completed` and show up later. The request reads the turn once. A retryable error gets one more read. A null result does not. The request does not sleep. `RecordingStudioAI::HostedTurnUsageJob` reads the turn again after about 5 seconds, 30 seconds, 2 minutes, and 10 minutes. When usage arrives it stores the token columns and charges `ai-hosted-agent-turn:<provider turn id>`. A second run of the job sees `usage_charged` and does not charge again. Null or empty usage leaves the run uncharged.
