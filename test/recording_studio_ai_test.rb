@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordingStudioAITest < Minitest::Test
   def test_version_matches_initial_addon_release
-    assert_equal "0.25.3", RecordingStudioAI::VERSION
+    assert_equal "0.26.0", RecordingStudioAI::VERSION
   end
 
   def test_admin_catalog_uses_public_rsa_registration
@@ -65,19 +65,41 @@ class RecordingStudioAITest < Minitest::Test
     refute_includes dependencies.keys, "recording_studio_accessible"
     refute_includes dependencies.keys, "recording_studio_admin"
 
+    shared_pins = [
+      'gem "recording_studio", "~> 7.8", github: "bowerbird-app/RecordingStudio", tag: "v7.8.0"',
+      'gem "flat_pack", "~> 0.2", github: "bowerbird-app/flatpack", tag: "v0.2.0"',
+      'gem "recording_studio_logs", "~> 0.9", github: "bowerbird-app/RecordingStudio_logs", tag: "v0.9.0"',
+      'gem "recording_studio_metrics", "~> 0.10", github: "bowerbird-app/RecordingStudio_metrics", tag: "v0.10.0"',
+      'gem "view_component", "4.19.0"'
+    ]
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.expand_path("../#{path}", __dir__))
       assert_includes contents, "RecordingStudio_logs", path
-      assert_includes contents, 'tag: "v0.8.1"', path
-      assert_includes contents, 'tag: "v0.9.1"', path
-      assert_includes contents, 'tag: "v7.7.0"', path
-      assert_includes contents, 'tag: "v0.1.377"', path
-      assert_includes contents, 'gem "view_component", "4.19.0"', path
+      shared_pins.each do |line|
+        assert_includes contents, line, path
+      end
     end
 
+    importmap = File.read(File.expand_path("../test/dummy/config/importmap.rb", __dir__))
+    refute_includes importmap, "flat_pack/heroicons"
+    refute_includes importmap, "flat-pack--icon"
+
     dummy_gemfile = File.read(File.expand_path("../test/dummy/Gemfile", __dir__))
-    assert_includes dummy_gemfile, 'tag: "v0.48.0"'
-    assert_includes dummy_gemfile, 'tag: "v1.0.2"'
+    dummy_pins = [
+      'gem "recording_studio_accessible", "~> 0.58", ' \
+      'github: "bowerbird-app/RecordingStudio_accessible", tag: "v0.58.0"',
+      'gem "recording_studio_admin", "~> 2.19", ' \
+      'github: "bowerbird-app/RecordingStudio_admin", tag: "v2.19.1"',
+      'gem "recording_studio_trashable", "~> 1.3", ' \
+      'github: "bowerbird-app/RecordingStudio_trashable", tag: "v1.3.0", require: false',
+      'gem "recording_studio_root_switchable", "~> 0.17", ' \
+      'github: "bowerbird-app/RecordingStudio_root_switchable", tag: "v0.17.0"',
+      'gem "recording_studio_cache", "~> 0.8", ' \
+      'github: "bowerbird-app/RecordingStudio_cache", tag: "v0.8.0"'
+    ]
+    dummy_pins.each do |line|
+      assert_includes dummy_gemfile, line
+    end
   end
 
   def test_phase_six_ships_concrete_providers_without_example_surfaces

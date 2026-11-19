@@ -1,37 +1,37 @@
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio.git
-  revision: e14e0665a80bc509be082cb2dcd9f292ed7e43bb
-  tag: v7.7.0
+  revision: 65ce2d0198b37d14429d4189772d29a9ab0b39cf
+  tag: v7.8.0
   specs:
-    recording_studio (7.7.0)
+    recording_studio (7.8.0)
       flat_pack (>= 0.1.315)
       rails (>= 8.1.4.1)
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_logs.git
-  revision: 5257420b7831b9849ecfaebf4ceecacc6f60b050
-  tag: v0.8.1
+  revision: bd39e2691f888af2d9a317553cd892a1b92428d1
+  tag: v0.9.0
   specs:
-    recording_studio_logs (0.8.1)
+    recording_studio_logs (0.9.0)
       rails (~> 8.1.0)
       recording_studio (>= 7.0, < 8.0)
       recording_studio_metrics (>= 0.9.0, < 1.0)
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_metrics.git
-  revision: 08a69c82cdd42ed7b7a78e9ea31ed26c6b36467a
-  tag: v0.9.1
+  revision: 782080ddda956dbe8b7c3f999a40bd74e37aabb3
+  tag: v0.10.0
   specs:
-    recording_studio_metrics (0.9.1)
+    recording_studio_metrics (0.10.0)
       rails (~> 8.1.0)
       recording_studio (>= 7.0, < 8.0)
 
 GIT
   remote: https://github.com/bowerbird-app/flatpack.git
-  revision: 1e7d5be3f206d4e044791271b4da432b2bbef842
-  tag: v0.1.377
+  revision: 2286d0f8c494a67f7a71370d2987cfc435b0c430
+  tag: v0.2.0
   specs:
-    flat_pack (0.1.377)
+    flat_pack (0.2.0)
       pagy (~> 9.0)
       rails (>= 7.1, < 9)
       tailwind_merge (>= 1.5.2, < 2)
@@ -40,7 +40,7 @@ GIT
 PATH
   remote: .
   specs:
-    recording_studio_ai (0.25.3)
+    recording_studio_ai (0.26.0)
       csv (>= 3.2)
       flat_pack (>= 0.1.315)
       json_schemer (~> 2.4)
@@ -322,13 +322,13 @@ PLATFORMS
 
 DEPENDENCIES
   debug
-  flat_pack!
+  flat_pack (~> 0.2)!
   minitest-mock
   puma
-  recording_studio!
+  recording_studio (~> 7.8)!
   recording_studio_ai!
-  recording_studio_logs!
-  recording_studio_metrics!
+  recording_studio_logs (~> 0.9)!
+  recording_studio_metrics (~> 0.10)!
   rubocop
   rubocop-rails
   simplecov
@@ -363,7 +363,7 @@ CHECKSUMS
   drb (2.2.3) sha256=0b00d6fdb50995fe4a45dea13663493c841112e4068656854646f418fda13373
   erb (6.0.7) sha256=c5ca6dc25b0ef974a44dc8f59fe847577122483b1968a38dec305c60bf91ee92
   erubi (1.13.1) sha256=a082103b0885dbc5ecf1172fede897f9ebdb745a4b97a5e8dc63953db1ee4ad9
-  flat_pack (0.1.377)
+  flat_pack (0.2.0)
   globalid (1.4.0) sha256=037f12fbf1d9d7a014d501c2d5c77356fd4ddd96d7a7991d6700bba96706f427
   hana (1.3.7) sha256=5425db42d651fea08859811c29d20446f16af196308162894db208cac5ce9b0d
   i18n (1.15.2) sha256=00f9eb62412fe593b2a65a97daa75300d37abb8f7202ec748e94b6d46a9dd1b5
@@ -407,10 +407,10 @@ CHECKSUMS
   rake (13.4.2) sha256=cb825b2bd5f1f8e91ca37bddb4b9aaf345551b4731da62949be002fa89283701
   rbs (4.2.0) sha256=51f7b886dcc05bc09e10b901daa6a81829f6adc03101d6ca9ea4aac6103e0674
   rdoc (8.1.0) sha256=befc37880a5cfd36dcb176c748b5fd5ee39dd3536a75e81824e4972ce230f60a
-  recording_studio (7.7.0)
-  recording_studio_ai (0.25.3)
-  recording_studio_logs (0.8.1)
-  recording_studio_metrics (0.9.1)
+  recording_studio (7.8.0)
+  recording_studio_ai (0.26.0)
+  recording_studio_logs (0.9.0)
+  recording_studio_metrics (0.10.0)
   regexp_parser (2.12.0) sha256=35a916a1d63190ab5c9009457136ae5f3c0c7512d60291d0d1378ba18ce08ebb
   reline (0.7.0) sha256=5b012d8e55dbf9d450f12bde2cf7d15ff546ae80b3f8f3b30e570d431815583d
   rubocop (1.81.7) sha256=6fb5cc298c731691e2a414fe0041a13eb1beed7bab23aec131da1bcc527af094

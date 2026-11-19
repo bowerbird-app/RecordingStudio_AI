@@ -31,6 +31,9 @@ class TailwindGemSourcesTest < ActiveSupport::TestCase
     entry = File.read(Rails.root.join("app/assets/tailwind/application.css"))
 
     assert_includes entry, '@import "./gem_sources.css"'
+    assert_includes entry, '@source "../../../vendor/flat_pack/app/components/**/*.{rb,erb}";'
+    assert_includes entry, '@source "../../../vendor/bundle/**/flatpack*/app/components/**/*.{rb,erb}";'
+    assert_includes entry, '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";'
   end
 
   test "compiled dummy tailwind includes default layout utilities" do

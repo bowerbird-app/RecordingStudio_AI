@@ -1,5 +1,19 @@
 # Upgrading RecordingStudioAI
 
+## Upgrading to 0.26.0
+
+Development pins move to Recording Studio `v7.8.0` (`~> 7.8`), Flatpack `v0.2.0` (`~> 0.2`), Logs `v0.9.0` (`~> 0.9`), and Metrics `v0.10.0` (`~> 0.10`). The dummy app moves to Accessible `v0.58.0`, Admin `v2.19.1`, Trashable `v1.3.0`, Root Switchable `v0.17.0`, and Cache `v0.8.0`. `view_component` stays `4.19.0`. Gemspec ranges are unchanged. `recording_studio_moveable` is not pinned here.
+
+The dummy importmap no longer pins `flat_pack/heroicons`. Icons render on the server. The dummy Tailwind entry sources `vendor/flat_pack` (the symlink from `recording_studio_root_switchable:link_tailwind_sources`) and the `flat_pack-*` / `flatpack-*` bundle globs. Do not rerun `flat_pack:install`.
+
+Recording Studio 7.4, 7.5, and 7.7 migrations are intentionally not copied into the dummy app. This release adds no RecordingStudioAI migration.
+
+### Upgrade steps
+
+1. Install RecordingStudioAI `0.26.0`. No RecordingStudioAI migration.
+2. Hosts MUST run the Recording Studio 7.4, 7.5 and 7.7 migrations if they have not.
+3. flat_pack 0.2.0 is supported; hosts moving to 0.2 must remove the manual `flat_pack/heroicons` importmap pin and any `flat-pack--icon` controller registration. Hosts that stay on Flatpack 0.1.x can keep the gemspec floor `>= 0.1.315`.
+
 ## Upgrading to 0.25.3
 
 A hosted follow-up no longer adopts the previous turn. If the run has no turn id and the saved snapshot is a turn another run in that session already holds, the snapshot is ignored. The run stays unfinished, the old items are not replayed, and nothing is billed from that snapshot. The stream stays open until the new turn's events arrive. An event stores its turn id only when no other run holds it.
