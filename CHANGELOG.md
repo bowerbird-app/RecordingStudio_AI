@@ -11,7 +11,7 @@ Versioning and Keep a Changelog.
 - Development pins move to Recording Studio `v7.8.0` (`~> 7.8`), Flatpack `v0.2.0` (`~> 0.2`), Logs `v0.9.0` (`~> 0.9`), and Metrics `v0.10.0` (`~> 0.10`). `view_component` stays `4.19.0`. Gemspec ranges stay `recording_studio >= 7.0, < 8.0` and `flat_pack >= 0.1.315`.
 - Dummy pins move to Accessible `v0.58.0` (`~> 0.58`), Admin `v2.19.1` (`~> 2.19`), Trashable `v1.3.0` (`~> 1.3`), Root Switchable `v0.17.0` (`~> 0.17`), and Cache `v0.8.0` (`~> 0.8`). Logs and Metrics match the development pins.
 - The dummy importmap drops the `flat_pack/heroicons` pin. There is no `flat-pack--icon` controller registration to remove.
-- Dummy Tailwind `@source` follows the Flatpack 0.2 checkout: `vendor/flat_pack` plus the `flat_pack-*` and `flatpack-*` bundle globs.
+- Dummy Tailwind scans Flatpack through the generated gem root. The `vendor/bundle/**/flatpack*` and `/usr/local/bundle/.../flatpack-*` globs are not used.
 
 ### Upgrade notes
 - Bump to `0.26.0`. No RecordingStudioAI migration. See [UPGRADING.md](UPGRADING.md#upgrading-to-0260).

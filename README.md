@@ -347,9 +347,9 @@ roots. Omitting `root_ids` fails closed (empty metrics).
 
 Staff use Recording Studio Admin only. Mount Admin, enable the
 `recording_studio_ai` section, and grant Accessible access on that admin root.
-There is no `/recording_studio_ai/admin` surface. Admin `2.19.1` and Accessible
-`0.58.0` need Trashable query helpers (`require: false`); pin Metrics for
-Bundler even when the host already exposes it elsewhere:
+There is no `/recording_studio_ai/admin` surface. Admin `2.19.1` needs
+Trashable query helpers (`require: false`). Accessible `0.58.0` does not. Pin
+Metrics for Bundler even when the host already exposes it elsewhere:
 
 ```ruby
 gem "recording_studio_accessible", "~> 0.58", github: "bowerbird-app/RecordingStudio_accessible", tag: "v0.58.0"

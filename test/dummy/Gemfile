@@ -8,7 +8,8 @@ gem "recording_studio", "~> 7.8", github: "bowerbird-app/RecordingStudio", tag: 
 gem "view_component", "4.19.0"
 gem "recording_studio_accessible", "~> 0.58", github: "bowerbird-app/RecordingStudio_accessible", tag: "v0.58.0"
 gem "recording_studio_admin", "~> 2.19", github: "bowerbird-app/RecordingStudio_admin", tag: "v2.19.1"
-# Admin query helpers only (Trashable gemspec still lists Metrics for Bundler).
+# Admin 2.19.1 query helpers. Accessible 0.58 does not need Trashable.
+# Trashable gemspec still lists Metrics for Bundler.
 gem "recording_studio_trashable", "~> 1.3", github: "bowerbird-app/RecordingStudio_trashable", tag: "v1.3.0", require: false
 
 # Host registers Metrics definitions. AI does not depend on RecordingStudio API.

@@ -4,7 +4,7 @@
 
 Development pins move to Recording Studio `v7.8.0` (`~> 7.8`), Flatpack `v0.2.0` (`~> 0.2`), Logs `v0.9.0` (`~> 0.9`), and Metrics `v0.10.0` (`~> 0.10`). The dummy app moves to Accessible `v0.58.0`, Admin `v2.19.1`, Trashable `v1.3.0`, Root Switchable `v0.17.0`, and Cache `v0.8.0`. `view_component` stays `4.19.0`. Gemspec ranges are unchanged. `recording_studio_moveable` is not pinned here.
 
-The dummy importmap no longer pins `flat_pack/heroicons`. Icons render on the server. The dummy Tailwind entry sources `vendor/flat_pack` (the symlink from `recording_studio_root_switchable:link_tailwind_sources`) and the `flat_pack-*` / `flatpack-*` bundle globs. Do not rerun `flat_pack:install`.
+The dummy importmap no longer pins `flat_pack/heroicons`. Icons render on the server. The dummy Tailwind build scans the installed Flatpack gem root. Do not rerun `flat_pack:install`.
 
 Recording Studio 7.4, 7.5, and 7.7 migrations are intentionally not copied into the dummy app. This release adds no RecordingStudioAI migration.
 

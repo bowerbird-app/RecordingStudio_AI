@@ -14,12 +14,9 @@
 @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/RecordingStudio-*/app/views/**/*.erb";
 
 /* Scan FlatPack components for classes used by the bundled ViewComponents.
-   vendor/flat_pack is the symlink from link_tailwind_sources. */
-@source "../../../vendor/flat_pack/app/components/**/*.{rb,erb}";
+   The real gem root is written into gem_sources.css at build time. */
 @source "../../../vendor/bundle/**/flat_pack*/app/components/**/*.{rb,erb}";
-@source "../../../vendor/bundle/**/flatpack*/app/components/**/*.{rb,erb}";
 @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flat_pack-*/app/components/**/*.{rb,erb}";
-@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";
 
 /* Scan RecordingStudioAdmin gem views for widget utility classes */
 @source "../../../vendor/bundle/**/RecordingStudio_admin-*/app/views/**/*.erb";
